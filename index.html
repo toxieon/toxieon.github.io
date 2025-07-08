@@ -1,43 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Neill Data and Security</title>
   <style>
     body {
       font-family: 'Arial', sans-serif;
       margin: 0;
       padding: 0;
-      background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
-      color: #f1f1f1;
+      background-color: #e8eff6;
+      color: #1c1c1c;
+      scroll-behavior: smooth;
     }
     header {
-      text-align: center;
-      padding: 40px 20px 20px;
+      position: sticky;
+      top: 0;
+      background-color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+      transition: all 0.3s ease;
+      z-index: 999;
+      border-bottom: 1px solid #ddd;
+    }
+    header.shrink {
+      justify-content: flex-start;
+      padding-left: 20px;
+      height: 60px;
     }
     img.logo {
-      width: 100px;
+      width: 140px;
       height: auto;
+      transition: all 0.3s ease;
     }
-    h1 {
-      font-size: 28px;
-      margin: 10px 0 5px;
+    header.shrink img.logo {
+      width: 90px;
     }
-    p.tagline {
-      font-size: 16px;
-      color: #ccc;
+    .tagline {
+      text-align: center;
+      font-size: 20px;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #003366;
     }
     nav {
+      position: fixed;
+      top: 100px;
+      left: 0;
+      right: 0;
+      background-color: #004080;
+      padding: 10px 0;
       text-align: center;
-      padding: 10px;
-      background-color: rgba(255, 255, 255, 0.1);
+      z-index: 998;
+      transition: top 0.3s;
+    }
+    header.shrink + nav {
+      top: 60px;
+    }
+    nav.hidden {
+      top: -60px;
     }
     nav a {
-      color: #f1f1f1;
+      color: #ffffff;
       text-decoration: none;
       margin: 0 15px;
       font-weight: bold;
+      font-size: 16px;
     }
     nav a:hover {
       text-decoration: underline;
@@ -47,84 +77,99 @@
       max-width: 900px;
       margin: auto;
     }
-    .contact {
-      margin: 30px 0;
-      font-size: 18px;
-    }
-    .contact a {
-      color: #fff;
-      text-decoration: none;
-    }
-    .contact i {
-      margin-right: 8px;
-    }
-    .instagram-preview {
-      margin-top: 40px;
-    }
-    .instagram-preview iframe {
-      border: none;
-      width: 100%;
-      height: 500px;
-      max-width: 400px;
-    }
     .cameras {
-      background-color: rgba(255,255,255,0.05);
+      background-color: #ffffff;
       padding: 20px;
       border-radius: 8px;
       margin-top: 40px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     .cameras h2 {
       text-align: center;
-      color: #fff;
+      color: #002244;
     }
     .camera-tier {
       margin: 20px 0;
     }
     .camera-tier h3 {
-      color: #ffd700;
+      color: #004080;
     }
     ul {
       text-align: left;
       padding-left: 20px;
     }
+    .contact {
+      background-color: #d9e6f2;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 50px auto 20px;
+      text-align: center;
+    }
+    .contact a {
+      display: inline-block;
+      margin: 10px;
+      text-decoration: none;
+      color: #fff;
+      font-size: 18px;
+      background-color: #004080;
+      padding: 10px 20px;
+      border-radius: 6px;
+    }
+    .contact a:hover {
+      background-color: #0055a5;
+    }
     footer {
       text-align: center;
       padding: 20px;
-      color: #aaa;
+      color: #888;
       font-size: 12px;
       margin-top: 40px;
     }
   </style>
+  <script>
+    // Shrink header on scroll
+    window.addEventListener('scroll', function() {
+      const header = document.querySelector('header');
+      if (window.scrollY > 50) {
+        header.classList.add('shrink');
+      } else {
+        header.classList.remove('shrink');
+      }
+    });
+
+    // Hide nav on scroll down, show on scroll up
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+      const nav = document.querySelector('nav');
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      if (scrollTop > lastScrollTop && scrollTop > 150) {
+        nav.classList.add('hidden');
+      } else {
+        nav.classList.remove('hidden');
+      }
+      lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+    }, false);
+  </script>
 </head>
 <body>
 
   <header>
-    <img src="logo.png" alt="Neill Logo" class="logo">
-    <h1>NEILL</h1>
-    <p class="tagline">Data and Security Solutions</p>
+    <img src="logo.png" alt="Neill Logo" class="logo" />
   </header>
 
+  <p class="tagline">Professional Data and Security Solutions</p>
+
   <nav>
-    <a href="#">Home</a>
-    <a href="#">Services</a>
-    <a href="#">Gallery</a>
-    <a href="#">Contact</a>
+    <a href="#home">Home</a>
+    <a href="#services">Services</a>
+    <a href="#contact">Contact</a>
   </nav>
 
-  <div class="content">
+  <div class="content" id="home">
     <p>Neill Data and Security delivers tailored surveillance and data solutions with a professional approach, top-tier equipment, and a focus on customer satisfaction.</p>
+  </div>
 
-    <div class="contact">
-      <p><i>📞</i><a href="tel:0418912681">0418 912 681</a></p>
-      <p><i>📷</i><a href="https://www.instagram.com/neillelectrical?igsh=b3JuZHRka2VnemR0&utm_source=qr" target="_blank">Follow us on Instagram</a></p>
-    </div>
-
-    <div class="instagram-preview">
-      <h2>Instagram Preview</h2>
-      <iframe src="https://snapwidget.com/embed/1057373" allowtransparency="true"></iframe>
-      <p style="font-size: 12px; color: #888;">*Instagram previews require SnapWidget or similar service — real-time preview not available without it*</p>
-    </div>
-
+  <div class="content" id="services">
     <div class="cameras">
       <h2>IVSEC Camera Packages</h2>
 
@@ -156,6 +201,13 @@
       </div>
 
       <p style="text-align:center;">All camera systems available in bundles of 2, 4, 6, and 8 units.</p>
+    </div>
+  </div>
+
+  <div class="content" id="contact">
+    <div class="contact">
+      <a href="tel:0418912681">📞 Call: 0418 912 681</a>
+      <a href="https://www.instagram.com/neillelectrical?igsh=b3JuZHRka2VnemR0&utm_source=qr" target="_blank">📷 Instagram: @neillelectrical</a>
     </div>
   </div>
 
