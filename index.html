@@ -13,6 +13,7 @@
       color: #1c1c1c;
       scroll-behavior: smooth;
     }
+
     header {
       position: sticky;
       top: 0;
@@ -25,43 +26,41 @@
       z-index: 999;
       border-bottom: 1px solid #ddd;
     }
+
     header.shrink {
       justify-content: flex-start;
       padding-left: 20px;
       height: 60px;
     }
+
     img.logo {
       width: 140px;
       height: auto;
       transition: all 0.3s ease;
     }
+
     header.shrink img.logo {
       width: 90px;
     }
-    .tagline {
-      text-align: center;
-      font-size: 20px;
-      margin-top: 20px;
-      font-weight: bold;
-      color: #003366;
-    }
+
     nav {
-      position: fixed;
+      position: sticky;
       top: 100px;
-      left: 0;
-      right: 0;
       background-color: #004080;
       padding: 10px 0;
       text-align: center;
       z-index: 998;
-      transition: top 0.3s;
+      transition: top 0.3s ease;
     }
+
     header.shrink + nav {
       top: 60px;
     }
+
     nav.hidden {
-      top: -60px;
+      transform: translateY(-100%);
     }
+
     nav a {
       color: #ffffff;
       text-decoration: none;
@@ -69,14 +68,17 @@
       font-weight: bold;
       font-size: 16px;
     }
+
     nav a:hover {
       text-decoration: underline;
     }
+
     .content {
       padding: 20px;
       max-width: 900px;
       margin: auto;
     }
+
     .cameras {
       background-color: #ffffff;
       padding: 20px;
@@ -84,20 +86,25 @@
       margin-top: 40px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+
     .cameras h2 {
       text-align: center;
       color: #002244;
     }
+
     .camera-tier {
       margin: 20px 0;
     }
+
     .camera-tier h3 {
       color: #004080;
     }
+
     ul {
       text-align: left;
       padding-left: 20px;
     }
+
     .contact {
       background-color: #d9e6f2;
       padding: 20px;
@@ -105,6 +112,7 @@
       margin: 50px auto 20px;
       text-align: center;
     }
+
     .contact a {
       display: inline-block;
       margin: 10px;
@@ -115,9 +123,11 @@
       padding: 10px 20px;
       border-radius: 6px;
     }
+
     .contact a:hover {
       background-color: #0055a5;
     }
+
     footer {
       text-align: center;
       padding: 20px;
@@ -127,20 +137,17 @@
     }
   </style>
   <script>
-    // Shrink header on scroll
+    let lastScrollTop = 0;
     window.addEventListener('scroll', function() {
       const header = document.querySelector('header');
+      const nav = document.querySelector('nav');
+
       if (window.scrollY > 50) {
         header.classList.add('shrink');
       } else {
         header.classList.remove('shrink');
       }
-    });
 
-    // Hide nav on scroll down, show on scroll up
-    let lastScrollTop = 0;
-    window.addEventListener('scroll', function() {
-      const nav = document.querySelector('nav');
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       if (scrollTop > lastScrollTop && scrollTop > 150) {
         nav.classList.add('hidden');
@@ -148,7 +155,7 @@
         nav.classList.remove('hidden');
       }
       lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
-    }, false);
+    });
   </script>
 </head>
 <body>
@@ -157,8 +164,6 @@
     <img src="logo.png" alt="Neill Logo" class="logo" />
   </header>
 
-  <p class="tagline">Professional Data and Security Solutions</p>
-
   <nav>
     <a href="#home">Home</a>
     <a href="#services">Services</a>
@@ -166,6 +171,7 @@
   </nav>
 
   <div class="content" id="home">
+    <h2 style="text-align:center; color:#003366;">Professional Data and Security Solutions</h2>
     <p>Neill Data and Security delivers tailored surveillance and data solutions with a professional approach, top-tier equipment, and a focus on customer satisfaction.</p>
   </div>
 
