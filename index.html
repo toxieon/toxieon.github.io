@@ -1,225 +1,386 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-AU">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Neill Data and Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Neill Data & Security provides CCTV, data cabling, Wi-Fi, networking and smart security installations across Melbourne and the Mornington Peninsula." />
+  <title>Neill Data & Security | CCTV, Data & Security Installations</title>
   <style>
-    body {
-      font-family: 'Arial', sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #e8eff6;
-      color: #1c1c1c;
-      scroll-behavior: smooth;
+    :root {
+      --bg: #07111f;
+      --bg-soft: #0d1b2f;
+      --card: rgba(255,255,255,0.08);
+      --card-border: rgba(255,255,255,0.14);
+      --text: #f6f8fb;
+      --muted: #b9c5d6;
+      --brand: #31d0ff;
+      --brand-2: #6affb8;
+      --warning: #ffd166;
+      --shadow: 0 20px 70px rgba(0,0,0,0.35);
+      --radius: 24px;
+      --max: 1160px;
     }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem),
+        radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .container { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
 
     header {
       position: sticky;
       top: 0;
-      background-color: #ffffff;
+      z-index: 50;
+      backdrop-filter: blur(18px);
+      background: rgba(7,17,31,0.78);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .nav {
+      min-height: 76px;
       display: flex;
-      justify-content: center;
+      justify-content: space-between;
       align-items: center;
-      height: 100px;
-      transition: all 0.3s ease;
-      z-index: 999;
-      border-bottom: 1px solid #ddd;
+      gap: 24px;
     }
 
-    header.shrink {
-      justify-content: flex-start;
-      padding-left: 20px;
-      height: 60px;
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 850;
+      letter-spacing: -0.03em;
+      font-size: 1.25rem;
     }
 
-    img.logo {
-      width: 140px;
-      height: auto;
-      transition: all 0.3s ease;
+    .logo-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d;
+      display: grid;
+      place-items: center;
+      font-weight: 950;
+      box-shadow: 0 12px 32px rgba(49,208,255,0.24);
     }
 
-    header.shrink img.logo {
-      width: 90px;
+    .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-weight: 650; }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 0 20px;
+      border-radius: 999px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      transition: 0.2s ease;
     }
 
-    nav {
-      position: sticky;
-      top: 100px;
-      background-color: #004080;
-      padding: 10px 0;
-      text-align: center;
-      z-index: 998;
-      transition: top 0.3s ease;
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d;
+      box-shadow: 0 14px 38px rgba(49,208,255,0.22);
     }
 
-    header.shrink + nav {
-      top: 60px;
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-secondary { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .hero { padding: 90px 0 70px; }
+    .hero-grid { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 42px; align-items: center; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--brand-2);
+      background: rgba(106,255,184,0.09);
+      border: 1px solid rgba(106,255,184,0.18);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-weight: 800;
+      margin-bottom: 20px;
     }
 
-    nav.hidden {
-      transform: translateY(-100%);
+    h1, h2, h3 { line-height: 1.05; margin: 0; letter-spacing: -0.045em; }
+    h1 { font-size: clamp(3rem, 7vw, 5.8rem); max-width: 830px; }
+    h2 { font-size: clamp(2.1rem, 4vw, 3.45rem); }
+    h3 { font-size: 1.35rem; }
+
+    .hero p { color: var(--muted); font-size: 1.15rem; max-width: 650px; margin: 24px 0 0; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 36px;
+      max-width: 720px;
     }
 
-    nav a {
-      color: #ffffff;
-      text-decoration: none;
-      margin: 0 15px;
-      font-weight: bold;
-      font-size: 16px;
+    .trust-card, .visual-card, .service-card, .package-card, .step-card, .quote-box {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
     }
 
-    nav a:hover {
-      text-decoration: underline;
+    .trust-card { padding: 18px; }
+    .trust-card strong { display: block; font-size: 1.4rem; }
+    .trust-card span { color: var(--muted); font-size: 0.95rem; }
+
+    .visual-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 530px;
+      padding: 28px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.035)),
+        radial-gradient(circle at 20% 10%, rgba(49,208,255,0.25), transparent 18rem),
+        var(--bg-soft);
     }
 
-    .content {
-      padding: 20px;
-      max-width: 900px;
-      margin: auto;
+    .camera-mock {
+      position: absolute;
+      inset: 70px 36px auto auto;
+      width: 270px;
+      height: 190px;
+      border-radius: 36px;
+      background: linear-gradient(145deg, #eef7ff, #9eb1c7);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+      transform: rotate(-8deg);
     }
 
-    .cameras {
-      background-color: #ffffff;
-      padding: 20px;
-      border-radius: 8px;
-      margin-top: 40px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    .camera-mock:before {
+      content: "";
+      position: absolute;
+      width: 108px;
+      height: 108px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #08111d 0 28%, #233b55 29% 45%, #06101d 46% 100%);
+      left: 34px;
+      top: 41px;
+      box-shadow: inset 0 0 0 10px rgba(255,255,255,0.12);
     }
 
-    .cameras h2 {
-      text-align: center;
-      color: #002244;
+    .camera-mock:after {
+      content: "4K";
+      position: absolute;
+      right: 26px;
+      top: 32px;
+      color: #06101d;
+      font-weight: 950;
+      font-size: 2.2rem;
+      letter-spacing: -0.08em;
     }
 
-    .camera-tier {
-      margin: 20px 0;
+    .signal-card {
+      position: absolute;
+      left: 28px;
+      bottom: 28px;
+      right: 28px;
+      padding: 22px;
+      border-radius: 22px;
+      background: rgba(7,17,31,0.74);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(14px);
     }
 
-    .camera-tier h3 {
-      color: #004080;
+    .signal-card ul { padding: 0; margin: 18px 0 0; list-style: none; display: grid; gap: 10px; }
+    .signal-card li { display: flex; justify-content: space-between; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
+    .signal-card b { color: var(--text); }
+
+    section { padding: 74px 0; }
+    .section-head { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 30px; }
+    .section-head p { margin: 0; color: var(--muted); max-width: 560px; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+
+    .service-card, .package-card, .step-card { padding: 26px; }
+    .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: rgba(49,208,255,0.13);
+      border: 1px solid rgba(49,208,255,0.22);
+      font-size: 1.35rem;
+      margin-bottom: 20px;
     }
 
-    ul {
-      text-align: left;
-      padding-left: 20px;
+    .service-card p, .package-card p, .step-card p { color: var(--muted); margin: 12px 0 0; }
+    .package-card.featured { border-color: rgba(106,255,184,0.42); background: linear-gradient(180deg, rgba(106,255,184,0.1), rgba(255,255,255,0.06)); }
+    .badge { display: inline-block; color: #06101d; background: var(--warning); font-weight: 900; border-radius: 999px; padding: 5px 10px; margin-bottom: 14px; font-size: 0.82rem; }
+
+    .package-card ul { padding-left: 18px; color: var(--muted); margin-bottom: 0; }
+    .quote-box { padding: 34px; display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center; background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09)); }
+    .quote-box p { color: var(--muted); margin: 12px 0 0; }
+
+    footer { padding: 46px 0; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.08); }
+    .footer-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+    @media (max-width: 900px) {
+      .hero-grid, .quote-box { grid-template-columns: 1fr; }
+      .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+      .visual-card { min-height: 430px; }
     }
 
-    .contact {
-      background-color: #d9e6f2;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 50px auto 20px;
-      text-align: center;
-    }
-
-    .contact a {
-      display: inline-block;
-      margin: 10px;
-      text-decoration: none;
-      color: #fff;
-      font-size: 18px;
-      background-color: #004080;
-      padding: 10px 20px;
-      border-radius: 6px;
-    }
-
-    .contact a:hover {
-      background-color: #0055a5;
-    }
-
-    footer {
-      text-align: center;
-      padding: 20px;
-      color: #888;
-      font-size: 12px;
-      margin-top: 40px;
+    @media (max-width: 620px) {
+      .grid-3, .grid-4, .trust-row { grid-template-columns: 1fr; }
+      .hero { padding-top: 56px; }
+      .section-head { display: block; }
+      .hero-actions .btn, .quote-box .btn { width: 100%; }
+      .camera-mock { width: 220px; height: 155px; right: 18px; }
     }
   </style>
-  <script>
-    let lastScrollTop = 0;
-    window.addEventListener('scroll', function() {
-      const header = document.querySelector('header');
-      const nav = document.querySelector('nav');
-
-      if (window.scrollY > 50) {
-        header.classList.add('shrink');
-      } else {
-        header.classList.remove('shrink');
-      }
-
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      if (scrollTop > lastScrollTop && scrollTop > 150) {
-        nav.classList.add('hidden');
-      } else {
-        nav.classList.remove('hidden');
-      }
-      lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
-    });
-  </script>
 </head>
 <body>
-
   <header>
-    <img src="logo.png" alt="Neill Logo" class="logo" />
+    <div class="container nav">
+      <a class="logo" href="#top" aria-label="Neill Data and Security home">
+        <span class="logo-mark">ND</span>
+        <span>Neill Data & Security</span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#services">Services</a>
+        <a href="#packages">Camera Packages</a>
+        <a href="#process">Process</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="btn btn-primary" href="tel:0418912681">Call Now</a>
+    </div>
   </header>
 
-  <nav>
-    <a href="#home">Home</a>
-    <a href="#services">Services</a>
-    <a href="#contact">Contact</a>
-  </nav>
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">Melbourne CCTV • Data • Security</div>
+          <h1>Clean installs. Reliable cameras. Smarter security.</h1>
+          <p>Professional surveillance, data cabling, Wi-Fi and security solutions designed around your home or business — with neat workmanship, quality equipment and straightforward advice.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#contact">Get a Quote</a>
+            <a class="btn btn-secondary" href="#packages">View Camera Packages</a>
+          </div>
+          <div class="trust-row">
+            <div class="trust-card"><strong>2–8+</strong><span>camera bundles available</span></div>
+            <div class="trust-card"><strong>4MP–8MP</strong><span>HD and 4K options</span></div>
+            <div class="trust-card"><strong>Local</strong><span>Melbourne based service</span></div>
+          </div>
+        </div>
 
-  <div class="content" id="home">
-    <h2 style="text-align:center; color:#003366;">Professional Data and Security Solutions</h2>
-    <p>Neill Data and Security delivers tailored surveillance and data solutions with a professional approach, top-tier equipment, and a focus on customer satisfaction.</p>
-  </div>
-
-  <div class="content" id="services">
-    <div class="cameras">
-      <h2>IVSEC Camera Packages</h2>
-
-      <div class="camera-tier">
-        <h3>🔹 Basic 4MP Cameras</h3>
-        <ul>
-          <li>Crisp and clear HD quality</li>
-          <li>Great for small homes and shops</li>
-          <li>Available in 2, 4, 6, or 8 camera bundles</li>
-        </ul>
+        <div class="visual-card" aria-label="Security camera feature panel">
+          <div class="camera-mock"></div>
+          <div class="signal-card">
+            <h3>Security that actually feels sorted</h3>
+            <ul>
+              <li><span>Active deterrence</span><b>Siren + strobe</b></li>
+              <li><span>Recording</span><b>NVR storage</b></li>
+              <li><span>Remote access</span><b>Phone app</b></li>
+              <li><span>Install finish</span><b>Neat cabling</b></li>
+            </ul>
+          </div>
+        </div>
       </div>
+    </section>
 
-      <div class="camera-tier">
-        <h3>🔸 4MP Cameras with Siren Lights</h3>
-        <ul>
-          <li>Built-in active deterrent siren and strobe</li>
-          <li>Smart motion detection</li>
-          <li>Ideal for higher security needs</li>
-        </ul>
+    <section id="services">
+      <div class="container">
+        <div class="section-head">
+          <h2>What we install</h2>
+          <p>From a simple home camera setup to a cleaner data and network install for a shop, office or larger property.</p>
+        </div>
+        <div class="grid-3">
+          <article class="service-card"><div class="icon">📹</div><h3>CCTV Systems</h3><p>IVSEC camera systems, NVR setup, phone app access, motion detection and active deterrent options.</p></article>
+          <article class="service-card"><div class="icon">🌐</div><h3>Data & Networking</h3><p>Cat6 runs, network points, patching, router locations and cleaner cabling for homes and businesses.</p></article>
+          <article class="service-card"><div class="icon">📶</div><h3>Wi‑Fi Improvements</h3><p>Better coverage, smarter access point placement and practical solutions for dead spots.</p></article>
+        </div>
       </div>
+    </section>
 
-      <div class="camera-tier">
-        <h3>⭐ 8MP Ultra HD Cameras</h3>
-        <ul>
-          <li>Top-tier clarity with 4K resolution</li>
-          <li>Wider coverage and superior night vision</li>
-          <li>Best for larger properties and businesses</li>
-        </ul>
+    <section id="packages">
+      <div class="container">
+        <div class="section-head">
+          <h2>IVSEC camera packages</h2>
+          <p>Choose the camera level that suits the property. Bundles can be built around 2, 4, 6 or 8 cameras.</p>
+        </div>
+        <div class="grid-3">
+          <article class="package-card">
+            <h3>Basic 4MP Cameras</h3>
+            <p>Crisp HD quality for smaller homes, units and shops.</p>
+            <ul><li>Clear everyday coverage</li><li>Great value option</li><li>Remote viewing available</li></ul>
+          </article>
+          <article class="package-card featured">
+            <span class="badge">Popular</span>
+            <h3>4MP Siren Light Cameras</h3>
+            <p>Active deterrent cameras with built-in siren and strobe.</p>
+            <ul><li>Smart motion detection</li><li>Siren and strobe deterrent</li><li>Ideal for higher security areas</li></ul>
+          </article>
+          <article class="package-card">
+            <h3>8MP Ultra HD Cameras</h3>
+            <p>4K clarity with wider coverage and stronger detail.</p>
+            <ul><li>Top-tier image quality</li><li>Better detail at distance</li><li>Best for larger properties</li></ul>
+          </article>
+        </div>
       </div>
+    </section>
 
-      <p style="text-align:center;">All camera systems available in bundles of 2, 4, 6, and 8 units.</p>
-    </div>
-  </div>
+    <section id="process">
+      <div class="container">
+        <div class="section-head">
+          <h2>Simple process</h2>
+          <p>No confusing sales pitch. Just a clean plan, clear options and a proper install.</p>
+        </div>
+        <div class="grid-4">
+          <article class="step-card"><div class="icon">1</div><h3>Enquiry</h3><p>Send through the property details, what you want covered and any photos if helpful.</p></article>
+          <article class="step-card"><div class="icon">2</div><h3>Plan</h3><p>We recommend camera positions, equipment and the cleanest cabling approach.</p></article>
+          <article class="step-card"><div class="icon">3</div><h3>Install</h3><p>Cameras, cabling, NVR and app access are installed and tested.</p></article>
+          <article class="step-card"><div class="icon">4</div><h3>Handover</h3><p>You get a walkthrough so you know how to view footage and use the system.</p></article>
+        </div>
+      </div>
+    </section>
 
-  <div class="content" id="contact">
-    <div class="contact">
-      <a href="tel:0418912681">📞 Call: 0418 912 681</a>
-      <a href="https://www.instagram.com/neillelectrical?igsh=b3JuZHRka2VnemR0&utm_source=qr" target="_blank">📷 Instagram: @neillelectrical</a>
-    </div>
-  </div>
+    <section id="contact">
+      <div class="container">
+        <div class="quote-box">
+          <div>
+            <h2>Ready to upgrade your setup?</h2>
+            <p>Call, message or send through what you need and we’ll help work out the best package.</p>
+          </div>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="tel:0418912681">Call 0418 912 681</a>
+            <a class="btn btn-secondary" href="https://www.instagram.com/neillelectrical" target="_blank" rel="noopener">Instagram</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 
   <footer>
-    &copy; 2025 Neill Data and Security. All rights reserved.
+    <div class="container footer-grid">
+      <div>© 2026 Neill Data & Security. All rights reserved.</div>
+      <div>Melbourne • Mornington Peninsula • Surrounding areas</div>
+    </div>
   </footer>
-
 </body>
 </html>
