@@ -619,6 +619,16 @@ footer-note {
 
 <script>
 /* =====================================================
+   ▼▼▼ PASTE YOUR GOOGLE MAPS API KEY HERE ▼▼▼
+   This baked-in key is used on every device.
+   The Settings field can still override it per device.
+   ===================================================== */
+const HARDCODED_MAPS_KEY = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
+/* =====================================================
+   ▲▲▲ PASTE YOUR GOOGLE MAPS API KEY HERE ▲▲▲
+   ===================================================== */
+
+/* =====================================================
    STATE & DEFAULTS
    ===================================================== */
 const LS_KEY = 'nd_quote_tool_v1';
@@ -941,10 +951,15 @@ function resetQuoteUI() {
 /* =====================================================
    GOOGLE MAPS LOADER + INTEGRATION
    ===================================================== */
+function getActiveMapsKey() {
+  // Per-device Settings key wins if set, otherwise use the hard-coded one.
+  return (settings.mapsKey && settings.mapsKey.trim()) || HARDCODED_MAPS_KEY || '';
+}
 function loadGoogleMaps() {
-  if (!settings.mapsKey) {
+  const key = getActiveMapsKey();
+  if (!key) {
     document.getElementById('route-warn').style.display = 'block';
-    document.getElementById('route-warn').innerHTML = 'Add a Google Maps API key in Settings to enable address autocomplete and auto-distance.';
+    document.getElementById('route-warn').innerHTML = 'Add a Google Maps API key in Settings (or bake one into the file) to enable address autocomplete and auto-distance.';
     return;
   }
   if (window.google && window.google.maps && window.google.maps.places) {
@@ -952,7 +967,7 @@ function loadGoogleMaps() {
     return;
   }
   const s = document.createElement('script');
-  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(settings.mapsKey)}&libraries=places&loading=async&callback=__ndMapsReady`;
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async&callback=__ndMapsReady`;
   s.async = true; s.defer = true;
   s.onerror = () => {
     document.getElementById('route-warn').style.display = 'block';
