@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ND • On-site Quote Tool</title>
+<style>
+:root {
+  --bg: #07111f;
+  --bg-soft: #0d1b2f;
+  --card: rgba(255,255,255,0.08);
+  --card-border: rgba(255,255,255,0.14);
+  --text: #f6f8fb;
+  --muted: #b9c5d6;
+  --brand: #31d0ff;
+  --brand-2: #6affb8;
+  --warning: #ffd166;
+  --danger: #ff6b88;
+  --shadow: 0 20px 70px rgba(0,0,0,0.35);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --max: 920px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem),
+    radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem),
+    var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+a { color: var(--brand); text-decoration: none; }
+.container { width: min(var(--max), calc(100% - 24px)); margin: 0 auto; }
+
+/* ---------- Lock screen ---------- */
+#lock-screen {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: var(--bg);
+  z-index: 100;
+}
+.lock-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 360px;
+  width: calc(100% - 24px);
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.lock-card h1 { font-size: 1.4rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+.lock-card p { color: var(--muted); margin: 0 0 24px; font-size: 0.95rem; }
+.lock-mark {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #06101d;
+  display: grid; place-items: center;
+  font-weight: 950;
+  margin: 0 auto 20px;
+  font-size: 1.4rem;
+}
+.lock-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-family: inherit;
+}
+.lock-err { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin-top: 8px; }
+
+/* ---------- Header / tabs ---------- */
+header {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(18px);
+  background: rgba(7,17,31,0.82);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.head-row {
+  display: flex; justify-content: space-between; align-items: center;
+  min-height: 64px; gap: 12px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 850; letter-spacing: -0.03em; font-size: 1.05rem;
+}
+.logo-mark {
+  width: 36px; height: 36px; border-radius: 11px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #06101d;
+  display: grid; place-items: center;
+  font-weight: 950; font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(49,208,255,0.24);
+}
+.tabs {
+  display: flex; gap: 4px;
+  background: rgba(0,0,0,0.25);
+  padding: 4px; border-radius: 999px;
+  border: 1px solid var(--card-border);
+}
+.tab {
+  appearance: none; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-weight: 700; font-size: 0.85rem;
+  padding: 8px 14px; border-radius: 999px;
+  transition: 0.15s ease;
+  font-family: inherit;
+}
+.tab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
+
+/* ---------- Main panels ---------- */
+main { padding: 24px 0 80px; }
+.panel { display: none; }
+.panel.active { display: block; }
+.panel-title { font-size: 1.4rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+.panel-sub { color: var(--muted); margin: 0 0 22px; font-size: 0.95rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.card h3 {
+  margin: 0 0 16px; font-size: 1rem; letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 10px;
+}
+.card h3 .pill {
+  font-size: 0.7rem; padding: 3px 8px; border-radius: 999px;
+  background: rgba(49,208,255,0.15); color: var(--brand);
+  border: 1px solid rgba(49,208,255,0.25);
+  font-weight: 700;
+}
+
+/* ---------- Forms ---------- */
+label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+input, select, textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(49,208,255,0.15);
+}
+textarea { resize: vertical; min-height: 70px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.inline-row { display: flex; align-items: center; gap: 10px; }
+.inline-row input[type="checkbox"] { width: auto; }
+
+/* ---------- Line items ---------- */
+.line-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.7fr 0.9fr 0.9fr auto;
+  gap: 8px; align-items: end;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(255,255,255,0.08);
+}
+.line-row:last-of-type { border-bottom: 0; }
+.line-row label { font-size: 0.7rem; margin-bottom: 4px; }
+.line-row input, .line-row select { padding: 9px 10px; font-size: 0.9rem; }
+.line-row .sub { font-weight: 800; color: var(--brand-2); text-align: right; padding-right: 4px; }
+.line-row .del {
+  background: rgba(255,107,136,0.12); border: 1px solid rgba(255,107,136,0.25);
+  color: var(--danger); border-radius: 10px; cursor: pointer;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  font-size: 1.1rem; font-weight: 900;
+}
+.add-line {
+  appearance: none; border: 1px dashed var(--card-border); background: transparent;
+  color: var(--muted); cursor: pointer; font-family: inherit; font-weight: 700;
+  width: 100%; padding: 10px; border-radius: var(--radius-sm);
+  margin-top: 8px; font-size: 0.85rem;
+}
+.add-line:hover { color: var(--text); border-color: var(--brand); }
+
+/* ---------- Totals ---------- */
+.totals-card {
+  background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09));
+  border: 1px solid rgba(106,255,184,0.32);
+}
+.total-row { display: flex; justify-content: space-between; padding: 6px 0; color: var(--muted); }
+.total-row.grand { font-size: 1.4rem; padding-top: 14px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); color: var(--text); font-weight: 900; }
+.total-row.grand b { color: var(--brand-2); }
+.total-row .strike { text-decoration: line-through; opacity: 0.6; margin-right: 6px; font-size: 0.85em; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 0 18px;
+  border-radius: 999px; font-weight: 800; font-family: inherit; font-size: 0.95rem;
+  border: 1px solid transparent; cursor: pointer; transition: 0.15s ease;
+}
+.btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; box-shadow: 0 10px 28px rgba(49,208,255,0.22); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--card-border); }
+.btn-secondary:hover { background: rgba(255,255,255,0.12); }
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-ghost:hover { color: var(--text); }
+.btn-danger { background: rgba(255,107,136,0.12); color: var(--danger); border-color: rgba(255,107,136,0.25); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+/* ---------- History list ---------- */
+.history-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px; border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+  background: rgba(0,0,0,0.18);
+}
+.history-item-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.history-item-name { font-weight: 700; }
+.history-item-sub { color: var(--muted); font-size: 0.85rem; }
+.history-item-total { font-weight: 900; color: var(--brand-2); margin: 0 12px; }
+.history-actions { display: flex; gap: 6px; }
+.history-actions button { padding: 6px 10px; font-size: 0.8rem; min-height: 0; border-radius: 10px; }
+
+/* ---------- Route summary ---------- */
+.route-box {
+  background: rgba(0,0,0,0.22);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 10px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.route-box .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.88rem; }
+.route-box .row b { color: var(--text); }
+.route-box.warn { border-color: rgba(255,209,102,0.4); background: rgba(255,209,102,0.08); color: var(--warning); }
+
+/* ---------- Tip / banner ---------- */
+.tip {
+  font-size: 0.82rem; color: var(--muted);
+  background: rgba(49,208,255,0.06);
+  border: 1px solid rgba(49,208,255,0.18);
+  border-radius: var(--radius-sm); padding: 10px 12px; margin: 10px 0 0;
+  line-height: 1.4;
+}
+.tip b { color: var(--brand); }
+
+/* ---------- Toggle ---------- */
+.toggle-row {
+  display: flex; gap: 6px;
+  background: rgba(0,0,0,0.25); padding: 4px;
+  border-radius: 999px; border: 1px solid var(--card-border);
+  margin-bottom: 16px;
+}
+.toggle-row button {
+  flex: 1; appearance: none; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-weight: 700; padding: 8px; border-radius: 999px;
+  font-family: inherit; font-size: 0.85rem;
+}
+.toggle-row button.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .head-row { flex-wrap: wrap; }
+  .tabs { width: 100%; justify-content: space-between; }
+  .tab { flex: 1; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .line-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 8px;
+  }
+  .line-row .del { grid-column: span 2; width: 100%; height: 38px; }
+}
+
+/* hide spinners on number inputs (cleaner mobile UX) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* Google Places autocomplete dropdown styling */
+.pac-container {
+  background: var(--bg-soft);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  box-shadow: var(--shadow);
+  margin-top: 4px;
+}
+.pac-item { padding: 8px 12px; color: var(--text); border-top: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+.pac-item:hover { background: rgba(255,255,255,0.05); }
+.pac-item-query { color: var(--brand); }
+.pac-matched { color: var(--brand-2); }
+
+footer-note {
+  display: block; text-align: center; color: var(--muted);
+  font-size: 0.78rem; margin-top: 24px; opacity: 0.6;
+}
+</style>
+</head>
+<body>
+
+<!-- ====================== LOCK SCREEN ====================== -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-mark">ND</div>
+    <h1>Quote Tool</h1>
+    <p>Enter your passcode</p>
+    <input type="password" inputmode="numeric" id="passcode-input" class="lock-input" autocomplete="off" />
+    <div class="lock-err" id="lock-err"></div>
+    <div class="btn-row" style="justify-content:center;">
+      <button class="btn btn-primary" id="passcode-submit" style="width:100%;">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== APP ====================== -->
+<div id="app" hidden>
+  <header>
+    <div class="container head-row">
+      <div class="logo">
+        <span class="logo-mark">ND</span>
+        <span>Quote Tool</span>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="quote">Quote</button>
+        <button class="tab" data-tab="history">History</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ============= QUOTE PANEL ============= -->
+    <section class="panel active" data-panel="quote">
+      <h2 class="panel-title">New quote</h2>
+      <p class="panel-sub">Tap each section, fill what applies, leave the rest at 0.</p>
+
+      <!-- Client + address -->
+      <div class="card">
+        <h3>Client & site</h3>
+        <div class="grid-2">
+          <div class="field">
+            <label for="client-name">Client name</label>
+            <input id="client-name" type="text" placeholder="e.g. John Smith" />
+          </div>
+          <div class="field">
+            <label for="client-phone">Client phone</label>
+            <input id="client-phone" type="tel" placeholder="04xx xxx xxx" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="client-address">Site address</label>
+          <input id="client-address" type="text" placeholder="Start typing the address..." autocomplete="off" />
+        </div>
+        <div id="route-box" class="route-box" style="display:none;">
+          <div class="row"><span>From home base</span><b id="route-from">—</b></div>
+          <div class="row"><span>Distance</span><b id="route-distance">—</b></div>
+          <div class="row"><span>Drive time</span><b id="route-duration">—</b></div>
+          <div class="row"><span>Travel band</span><b id="route-band">—</b></div>
+        </div>
+        <div id="route-warn" class="tip" style="display:none;"></div>
+      </div>
+
+      <!-- Cameras -->
+      <div class="card">
+        <h3>Cameras <span class="pill">No discount</span></h3>
+        <div id="cam-lines"></div>
+        <button class="add-line" id="add-cam">+ Add camera line</button>
+      </div>
+
+      <!-- NVR / extras -->
+      <div class="card">
+        <h3>NVR & equipment <span class="pill">No discount</span></h3>
+        <div id="nvr-lines"></div>
+        <button class="add-line" id="add-nvr">+ Add equipment line</button>
+      </div>
+
+      <!-- Cable -->
+      <div class="card">
+        <h3>Cable <span class="pill">Max 25% discount</span></h3>
+        <div class="grid-2">
+          <div class="field">
+            <label>Cat6 metres</label>
+            <input id="cable-metres" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="field">
+            <label>Rate ($/m)</label>
+            <input id="cable-rate-view" type="number" disabled />
+          </div>
+        </div>
+      </div>
+
+      <!-- Labour -->
+      <div class="card">
+        <h3>Labour <span class="pill">Discountable</span></h3>
+        <div class="grid-2">
+          <div class="field">
+            <label>Hours @ hourly rate</label>
+            <input id="hours" type="number" min="0" step="0.25" value="0" />
+          </div>
+          <div class="field">
+            <label>Days @ day rate</label>
+            <input id="days" type="number" min="0" step="0.5" value="0" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Hourly rate ($)</label>
+            <input id="hourly-rate-view" type="number" disabled />
+          </div>
+          <div class="field">
+            <label>Day rate ($)</label>
+            <input id="day-rate-view" type="number" disabled />
+          </div>
+        </div>
+      </div>
+
+      <!-- Travel -->
+      <div class="card">
+        <h3>Travel / call-out <span class="pill">Discountable</span></h3>
+        <div class="grid-2">
+          <div class="field">
+            <label>Auto band ($)</label>
+            <input id="travel-auto" type="number" disabled value="0" />
+          </div>
+          <div class="field">
+            <label>Manual override ($)</label>
+            <input id="travel-override" type="number" min="0" step="1" placeholder="leave blank to use band" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom lines -->
+      <div class="card">
+        <h3>Other items <span class="pill">Discountable</span></h3>
+        <div id="other-lines"></div>
+        <button class="add-line" id="add-other">+ Add custom line</button>
+      </div>
+
+      <!-- Discount + notes -->
+      <div class="card">
+        <h3>Discount & notes</h3>
+        <div class="grid-2">
+          <div class="field">
+            <label>Discount % (applied to labour, travel, other; cable capped)</label>
+            <input id="discount" type="number" min="0" max="100" step="1" value="0" />
+          </div>
+          <div class="field">
+            <label class="inline-row" style="margin-bottom:8px;">
+              <input id="gst-toggle" type="checkbox" /> Add GST (<span id="gst-pct-label">10</span>%)
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Notes (shown on PDF)</label>
+          <textarea id="notes" placeholder="Anything specific about this quote..."></textarea>
+        </div>
+      </div>
+
+      <!-- Totals -->
+      <div class="card totals-card">
+        <h3>Total</h3>
+        <div id="totals-breakdown"></div>
+        <div class="total-row grand"><span>Total</span><b id="grand-total">$0.00</b></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="save-pdf">Save & download PDF</button>
+        <button class="btn btn-secondary" id="save-only">Save quote</button>
+        <button class="btn btn-ghost" id="clear-quote">Clear</button>
+      </div>
+    </section>
+
+    <!-- ============= HISTORY PANEL ============= -->
+    <section class="panel" data-panel="history">
+      <h2 class="panel-title">Quote history</h2>
+      <p class="panel-sub">Quotes are saved on this device only.</p>
+      <div id="history-list"></div>
+      <div id="history-empty" class="tip" style="display:none;">No saved quotes yet. Build one in the Quote tab and tap "Save".</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="export-history">Export all (JSON)</button>
+        <button class="btn btn-danger" id="clear-history">Clear history</button>
+      </div>
+    </section>
+
+    <!-- ============= SETTINGS PANEL ============= -->
+    <section class="panel" data-panel="settings">
+      <h2 class="panel-title">Settings</h2>
+      <p class="panel-sub">Edit your business info, pricing, and integrations.</p>
+
+      <!-- Business -->
+      <div class="card">
+        <h3>Business info</h3>
+        <div class="grid-2">
+          <div class="field"><label>Business name</label><input id="biz-name" type="text" /></div>
+          <div class="field"><label>ABN</label><input id="biz-abn" type="text" /></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Phone</label><input id="biz-phone" type="tel" /></div>
+          <div class="field"><label>Email</label><input id="biz-email" type="email" /></div>
+        </div>
+        <div class="field">
+          <label>Home base address (where travel is measured from)</label>
+          <input id="home-address" type="text" autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Pricing source toggle -->
+      <div class="card">
+        <h3>Pricing source</h3>
+        <div class="toggle-row">
+          <button data-mode="manual" class="active">Manual (edit here)</button>
+          <button data-mode="gsheets">Google Sheets sync</button>
+        </div>
+
+        <!-- Google Sheets mode -->
+        <div id="gsheets-block" style="display:none;">
+          <div class="field">
+            <label>Published Google Sheet ID (or full URL)</label>
+            <input id="gsheets-id" type="text" placeholder="docs.google.com/spreadsheets/d/<ID>/..." />
+          </div>
+          <div class="tip">
+            <b>How to set this up:</b> In your Google Sheet → <b>File → Share → Publish to web</b> → "Entire document" → "Web page" → Publish.
+            Then paste the sheet ID (or full URL) above. Your sheet must have three tabs named exactly: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. See the setup guide for the exact column layout.
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="gsheets-sync">Sync now</button>
+            <span id="gsheets-status" style="align-self:center;color:var(--muted);font-size:0.85rem;"></span>
+          </div>
+        </div>
+
+        <!-- Manual mode -->
+        <div id="manual-block">
+          <h3 style="margin-top:18px;">Camera types</h3>
+          <div id="cam-types"></div>
+          <button class="add-line" id="add-cam-type">+ Add camera type</button>
+
+          <h3 style="margin-top:18px;">NVR / equipment types</h3>
+          <div id="nvr-types"></div>
+          <button class="add-line" id="add-nvr-type">+ Add equipment type</button>
+
+          <h3 style="margin-top:18px;">Cable & labour rates</h3>
+          <div class="grid-3">
+            <div class="field"><label>Cable $/m</label><input id="cable-rate" type="number" min="0" step="0.01" /></div>
+            <div class="field"><label>Hourly rate $</label><input id="hourly-rate" type="number" min="0" step="1" /></div>
+            <div class="field"><label>Day rate $</label><input id="day-rate" type="number" min="0" step="1" /></div>
+          </div>
+
+          <h3 style="margin-top:18px;">Travel bands (one-way km → flat $)</h3>
+          <div id="travel-bands"></div>
+          <button class="add-line" id="add-band">+ Add band</button>
+          <div class="tip">Bands are checked in order. Set the last band to a very high max km (e.g. 9999) to catch jobs further out.</div>
+
+          <h3 style="margin-top:18px;">GST</h3>
+          <div class="grid-2">
+            <div class="field"><label>GST % (Australia = 10)</label><input id="gst-pct" type="number" min="0" max="100" step="0.1" /></div>
+            <div class="field" style="align-self:end;">
+              <label class="inline-row"><input id="gst-default" type="checkbox" /> Apply GST by default</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Google Maps -->
+      <div class="card">
+        <h3>Google Maps API key</h3>
+        <div class="field">
+          <label>API key (for address autocomplete + distance)</label>
+          <input id="maps-key" type="text" placeholder="AIzaSy..." />
+        </div>
+        <div class="tip">
+          You'll need a Google Cloud account with billing enabled (free tier is plenty for your volume).
+          See the setup guide for step-by-step. Restrict the key to your domain in the Cloud console so it can't be abused.
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="reload-maps">Reload maps with new key</button>
+        </div>
+      </div>
+
+      <!-- Passcode + danger zone -->
+      <div class="card">
+        <h3>Security</h3>
+        <div class="field">
+          <label>Passcode (used to unlock this page)</label>
+          <input id="passcode-new" type="text" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="save-settings">Save settings</button>
+        <button class="btn btn-ghost" id="export-settings">Export settings (JSON)</button>
+        <button class="btn btn-ghost" id="import-settings-btn">Import settings</button>
+        <input type="file" id="import-settings-file" accept="application/json" style="display:none;" />
+      </div>
+      <footer-note>Neill Data &amp; Security — internal quoting tool</footer-note>
+    </section>
+
+  </main>
+</div>
+
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+/* =====================================================
+   STATE & DEFAULTS
+   ===================================================== */
+const LS_KEY = 'nd_quote_tool_v1';
+const HISTORY_KEY = 'nd_quote_history_v1';
+
+const defaultSettings = {
+  passcode: '1234',
+  business: {
+    name: 'Neill Data & Security',
+    abn: '',
+    phone: '0418 912 681',
+    email: '',
+    homeAddress: ''
+  },
+  mapsKey: '',
+  sourceMode: 'manual',          // 'manual' | 'gsheets'
+  gsheetsId: '',
+  gsheetsLastSync: '',
+  cameras: [
+    { type: 'Basic 4MP', price: 0 },
+    { type: '4MP Siren Light', price: 0 },
+    { type: '8MP Ultra HD', price: 0 }
+  ],
+  nvrs: [
+    { type: '4ch NVR', price: 0 },
+    { type: '8ch NVR', price: 0 },
+    { type: 'Hard drive (per TB)', price: 0 }
+  ],
+  cableRate: 0,
+  hourlyRate: 0,
+  dayRate: 0,
+  travelBands: [
+    { maxKm: 20, price: 0 },
+    { maxKm: 40, price: 0 },
+    { maxKm: 80, price: 0 },
+    { maxKm: 9999, price: 0 }
+  ],
+  cableDiscountCap: 25,
+  gstPct: 10,
+  gstDefault: false
+};
+
+let settings = loadSettings();
+let history = loadHistory();
+let currentQuote = blankQuote();
+let routeInfo = { distanceKm: null, durationMin: null };
+let mapsReady = false;
+let placesAutocomplete = null;
+let homeAutocomplete = null;
+let geocoderInst = null;
+let distanceMatrixSvc = null;
+
+function blankQuote() {
+  return {
+    id: null,
+    createdAt: null,
+    client: { name: '', phone: '', address: '' },
+    cameras: [],          // [{ typeIndex, qty }]
+    nvrs: [],
+    cableMetres: 0,
+    hours: 0,
+    days: 0,
+    travelOverride: null,
+    other: [],            // [{ label, amount }]
+    discountPct: 0,
+    gst: settings.gstDefault,
+    notes: '',
+    distanceKm: null,
+    durationMin: null,
+    bandPrice: 0
+  };
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(defaultSettings));
+    const parsed = JSON.parse(raw);
+    return Object.assign(JSON.parse(JSON.stringify(defaultSettings)), parsed);
+  } catch (e) { return JSON.parse(JSON.stringify(defaultSettings)); }
+}
+function saveSettings() { localStorage.setItem(LS_KEY, JSON.stringify(settings)); }
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function saveHistory() { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); }
+
+/* =====================================================
+   PASSCODE GATE
+   ===================================================== */
+const lockScreen = document.getElementById('lock-screen');
+const passcodeInput = document.getElementById('passcode-input');
+const lockErr = document.getElementById('lock-err');
+
+document.getElementById('passcode-submit').onclick = tryUnlock;
+passcodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+
+function tryUnlock() {
+  if (passcodeInput.value === settings.passcode) {
+    lockScreen.style.display = 'none';
+    document.getElementById('app').hidden = false;
+    init();
+  } else {
+    lockErr.textContent = 'Wrong passcode';
+    passcodeInput.value = '';
+    passcodeInput.focus();
+  }
+}
+// Auto-focus passcode input on load
+window.addEventListener('load', () => passcodeInput.focus());
+
+/* =====================================================
+   TAB SWITCHING
+   ===================================================== */
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`.panel[data-panel="${t.dataset.tab}"]`).classList.add('active');
+    if (t.dataset.tab === 'history') renderHistory();
+    if (t.dataset.tab === 'settings') renderSettings();
+  };
+});
+
+/* =====================================================
+   PRICING ENGINE
+   ===================================================== */
+function calcQuote() {
+  const q = currentQuote;
+  const cap = settings.cableDiscountCap;
+  const d  = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
+  const dCable = Math.min(d, cap);
+
+  let cameraTotal = 0;
+  q.cameras.forEach(l => {
+    const price = settings.cameras[l.typeIndex]?.price || 0;
+    cameraTotal += price * (Number(l.qty) || 0);
+  });
+  let nvrTotal = 0;
+  q.nvrs.forEach(l => {
+    const price = settings.nvrs[l.typeIndex]?.price || 0;
+    nvrTotal += price * (Number(l.qty) || 0);
+  });
+
+  const cableRaw = settings.cableRate * (Number(q.cableMetres) || 0);
+  const cableNet = cableRaw * (1 - dCable / 100);
+
+  const labourRaw = settings.hourlyRate * (Number(q.hours) || 0)
+                  + settings.dayRate    * (Number(q.days) || 0);
+  const labourNet = labourRaw * (1 - d / 100);
+
+  const travelRaw = (q.travelOverride !== null && q.travelOverride !== '' && !isNaN(q.travelOverride))
+    ? Number(q.travelOverride) : q.bandPrice || 0;
+  const travelNet = travelRaw * (1 - d / 100);
+
+  const otherRaw = q.other.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+  const otherNet = otherRaw * (1 - d / 100);
+
+  const subtotal = cameraTotal + nvrTotal + cableNet + labourNet + travelNet + otherNet;
+  const gstAmt = q.gst ? subtotal * (settings.gstPct / 100) : 0;
+  const grand = subtotal + gstAmt;
+
+  return {
+    cameraTotal, nvrTotal,
+    cableRaw, cableNet, dCable,
+    labourRaw, labourNet, d,
+    travelRaw, travelNet,
+    otherRaw, otherNet,
+    subtotal, gstAmt, grand
+  };
+}
+
+function fmt(n) {
+  return '$' + (Math.round(n * 100) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderTotals() {
+  const c = calcQuote();
+  const rows = [];
+  if (c.cameraTotal) rows.push(['Cameras', c.cameraTotal, null]);
+  if (c.nvrTotal)    rows.push(['NVR / equipment', c.nvrTotal, null]);
+  if (c.cableRaw)    rows.push([`Cable (${c.dCable ? c.dCable + '% off' : 'no discount'})`, c.cableNet, c.cableRaw]);
+  if (c.labourRaw)   rows.push([`Labour (${c.d ? c.d + '% off' : 'no discount'})`, c.labourNet, c.labourRaw]);
+  if (c.travelRaw)   rows.push([`Travel (${c.d ? c.d + '% off' : 'no discount'})`, c.travelNet, c.travelRaw]);
+  if (c.otherRaw)    rows.push([`Other (${c.d ? c.d + '% off' : 'no discount'})`, c.otherNet, c.otherRaw]);
+
+  let html = '';
+  rows.forEach(([label, net, raw]) => {
+    html += `<div class="total-row"><span>${label}</span><span>`;
+    if (raw && Math.abs(raw - net) > 0.001) html += `<span class="strike">${fmt(raw)}</span>`;
+    html += `${fmt(net)}</span></div>`;
+  });
+  if (!rows.length) html = '<div class="total-row"><span>No items yet</span><span>$0.00</span></div>';
+  html += `<div class="total-row"><span>Subtotal</span><span>${fmt(c.subtotal)}</span></div>`;
+  if (currentQuote.gst) html += `<div class="total-row"><span>GST (${settings.gstPct}%)</span><span>${fmt(c.gstAmt)}</span></div>`;
+  document.getElementById('totals-breakdown').innerHTML = html;
+  document.getElementById('grand-total').textContent = fmt(c.grand);
+}
+
+/* =====================================================
+   QUOTE PANEL RENDERING
+   ===================================================== */
+function renderCameraLines() {
+  const wrap = document.getElementById('cam-lines');
+  wrap.innerHTML = '';
+  currentQuote.cameras.forEach((line, i) => {
+    const price = settings.cameras[line.typeIndex]?.price || 0;
+    const sub = price * (Number(line.qty) || 0);
+    const row = document.createElement('div');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <div><label>Type</label><select data-i="${i}" class="cam-type">${
+        settings.cameras.map((c, idx) => `<option value="${idx}" ${idx === line.typeIndex ? 'selected' : ''}>${c.type}</option>`).join('')
+      }</select></div>
+      <div><label>Qty</label><input data-i="${i}" class="cam-qty" type="number" min="0" step="1" value="${line.qty}"/></div>
+      <div><label>Unit $</label><input value="${price}" disabled /></div>
+      <div><label>Subtotal</label><div class="sub">${fmt(sub)}</div></div>
+      <button class="del" data-i="${i}" aria-label="Remove">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.cam-type').forEach(el => el.onchange = e => { currentQuote.cameras[+e.target.dataset.i].typeIndex = +e.target.value; renderCameraLines(); renderTotals(); });
+  wrap.querySelectorAll('.cam-qty').forEach(el => el.oninput = e => { currentQuote.cameras[+e.target.dataset.i].qty = e.target.value; renderCameraLines(); renderTotals(); });
+  wrap.querySelectorAll('.del').forEach(el => el.onclick = e => { currentQuote.cameras.splice(+e.currentTarget.dataset.i, 1); renderCameraLines(); renderTotals(); });
+}
+function renderNvrLines() {
+  const wrap = document.getElementById('nvr-lines');
+  wrap.innerHTML = '';
+  currentQuote.nvrs.forEach((line, i) => {
+    const price = settings.nvrs[line.typeIndex]?.price || 0;
+    const sub = price * (Number(line.qty) || 0);
+    const row = document.createElement('div');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <div><label>Type</label><select data-i="${i}" class="nvr-type">${
+        settings.nvrs.map((c, idx) => `<option value="${idx}" ${idx === line.typeIndex ? 'selected' : ''}>${c.type}</option>`).join('')
+      }</select></div>
+      <div><label>Qty</label><input data-i="${i}" class="nvr-qty" type="number" min="0" step="1" value="${line.qty}"/></div>
+      <div><label>Unit $</label><input value="${price}" disabled /></div>
+      <div><label>Subtotal</label><div class="sub">${fmt(sub)}</div></div>
+      <button class="del" data-i="${i}" aria-label="Remove">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.nvr-type').forEach(el => el.onchange = e => { currentQuote.nvrs[+e.target.dataset.i].typeIndex = +e.target.value; renderNvrLines(); renderTotals(); });
+  wrap.querySelectorAll('.nvr-qty').forEach(el => el.oninput = e => { currentQuote.nvrs[+e.target.dataset.i].qty = e.target.value; renderNvrLines(); renderTotals(); });
+  wrap.querySelectorAll('.del').forEach(el => el.onclick = e => { currentQuote.nvrs.splice(+e.currentTarget.dataset.i, 1); renderNvrLines(); renderTotals(); });
+}
+function renderOtherLines() {
+  const wrap = document.getElementById('other-lines');
+  wrap.innerHTML = '';
+  currentQuote.other.forEach((line, i) => {
+    const row = document.createElement('div');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <div style="grid-column: span 3"><label>Description</label><input data-i="${i}" class="other-label" type="text" value="${escapeHtml(line.label || '')}" placeholder="e.g. extra mounting kit" /></div>
+      <div><label>Amount $</label><input data-i="${i}" class="other-amount" type="number" min="0" step="1" value="${line.amount}" /></div>
+      <button class="del" data-i="${i}" aria-label="Remove">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.other-label').forEach(el => el.oninput = e => { currentQuote.other[+e.target.dataset.i].label = e.target.value; });
+  wrap.querySelectorAll('.other-amount').forEach(el => el.oninput = e => { currentQuote.other[+e.target.dataset.i].amount = e.target.value; renderTotals(); });
+  wrap.querySelectorAll('.del').forEach(el => el.onclick = e => { currentQuote.other.splice(+e.currentTarget.dataset.i, 1); renderOtherLines(); renderTotals(); });
+}
+
+function syncQuotePanelFromSettings() {
+  document.getElementById('cable-rate-view').value = settings.cableRate;
+  document.getElementById('hourly-rate-view').value = settings.hourlyRate;
+  document.getElementById('day-rate-view').value = settings.dayRate;
+  document.getElementById('gst-pct-label').textContent = settings.gstPct;
+}
+
+document.getElementById('add-cam').onclick = () => { currentQuote.cameras.push({ typeIndex: 0, qty: 1 }); renderCameraLines(); renderTotals(); };
+document.getElementById('add-nvr').onclick = () => { currentQuote.nvrs.push({ typeIndex: 0, qty: 1 }); renderNvrLines(); renderTotals(); };
+document.getElementById('add-other').onclick = () => { currentQuote.other.push({ label: '', amount: 0 }); renderOtherLines(); renderTotals(); };
+
+['cable-metres','hours','days','discount'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    const key = ({ 'cable-metres':'cableMetres', 'hours':'hours', 'days':'days', 'discount':'discountPct' })[id];
+    currentQuote[key] = e.target.value;
+    renderTotals();
+  });
+});
+document.getElementById('travel-override').addEventListener('input', e => {
+  currentQuote.travelOverride = e.target.value === '' ? null : e.target.value;
+  renderTotals();
+});
+document.getElementById('gst-toggle').addEventListener('change', e => {
+  currentQuote.gst = e.target.checked; renderTotals();
+});
+document.getElementById('notes').addEventListener('input', e => currentQuote.notes = e.target.value);
+document.getElementById('client-name').addEventListener('input', e => currentQuote.client.name = e.target.value);
+document.getElementById('client-phone').addEventListener('input', e => currentQuote.client.phone = e.target.value);
+
+document.getElementById('clear-quote').onclick = () => {
+  if (confirm('Clear this quote?')) { currentQuote = blankQuote(); resetQuoteUI(); }
+};
+function resetQuoteUI() {
+  document.getElementById('client-name').value = '';
+  document.getElementById('client-phone').value = '';
+  document.getElementById('client-address').value = '';
+  document.getElementById('cable-metres').value = 0;
+  document.getElementById('hours').value = 0;
+  document.getElementById('days').value = 0;
+  document.getElementById('travel-override').value = '';
+  document.getElementById('travel-auto').value = 0;
+  document.getElementById('discount').value = 0;
+  document.getElementById('notes').value = '';
+  document.getElementById('gst-toggle').checked = settings.gstDefault;
+  document.getElementById('route-box').style.display = 'none';
+  document.getElementById('route-warn').style.display = 'none';
+  routeInfo = { distanceKm: null, durationMin: null };
+  renderCameraLines(); renderNvrLines(); renderOtherLines();
+  renderTotals();
+}
+
+/* =====================================================
+   GOOGLE MAPS LOADER + INTEGRATION
+   ===================================================== */
+function loadGoogleMaps() {
+  if (!settings.mapsKey) {
+    document.getElementById('route-warn').style.display = 'block';
+    document.getElementById('route-warn').innerHTML = 'Add a Google Maps API key in Settings to enable address autocomplete and auto-distance.';
+    return;
+  }
+  if (window.google && window.google.maps && window.google.maps.places) {
+    initMapsServices();
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(settings.mapsKey)}&libraries=places&loading=async&callback=__ndMapsReady`;
+  s.async = true; s.defer = true;
+  s.onerror = () => {
+    document.getElementById('route-warn').style.display = 'block';
+    document.getElementById('route-warn').innerHTML = 'Google Maps failed to load. Check the API key in Settings.';
+  };
+  document.body.appendChild(s);
+}
+window.__ndMapsReady = function() {
+  initMapsServices();
+};
+function initMapsServices() {
+  if (!window.google?.maps?.places) return;
+  mapsReady = true;
+  geocoderInst = new google.maps.Geocoder();
+  distanceMatrixSvc = new google.maps.DistanceMatrixService();
+
+  const clientField = document.getElementById('client-address');
+  if (placesAutocomplete) google.maps.event.clearInstanceListeners(clientField);
+  placesAutocomplete = new google.maps.places.Autocomplete(clientField, {
+    componentRestrictions: { country: 'au' },
+    fields: ['formatted_address', 'geometry']
+  });
+  placesAutocomplete.addListener('place_changed', () => {
+    const p = placesAutocomplete.getPlace();
+    if (!p.formatted_address) return;
+    currentQuote.client.address = p.formatted_address;
+    clientField.value = p.formatted_address;
+    computeRoute();
+  });
+
+  const homeField = document.getElementById('home-address');
+  if (homeAutocomplete) google.maps.event.clearInstanceListeners(homeField);
+  homeAutocomplete = new google.maps.places.Autocomplete(homeField, {
+    componentRestrictions: { country: 'au' },
+    fields: ['formatted_address']
+  });
+  homeAutocomplete.addListener('place_changed', () => {
+    const p = homeAutocomplete.getPlace();
+    if (p.formatted_address) {
+      settings.business.homeAddress = p.formatted_address;
+      homeField.value = p.formatted_address;
+      saveSettings();
+    }
+  });
+}
+
+function computeRoute() {
+  const home = settings.business.homeAddress;
+  const client = currentQuote.client.address;
+  if (!home || !client || !distanceMatrixSvc) return;
+  distanceMatrixSvc.getDistanceMatrix({
+    origins: [home],
+    destinations: [client],
+    travelMode: google.maps.TravelMode.DRIVING,
+    unitSystem: google.maps.UnitSystem.METRIC
+  }, (resp, status) => {
+    if (status !== 'OK') return;
+    const el = resp.rows[0]?.elements[0];
+    if (!el || el.status !== 'OK') return;
+    const km = el.distance.value / 1000;
+    const mins = el.duration.value / 60;
+    currentQuote.distanceKm = km;
+    currentQuote.durationMin = mins;
+    routeInfo = { distanceKm: km, durationMin: mins };
+    const band = settings.travelBands.find(b => km <= Number(b.maxKm));
+    const bandPrice = band ? Number(band.price) || 0 : 0;
+    currentQuote.bandPrice = bandPrice;
+    document.getElementById('route-box').style.display = 'flex';
+    document.getElementById('route-from').textContent = home;
+    document.getElementById('route-distance').textContent = `${km.toFixed(1)} km`;
+    document.getElementById('route-duration').textContent = `${Math.round(mins)} min`;
+    document.getElementById('route-band').textContent = band ? `≤${band.maxKm} km → ${fmt(bandPrice)}` : 'No matching band';
+    document.getElementById('travel-auto').value = bandPrice;
+    renderTotals();
+  });
+}
+
+/* =====================================================
+   HISTORY
+   ===================================================== */
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  if (!history.length) {
+    document.getElementById('history-empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('history-empty').style.display = 'none';
+  history.slice().reverse().forEach(q => {
+    const date = new Date(q.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div class="history-item-meta">
+        <span class="history-item-name">${escapeHtml(q.client.name || '(no name)')}</span>
+        <span class="history-item-sub">${date} • ${escapeHtml(q.client.address || 'no address')}</span>
+      </div>
+      <span class="history-item-total">${fmt(q.grand || 0)}</span>
+      <div class="history-actions">
+        <button class="btn btn-secondary" data-id="${q.id}" data-act="open">Open</button>
+        <button class="btn btn-secondary" data-id="${q.id}" data-act="pdf">PDF</button>
+        <button class="btn btn-danger" data-id="${q.id}" data-act="del">×</button>
+      </div>`;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const q = history.find(x => x.id === b.dataset.id);
+    if (!q) return;
+    if (b.dataset.act === 'open') {
+      currentQuote = JSON.parse(JSON.stringify(q));
+      // Don't keep the cached grand; recalc will run
+      delete currentQuote.grand;
+      hydrateQuoteUI();
+      document.querySelector('.tab[data-tab="quote"]').click();
+    } else if (b.dataset.act === 'pdf') {
+      const snap = JSON.parse(JSON.stringify(currentQuote));
+      currentQuote = JSON.parse(JSON.stringify(q));
+      generatePDF();
+      currentQuote = snap;
+    } else if (b.dataset.act === 'del') {
+      if (confirm('Delete this quote?')) {
+        history = history.filter(x => x.id !== q.id);
+        saveHistory(); renderHistory();
+      }
+    }
+  });
+}
+function hydrateQuoteUI() {
+  document.getElementById('client-name').value = currentQuote.client.name || '';
+  document.getElementById('client-phone').value = currentQuote.client.phone || '';
+  document.getElementById('client-address').value = currentQuote.client.address || '';
+  document.getElementById('cable-metres').value = currentQuote.cableMetres || 0;
+  document.getElementById('hours').value = currentQuote.hours || 0;
+  document.getElementById('days').value = currentQuote.days || 0;
+  document.getElementById('travel-override').value = currentQuote.travelOverride ?? '';
+  document.getElementById('travel-auto').value = currentQuote.bandPrice || 0;
+  document.getElementById('discount').value = currentQuote.discountPct || 0;
+  document.getElementById('notes').value = currentQuote.notes || '';
+  document.getElementById('gst-toggle').checked = !!currentQuote.gst;
+  if (currentQuote.distanceKm) {
+    document.getElementById('route-box').style.display = 'flex';
+    document.getElementById('route-from').textContent = settings.business.homeAddress;
+    document.getElementById('route-distance').textContent = currentQuote.distanceKm.toFixed(1) + ' km';
+    document.getElementById('route-duration').textContent = Math.round(currentQuote.durationMin) + ' min';
+    document.getElementById('route-band').textContent = fmt(currentQuote.bandPrice);
+  }
+  renderCameraLines(); renderNvrLines(); renderOtherLines();
+  renderTotals();
+}
+
+document.getElementById('save-only').onclick = () => { saveCurrentQuote(); alert('Quote saved.'); };
+document.getElementById('save-pdf').onclick = () => { saveCurrentQuote(); generatePDF(); };
+function saveCurrentQuote() {
+  const c = calcQuote();
+  if (!currentQuote.id) currentQuote.id = 'Q-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  if (!currentQuote.createdAt) currentQuote.createdAt = new Date().toISOString();
+  currentQuote.grand = c.grand;
+  // upsert
+  const idx = history.findIndex(x => x.id === currentQuote.id);
+  const snap = JSON.parse(JSON.stringify(currentQuote));
+  if (idx >= 0) history[idx] = snap; else history.push(snap);
+  saveHistory();
+}
+document.getElementById('export-history').onclick = () => {
+  const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `nd-quotes-${Date.now()}.json`);
+};
+document.getElementById('clear-history').onclick = () => {
+  if (confirm('Delete all saved quotes? This cannot be undone.')) { history = []; saveHistory(); renderHistory(); }
+};
+
+/* =====================================================
+   SETTINGS PANEL
+   ===================================================== */
+function renderSettings() {
+  document.getElementById('biz-name').value  = settings.business.name;
+  document.getElementById('biz-abn').value   = settings.business.abn;
+  document.getElementById('biz-phone').value = settings.business.phone;
+  document.getElementById('biz-email').value = settings.business.email;
+  document.getElementById('home-address').value = settings.business.homeAddress;
+  document.getElementById('maps-key').value  = settings.mapsKey;
+  document.getElementById('passcode-new').value = settings.passcode;
+  document.getElementById('gsheets-id').value = settings.gsheetsId;
+  document.getElementById('cable-rate').value = settings.cableRate;
+  document.getElementById('hourly-rate').value = settings.hourlyRate;
+  document.getElementById('day-rate').value   = settings.dayRate;
+  document.getElementById('gst-pct').value    = settings.gstPct;
+  document.getElementById('gst-default').checked = settings.gstDefault;
+
+  document.querySelectorAll('.toggle-row button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === settings.sourceMode);
+  });
+  document.getElementById('manual-block').style.display = settings.sourceMode === 'manual' ? 'block' : 'none';
+  document.getElementById('gsheets-block').style.display = settings.sourceMode === 'gsheets' ? 'block' : 'none';
+  if (settings.gsheetsLastSync) {
+    document.getElementById('gsheets-status').textContent = 'Last synced ' + new Date(settings.gsheetsLastSync).toLocaleString();
+  }
+
+  renderTypesList('cam-types', settings.cameras, 'cameras');
+  renderTypesList('nvr-types', settings.nvrs, 'nvrs');
+  renderBandsList();
+}
+function renderTypesList(targetId, arr, key) {
+  const wrap = document.getElementById(targetId);
+  wrap.innerHTML = '';
+  arr.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <div style="grid-column: span 3"><label>Name</label><input data-i="${i}" class="t-name" type="text" value="${escapeHtml(it.type)}" /></div>
+      <div><label>Price $</label><input data-i="${i}" class="t-price" type="number" min="0" step="1" value="${it.price}" /></div>
+      <button class="del" data-i="${i}">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.t-name').forEach(el => el.oninput = e => { arr[+e.target.dataset.i].type = e.target.value; });
+  wrap.querySelectorAll('.t-price').forEach(el => el.oninput = e => { arr[+e.target.dataset.i].price = Number(e.target.value) || 0; });
+  wrap.querySelectorAll('.del').forEach(el => el.onclick = e => {
+    arr.splice(+e.currentTarget.dataset.i, 1);
+    renderSettings();
+  });
+}
+function renderBandsList() {
+  const wrap = document.getElementById('travel-bands');
+  wrap.innerHTML = '';
+  settings.travelBands.forEach((b, i) => {
+    const prev = i === 0 ? 0 : settings.travelBands[i-1].maxKm;
+    const row = document.createElement('div');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <div><label>From km</label><input value="${prev}" disabled /></div>
+      <div><label>To km</label><input data-i="${i}" class="b-max" type="number" min="0" step="1" value="${b.maxKm}" /></div>
+      <div><label>Flat $</label><input data-i="${i}" class="b-price" type="number" min="0" step="1" value="${b.price}" /></div>
+      <div></div>
+      <button class="del" data-i="${i}">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.b-max').forEach(el => el.oninput = e => { settings.travelBands[+e.target.dataset.i].maxKm = Number(e.target.value) || 0; });
+  wrap.querySelectorAll('.b-price').forEach(el => el.oninput = e => { settings.travelBands[+e.target.dataset.i].price = Number(e.target.value) || 0; });
+  wrap.querySelectorAll('.del').forEach(el => el.onclick = e => {
+    settings.travelBands.splice(+e.currentTarget.dataset.i, 1); renderBandsList();
+  });
+}
+
+document.querySelectorAll('.toggle-row button').forEach(b => b.onclick = () => {
+  settings.sourceMode = b.dataset.mode;
+  renderSettings();
+});
+document.getElementById('add-cam-type').onclick = () => { settings.cameras.push({ type: 'New camera', price: 0 }); renderSettings(); };
+document.getElementById('add-nvr-type').onclick = () => { settings.nvrs.push({ type: 'New item', price: 0 }); renderSettings(); };
+document.getElementById('add-band').onclick = () => { settings.travelBands.push({ maxKm: 9999, price: 0 }); renderBandsList(); };
+
+document.getElementById('save-settings').onclick = () => {
+  settings.business.name = document.getElementById('biz-name').value;
+  settings.business.abn = document.getElementById('biz-abn').value;
+  settings.business.phone = document.getElementById('biz-phone').value;
+  settings.business.email = document.getElementById('biz-email').value;
+  settings.business.homeAddress = document.getElementById('home-address').value;
+  settings.mapsKey = document.getElementById('maps-key').value.trim();
+  settings.passcode = document.getElementById('passcode-new').value || '1234';
+  settings.gsheetsId = extractSheetId(document.getElementById('gsheets-id').value);
+  settings.cableRate = Number(document.getElementById('cable-rate').value) || 0;
+  settings.hourlyRate = Number(document.getElementById('hourly-rate').value) || 0;
+  settings.dayRate = Number(document.getElementById('day-rate').value) || 0;
+  settings.gstPct = Number(document.getElementById('gst-pct').value) || 0;
+  settings.gstDefault = document.getElementById('gst-default').checked;
+  saveSettings();
+  syncQuotePanelFromSettings();
+  renderTotals();
+  alert('Settings saved.');
+};
+document.getElementById('reload-maps').onclick = () => {
+  // Force reload
+  document.querySelectorAll('script[src*="maps.googleapis.com"]').forEach(s => s.remove());
+  delete window.google;
+  mapsReady = false;
+  loadGoogleMaps();
+};
+document.getElementById('export-settings').onclick = () => {
+  const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `nd-quote-settings-${Date.now()}.json`);
+};
+document.getElementById('import-settings-btn').onclick = () => document.getElementById('import-settings-file').click();
+document.getElementById('import-settings-file').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      settings = Object.assign(JSON.parse(JSON.stringify(defaultSettings)), imported);
+      saveSettings(); renderSettings(); syncQuotePanelFromSettings(); renderTotals();
+      alert('Settings imported.');
+    } catch (err) { alert('Could not parse settings file.'); }
+  };
+  reader.readAsText(file);
+});
+
+/* =====================================================
+   GOOGLE SHEETS SYNC
+   ===================================================== */
+function extractSheetId(input) {
+  if (!input) return '';
+  const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : input.trim();
+}
+async function gsheetsSync() {
+  const id = settings.gsheetsId;
+  if (!id) { alert('Paste a Google Sheets URL or ID first.'); return; }
+  const tabs = ['Cameras', 'Travel', 'Rates'];
+  const statusEl = document.getElementById('gsheets-status');
+  statusEl.textContent = 'Syncing…';
+  try {
+    const [camsCsv, travelCsv, ratesCsv] = await Promise.all(tabs.map(t =>
+      fetch(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(t)}`)
+        .then(r => { if (!r.ok) throw new Error(t + ' fetch failed (' + r.status + ')'); return r.text(); })
+    ));
+    const cams = parseCsv(camsCsv);   // header: Type, Price
+    const travel = parseCsv(travelCsv); // header: Max km, Price
+    const rates = parseCsv(ratesCsv);   // header: Key, Value
+    settings.cameras = cams.filter(r => r.Type).map(r => ({ type: r.Type, price: Number(r.Price) || 0 }));
+    settings.travelBands = travel.filter(r => r['Max km']).map(r => ({ maxKm: Number(r['Max km']) || 0, price: Number(r.Price) || 0 }));
+    const ratesMap = {};
+    rates.forEach(r => { if (r.Key) ratesMap[r.Key.trim()] = r.Value; });
+    if (ratesMap['cable_per_metre'] !== undefined) settings.cableRate = Number(ratesMap['cable_per_metre']) || 0;
+    if (ratesMap['hourly_rate'] !== undefined) settings.hourlyRate = Number(ratesMap['hourly_rate']) || 0;
+    if (ratesMap['day_rate'] !== undefined) settings.dayRate = Number(ratesMap['day_rate']) || 0;
+    if (ratesMap['gst_percent'] !== undefined) settings.gstPct = Number(ratesMap['gst_percent']) || 0;
+    if (ratesMap['cable_discount_cap'] !== undefined) settings.cableDiscountCap = Number(ratesMap['cable_discount_cap']) || 25;
+    // NVR is optional — only if a 4th tab exists
+    try {
+      const nvrCsv = await fetch(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=NVR`).then(r => r.ok ? r.text() : null);
+      if (nvrCsv) {
+        const nvr = parseCsv(nvrCsv);
+        if (nvr.length) settings.nvrs = nvr.filter(r => r.Type).map(r => ({ type: r.Type, price: Number(r.Price) || 0 }));
+      }
+    } catch(e) { /* optional */ }
+    settings.gsheetsLastSync = new Date().toISOString();
+    saveSettings(); renderSettings(); syncQuotePanelFromSettings(); renderTotals();
+    statusEl.textContent = 'Synced just now';
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Sync failed: ' + err.message + '. Make sure the sheet is published to web.';
+  }
+}
+document.getElementById('gsheets-sync').onclick = gsheetsSync;
+
+function parseCsv(text) {
+  // Minimal RFC4180-ish CSV parser handling quoted fields
+  const rows = [];
+  let cur = []; let field = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { cur.push(field); field = ''; }
+      else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field || cur.length) { cur.push(field); rows.push(cur); }
+  if (!rows.length) return [];
+  const headers = rows.shift().map(h => h.trim());
+  return rows.filter(r => r.some(x => x !== '')).map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+
+/* =====================================================
+   PDF GENERATION
+   ===================================================== */
+function generatePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const M = 48;
+  const c = calcQuote();
+  let y = M;
+
+  // Header brand
+  doc.setFillColor(7, 17, 31);
+  doc.rect(0, 0, W, 90, 'F');
+  doc.setTextColor(255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+  doc.text(settings.business.name || 'Neill Data & Security', M, 42);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  const bizLine = [settings.business.phone, settings.business.email, settings.business.abn ? 'ABN ' + settings.business.abn : ''].filter(Boolean).join('  •  ');
+  if (bizLine) doc.text(bizLine, M, 62);
+
+  // Quote title
+  y = 120;
+  doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
+  doc.text('Quote', M, y); y += 24;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const expires = new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  doc.text(`Issued: ${today}    Valid until: ${expires}`, M, y); y += 14;
+  if (currentQuote.id) { doc.text('Ref: ' + currentQuote.id, M, y); y += 14; }
+
+  // Client
+  y += 8;
+  doc.setFont('helvetica', 'bold'); doc.text('Prepared for', M, y); y += 14;
+  doc.setFont('helvetica', 'normal');
+  if (currentQuote.client.name) { doc.text(currentQuote.client.name, M, y); y += 12; }
+  if (currentQuote.client.phone) { doc.text(currentQuote.client.phone, M, y); y += 12; }
+  if (currentQuote.client.address) {
+    const wrapped = doc.splitTextToSize(currentQuote.client.address, W - M*2);
+    doc.text(wrapped, M, y); y += wrapped.length * 12;
+  }
+  y += 8;
+
+  // Line items
+  const colX = [M, M + 280, M + 360, M + 460];
+  doc.setFillColor(240, 244, 250);
+  doc.rect(M - 8, y - 12, W - M*2 + 16, 22, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Item', colX[0], y);
+  doc.text('Qty/Units', colX[1], y);
+  doc.text('Unit', colX[2], y);
+  doc.text('Total', colX[3], y, { align: 'right' });
+  y += 18;
+  doc.setFont('helvetica', 'normal');
+
+  const lineOut = (label, qty, unit, total, original) => {
+    if (y > 760) { doc.addPage(); y = M; }
+    const lbl = doc.splitTextToSize(label, 260);
+    doc.text(lbl, colX[0], y);
+    if (qty != null) doc.text(String(qty), colX[1], y);
+    if (unit != null) doc.text(fmt(unit), colX[2], y);
+    if (original != null && Math.abs(original - total) > 0.001) {
+      doc.setTextColor(160);
+      doc.text(fmt(original), colX[3] - 60, y, { align: 'right' });
+      doc.setTextColor(0);
+    }
+    doc.text(fmt(total), W - M, y, { align: 'right' });
+    y += Math.max(14, lbl.length * 12);
+  };
+
+  currentQuote.cameras.forEach(l => {
+    const cam = settings.cameras[l.typeIndex];
+    if (!cam || !l.qty) return;
+    lineOut(cam.type, l.qty, cam.price, cam.price * Number(l.qty));
+  });
+  currentQuote.nvrs.forEach(l => {
+    const it = settings.nvrs[l.typeIndex];
+    if (!it || !l.qty) return;
+    lineOut(it.type, l.qty, it.price, it.price * Number(l.qty));
+  });
+  if (c.cableRaw) lineOut(`Cat6 cable (${currentQuote.cableMetres} m @ ${fmt(settings.cableRate)}/m)${c.dCable ? ' — ' + c.dCable + '% off' : ''}`, null, null, c.cableNet, c.cableRaw);
+  if (Number(currentQuote.hours)) lineOut(`Labour — ${currentQuote.hours} hr @ ${fmt(settings.hourlyRate)}/hr${c.d ? ' — ' + c.d + '% off' : ''}`, null, null, settings.hourlyRate * Number(currentQuote.hours) * (1 - c.d/100), settings.hourlyRate * Number(currentQuote.hours));
+  if (Number(currentQuote.days)) lineOut(`Labour — ${currentQuote.days} day(s) @ ${fmt(settings.dayRate)}/day${c.d ? ' — ' + c.d + '% off' : ''}`, null, null, settings.dayRate * Number(currentQuote.days) * (1 - c.d/100), settings.dayRate * Number(currentQuote.days));
+  if (c.travelRaw) {
+    const km = currentQuote.distanceKm ? `${currentQuote.distanceKm.toFixed(1)} km` : 'flat';
+    lineOut(`Travel / call-out (${km})${c.d ? ' — ' + c.d + '% off' : ''}`, null, null, c.travelNet, c.travelRaw);
+  }
+  currentQuote.other.forEach(o => {
+    if (!Number(o.amount)) return;
+    lineOut(o.label || 'Other', null, null, Number(o.amount) * (1 - c.d/100), Number(o.amount));
+  });
+
+  // Totals
+  y += 10;
+  doc.setDrawColor(220); doc.line(M, y, W - M, y); y += 18;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Subtotal', W - M - 90, y, { align: 'right' }); doc.text(fmt(c.subtotal), W - M, y, { align: 'right' }); y += 14;
+  if (currentQuote.gst) {
+    doc.text(`GST (${settings.gstPct}%)`, W - M - 90, y, { align: 'right' }); doc.text(fmt(c.gstAmt), W - M, y, { align: 'right' }); y += 14;
+  }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text('Total', W - M - 90, y + 4, { align: 'right' });
+  doc.text(fmt(c.grand), W - M, y + 4, { align: 'right' });
+  y += 30;
+
+  // Notes
+  if (currentQuote.notes) {
+    if (y > 720) { doc.addPage(); y = M; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('Notes', M, y); y += 14;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    const wrapped = doc.splitTextToSize(currentQuote.notes, W - M*2);
+    doc.text(wrapped, M, y); y += wrapped.length * 12 + 6;
+  }
+
+  // Footer
+  doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(120);
+  doc.text('Prices include nominated discount where applicable. Quote valid for 30 days. Final pricing subject to site assessment.', M, 800, { maxWidth: W - M*2 });
+
+  const fname = `quote-${(currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+}
+
+/* =====================================================
+   UTILITIES
+   ===================================================== */
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* =====================================================
+   INIT
+   ===================================================== */
+function init() {
+  syncQuotePanelFromSettings();
+  resetQuoteUI();
+  loadGoogleMaps();
+}
+</script>
+</body>
+</html>
