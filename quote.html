@@ -521,9 +521,30 @@ footer-note {
         </div>
       </div>
 
+      <!-- CSV auto-load (from repo) -->
+      <div class="card">
+        <h3>Auto-load pricing from repo CSV</h3>
+        <div class="field inline-row" style="margin-bottom:12px;">
+          <label class="inline-row" style="margin:0;"><input id="csv-auto" type="checkbox" /> &nbsp;Auto-load on every page open</label>
+        </div>
+        <div class="field">
+          <label>CSV URL (relative to this page, or full URL)</label>
+          <input id="csv-url" type="text" placeholder="pricing.csv" />
+        </div>
+        <div id="csv-status" class="tip" style="display:none;"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="csv-reload">Reload CSV now</button>
+        </div>
+        <div class="tip">
+          Put a file called <b>pricing.csv</b> in the same folder as <b>quote.html</b> in your repo.
+          Edit the CSV in GitHub to update prices — they'll pick up automatically on the next page load.
+          The tool also keeps a fallback set of prices locally in case the CSV ever can't be reached.
+        </div>
+      </div>
+
       <!-- Pricing source toggle -->
       <div class="card">
-        <h3>Pricing source</h3>
+        <h3>Manual / Google Sheets pricing (fallback)</h3>
         <div class="toggle-row">
           <button data-mode="manual" class="active">Manual (edit here)</button>
           <button data-mode="gsheets">Google Sheets sync</button>
@@ -668,7 +689,10 @@ const defaultSettings = {
   ],
   cableDiscountCap: 25,
   gstPct: 10,
-  gstDefault: false
+  gstDefault: false,
+  csvAutoLoad: true,
+  csvUrl: 'pricing.csv',     // relative to this page; works when pricing.csv lives in repo root
+  csvLastStatus: ''
 };
 
 let settings = loadSettings();
@@ -1157,6 +1181,17 @@ function renderSettings() {
   document.getElementById('gst-pct').value    = settings.gstPct;
   document.getElementById('gst-default').checked = settings.gstDefault;
 
+  document.getElementById('csv-auto').checked = !!settings.csvAutoLoad;
+  document.getElementById('csv-url').value = settings.csvUrl || 'pricing.csv';
+  const statusEl = document.getElementById('csv-status');
+  if (settings.csvLastStatus) {
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = settings.csvLastStatus.startsWith('Loaded')
+      ? '<b style="color:var(--brand-2);">✓</b> ' + settings.csvLastStatus
+      : '<b style="color:var(--warning);">!</b> ' + settings.csvLastStatus;
+  } else {
+    statusEl.style.display = 'none';
+  }
   document.querySelectorAll('.toggle-row button').forEach(b => {
     b.classList.toggle('active', b.dataset.mode === settings.sourceMode);
   });
@@ -1221,7 +1256,16 @@ document.getElementById('add-cam-type').onclick = () => { settings.cameras.push(
 document.getElementById('add-nvr-type').onclick = () => { settings.nvrs.push({ type: 'New item', price: 0 }); renderSettings(); };
 document.getElementById('add-band').onclick = () => { settings.travelBands.push({ maxKm: 9999, price: 0 }); renderBandsList(); };
 
+document.getElementById('csv-reload').onclick = () => {
+  // Persist any URL change first
+  settings.csvUrl = document.getElementById('csv-url').value.trim() || 'pricing.csv';
+  settings.csvAutoLoad = document.getElementById('csv-auto').checked;
+  saveSettings();
+  loadPricingCsv(false);
+};
 document.getElementById('save-settings').onclick = () => {
+  settings.csvAutoLoad = document.getElementById('csv-auto').checked;
+  settings.csvUrl = document.getElementById('csv-url').value.trim() || 'pricing.csv';
   settings.business.name = document.getElementById('biz-name').value;
   settings.business.abn = document.getElementById('biz-abn').value;
   settings.business.phone = document.getElementById('biz-phone').value;
@@ -1314,6 +1358,77 @@ async function gsheetsSync() {
   }
 }
 document.getElementById('gsheets-sync').onclick = gsheetsSync;
+
+/* =====================================================
+   AUTO-LOAD pricing.csv FROM REPO
+   ===================================================== */
+async function loadPricingCsv(silent) {
+  if (!settings.csvAutoLoad || !settings.csvUrl) return;
+  const url = settings.csvUrl + (settings.csvUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    const sections = parseSectionedCsv(text);
+    applySectionsToSettings(sections);
+    settings.csvLastStatus = 'Loaded from ' + settings.csvUrl + ' at ' + new Date().toLocaleTimeString();
+    saveSettings();
+    syncQuotePanelFromSettings();
+    renderTotals();
+    if (!silent) renderSettings();
+  } catch (e) {
+    settings.csvLastStatus = 'Could not load ' + settings.csvUrl + ' (' + e.message + ') — using local settings';
+    if (!silent) renderSettings();
+  }
+}
+function parseSectionedCsv(text) {
+  const out = { cameras: [], nvr: [], travel: [], rates: [] };
+  const lines = text.split(/\r?\n/);
+  let current = null;
+  let buffer = [];
+  const flush = () => {
+    if (current && buffer.length) {
+      out[current] = parseCsv(buffer.join('\n'));
+    }
+    buffer = [];
+  };
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    const sec = t.match(/^#(cameras|nvr|travel|rates)\s*$/i);
+    if (sec) { flush(); current = sec[1].toLowerCase(); continue; }
+    if (t.startsWith('# ') || t === '#') continue;   // skip comments
+    if (current) buffer.push(line);
+  }
+  flush();
+  return out;
+}
+function applySectionsToSettings(sections) {
+  if (Array.isArray(sections.cameras) && sections.cameras.length) {
+    settings.cameras = sections.cameras
+      .filter(r => r.Type)
+      .map(r => ({ type: r.Type, price: Number(r.Price) || 0 }));
+  }
+  if (Array.isArray(sections.nvr) && sections.nvr.length) {
+    settings.nvrs = sections.nvr
+      .filter(r => r.Type)
+      .map(r => ({ type: r.Type, price: Number(r.Price) || 0 }));
+  }
+  if (Array.isArray(sections.travel) && sections.travel.length) {
+    settings.travelBands = sections.travel
+      .filter(r => r['Max km'])
+      .map(r => ({ maxKm: Number(r['Max km']) || 0, price: Number(r.Price) || 0 }));
+  }
+  if (Array.isArray(sections.rates) && sections.rates.length) {
+    const map = {};
+    sections.rates.forEach(r => { if (r.Key) map[r.Key.trim()] = r.Value; });
+    if (map['cable_per_metre'] !== undefined) settings.cableRate = Number(map['cable_per_metre']) || 0;
+    if (map['hourly_rate'] !== undefined)     settings.hourlyRate = Number(map['hourly_rate']) || 0;
+    if (map['day_rate'] !== undefined)        settings.dayRate = Number(map['day_rate']) || 0;
+    if (map['gst_percent'] !== undefined)     settings.gstPct = Number(map['gst_percent']) || 0;
+    if (map['cable_discount_cap'] !== undefined) settings.cableDiscountCap = Number(map['cable_discount_cap']) || 25;
+  }
+}
 
 function parseCsv(text) {
   // Minimal RFC4180-ish CSV parser handling quoted fields
@@ -1480,6 +1595,8 @@ function init() {
   syncQuotePanelFromSettings();
   resetQuoteUI();
   loadGoogleMaps();
+  // Auto-load prices from repo CSV (fires and forgets — UI updates when done)
+  loadPricingCsv(true);
 }
 </script>
 </body>
