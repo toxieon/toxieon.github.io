@@ -7,41 +7,26 @@
 <title>ND • On-site Quote Tool</title>
 <style>
 :root {
-  --bg: #07111f;
-  --bg-soft: #0d1b2f;
-  --card: rgba(255,255,255,0.08);
-  --card-border: rgba(255,255,255,0.14);
-  --text: #f6f8fb;
-  --muted: #b9c5d6;
-  --brand: #31d0ff;
-  --brand-2: #6affb8;
-  --cash: #4ade80;
-  --cash-2: #22c55e;
-  --warning: #ffd166;
-  --danger: #ff6b88;
+  --bg: #07111f; --bg-soft: #0d1b2f;
+  --card: rgba(255,255,255,0.08); --card-border: rgba(255,255,255,0.14);
+  --text: #f6f8fb; --muted: #b9c5d6;
+  --brand: #31d0ff; --brand-2: #6affb8;
+  --cash: #4ade80; --cash-2: #22c55e;
+  --warning: #ffd166; --danger: #ff6b88;
   --shadow: 0 20px 70px rgba(0,0,0,0.35);
-  --radius: 18px;
-  --radius-sm: 12px;
+  --radius: 18px; --radius-sm: 12px;
   --max: 920px;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem),
-    radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem),
-    var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  min-height: 100vh;
-  -webkit-tap-highlight-color: transparent;
+body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem), radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem), var(--bg);
+  color: var(--text); line-height: 1.5; min-height: 100vh; -webkit-tap-highlight-color: transparent;
 }
 a { color: var(--brand); text-decoration: none; }
 .container { width: min(var(--max), calc(100% - 24px)); margin: 0 auto; }
 
-/* lock screen */
+/* lock */
 #lock-screen { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 100; }
 .lock-card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 32px; max-width: 360px; width: calc(100% - 24px); text-align: center; box-shadow: var(--shadow); }
 .lock-card h1 { font-size: 1.4rem; margin: 0 0 4px; letter-spacing: -0.02em; }
@@ -50,13 +35,12 @@ a { color: var(--brand); text-decoration: none; }
 .lock-input { width: 100%; padding: 14px 16px; border-radius: var(--radius-sm); border: 1px solid var(--card-border); background: rgba(0,0,0,0.25); color: var(--text); font-size: 1.1rem; text-align: center; letter-spacing: 0.3em; font-family: inherit; }
 .lock-err { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin-top: 8px; }
 
-/* header */
 header { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); background: rgba(7,17,31,0.82); border-bottom: 1px solid rgba(255,255,255,0.08); }
 .head-row { display: flex; justify-content: space-between; align-items: center; min-height: 64px; gap: 12px; }
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 850; letter-spacing: -0.03em; font-size: 1.05rem; }
 .logo-mark { width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; display: grid; place-items: center; font-weight: 950; font-size: 0.85rem; box-shadow: 0 8px 24px rgba(49,208,255,0.24); }
 .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 4px; border-radius: 999px; border: 1px solid var(--card-border); }
-.tab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 8px 14px; border-radius: 999px; transition: 0.15s ease; font-family: inherit; }
+.tab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 8px 14px; border-radius: 999px; transition: 0.15s; font-family: inherit; }
 .tab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
 
 main { padding: 24px 0 80px; }
@@ -66,7 +50,7 @@ main { padding: 24px 0 80px; }
 .panel-sub { color: var(--muted); margin: 0 0 22px; font-size: 0.95rem; }
 
 .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.card h3 { margin: 0 0 16px; font-size: 1rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.card h3 { margin: 0 0 16px; font-size: 1rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .card h3 .pill { font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; background: rgba(49,208,255,0.15); color: var(--brand); border: 1px solid rgba(49,208,255,0.25); font-weight: 700; }
 
 label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
@@ -79,34 +63,72 @@ textarea { resize: vertical; min-height: 70px; }
 .field:last-child { margin-bottom: 0; }
 .inline-row { display: flex; align-items: center; gap: 10px; }
 .inline-row input[type="checkbox"] { width: auto; }
+.toggles-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: center; }
+.toggles-row .toggle-cell { display: flex; align-items: center; gap: 8px; padding: 11px 12px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); }
+.toggles-row .toggle-cell label { margin: 0; color: var(--text); font-size: 0.92rem; font-weight: 700; }
+.toggles-row .toggle-cell small { color: var(--muted); font-size: 0.7rem; font-weight: 500; }
 
-/* item list (used for cameras + extras subsections) */
-.item-list { display: flex; flex-direction: column; gap: 6px; }
-.item-row { display: grid; grid-template-columns: 34px 1fr 80px 90px 26px; gap: 8px; align-items: center; padding: 8px 10px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); }
+/* qty controls (shared by picker and list) */
+.qty-wrap { display: flex; align-items: stretch; gap: 0; border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.25); min-width: 110px; }
+.qty-wrap input { border: 0; border-radius: 0; text-align: center; padding: 8px 4px; width: 100%; background: transparent; font-size: 0.95rem; }
+.qty-wrap input:focus { box-shadow: none; }
+.qty-btn { appearance: none; border: 0; background: rgba(255,255,255,0.05); color: var(--text); width: 30px; cursor: pointer; font-weight: 900; font-size: 1.1rem; transition: 0.1s; }
+.qty-btn:hover { background: rgba(255,255,255,0.12); color: var(--brand); }
+
+/* list pattern row (Cable, Favourites) */
+.item-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 120px 75px 80px;
+  gap: 8px; align-items: center;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
 .item-row.fav { border-color: rgba(255,209,102,0.45); background: rgba(255,209,102,0.06); }
 .item-row.has-qty { border-color: rgba(106,255,184,0.45); background: rgba(106,255,184,0.06); }
-.item-star { appearance: none; border: 0; cursor: pointer; background: transparent; color: rgba(255,255,255,0.25); font-size: 1.3rem; padding: 0; width: 34px; height: 34px; transition: 0.1s; }
-.item-star.on { color: var(--warning); }
-.item-star:hover { color: var(--warning); transform: scale(1.1); }
 .item-info { min-width: 0; }
 .item-name { font-weight: 700; font-size: 0.95rem; line-height: 1.2; }
 .item-notes { color: var(--muted); font-size: 0.75rem; margin-top: 2px; line-height: 1.3; font-style: italic; }
-.item-row input[type="number"] { padding: 8px 8px; text-align: center; font-size: 0.95rem; }
-.item-unit { color: var(--muted); font-size: 0.82rem; text-align: right; padding-right: 4px; }
-.item-sub { font-weight: 800; color: var(--brand-2); font-size: 0.9rem; text-align: right; padding-right: 4px; }
+.item-unit { color: var(--muted); font-size: 0.85rem; text-align: right; font-weight: 600; }
+.item-sub { font-weight: 800; color: var(--brand-2); font-size: 0.92rem; text-align: right; min-width: 70px; }
 .item-empty { color: var(--muted); font-size: 0.85rem; padding: 14px; text-align: center; background: rgba(0,0,0,0.15); border: 1px dashed var(--card-border); border-radius: var(--radius-sm); }
 
-/* extras sub-tabs */
+/* picker pattern (Cameras, Conduit, Misc, dynamic) */
+.picker-line {
+  display: grid;
+  grid-template-columns: 34px 1fr 120px 75px 80px 32px;
+  gap: 8px; align-items: center;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.picker-line.fav { border-color: rgba(255,209,102,0.45); background: rgba(255,209,102,0.06); }
+.picker-line.has-qty { border-color: rgba(106,255,184,0.45); background: rgba(106,255,184,0.06); }
+.picker-line select { padding: 9px 10px; font-size: 0.92rem; }
+.add-line-btn { appearance: none; border: 1px dashed var(--card-border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; font-weight: 700; width: 100%; padding: 10px; border-radius: var(--radius-sm); margin-top: 8px; font-size: 0.85rem; }
+.add-line-btn:hover { color: var(--text); border-color: var(--brand); }
+
+/* star toggle */
+.item-star { appearance: none; border: 0; cursor: pointer; background: transparent; color: rgba(255,255,255,0.25); font-size: 1.3rem; padding: 0; width: 34px; height: 34px; transition: 0.1s; }
+.item-star.on { color: var(--warning); }
+.item-star:hover { color: var(--warning); transform: scale(1.1); }
+.item-star:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* del */
+.del-btn { background: rgba(255,107,136,0.12); border: 1px solid rgba(255,107,136,0.25); color: var(--danger); border-radius: 8px; cursor: pointer; height: 36px; width: 32px; display: grid; place-items: center; font-weight: 900; font-size: 1.1rem; padding: 0; }
+
+/* extras subtabs */
 .subtabs { display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 4px; border-radius: 999px; border: 1px solid var(--card-border); margin-bottom: 14px; overflow-x: auto; }
-.subtab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.78rem; padding: 7px 13px; border-radius: 999px; transition: 0.15s ease; font-family: inherit; white-space: nowrap; }
+.subtab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.78rem; padding: 7px 13px; border-radius: 999px; transition: 0.15s; font-family: inherit; white-space: nowrap; }
 .subtab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
 
-/* custom (Misc 'Add custom') */
-.custom-row { display: grid; grid-template-columns: 1fr 100px 26px; gap: 8px; align-items: center; margin-bottom: 6px; }
+/* custom items (Misc) */
+.custom-row { display: grid; grid-template-columns: 1fr 100px 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
 .custom-row input { padding: 9px 10px; font-size: 0.92rem; }
-.add-custom { appearance: none; border: 1px dashed var(--card-border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; font-weight: 700; width: 100%; padding: 10px; border-radius: var(--radius-sm); margin-top: 8px; font-size: 0.85rem; }
-.add-custom:hover { color: var(--text); border-color: var(--brand); }
-.del-btn { background: rgba(255,107,136,0.12); border: 1px solid rgba(255,107,136,0.25); color: var(--danger); border-radius: 8px; cursor: pointer; height: 34px; display: grid; place-items: center; font-weight: 900; font-size: 1.1rem; padding: 0; }
 
 /* totals */
 .totals-card { background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09)); border: 1px solid rgba(106,255,184,0.32); }
@@ -118,7 +140,7 @@ textarea { resize: vertical; min-height: 70px; }
 .total-row .strike { text-decoration: line-through; opacity: 0.6; margin-right: 6px; font-size: 0.85em; }
 
 /* buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: 999px; font-weight: 800; font-family: inherit; font-size: 0.95rem; border: 1px solid transparent; cursor: pointer; transition: 0.15s ease; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: 999px; font-weight: 800; font-family: inherit; font-size: 0.95rem; border: 1px solid transparent; cursor: pointer; transition: 0.15s; }
 .btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; box-shadow: 0 10px 28px rgba(49,208,255,0.22); }
 .btn-primary:hover { transform: translateY(-1px); }
 .btn-cash { background: linear-gradient(135deg, var(--cash), var(--cash-2)); color: #052e16; box-shadow: 0 10px 28px rgba(74,222,128,0.28); }
@@ -129,22 +151,21 @@ textarea { resize: vertical; min-height: 70px; }
 .btn-ghost:hover { color: var(--text); }
 .btn-danger { background: rgba(255,107,136,0.12); color: var(--danger); border-color: rgba(255,107,136,0.25); }
 .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-.btn-row.cash-row { padding-top: 10px; border-top: 1px dashed var(--card-border); margin-top: 14px; }
-.btn-row.cash-row .btn-cash { font-size: 0.85rem; padding: 0 14px; min-height: 42px; }
+.btn-utility { background: rgba(49,208,255,0.1); border-color: rgba(49,208,255,0.25); color: var(--brand); font-size: 0.85rem; padding: 0 14px; min-height: 42px; }
 
 /* history */
-.history-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); margin-bottom: 8px; background: rgba(0,0,0,0.18); }
+.history-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); margin-bottom: 8px; background: rgba(0,0,0,0.18); gap: 10px; }
 .history-item.cash { border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.05); }
 .history-item-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .history-item-name { font-weight: 700; }
 .history-item-sub { color: var(--muted); font-size: 0.85rem; }
-.history-item-total { font-weight: 900; color: var(--brand-2); margin: 0 12px; }
+.history-item-total { font-weight: 900; color: var(--brand-2); }
 .history-item.cash .history-item-total { color: var(--cash); }
 .history-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .history-actions button { padding: 6px 10px; font-size: 0.78rem; min-height: 0; border-radius: 10px; }
 .tag-cash { display: inline-block; background: rgba(74,222,128,0.15); color: var(--cash); padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; margin-left: 6px; vertical-align: middle; }
 
-/* route box */
+/* route */
 .route-box { background: rgba(0,0,0,0.22); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
 .route-box .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.88rem; }
 .route-box .row b { color: var(--text); }
@@ -157,20 +178,38 @@ textarea { resize: vertical; min-height: 70px; }
 .tip.warn { background: rgba(255,209,102,0.07); border-color: rgba(255,209,102,0.25); }
 .tip.warn b { color: var(--warning); }
 
+/* date input */
+input[type="date"] { color-scheme: dark; }
+
 /* responsive */
 @media (max-width: 640px) {
   .head-row { flex-wrap: wrap; }
   .tabs { width: 100%; justify-content: space-between; }
   .tab { flex: 1; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .item-row { grid-template-columns: 30px 1fr 60px 22px; grid-template-areas: "star info qty del" "star unit sub sub"; gap: 4px 6px; padding: 8px; }
+  .toggles-row { grid-template-columns: 1fr; }
+  .item-row {
+    grid-template-columns: 32px 1fr 70px;
+    grid-template-areas: "star info qty" "unit sub sub";
+    gap: 6px 6px; padding: 10px;
+  }
   .item-row .item-star { grid-area: star; }
   .item-row .item-info { grid-area: info; }
-  .item-row input[type="number"] { grid-area: qty; }
-  .item-row .item-unit { grid-area: unit; font-size: 0.75rem; }
-  .item-row .item-sub { grid-area: sub; font-size: 0.85rem; }
-  .item-row .del-btn { grid-area: del; }
-  .custom-row { grid-template-columns: 1fr 80px 26px; }
+  .item-row .qty-wrap { grid-area: qty; min-width: 0; }
+  .item-row .item-unit { grid-area: unit; font-size: 0.75rem; text-align: left; }
+  .item-row .item-sub { grid-area: sub; }
+  .picker-line {
+    grid-template-columns: 32px 1fr 28px;
+    grid-template-areas: "star sel del" "qty qty qty" "unit sub sub";
+    gap: 6px;
+  }
+  .picker-line .item-star { grid-area: star; }
+  .picker-line .line-select { grid-area: sel; }
+  .picker-line .del-btn { grid-area: del; }
+  .picker-line .qty-wrap { grid-area: qty; min-width: 0; }
+  .picker-line .item-unit { grid-area: unit; font-size: 0.75rem; text-align: left; }
+  .picker-line .item-sub { grid-area: sub; }
+  .custom-row { grid-template-columns: 1fr 80px 28px; }
 }
 
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -187,7 +226,7 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
 </head>
 <body>
 
-<!-- LOCK SCREEN -->
+<!-- LOCK -->
 <div id="lock-screen">
   <div class="lock-card">
     <div class="lock-mark">ND</div>
@@ -216,12 +255,12 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
 
   <main class="container">
 
-    <!-- ============= QUOTE PANEL ============= -->
+    <!-- QUOTE -->
     <section class="panel active" data-panel="quote">
       <h2 class="panel-title">New quote</h2>
-      <p class="panel-sub">Set quantities on the items you need. Tap the ★ to favourite.</p>
+      <p class="panel-sub">Pick items, set quantities, generate PDF.</p>
 
-      <!-- Client + address -->
+      <!-- Client -->
       <div class="card">
         <h3>Client & site</h3>
         <div class="grid-2">
@@ -229,6 +268,7 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
           <div class="field"><label for="client-phone">Client phone</label><input id="client-phone" type="tel" placeholder="04xx xxx xxx" /></div>
         </div>
         <div class="field"><label for="client-address">Site address</label><input id="client-address" type="text" placeholder="Start typing the address..." autocomplete="off" /></div>
+        <div class="field"><label for="proposed-date">Proposed start date</label><input id="proposed-date" type="date" /></div>
         <div id="route-box" class="route-box" style="display:none;">
           <div class="row"><span>From home base</span><b id="route-from">—</b></div>
           <div class="row"><span>Distance</span><b id="route-distance">—</b></div>
@@ -238,27 +278,18 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
         <div id="route-warn" class="tip warn" style="display:none;"></div>
       </div>
 
-      <!-- Cameras -->
+      <!-- Cameras (picker) -->
       <div class="card">
-        <h3>Cameras <span class="pill" id="pill-cameras">No discount</span></h3>
-        <div id="camera-items" class="item-list"></div>
+        <h3>Cameras <span class="pill" id="pill-cameras">0% cap</span></h3>
+        <div id="camera-lines"></div>
+        <button class="add-line-btn" id="add-camera-line">+ Add camera line</button>
       </div>
 
       <!-- Extras -->
       <div class="card">
         <h3>Extras</h3>
-        <div class="subtabs" id="extras-subtabs">
-          <button class="subtab active" data-sub="cable">Cable</button>
-          <button class="subtab" data-sub="favourites">★ Favourites</button>
-          <button class="subtab" data-sub="misc">Misc</button>
-          <button class="subtab" data-sub="conduit">Conduit</button>
-        </div>
-        <div id="extras-items" class="item-list"></div>
-        <div id="custom-block" style="display:none;">
-          <div style="margin-top:14px;font-size:0.8rem;color:var(--muted);font-weight:700;">Custom items</div>
-          <div id="custom-lines"></div>
-          <button class="add-custom" id="add-custom">+ Add custom item</button>
-        </div>
+        <div class="subtabs" id="extras-subtabs"></div>
+        <div id="extras-content"></div>
       </div>
 
       <!-- Labour -->
@@ -272,22 +303,26 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
 
       <!-- Travel -->
       <div class="card">
-        <h3>Travel / call-out <span class="pill">Discountable</span></h3>
+        <h3>Travel / call-out <span class="pill" id="pill-travel">30% cap</span></h3>
         <div class="grid-2">
           <div class="field"><label>Auto band ($)</label><input id="travel-auto" type="number" disabled value="0" /></div>
           <div class="field"><label>Manual override ($)</label><input id="travel-override" type="number" min="0" step="1" placeholder="blank = use band" /></div>
         </div>
       </div>
 
-      <!-- Discount + GST + Cash + Notes -->
+      <!-- Discount/GST/Cash/Notes -->
       <div class="card">
-        <h3>Discount, GST & notes</h3>
-        <div class="grid-3">
-          <div class="field"><label>Discount %</label><input id="discount" type="number" min="0" max="100" step="1" value="0" /></div>
-          <div class="field" style="align-self:end;"><label class="inline-row"><input id="gst-toggle" type="checkbox" /> GST (<span id="gst-pct-label">10</span>%)</label></div>
-          <div class="field" style="align-self:end;"><label class="inline-row" title="Tick to also enable the off-the-books PDFs"><input id="cash-toggle" type="checkbox" /> Cash mode <small style="opacity:.6;margin-left:4px;">(hides GST)</small></label></div>
+        <h3>Discount, GST &amp; notes</h3>
+        <div class="field">
+          <label>Discount %</label>
+          <input id="discount" type="number" min="0" max="100" step="1" value="0" />
         </div>
-        <div class="field"><label>Internal notes (NOT shown on any PDF)</label><textarea id="notes" placeholder="Site access notes, reminders, anything..."></textarea></div>
+        <div class="toggles-row">
+          <div class="toggle-cell"><input id="gst-toggle" type="checkbox" /><label for="gst-toggle">GST <small>(<span id="gst-pct-label">10</span>%)</small></label></div>
+          <div class="toggle-cell"><input id="cash-toggle" type="checkbox" /><label for="cash-toggle">Cash mode <small>(hides GST)</small></label></div>
+          <div class="toggle-cell" style="opacity:0.5;"><label style="color:var(--muted);">More flags soon</label></div>
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Internal notes (NOT shown on any PDF)</label><textarea id="notes" placeholder="Site access notes, reminders, anything..."></textarea></div>
       </div>
 
       <!-- Totals -->
@@ -297,19 +332,20 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
         <div class="total-row grand"><span>Total</span><b id="grand-total">$0.00</b></div>
       </div>
 
+      <!-- Actions -->
       <div class="btn-row">
-        <button class="btn btn-primary" id="save-pdf">Save & download PDF</button>
+        <button class="btn btn-primary" id="save-pdf">Save &amp; download PDF</button>
+        <button class="btn btn-cash" id="save-cash-pdf" style="display:none;">Save &amp; download Cash PDF</button>
         <button class="btn btn-secondary" id="save-only">Save quote</button>
         <button class="btn btn-ghost" id="clear-quote">Clear</button>
       </div>
-      <div class="btn-row cash-row" id="cash-buttons">
-        <button class="btn btn-cash" data-cash="minimal">Cash · Minimal</button>
-        <button class="btn btn-cash" data-cash="green">Cash · Green</button>
-        <button class="btn btn-cash" data-cash="receipt">Cash · Receipt</button>
+      <div class="btn-row">
+        <button class="btn btn-utility" id="add-to-calendar">📅 Add to Calendar</button>
+        <button class="btn btn-utility" id="route-to-site">🗺️ Route to site</button>
       </div>
     </section>
 
-    <!-- ============= HISTORY PANEL ============= -->
+    <!-- HISTORY -->
     <section class="panel" data-panel="history">
       <h2 class="panel-title">Quote history</h2>
       <p class="panel-sub">Saved on this device. Cross-device sync coming in Phase 2.</p>
@@ -321,27 +357,24 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
       </div>
     </section>
 
-    <!-- ============= SETTINGS PANEL ============= -->
+    <!-- SETTINGS -->
     <section class="panel" data-panel="settings">
       <h2 class="panel-title">Settings</h2>
       <p class="panel-sub">Pricing comes from your Google Sheet. Edit it there.</p>
 
-      <!-- Sheet sync -->
       <div class="card">
         <h3>Google Sheet (pricing)</h3>
-        <div class="field"><label>Sheet ID or URL</label><input id="sheet-id" type="text" placeholder="docs.google.com/spreadsheets/d/<ID>/..." /></div>
+        <div class="field"><label>Sheet ID or URL</label><input id="sheet-id" type="text" /></div>
         <div id="sheet-status" class="tip" style="display:none;"></div>
         <div class="btn-row">
           <button class="btn btn-primary" id="sheet-sync">Sync now</button>
         </div>
         <div class="tip">
-          Required tabs: <b>Cameras</b>, <b>Cable</b>, <b>Conduit</b>, <b>Misc</b>, <b>Travel</b>, <b>Rates</b>.
-          Each product tab needs columns <b>Type, Price, Favourite, Notes</b>.
-          The sheet must be <b>shared</b> or <b>published to web</b>.
+          System tabs: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. Any other tab in the sheet becomes an Extras subsection automatically (requires Sheets API enabled on your Google Maps key — otherwise falls back to <b>Cable, Conduit, Misc</b>).
+          Product columns: <b>Type, Price, Favourite, Discount Cap, Notes</b>.
         </div>
       </div>
 
-      <!-- Business -->
       <div class="card">
         <h3>Business info</h3>
         <div class="grid-2">
@@ -355,7 +388,6 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
         <div class="field"><label>Home base address (travel measured from)</label><input id="home-address" type="text" autocomplete="off" /></div>
       </div>
 
-      <!-- Security -->
       <div class="card">
         <h3>Security</h3>
         <div class="field"><label>Passcode</label><input id="passcode-new" type="text" /></div>
@@ -378,10 +410,7 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
 
 <script>
 /* =====================================================
-   HARD-CODED CONSTANTS (edit these, commit, ship)
-   These are baked into the file so they apply on every device.
-   Any value can still be overridden per-device in Settings —
-   leave the Settings field blank to fall back to the hardcoded value.
+   HARD-CODED CONSTANTS
    ===================================================== */
 /* ▼▼▼ PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES BELOW ▼▼▼ */
 const HARDCODED_MAPS_KEY        = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
@@ -392,65 +421,72 @@ const HARDCODED_BUSINESS_NAME   = 'Neill Data & Security';
 const HARDCODED_BUSINESS_ABN    = '73 761 986 361';
 const HARDCODED_BUSINESS_PHONE  = '0418 912 681';
 const HARDCODED_BUSINESS_EMAIL  = 'brandon.j.neill@gmail.com';
-const HARDCODED_HOME_ADDRESS    = '';   // paste your home base here, e.g. '123 Example St, Frankston VIC 3199'
-const HARDCODED_PASSCODE        = '';   // paste your preferred passcode here (overrides the 1234 default)
+const HARDCODED_HOME_ADDRESS    = '1/84 Mount Eliza Way, Mount Eliza VIC 3930';
+const HARDCODED_PASSCODE        = '';
 
-// Getters — user-saved value wins if set, otherwise the hardcoded constant
-function getMapsKey()      { return (settings.mapsKey && settings.mapsKey.trim())                   || HARDCODED_MAPS_KEY        || ''; }
-function getSheetId()      { return (settings.sheetId && settings.sheetId.trim())                   || HARDCODED_SHEET_ID        || ''; }
-function getBizName()      { return (settings.business.name && settings.business.name.trim())       || HARDCODED_BUSINESS_NAME   || ''; }
-function getBizAbn()       { return (settings.business.abn && settings.business.abn.trim())         || HARDCODED_BUSINESS_ABN    || ''; }
-function getBizPhone()     { return (settings.business.phone && settings.business.phone.trim())     || HARDCODED_BUSINESS_PHONE  || ''; }
-function getBizEmail()     { return (settings.business.email && settings.business.email.trim())     || HARDCODED_BUSINESS_EMAIL  || ''; }
-function getHomeAddress()  { return (settings.business.homeAddress && settings.business.homeAddress.trim()) || HARDCODED_HOME_ADDRESS || ''; }
+// Tabs the parser treats as "system" (not extras subsections)
+const SYSTEM_TABS    = ['Cameras', 'Travel', 'Rates'];
+// Sections that always use the LIST UI pattern (always show all items)
+const LIST_SECTIONS  = ['cable', 'favourites'];
+// Subtab display order — others go alphabetical after these
+const PREFERRED_ORDER = ['cable', 'favourites'];
+// Fallback tab names if the Sheets API isn't reachable
+const FALLBACK_EXTRAS_TABS = ['Cable', 'Conduit', 'Misc'];
+
+// Getters — user setting wins if set, else hardcoded
+function getMapsKey()      { return (settings.mapsKey && settings.mapsKey.trim())                                   || HARDCODED_MAPS_KEY        || ''; }
+function getSheetId()      { return (settings.sheetId && settings.sheetId.trim())                                   || HARDCODED_SHEET_ID        || ''; }
+function getBizName()      { return (settings.business.name && settings.business.name.trim())                       || HARDCODED_BUSINESS_NAME   || ''; }
+function getBizAbn()       { return (settings.business.abn && settings.business.abn.trim())                         || HARDCODED_BUSINESS_ABN    || ''; }
+function getBizPhone()     { return (settings.business.phone && settings.business.phone.trim())                     || HARDCODED_BUSINESS_PHONE  || ''; }
+function getBizEmail()     { return (settings.business.email && settings.business.email.trim())                     || HARDCODED_BUSINESS_EMAIL  || ''; }
+function getHomeAddress()  { return (settings.business.homeAddress && settings.business.homeAddress.trim())         || HARDCODED_HOME_ADDRESS    || ''; }
 function getPasscode()     { return settings.passcode || HARDCODED_PASSCODE || '1234'; }
 
 /* =====================================================
    STATE
    ===================================================== */
-const LS_KEY      = 'nd_quote_tool_v2';
-const HISTORY_KEY = 'nd_quote_history_v2';
-const FAVS_KEY    = 'nd_user_favs_v2';
+const LS_KEY      = 'nd_quote_tool_v3';
+const HISTORY_KEY = 'nd_quote_history_v3';
+const FAVS_KEY    = 'nd_user_favs_v3';
 
 const defaultSettings = {
-  passcode: '1234',
-  business: { name: '', abn: '', phone: '', email: '', homeAddress: '' },
+  passcode: '',
+  business: { name:'', abn:'', phone:'', email:'', homeAddress:'' },
   mapsKey: '',
-  sheetId: HARDCODED_SHEET_ID,
-  // Catalog (populated from sheet)
+  sheetId: '',
   cameras: [],
-  extras: { cable: [], conduit: [], misc: [] },
-  // Rates
+  extras: {},   // { cable: [{type,price,favourite,discountCap,notes}], conduit: [...], misc: [...], ... }
   hourlyRate: 0,
   dayRate: 0,
-  travelBands: [{maxKm: 20, price: 0},{maxKm: 40, price: 0},{maxKm: 80, price: 0},{maxKm: 9999, price: 0}],
-  discountCaps: { cameras: 0, cable: 25, conduit: 25, misc: 100 },
+  travelBands: [{maxKm:20,price:0},{maxKm:40,price:0},{maxKm:80,price:0},{maxKm:9999,price:0}],
+  discountCaps: { cameras: 0, cable: 25, conduit: 25, misc: 100, travel: 30 },
   gstPct: 10,
   gstDefault: false,
   sheetLastStatus: ''
 };
 
 let settings = loadSettings();
-let userFavs = loadFavs();      // { 'cameras:Basic 4MP': true }
+let userFavs = loadFavs();
 let history  = loadHistory();
 let currentQuote = blankQuote();
 let activeExtrasSub = 'cable';
-let mapsReady = false;
 let placesAutocomplete = null, homeAutocomplete = null, distanceMatrixSvc = null;
 
 function blankQuote() {
   return {
-    id: null, createdAt: null,
+    id:null, createdAt:null,
     client: { name:'', phone:'', address:'' },
-    itemQty: {},          // { 'cameras:Basic 4MP': 2 }
-    customLines: [],      // [{ label, amount }]
+    proposedDate: '',
+    itemQty: {},                // { 'cameras:Basic 4MP': 2 }
+    pickerLines: { cameras: [] }, // ordered keys per picker section; dynamically extended
+    customLines: [],
     hours: 0, days: 0,
-    travelOverride: null,
-    bandPrice: 0,
+    travelOverride: null, bandPrice: 0,
     discountPct: 0,
     gst: settings.gstDefault,
     cashMode: false,
-    cashStyle: null,      // set when saved as cash quote
+    cashStyle: null,
     notes: '',
     distanceKm: null, durationMin: null
   };
@@ -461,12 +497,11 @@ function loadSettings() {
     const raw = localStorage.getItem(LS_KEY);
     const base = JSON.parse(JSON.stringify(defaultSettings));
     if (!raw) return base;
-    const parsed = JSON.parse(raw);
-    // shallow-merge nested objects
-    parsed.business = Object.assign({}, base.business, parsed.business || {});
-    parsed.extras = Object.assign({}, base.extras, parsed.extras || {});
-    parsed.discountCaps = Object.assign({}, base.discountCaps, parsed.discountCaps || {});
-    return Object.assign(base, parsed);
+    const p = JSON.parse(raw);
+    p.business = Object.assign({}, base.business, p.business || {});
+    p.extras = Object.assign({}, base.extras, p.extras || {});
+    p.discountCaps = Object.assign({}, base.discountCaps, p.discountCaps || {});
+    return Object.assign(base, p);
   } catch(e) { return JSON.parse(JSON.stringify(defaultSettings)); }
 }
 function saveSettings() { localStorage.setItem(LS_KEY, JSON.stringify(settings)); }
@@ -476,7 +511,7 @@ function loadFavs() { try { return JSON.parse(localStorage.getItem(FAVS_KEY) || 
 function saveFavs() { localStorage.setItem(FAVS_KEY, JSON.stringify(userFavs)); }
 
 /* =====================================================
-   PASSCODE GATE
+   PASSCODE
    ===================================================== */
 const lockScreen = document.getElementById('lock-screen');
 const passcodeInput = document.getElementById('passcode-input');
@@ -493,7 +528,7 @@ function tryUnlock() {
 window.addEventListener('load', () => passcodeInput.focus());
 
 /* =====================================================
-   TAB SWITCHING
+   TABS
    ===================================================== */
 document.querySelectorAll('.tab').forEach(t => {
   t.onclick = () => {
@@ -507,23 +542,22 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 /* =====================================================
-   FAVOURITES
+   HELPERS
    ===================================================== */
+function fmt(n) { return '$' + (Math.round(n * 100) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtShort(n) { return '$' + Math.round(n).toLocaleString('en-AU'); }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+
 function isFav(itemKey, sheetFav) {
-  // User toggle takes precedence; falls back to sheet default
   if (userFavs[itemKey] !== undefined) return !!userFavs[itemKey];
   return !!sheetFav;
 }
 function toggleFav(itemKey, sheetFav) {
-  const current = isFav(itemKey, sheetFav);
-  userFavs[itemKey] = !current;
+  userFavs[itemKey] = !isFav(itemKey, sheetFav);
   saveFavs();
 }
-function itemKey(section, item) { return section + ':' + item.type; }
-
-/* =====================================================
-   PRICING ENGINE
-   ===================================================== */
 function findItem(itemKey) {
   const [section, ...rest] = itemKey.split(':');
   const name = rest.join(':');
@@ -532,131 +566,291 @@ function findItem(itemKey) {
   else if (settings.extras[section]) pool = settings.extras[section];
   return pool.find(x => x.type === name);
 }
-function discountForSection(section) {
+
+/* =====================================================
+   PRICING
+   ===================================================== */
+function effectiveCap(section, item) {
+  if (item && item.discountCap !== undefined && item.discountCap !== null && item.discountCap !== '') {
+    return Number(item.discountCap) || 0;
+  }
   return settings.discountCaps[section] !== undefined ? settings.discountCaps[section] : 100;
 }
 function calcQuote() {
   const q = currentQuote;
   const d = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
 
-  // Group line subtotals by section so we can apply per-section discount caps
-  const sections = { cameras: 0, cable: 0, conduit: 0, misc: 0 };
-  const sectionRaw = { cameras: 0, cable: 0, conduit: 0, misc: 0 };
+  const sections = {};  // sectionName -> net total
+  const sectionRaws = {};
   Object.entries(q.itemQty).forEach(([key, qty]) => {
     const [section] = key.split(':');
-    if (!(section in sections)) return;
-    const item = findItem(key);
-    if (!item) return;
+    const item = findItem(key); if (!item) return;
     const raw = (Number(item.price) || 0) * (Number(qty) || 0);
-    sectionRaw[section] += raw;
-    const cap = discountForSection(section);
+    sectionRaws[section] = (sectionRaws[section] || 0) + raw;
+    const cap = effectiveCap(section, item);
     const effective = Math.min(d, cap);
-    sections[section] += raw * (1 - effective / 100);
+    sections[section] = (sections[section] || 0) + (raw * (1 - effective / 100));
   });
 
-  // Custom lines (treated as misc / fully discountable)
-  let customRaw = 0;
-  q.customLines.forEach(c => customRaw += (Number(c.amount) || 0));
+  let customRaw = 0; q.customLines.forEach(c => customRaw += (Number(c.amount) || 0));
   const customNet = customRaw * (1 - d / 100);
 
-  // Labour
   const labourRaw = settings.hourlyRate * (Number(q.hours) || 0) + settings.dayRate * (Number(q.days) || 0);
   const labourNet = labourRaw * (1 - d / 100);
 
-  // Travel
   const travelRaw = (q.travelOverride !== null && q.travelOverride !== '' && !isNaN(q.travelOverride))
     ? Number(q.travelOverride) : (q.bandPrice || 0);
-  const travelNet = travelRaw * (1 - d / 100);
+  const travelCap = settings.discountCaps.travel !== undefined ? settings.discountCaps.travel : 30;
+  const travelEff = Math.min(d, travelCap);
+  const travelNet = travelRaw * (1 - travelEff / 100);
 
-  const subtotal = sections.cameras + sections.cable + sections.conduit + sections.misc + customNet + labourNet + travelNet;
+  let subtotal = customNet + labourNet + travelNet;
+  Object.values(sections).forEach(v => subtotal += v);
+
   const gstAmt = (q.gst && !q.cashMode) ? subtotal * (settings.gstPct / 100) : 0;
   const grand = subtotal + gstAmt;
 
-  return { sections, sectionRaw, customRaw, customNet, labourRaw, labourNet, travelRaw, travelNet, subtotal, gstAmt, grand, d };
-}
-function fmt(n) {
-  return '$' + (Math.round(n * 100) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return { sections, sectionRaws, customRaw, customNet, labourRaw, labourNet, travelRaw, travelNet, subtotal, gstAmt, grand, d };
 }
 
 /* =====================================================
-   RENDER — QUOTE PANEL
+   RENDERING — CAMERA (picker) + EXTRAS (mixed)
    ===================================================== */
-function effectiveItemsForSection(section) {
-  let pool = [];
-  if (section === 'cameras') pool = settings.cameras;
-  else if (section === 'favourites') {
-    // aggregate ALL favourites across cameras + extras
-    const all = [];
-    settings.cameras.forEach(it => { if (isFav('cameras:' + it.type, it.favourite)) all.push({ section: 'cameras', item: it }); });
-    Object.entries(settings.extras).forEach(([sec, items]) => {
-      items.forEach(it => { if (isFav(sec + ':' + it.type, it.favourite)) all.push({ section: sec, item: it }); });
-    });
-    return all;
-  }
-  else if (settings.extras[section]) pool = settings.extras[section];
-  // Sort favourites first
-  const decorated = pool.map(item => ({ section, item, fav: isFav(section + ':' + item.type, item.favourite) }));
-  decorated.sort((a, b) => (b.fav - a.fav) || a.item.type.localeCompare(b.item.type));
-  return decorated;
+function ensurePickerLines(section, sectionItems) {
+  // Make sure pickerLines[section] reflects everything currently in itemQty for that section
+  if (!currentQuote.pickerLines) currentQuote.pickerLines = {};
+  if (!currentQuote.pickerLines[section]) currentQuote.pickerLines[section] = [];
+  const existing = new Set(currentQuote.pickerLines[section]);
+  Object.keys(currentQuote.itemQty).forEach(k => {
+    if (k.startsWith(section + ':') && !existing.has(k)) currentQuote.pickerLines[section].push(k);
+  });
+  // Drop entries that no longer exist in the catalogue
+  currentQuote.pickerLines[section] = currentQuote.pickerLines[section].filter(k => k === '' || findItem(k));
 }
 
-function renderItemList(targetEl, section) {
-  const entries = effectiveItemsForSection(section);
+function buildSelectOptions(section, items, currentKey) {
+  // Sort favourites first
+  const decorated = items.map(it => ({ it, fav: isFav(section + ':' + it.type, it.favourite) }));
+  decorated.sort((a, b) => (b.fav - a.fav) || a.it.type.localeCompare(b.it.type));
+  let html = `<option value="">— select an item —</option>`;
+  decorated.forEach(({ it, fav }) => {
+    const key = section + ':' + it.type;
+    const sel = key === currentKey ? ' selected' : '';
+    const label = (fav ? '★ ' : '') + it.type + '  ·  ' + fmtShort(Number(it.price) || 0);
+    html += `<option value="${escapeAttr(key)}"${sel}>${escapeHtml(label)}</option>`;
+  });
+  return html;
+}
+
+function renderQtyControlsHTML(key, qty) {
+  return `
+    <div class="qty-wrap">
+      <button class="qty-btn minus" data-key="${escapeAttr(key)}" type="button">−</button>
+      <input type="number" min="0" step="any" placeholder="0" data-key="${escapeAttr(key)}" class="qty-input" value="${qty || ''}" />
+      <button class="qty-btn plus"  data-key="${escapeAttr(key)}" type="button">+</button>
+    </div>`;
+}
+
+function renderPickerSection(targetEl, section, items, opts) {
+  ensurePickerLines(section, items);
+  const lines = currentQuote.pickerLines[section];
   targetEl.innerHTML = '';
-  if (!entries.length) {
-    targetEl.innerHTML = `<div class="item-empty">No items in "${section}". ${section === 'favourites' ? 'Tap the ★ on any item to favourite it.' : 'Add rows to the ' + section + ' tab in your sheet.'}</div>`;
+  if (!items.length && !lines.length) {
+    targetEl.innerHTML = `<div class="item-empty">No items in "${section}". Add rows to the ${section} tab in your sheet.</div>`;
     return;
   }
-  entries.forEach(({ section: sec, item, fav: prefab }) => {
-    const fav = prefab !== undefined ? prefab : isFav(sec + ':' + item.type, item.favourite);
-    const key = sec + ':' + item.type;
-    const qty = currentQuote.itemQty[key] || '';
-    const sub = (Number(item.price) || 0) * (Number(qty) || 0);
+  lines.forEach((key, idx) => {
+    const isEmpty = !key;
+    const item = isEmpty ? null : findItem(key);
+    const qty = isEmpty ? 0 : (currentQuote.itemQty[key] || 0);
+    const fav = isEmpty ? false : isFav(key, item?.favourite);
+    const unit = item ? (Number(item.price) || 0) : 0;
+    const sub = unit * qty;
     const row = document.createElement('div');
-    row.className = 'item-row' + (fav ? ' fav' : '') + (Number(qty) > 0 ? ' has-qty' : '');
+    row.className = 'picker-line' + (fav ? ' fav' : '') + (qty > 0 ? ' has-qty' : '');
+    row.dataset.idx = idx;
     row.innerHTML = `
-      <button class="item-star ${fav ? 'on' : ''}" data-key="${escapeAttr(key)}" data-sheetfav="${item.favourite ? 1 : 0}" title="Toggle favourite">${fav ? '★' : '☆'}</button>
+      <button class="item-star ${fav ? 'on' : ''}" ${isEmpty ? 'disabled' : ''} data-key="${escapeAttr(key)}" data-sheetfav="${item?.favourite ? 1 : 0}">${fav ? '★' : '☆'}</button>
+      <select class="line-select" data-idx="${idx}" data-section="${escapeAttr(section)}">${buildSelectOptions(section, items, key)}</select>
+      ${renderQtyControlsHTML(key, qty)}
+      <div class="item-unit">${unit ? fmt(unit) : ''}</div>
+      <div class="item-sub">${sub > 0 ? fmt(sub) : ''}</div>
+      <button class="del-btn" data-idx="${idx}" data-section="${escapeAttr(section)}" type="button">×</button>
+    `;
+    // notes row
+    if (item && item.notes) {
+      const noteRow = document.createElement('div');
+      noteRow.className = 'item-notes';
+      noteRow.style.padding = '0 12px 8px 54px';
+      noteRow.style.marginTop = '-6px';
+      noteRow.textContent = item.notes;
+      targetEl.appendChild(row);
+      targetEl.appendChild(noteRow);
+    } else {
+      targetEl.appendChild(row);
+    }
+  });
+  wirePickerSection(targetEl, section, items);
+}
+
+function wirePickerSection(targetEl, section, items) {
+  targetEl.querySelectorAll('.line-select').forEach(sel => sel.onchange = e => {
+    const idx = +e.target.dataset.idx;
+    const oldKey = currentQuote.pickerLines[section][idx];
+    const newKey = e.target.value;
+    if (oldKey && oldKey !== newKey && currentQuote.itemQty[oldKey]) {
+      delete currentQuote.itemQty[oldKey];
+    }
+    if (newKey) {
+      if (!currentQuote.itemQty[newKey]) currentQuote.itemQty[newKey] = 1;
+    }
+    currentQuote.pickerLines[section][idx] = newKey;
+    renderAll();
+  });
+  targetEl.querySelectorAll('.del-btn').forEach(b => b.onclick = () => {
+    const idx = +b.dataset.idx;
+    const key = currentQuote.pickerLines[section][idx];
+    if (key) delete currentQuote.itemQty[key];
+    currentQuote.pickerLines[section].splice(idx, 1);
+    renderAll();
+  });
+  wireQtyControls(targetEl);
+  wireStars(targetEl);
+}
+
+function renderListSection(targetEl, section) {
+  // Always show every item in the section (Cable, Favourites)
+  let entries = [];
+  if (section === 'favourites') {
+    // aggregate from cameras + every extras section
+    settings.cameras.forEach(it => { if (isFav('cameras:' + it.type, it.favourite)) entries.push({ section: 'cameras', item: it }); });
+    Object.entries(settings.extras).forEach(([sec, list]) => list.forEach(it => { if (isFav(sec + ':' + it.type, it.favourite)) entries.push({ section: sec, item: it }); }));
+  } else {
+    (settings.extras[section] || []).forEach(it => entries.push({ section, item: it }));
+  }
+  // Sort favourites first within their own section
+  entries.sort((a, b) => {
+    const fa = isFav(a.section + ':' + a.item.type, a.item.favourite);
+    const fb = isFav(b.section + ':' + b.item.type, b.item.favourite);
+    if (fa !== fb) return fb - fa;
+    return a.item.type.localeCompare(b.item.type);
+  });
+  targetEl.innerHTML = '';
+  if (!entries.length) {
+    targetEl.innerHTML = `<div class="item-empty">${section === 'favourites' ? 'No favourites yet. Tap ★ on any item.' : 'No items in this section.'}</div>`;
+    return;
+  }
+  entries.forEach(({ section: sec, item }) => {
+    const key = sec + ':' + item.type;
+    const fav = isFav(key, item.favourite);
+    const qty = currentQuote.itemQty[key] || 0;
+    const unit = Number(item.price) || 0;
+    const sub = unit * qty;
+    const row = document.createElement('div');
+    row.className = 'item-row' + (fav ? ' fav' : '') + (qty > 0 ? ' has-qty' : '');
+    row.innerHTML = `
+      <button class="item-star ${fav ? 'on' : ''}" data-key="${escapeAttr(key)}" data-sheetfav="${item.favourite ? 1 : 0}">${fav ? '★' : '☆'}</button>
       <div class="item-info">
         <div class="item-name">${escapeHtml(item.type)}${section === 'favourites' ? ` <span style="color:var(--muted);font-weight:500;font-size:0.8em;">· ${sec}</span>` : ''}</div>
         ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
       </div>
-      <input type="number" min="0" step="any" placeholder="0" data-key="${escapeAttr(key)}" class="qty-input" value="${qty}" />
-      <div class="item-unit">${fmt(Number(item.price) || 0)}</div>
+      ${renderQtyControlsHTML(key, qty)}
+      <div class="item-unit">${fmt(unit)}</div>
       <div class="item-sub">${sub > 0 ? fmt(sub) : ''}</div>
     `;
     targetEl.appendChild(row);
   });
-  // Wire star buttons
-  targetEl.querySelectorAll('.item-star').forEach(b => b.onclick = () => {
-    toggleFav(b.dataset.key, b.dataset.sheetfav === '1');
-    renderCameraItems(); renderExtrasItems();
+  wireQtyControls(targetEl);
+  wireStars(targetEl);
+}
+
+function wireQtyControls(rootEl) {
+  rootEl.querySelectorAll('.qty-input').forEach(inp => inp.oninput = e => {
+    const key = e.target.dataset.key; const v = e.target.value;
+    if (v === '' || Number(v) === 0) delete currentQuote.itemQty[key]; else currentQuote.itemQty[key] = Number(v);
+    renderAll();
   });
-  // Wire qty inputs
-  targetEl.querySelectorAll('.qty-input').forEach(inp => inp.oninput = e => {
-    const v = e.target.value;
-    if (v === '' || Number(v) === 0) delete currentQuote.itemQty[e.target.dataset.key];
-    else currentQuote.itemQty[e.target.dataset.key] = Number(v);
-    // light re-render to update subtotal/highlight
-    const row = e.target.closest('.item-row');
-    if (row) {
-      row.classList.toggle('has-qty', !!currentQuote.itemQty[e.target.dataset.key]);
-      const sub = row.querySelector('.item-sub');
-      const price = Number(row.querySelector('.item-unit').textContent.replace(/[^0-9.\-]/g,'')) || 0;
-      sub.textContent = (currentQuote.itemQty[e.target.dataset.key] || 0) * price > 0
-        ? fmt((currentQuote.itemQty[e.target.dataset.key] || 0) * price) : '';
-    }
-    renderTotals();
+  rootEl.querySelectorAll('.qty-btn.plus').forEach(b => b.onclick = () => {
+    const key = b.dataset.key; if (!key) return;
+    const cur = Number(currentQuote.itemQty[key]) || 0;
+    currentQuote.itemQty[key] = cur + 1;
+    renderAll();
+  });
+  rootEl.querySelectorAll('.qty-btn.minus').forEach(b => b.onclick = () => {
+    const key = b.dataset.key; if (!key) return;
+    const cur = Number(currentQuote.itemQty[key]) || 0;
+    const next = Math.max(0, cur - 1);
+    if (next === 0) delete currentQuote.itemQty[key]; else currentQuote.itemQty[key] = next;
+    renderAll();
   });
 }
-function renderCameraItems() { renderItemList(document.getElementById('camera-items'), 'cameras'); }
-function renderExtrasItems() {
-  renderItemList(document.getElementById('extras-items'), activeExtrasSub);
-  const customBlock = document.getElementById('custom-block');
-  customBlock.style.display = activeExtrasSub === 'misc' ? 'block' : 'none';
-  if (activeExtrasSub === 'misc') renderCustomLines();
+function wireStars(rootEl) {
+  rootEl.querySelectorAll('.item-star').forEach(b => b.onclick = () => {
+    if (b.disabled) return;
+    const key = b.dataset.key; if (!key) return;
+    toggleFav(key, b.dataset.sheetfav === '1');
+    renderAll();
+  });
+}
+
+/* =====================================================
+   RENDER ORCHESTRATION
+   ===================================================== */
+function renderCameras() {
+  renderPickerSection(document.getElementById('camera-lines'), 'cameras', settings.cameras);
+}
+function renderExtrasSubtabs() {
+  const tabs = [];
+  if (settings.extras.cable) tabs.push('cable');
+  tabs.push('favourites');
+  Object.keys(settings.extras).filter(k => k !== 'cable').sort().forEach(k => tabs.push(k));
+  // Make sure activeExtrasSub still exists
+  if (!tabs.includes(activeExtrasSub)) activeExtrasSub = tabs[0] || 'favourites';
+  const bar = document.getElementById('extras-subtabs');
+  bar.innerHTML = '';
+  tabs.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'subtab' + (t === activeExtrasSub ? ' active' : '');
+    b.dataset.sub = t;
+    b.textContent = t === 'favourites' ? '★ Favourites' : (t.charAt(0).toUpperCase() + t.slice(1));
+    b.onclick = () => { activeExtrasSub = t; renderExtras(); };
+    bar.appendChild(b);
+  });
+}
+function renderExtras() {
+  renderExtrasSubtabs();
+  const target = document.getElementById('extras-content');
+  target.innerHTML = '';
+  const sec = activeExtrasSub;
+  if (LIST_SECTIONS.includes(sec)) {
+    renderListSection(target, sec);
+  } else if (sec === 'favourites') {
+    renderListSection(target, 'favourites');
+  } else {
+    const items = settings.extras[sec] || [];
+    const wrap = document.createElement('div');
+    target.appendChild(wrap);
+    renderPickerSection(wrap, sec, items);
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-line-btn';
+    addBtn.textContent = `+ Add ${sec} line`;
+    addBtn.onclick = () => {
+      if (!currentQuote.pickerLines[sec]) currentQuote.pickerLines[sec] = [];
+      currentQuote.pickerLines[sec].push('');
+      renderExtras();
+    };
+    target.appendChild(addBtn);
+    if (sec === 'misc') {
+      const customWrap = document.createElement('div');
+      customWrap.innerHTML = `<div style="margin-top:16px;font-size:0.8rem;color:var(--muted);font-weight:700;">Custom one-off items</div><div id="custom-lines"></div><button class="add-line-btn" id="add-custom">+ Add custom item</button>`;
+      target.appendChild(customWrap);
+      renderCustomLines();
+      document.getElementById('add-custom').onclick = () => { currentQuote.customLines.push({ label:'', amount:'' }); renderCustomLines(); renderTotals(); };
+    }
+  }
 }
 function renderCustomLines() {
-  const wrap = document.getElementById('custom-lines');
+  const wrap = document.getElementById('custom-lines'); if (!wrap) return;
   wrap.innerHTML = '';
   currentQuote.customLines.forEach((line, i) => {
     const row = document.createElement('div');
@@ -664,7 +858,7 @@ function renderCustomLines() {
     row.innerHTML = `
       <input data-i="${i}" class="custom-label" type="text" value="${escapeAttr(line.label || '')}" placeholder="Description" />
       <input data-i="${i}" class="custom-amount" type="number" min="0" step="any" value="${line.amount || ''}" placeholder="$" />
-      <button class="del-btn" data-i="${i}">×</button>
+      <button class="del-btn" data-i="${i}" type="button">×</button>
     `;
     wrap.appendChild(row);
   });
@@ -673,29 +867,32 @@ function renderCustomLines() {
   wrap.querySelectorAll('.del-btn').forEach(el => el.onclick = e => { currentQuote.customLines.splice(+e.currentTarget.dataset.i, 1); renderCustomLines(); renderTotals(); });
 }
 
-document.querySelectorAll('#extras-subtabs .subtab').forEach(b => b.onclick = () => {
-  document.querySelectorAll('#extras-subtabs .subtab').forEach(x => x.classList.remove('active'));
-  b.classList.add('active');
-  activeExtrasSub = b.dataset.sub;
-  renderExtrasItems();
-});
-document.getElementById('add-custom').onclick = () => { currentQuote.customLines.push({ label:'', amount:'' }); renderCustomLines(); renderTotals(); };
+function renderAll() {
+  renderCameras();
+  renderExtras();
+  renderTotals();
+}
+
+document.getElementById('add-camera-line').onclick = () => {
+  if (!currentQuote.pickerLines.cameras) currentQuote.pickerLines.cameras = [];
+  currentQuote.pickerLines.cameras.push('');
+  renderCameras();
+};
 
 /* =====================================================
-   TOTALS RENDER
+   TOTALS
    ===================================================== */
 function renderTotals() {
   const c = calcQuote();
   const rows = [];
-  const cap = discountForSection.bind(null);
-  if (c.sectionRaw.cameras)  rows.push([`Cameras (${cap('cameras')}% cap)`, c.sections.cameras, c.sectionRaw.cameras]);
-  if (c.sectionRaw.cable)    rows.push([`Cable (${cap('cable')}% cap)`,     c.sections.cable,    c.sectionRaw.cable]);
-  if (c.sectionRaw.conduit)  rows.push([`Conduit (${cap('conduit')}% cap)`, c.sections.conduit,  c.sectionRaw.conduit]);
-  if (c.sectionRaw.misc)     rows.push([`Misc items`,                       c.sections.misc,     c.sectionRaw.misc]);
-  if (c.customRaw)           rows.push([`Custom items`,                     c.customNet,         c.customRaw]);
-  if (c.labourRaw)           rows.push([`Labour`,                           c.labourNet,         c.labourRaw]);
-  if (c.travelRaw)           rows.push([`Travel`,                           c.travelNet,         c.travelRaw]);
-
+  Object.keys(c.sectionRaws).sort().forEach(sec => {
+    const label = sec.charAt(0).toUpperCase() + sec.slice(1);
+    const cap = settings.discountCaps[sec] !== undefined ? settings.discountCaps[sec] : 100;
+    rows.push([`${label} ${cap < 100 ? `(${cap}% cap)` : ''}`.trim(), c.sections[sec] || 0, c.sectionRaws[sec] || 0]);
+  });
+  if (c.customRaw) rows.push(['Custom items', c.customNet, c.customRaw]);
+  if (c.labourRaw) rows.push(['Labour', c.labourNet, c.labourRaw]);
+  if (c.travelRaw) rows.push([`Travel (${settings.discountCaps.travel}% cap)`, c.travelNet, c.travelRaw]);
   let html = '';
   rows.forEach(([label, net, raw]) => {
     html += `<div class="total-row"><span>${label}</span><span>`;
@@ -716,7 +913,7 @@ function renderTotals() {
    ===================================================== */
 ['hours','days','discount'].forEach(id => {
   document.getElementById(id).addEventListener('input', e => {
-    const key = ({ 'hours':'hours','days':'days','discount':'discountPct' })[id];
+    const key = ({ hours:'hours', days:'days', discount:'discountPct' })[id];
     currentQuote[key] = e.target.value;
     renderTotals();
   });
@@ -726,17 +923,20 @@ document.getElementById('gst-toggle').addEventListener('change', e => { currentQ
 document.getElementById('cash-toggle').addEventListener('change', e => {
   currentQuote.cashMode = e.target.checked;
   if (e.target.checked) { currentQuote.gst = false; document.getElementById('gst-toggle').checked = false; }
+  document.getElementById('save-cash-pdf').style.display = e.target.checked ? '' : 'none';
   renderTotals();
 });
 document.getElementById('notes').addEventListener('input', e => currentQuote.notes = e.target.value);
 document.getElementById('client-name').addEventListener('input', e => currentQuote.client.name = e.target.value);
 document.getElementById('client-phone').addEventListener('input', e => currentQuote.client.phone = e.target.value);
+document.getElementById('proposed-date').addEventListener('change', e => currentQuote.proposedDate = e.target.value);
 document.getElementById('clear-quote').onclick = () => { if (confirm('Clear this quote? Anything not saved will be lost.')) { currentQuote = blankQuote(); resetQuoteUI(); } };
 
 function resetQuoteUI() {
   document.getElementById('client-name').value = '';
   document.getElementById('client-phone').value = '';
   document.getElementById('client-address').value = '';
+  document.getElementById('proposed-date').value = '';
   document.getElementById('hours').value = 0;
   document.getElementById('days').value = 0;
   document.getElementById('travel-override').value = '';
@@ -745,22 +945,24 @@ function resetQuoteUI() {
   document.getElementById('notes').value = '';
   document.getElementById('gst-toggle').checked = settings.gstDefault;
   document.getElementById('cash-toggle').checked = false;
+  document.getElementById('save-cash-pdf').style.display = 'none';
   document.getElementById('route-box').style.display = 'none';
   document.getElementById('route-warn').style.display = 'none';
-  renderCameraItems(); renderExtrasItems(); renderTotals();
+  renderAll();
 }
 function syncQuoteFromSettings() {
-  document.getElementById('hr-rate-lbl').textContent = fmt(settings.hourlyRate || 0).replace('.00','');
-  document.getElementById('day-rate-lbl').textContent = fmt(settings.dayRate || 0).replace('.00','');
+  document.getElementById('hr-rate-lbl').textContent = fmtShort(settings.hourlyRate || 0);
+  document.getElementById('day-rate-lbl').textContent = fmtShort(settings.dayRate || 0);
   document.getElementById('gst-pct-label').textContent = settings.gstPct;
+  document.getElementById('pill-cameras').textContent = (settings.discountCaps.cameras ?? 0) + '% cap';
+  document.getElementById('pill-travel').textContent  = (settings.discountCaps.travel  ?? 30) + '% cap';
 }
 
 /* =====================================================
-   GOOGLE MAPS
+   MAPS
    ===================================================== */
-function getActiveMapsKey() { return getMapsKey(); } // back-compat alias
 function loadGoogleMaps() {
-  const key = getActiveMapsKey();
+  const key = getMapsKey();
   if (!key) { document.getElementById('route-warn').style.display = 'block'; document.getElementById('route-warn').innerHTML = 'No Google Maps key configured.'; return; }
   if (window.google?.maps?.places) return initMapsServices();
   const s = document.createElement('script');
@@ -772,7 +974,6 @@ function loadGoogleMaps() {
 window.__ndMapsReady = () => initMapsServices();
 function initMapsServices() {
   if (!window.google?.maps?.places) return;
-  mapsReady = true;
   distanceMatrixSvc = new google.maps.DistanceMatrixService();
   const clientField = document.getElementById('client-address');
   if (placesAutocomplete) google.maps.event.clearInstanceListeners(clientField);
@@ -811,31 +1012,55 @@ function computeRoute() {
 }
 
 /* =====================================================
-   SHEET SYNC
+   SHEET SYNC + DYNAMIC TAB DISCOVERY
    ===================================================== */
 function extractSheetId(s) { if (!s) return ''; const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/); return m ? m[1] : s.trim(); }
-function sheetUrl(id, tab) { return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&t=${Date.now()}`; }
+function sheetCsvUrl(id, tab) { return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&t=${Date.now()}`; }
+async function discoverTabs(id, key) {
+  if (!key) return null;
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${id}?key=${encodeURIComponent(key)}&fields=sheets.properties.title`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data.sheets) return null;
+    return data.sheets.map(s => s.properties.title);
+  } catch(e) { return null; }
+}
 async function syncFromSheet(silent) {
   const id = getSheetId();
   if (!id) return;
   const status = document.getElementById('sheet-status');
   if (status && !silent) { status.style.display='block'; status.className='tip'; status.innerHTML='Syncing…'; }
   try {
-    const tabs = ['Cameras','Cable','Conduit','Misc','Travel','Rates'];
-    const results = await Promise.all(tabs.map(async t => {
-      try { const r = await fetch(sheetUrl(id, t)); if (!r.ok) throw new Error(t + ': ' + r.status); return [t, await r.text()]; }
-      catch (e) { return [t, null]; }
-    }));
-    const data = Object.fromEntries(results);
-    const productSection = (csv) => parseCsv(csv).filter(r => r.Type).map(r => ({
-      type: r.Type, price: Number(r.Price) || 0,
+    // Discover all tabs
+    const allTabs = await discoverTabs(id, getMapsKey());
+    const tabsList = allTabs || [...SYSTEM_TABS, ...FALLBACK_EXTRAS_TABS];
+    const extrasTabNames = tabsList.filter(t => !SYSTEM_TABS.includes(t));
+
+    // Fetch all the tabs we need
+    const fetches = {};
+    [...SYSTEM_TABS, ...extrasTabNames].forEach(t => {
+      fetches[t] = fetch(sheetCsvUrl(id, t)).then(r => r.ok ? r.text() : null).catch(() => null);
+    });
+    const data = {};
+    for (const [tab, p] of Object.entries(fetches)) data[tab] = await p;
+
+    const parseProduct = (csv) => parseCsv(csv).filter(r => r.Type).map(r => ({
+      type: r.Type,
+      price: Number(r.Price) || 0,
       favourite: ['true','yes','y','1','✓','x'].includes(String(r.Favourite || '').trim().toLowerCase()),
+      discountCap: r['Discount Cap'] !== undefined && r['Discount Cap'] !== '' ? Number(r['Discount Cap']) : (r.DiscountCap !== undefined && r.DiscountCap !== '' ? Number(r.DiscountCap) : null),
       notes: r.Notes || ''
     }));
-    if (data.Cameras) settings.cameras = productSection(data.Cameras);
-    if (data.Cable)   settings.extras.cable   = productSection(data.Cable);
-    if (data.Conduit) settings.extras.conduit = productSection(data.Conduit);
-    if (data.Misc)    settings.extras.misc    = productSection(data.Misc);
+
+    if (data.Cameras) settings.cameras = parseProduct(data.Cameras);
+    settings.extras = {};
+    extrasTabNames.forEach(t => {
+      if (!data[t]) return;
+      const items = parseProduct(data[t]);
+      if (items.length) settings.extras[t.toLowerCase()] = items;
+    });
     if (data.Travel) {
       const rows = parseCsv(data.Travel).filter(r => r['Max km']);
       if (rows.length) settings.travelBands = rows.map(r => ({ maxKm: Number(r['Max km']) || 0, price: Number(r.Price) || 0 }));
@@ -843,24 +1068,24 @@ async function syncFromSheet(silent) {
     if (data.Rates) {
       const map = {}; parseCsv(data.Rates).forEach(r => { if (r.Key) map[r.Key.trim()] = r.Value; });
       if (map.hourly_rate !== undefined) settings.hourlyRate = Number(map.hourly_rate) || 0;
-      if (map.day_rate    !== undefined) settings.dayRate    = Number(map.day_rate) || 0;
+      if (map.day_rate    !== undefined) settings.dayRate    = Number(map.day_rate)    || 0;
       if (map.gst_percent !== undefined) settings.gstPct     = Number(map.gst_percent) || 0;
-      if (map.cable_discount_cap   !== undefined) settings.discountCaps.cable   = Number(map.cable_discount_cap)   || 0;
-      if (map.conduit_discount_cap !== undefined) settings.discountCaps.conduit = Number(map.conduit_discount_cap) || 0;
+      if (map.travel_discount_cap !== undefined) settings.discountCaps.travel = Number(map.travel_discount_cap) || 30;
+      if (map.cable_discount_cap   !== undefined) settings.discountCaps.cable   = Number(map.cable_discount_cap)   || 25;
+      if (map.conduit_discount_cap !== undefined) settings.discountCaps.conduit = Number(map.conduit_discount_cap) || 25;
       if (map.camera_discount_cap  !== undefined) settings.discountCaps.cameras = Number(map.camera_discount_cap)  || 0;
-      if (map.misc_discount_cap    !== undefined) settings.discountCaps.misc    = Number(map.misc_discount_cap)    || 0;
+      if (map.misc_discount_cap    !== undefined) settings.discountCaps.misc    = Number(map.misc_discount_cap)    || 100;
     }
-    settings.sheetLastStatus = '✓ Synced from sheet at ' + new Date().toLocaleTimeString();
-    saveSettings(); syncQuoteFromSettings(); renderCameraItems(); renderExtrasItems(); renderTotals();
-    if (status) { status.style.display='block'; status.className='tip ok'; status.innerHTML='<b>✓</b> ' + settings.sheetLastStatus; }
-    document.getElementById('pill-cameras').textContent = settings.discountCaps.cameras + '% discount cap';
+    settings.sheetLastStatus = '✓ Synced from sheet at ' + new Date().toLocaleTimeString() + (allTabs ? ' (auto-discovered ' + tabsList.length + ' tabs)' : ' (used fallback tab list)');
+    saveSettings(); syncQuoteFromSettings(); renderAll();
+    if (status) { status.style.display='block'; status.className='tip ok'; status.innerHTML='<b>✓</b> ' + settings.sheetLastStatus.slice(2); }
   } catch (e) {
     settings.sheetLastStatus = 'Sync failed: ' + e.message;
     if (status) { status.style.display='block'; status.className='tip warn'; status.innerHTML='<b>!</b> ' + settings.sheetLastStatus; }
   }
 }
-
 function parseCsv(text) {
+  if (!text) return [];
   const rows = []; let cur = []; let f = ''; let q = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
@@ -907,11 +1132,12 @@ function renderHistory() {
     const q = history.find(x => x.id === b.dataset.id); if (!q) return;
     if (b.dataset.act === 'open') {
       currentQuote = JSON.parse(JSON.stringify(q)); delete currentQuote.grand;
+      if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
       hydrateQuoteUI(); document.querySelector('.tab[data-tab="quote"]').click();
     } else if (b.dataset.act === 'pdf') {
       const snap = JSON.parse(JSON.stringify(currentQuote));
       currentQuote = JSON.parse(JSON.stringify(q));
-      if (q.cashMode) generatePDF(q.cashStyle || 'minimal'); else generatePDF('regular');
+      generatePDF(q.cashMode ? 'cash' : 'regular');
       currentQuote = snap;
     } else if (b.dataset.act === 'del') {
       if (confirm('Delete this quote? This cannot be undone.')) { history = history.filter(x => x.id !== q.id); saveHistory(); renderHistory(); }
@@ -922,6 +1148,7 @@ function hydrateQuoteUI() {
   document.getElementById('client-name').value  = currentQuote.client.name  || '';
   document.getElementById('client-phone').value = currentQuote.client.phone || '';
   document.getElementById('client-address').value = currentQuote.client.address || '';
+  document.getElementById('proposed-date').value = currentQuote.proposedDate || '';
   document.getElementById('hours').value    = currentQuote.hours || 0;
   document.getElementById('days').value     = currentQuote.days  || 0;
   document.getElementById('travel-override').value = currentQuote.travelOverride ?? '';
@@ -930,24 +1157,25 @@ function hydrateQuoteUI() {
   document.getElementById('notes').value    = currentQuote.notes || '';
   document.getElementById('gst-toggle').checked  = !!currentQuote.gst;
   document.getElementById('cash-toggle').checked = !!currentQuote.cashMode;
+  document.getElementById('save-cash-pdf').style.display = currentQuote.cashMode ? '' : 'none';
   if (currentQuote.distanceKm) {
     document.getElementById('route-box').style.display = 'flex';
-    document.getElementById('route-from').textContent = settings.business.homeAddress;
+    document.getElementById('route-from').textContent = getHomeAddress();
     document.getElementById('route-distance').textContent = currentQuote.distanceKm.toFixed(1) + ' km';
     document.getElementById('route-duration').textContent = Math.round(currentQuote.durationMin) + ' min';
     document.getElementById('route-band').textContent = fmt(currentQuote.bandPrice);
   }
-  renderCameraItems(); renderExtrasItems(); renderTotals();
+  renderAll();
 }
 document.getElementById('save-only').onclick = () => { saveCurrentQuote('regular'); alert('Quote saved.'); };
 document.getElementById('save-pdf').onclick  = () => { saveCurrentQuote('regular'); generatePDF('regular'); };
-document.querySelectorAll('#cash-buttons .btn-cash').forEach(b => b.onclick = () => {
+document.getElementById('save-cash-pdf').onclick = () => {
   currentQuote.cashMode = true; document.getElementById('cash-toggle').checked = true;
   currentQuote.gst = false; document.getElementById('gst-toggle').checked = false;
   renderTotals();
-  saveCurrentQuote(b.dataset.cash);
-  generatePDF(b.dataset.cash);
-});
+  saveCurrentQuote('cash');
+  generatePDF('cash');
+};
 function saveCurrentQuote(style) {
   const c = calcQuote();
   if (!currentQuote.id) currentQuote.id = 'Q-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
@@ -972,14 +1200,43 @@ document.getElementById('clear-history').onclick = () => {
 };
 
 /* =====================================================
-   SETTINGS PANEL
+   CALENDAR + ROUTE
+   ===================================================== */
+function icsEscape(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+document.getElementById('add-to-calendar').onclick = () => {
+  if (!currentQuote.proposedDate) { alert('Set a proposed start date first.'); return; }
+  const date = currentQuote.proposedDate.replace(/-/g, '');
+  const next = new Date(currentQuote.proposedDate + 'T00:00:00');
+  next.setDate(next.getDate() + 1);
+  const dateEnd = next.toISOString().slice(0, 10).replace(/-/g, '');
+  const uid = (currentQuote.id || 'Q-' + Date.now()) + '@neilldata';
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const summary = `Install — ${currentQuote.client.name || 'client'}`;
+  const location = currentQuote.client.address || '';
+  const desc = `Quote ref ${currentQuote.id || ''}\nTotal: ${fmt(currentQuote.grand || calcQuote().grand)}\n${currentQuote.client.phone || ''}`;
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//NeillData//Quote//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${date}`,`DTEND;VALUE=DATE:${dateEnd}`,
+    `SUMMARY:${icsEscape(summary)}`,`LOCATION:${icsEscape(location)}`,`DESCRIPTION:${icsEscape(desc)}`,
+    'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  downloadBlob(blob, `install-${(currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.ics`);
+};
+document.getElementById('route-to-site').onclick = () => {
+  const addr = currentQuote.client.address || document.getElementById('client-address').value;
+  if (!addr) { alert('No client address set.'); return; }
+  // Apple Maps URL — opens Apple Maps on iOS, falls back to web on other platforms
+  const url = `https://maps.apple.com/?daddr=${encodeURIComponent(addr)}`;
+  window.open(url, '_blank');
+};
+
+/* =====================================================
+   SETTINGS
    ===================================================== */
 function renderSettings() {
-  // Show user's saved override (or empty). Placeholders show the hardcoded fallback.
   const setVal = (id, saved, hard) => {
     const el = document.getElementById(id);
     el.value = saved || '';
-    el.placeholder = hard ? hard + (saved ? '' : '  (using hardcoded default)') : '';
+    el.placeholder = hard ? hard + (saved ? '' : '  (default)') : '';
   };
   setVal('biz-name',     settings.business.name,        HARDCODED_BUSINESS_NAME);
   setVal('biz-abn',      settings.business.abn,         HARDCODED_BUSINESS_ABN);
@@ -1001,8 +1258,8 @@ document.getElementById('save-settings').onclick = () => {
   settings.business.phone = document.getElementById('biz-phone').value;
   settings.business.email = document.getElementById('biz-email').value;
   settings.business.homeAddress = document.getElementById('home-address').value;
-  settings.passcode = document.getElementById('passcode-new').value;  // empty = use hardcoded
-  settings.sheetId = extractSheetId(document.getElementById('sheet-id').value);  // empty = use hardcoded
+  settings.passcode = document.getElementById('passcode-new').value;
+  settings.sheetId = extractSheetId(document.getElementById('sheet-id').value);
   saveSettings(); syncQuoteFromSettings(); renderTotals();
   alert('Settings saved.');
 };
@@ -1023,54 +1280,34 @@ document.getElementById('import-settings-file').addEventListener('change', e => 
 });
 
 /* =====================================================
-   PDF GENERATION
-   style: 'regular' | 'minimal' | 'green' | 'receipt'
+   PDF
    ===================================================== */
 function generatePDF(style) {
   const { jsPDF } = window.jspdf;
-  const isCash = style && style !== 'regular';
   const doc = new jsPDF({ unit:'pt', format:'a4' });
-  if (style === 'receipt') return buildReceiptPDF(doc);
-  buildStandardPDF(doc, style);
-}
-
-function buildStandardPDF(doc, style) {
   const W = doc.internal.pageSize.getWidth();
   const M = 48;
   const c = calcQuote();
   let y = M;
-  const isCash = style && style !== 'regular';
-  const headerColor = style === 'green' ? [22, 101, 52]
-                    : style === 'minimal' ? [255, 255, 255]
-                    : [7, 17, 31];
-  const headerTextColor = style === 'minimal' ? [0,0,0] : [255,255,255];
+  const isCash = style === 'cash';
 
-  // Header bar (no business info if cash)
-  if (style !== 'minimal') {
-    doc.setFillColor(...headerColor); doc.rect(0, 0, W, 90, 'F');
-    doc.setTextColor(...headerTextColor);
-    doc.setFont('helvetica','bold'); doc.setFontSize(20);
-    if (!isCash) {
-      doc.text(getBizName(), M, 42);
-      doc.setFont('helvetica','normal'); doc.setFontSize(10);
-      const bizLine = [getBizPhone(), getBizEmail(), getBizAbn() ? 'ABN ' + getBizAbn() : ''].filter(Boolean).join('  •  ');
-      if (bizLine) doc.text(bizLine, M, 62);
-    } else {
-      doc.text('Estimate', M, 50);
-    }
-    y = 120;
+  if (isCash) {
+    doc.setFillColor(22, 101, 52); doc.rect(0, 0, W, 90, 'F');
+    doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+    doc.text('Estimate', M, 50);
   } else {
-    // Minimal: no header bar at all
-    doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.setFontSize(18);
-    doc.text('Estimate', M, y + 20); y += 48;
+    doc.setFillColor(7, 17, 31); doc.rect(0, 0, W, 90, 'F');
+    doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(20);
+    doc.text(getBizName(), M, 42);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    const bizLine = [getBizPhone(), getBizEmail(), getBizAbn() ? 'ABN ' + getBizAbn() : ''].filter(Boolean).join('  •  ');
+    if (bizLine) doc.text(bizLine, M, 62);
   }
+  y = 120;
 
-  // Title for non-cash regular quote
-  if (!isCash) {
-    doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.setFontSize(22);
-    doc.text('Quote', M, y); y += 24;
-  }
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(0);
+  doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  if (!isCash) { doc.text('Quote', M, y); y += 24; }
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const today = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
   doc.text('Date: ' + today, M, y); y += 14;
   if (!isCash) {
@@ -1078,8 +1315,11 @@ function buildStandardPDF(doc, style) {
     doc.text('Valid until: ' + exp, M, y); y += 14;
     if (currentQuote.id) { doc.text('Ref: ' + currentQuote.id, M, y); y += 14; }
   }
+  if (currentQuote.proposedDate) {
+    const pd = new Date(currentQuote.proposedDate + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+    doc.text('Proposed start: ' + pd, M, y); y += 14;
+  }
 
-  // Client
   y += 8;
   doc.setFont('helvetica','bold'); doc.text(isCash ? 'For' : 'Prepared for', M, y); y += 14;
   doc.setFont('helvetica','normal');
@@ -1087,11 +1327,8 @@ function buildStandardPDF(doc, style) {
   if (currentQuote.client.address) { const w = doc.splitTextToSize(currentQuote.client.address, W - M*2); doc.text(w, M, y); y += w.length * 12; }
   y += 8;
 
-  // Line items header
   const colX = [M, M + 280, M + 360, M + 460];
-  if (style === 'green') doc.setFillColor(220, 252, 231);
-  else if (style === 'minimal') doc.setFillColor(245, 245, 245);
-  else doc.setFillColor(240, 244, 250);
+  doc.setFillColor(isCash ? 220 : 240, isCash ? 252 : 244, isCash ? 231 : 250);
   doc.rect(M - 8, y - 12, W - M*2 + 16, 22, 'F');
   doc.setFont('helvetica','bold'); doc.setTextColor(0);
   doc.text('Item', colX[0], y); doc.text('Qty', colX[1], y); doc.text('Unit', colX[2], y); doc.text('Total', colX[3], y, { align:'right' });
@@ -1108,29 +1345,24 @@ function buildStandardPDF(doc, style) {
     y += Math.max(14, lbl.length * 12);
   };
 
-  // Iterate items by section, in display order
-  const emitSection = (sec) => {
+  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
+  sectionOrder.forEach(sec => {
     Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
       const [section, ...rest] = key.split(':');
       if (section !== sec) return;
       const item = findItem(key); if (!item || !qty) return;
       const raw = (Number(item.price) || 0) * Number(qty);
-      const cap = discountForSection(sec);
-      const effective = Math.min(c.d, cap);
-      const net = raw * (1 - effective / 100);
+      const cap = effectiveCap(sec, item);
+      const eff = Math.min(c.d, cap);
+      const net = raw * (1 - eff / 100);
       lineOut(rest.join(':'), qty, item.price, net, raw);
     });
-  };
-  emitSection('cameras');
-  emitSection('cable');
-  emitSection('conduit');
-  emitSection('misc');
-  currentQuote.customLines.forEach(o => { if (!Number(o.amount)) return; lineOut(o.label || 'Custom', null, null, Number(o.amount) * (1 - c.d/100), Number(o.amount)); });
+  });
+  currentQuote.customLines.forEach(o => { if (!Number(o.amount)) return; lineOut(o.label || 'Custom', null, null, Number(o.amount) * (1 - c.d / 100), Number(o.amount)); });
   if (Number(currentQuote.hours)) lineOut(`Labour — ${currentQuote.hours} hr @ ${fmt(settings.hourlyRate)}/hr`, null, null, settings.hourlyRate * Number(currentQuote.hours) * (1 - c.d/100), settings.hourlyRate * Number(currentQuote.hours));
   if (Number(currentQuote.days))  lineOut(`Labour — ${currentQuote.days} day(s) @ ${fmt(settings.dayRate)}/day`, null, null, settings.dayRate * Number(currentQuote.days) * (1 - c.d/100), settings.dayRate * Number(currentQuote.days));
   if (c.travelRaw) lineOut(isCash ? 'Travel' : `Travel${currentQuote.distanceKm ? ' (' + currentQuote.distanceKm.toFixed(1) + ' km)' : ''}`, null, null, c.travelNet, c.travelRaw);
 
-  // Totals
   y += 10; doc.setDrawColor(200); doc.line(M, y, W - M, y); y += 18;
   doc.setFont('helvetica','normal');
   doc.text('Subtotal', W - M - 90, y, { align:'right' }); doc.text(fmt(c.subtotal), W - M, y, { align:'right' }); y += 14;
@@ -1141,55 +1373,16 @@ function buildStandardPDF(doc, style) {
 
   if (!isCash) {
     doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(120);
-    doc.text('Quote valid 30 days. Final pricing subject to site assessment.', M, 800, { maxWidth: W - M*2 });
+    doc.text('Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.', M, 800, { maxWidth: W - M*2 });
   }
-  doc.save(buildFilename(style));
-}
-
-function buildReceiptPDF(doc) {
-  // Narrow receipt style: small page, monospace font, no business info
-  const W = doc.internal.pageSize.getWidth();
-  const M = 36;
-  const c = calcQuote();
-  let y = M;
-  doc.setFont('courier','bold'); doc.setFontSize(16);
-  doc.text('ESTIMATE', M, y); y += 22;
-  doc.setFont('courier','normal'); doc.setFontSize(10);
-  doc.text(new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }), M, y); y += 14;
-  if (currentQuote.client.name) { doc.text('For: ' + currentQuote.client.name, M, y); y += 14; }
-  y += 6;
-  doc.text('-'.repeat(58), M, y); y += 14;
-  const line = (l, r) => { doc.text(l.slice(0,40), M, y); doc.text(r, W - M, y, { align:'right' }); y += 13; };
-  Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
-    const item = findItem(key); if (!item || !qty) return;
-    const [section, ...rest] = key.split(':');
-    const cap = discountForSection(section);
-    const effective = Math.min(c.d, cap);
-    const net = (Number(item.price)||0) * Number(qty) * (1 - effective/100);
-    line(`${qty}x ${rest.join(':')}`, fmt(net));
-  });
-  currentQuote.customLines.forEach(o => { if (!Number(o.amount)) return; line(o.label || 'Item', fmt(Number(o.amount) * (1 - c.d/100))); });
-  if (Number(currentQuote.hours)) line(`Labour ${currentQuote.hours}hr`, fmt(settings.hourlyRate * Number(currentQuote.hours) * (1 - c.d/100)));
-  if (Number(currentQuote.days)) line(`Labour ${currentQuote.days}d`, fmt(settings.dayRate * Number(currentQuote.days) * (1 - c.d/100)));
-  if (c.travelRaw) line('Travel', fmt(c.travelNet));
-  y += 4; doc.text('-'.repeat(58), M, y); y += 14;
-  doc.setFont('courier','bold'); doc.setFontSize(13);
-  line('TOTAL', fmt(c.grand));
-  doc.save(buildFilename('receipt'));
-}
-
-function buildFilename(style) {
   const slug = (currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
-  const tag = style === 'regular' ? '' : '-cash-' + style;
-  return `quote-${slug}-${new Date().toISOString().slice(0,10)}${tag}.pdf`;
+  const tag = isCash ? '-cash' : '';
+  doc.save(`quote-${slug}-${new Date().toISOString().slice(0,10)}${tag}.pdf`);
 }
 
 /* =====================================================
-   UTILS + INIT
+   INIT
    ===================================================== */
-function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
-function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function init() {
   syncQuoteFromSettings();
   resetQuoteUI();
