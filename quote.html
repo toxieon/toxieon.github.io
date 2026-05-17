@@ -424,6 +424,7 @@ const HARDCODED_BUSINESS_PHONE  = '0418 912 681';
 const HARDCODED_BUSINESS_EMAIL  = 'brandon.j.neill@gmail.com';
 const HARDCODED_HOME_ADDRESS    = '1/84 Mount Eliza Way, Mount Eliza VIC 3930';
 const HARDCODED_PASSCODE        = '';
+const HARDCODED_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
 
 // Tabs the parser treats as "system" (not extras subsections)
 const SYSTEM_TABS    = ['Cameras', 'Travel', 'Rates'];
@@ -443,6 +444,7 @@ function getBizPhone()     { return (settings.business.phone && settings.busines
 function getBizEmail()     { return (settings.business.email && settings.business.email.trim())                     || HARDCODED_BUSINESS_EMAIL  || ''; }
 function getHomeAddress()  { return (settings.business.homeAddress && settings.business.homeAddress.trim())         || HARDCODED_HOME_ADDRESS    || ''; }
 function getPasscode()     { return settings.passcode || HARDCODED_PASSCODE || '1234'; }
+function getBackendUrl()   { return (settings.backendUrl && settings.backendUrl.trim()) || HARDCODED_APPS_SCRIPT_URL || ''; }
 
 /* =====================================================
    STATE
@@ -456,6 +458,7 @@ const defaultSettings = {
   business: { name:'', abn:'', phone:'', email:'', homeAddress:'' },
   mapsKey: '',
   sheetId: '',
+  backendUrl: '',
   cameras: [],
   extras: {},   // { cable: [{type,price,favourite,discountCap,notes}], conduit: [...], misc: [...], ... }
   hourlyRate: 0,
@@ -472,6 +475,8 @@ let userFavs = loadFavs();
 let history  = loadHistory();
 let currentQuote = blankQuote();
 let activeExtrasSub = 'cable';
+let currentUser = null;   // { username, role, passwordHash, ... } set on successful unlock
+let backendOnline = false; // tracks whether last backend call succeeded
 let placesAutocomplete = null, homeAutocomplete = null, distanceMatrixSvc = null;
 
 function blankQuote() {
@@ -519,12 +524,65 @@ const passcodeInput = document.getElementById('passcode-input');
 const lockErr = document.getElementById('lock-err');
 document.getElementById('passcode-submit').onclick = tryUnlock;
 passcodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
-function tryUnlock() {
-  if (passcodeInput.value === getPasscode()) {
-    lockScreen.style.display = 'none';
-    document.getElementById('app').hidden = false;
-    init();
-  } else { lockErr.textContent = 'Wrong passcode'; passcodeInput.value = ''; passcodeInput.focus(); }
+
+async function tryUnlock() {
+  const passcode = passcodeInput.value;
+  if (!passcode) return;
+  lockErr.textContent = 'Checking…';
+  let hash;
+  try { hash = await sha256Hex(passcode); }
+  catch (e) { lockErr.textContent = 'Hash error: ' + e.message; return; }
+
+  // Try backend login first
+  try {
+    const r = await fetch(getBackendUrl(), {
+      method: 'POST',
+      body: JSON.stringify({ action: 'login', passwordHash: hash }),
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      redirect: 'follow'
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (data.ok && data.user) {
+        currentUser = Object.assign({}, data.user, { passwordHash: hash });
+        backendOnline = true;
+        finishUnlock();
+        return;
+      }
+      // Server reachable but rejected
+      if (data && data.locked) {
+        lockErr.textContent = 'Account locked. Contact admin.';
+        wipeLocalCache();
+        passcodeInput.value = '';
+        return;
+      }
+      // 'invalid passcode' or similar - fall through to offline fallback below
+    }
+  } catch (e) {
+    // Network error - fall through to offline fallback
+    backendOnline = false;
+  }
+
+  // Offline fallback: local passcode check
+  if (passcode === getPasscode()) {
+    currentUser = { username: 'local', role: 'master', passwordHash: hash };
+    finishUnlock();
+    return;
+  }
+  lockErr.textContent = 'Wrong passcode';
+  passcodeInput.value = '';
+  passcodeInput.focus();
+}
+
+function finishUnlock() {
+  lockScreen.style.display = 'none';
+  document.getElementById('app').hidden = false;
+  // Hide Settings tab for staff (master sees everything)
+  if (currentUser && currentUser.role !== 'master') {
+    const tabEl = document.querySelector('.tab[data-tab="settings"]');
+    if (tabEl) tabEl.style.display = 'none';
+  }
+  init();
 }
 window.addEventListener('load', () => passcodeInput.focus());
 
@@ -541,6 +599,73 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'settings') renderSettings();
   };
 });
+
+/* =====================================================
+   BACKEND (Apps Script) INTEGRATION
+   ===================================================== */
+async function sha256Hex(str) {
+  const buf = new TextEncoder().encode(String(str || ''));
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function backendCall(action, body) {
+  const url = getBackendUrl();
+  if (!url) throw new Error('No backend URL configured');
+  body = Object.assign({}, body || {}, { action });
+  if (currentUser && currentUser.passwordHash && !body.passwordHash) body.passwordHash = currentUser.passwordHash;
+  // Use text/plain to avoid CORS preflight on Apps Script web apps
+  const r = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    redirect: 'follow'
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json();
+  backendOnline = true;
+  if (data && data.error) {
+    const err = new Error(data.error);
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+function wipeLocalCache() {
+  localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(HISTORY_KEY);
+  localStorage.removeItem(FAVS_KEY);
+  history = [];
+  settings = JSON.parse(JSON.stringify(defaultSettings));
+  userFavs = {};
+}
+async function syncQuotesFromBackend() {
+  if (!currentUser || !currentUser.passwordHash) return;
+  try {
+    const r = await backendCall('get_quotes', {});
+    const remoteQuotes = (r && r.quotes) || [];
+    const remoteIds = new Set(remoteQuotes.map(q => q.id));
+    // Push local-only quotes up first
+    const toPush = history.filter(q => q.id && !remoteIds.has(q.id));
+    for (const q of toPush) {
+      try { await backendCall('save_quote', { quote: q }); } catch (e) { console.warn('push failed', q.id, e.message); }
+    }
+    // Merge: remote wins for matching ids
+    const merged = {};
+    history.forEach(q => { if (q.id) merged[q.id] = q; });
+    remoteQuotes.forEach(q => { if (q.id) merged[q.id] = q; });
+    history = Object.values(merged).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    saveHistory();
+    if (document.querySelector('.tab[data-tab="history"]').classList.contains('active')) renderHistory();
+  } catch (e) {
+    console.warn('cloud sync failed:', e.message);
+    backendOnline = false;
+  }
+}
+async function pushQuoteToBackend(quote) {
+  if (!currentUser || !currentUser.passwordHash) return;
+  try { await backendCall('save_quote', { quote }); }
+  catch (e) { console.warn('cloud push failed:', e.message); backendOnline = false; }
+}
 
 /* =====================================================
    HELPERS
@@ -1175,7 +1300,13 @@ function renderHistory() {
       generatePDF(q.cashMode ? 'cash' : 'regular');
       currentQuote = snap;
     } else if (b.dataset.act === 'del') {
-      if (confirm('Delete this quote? This cannot be undone.')) { history = history.filter(x => x.id !== q.id); saveHistory(); renderHistory(); }
+      if (confirm('Delete this quote? This cannot be undone.')) {
+        history = history.filter(x => x.id !== q.id);
+        saveHistory();
+        renderHistory();
+        // Also remove from cloud (fire and forget)
+        backendCall('delete_quote', { id: q.id }).catch(e => console.warn('cloud delete failed:', e.message));
+      }
     }
   });
 }
@@ -1221,6 +1352,8 @@ function saveCurrentQuote(style) {
   const snap = JSON.parse(JSON.stringify(currentQuote));
   if (idx >= 0) history[idx] = snap; else history.push(snap);
   saveHistory();
+  // Push to backend (fire and forget - never blocks the UI)
+  pushQuoteToBackend(snap);
 }
 document.getElementById('export-history').onclick = () => {
   const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
@@ -1438,6 +1571,8 @@ function init() {
   resetQuoteUI();
   loadGoogleMaps();
   syncFromSheet(true);
+  // Pull cloud quotes + push any local-only ones (non-blocking)
+  syncQuotesFromBackend();
 }
 </script>
 </body>
