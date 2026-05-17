@@ -268,7 +268,7 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
           <div class="field"><label for="client-phone">Client phone</label><input id="client-phone" type="tel" placeholder="04xx xxx xxx" /></div>
         </div>
         <div class="field"><label for="client-address">Site address</label><input id="client-address" type="text" placeholder="Start typing the address..." autocomplete="off" /></div>
-        <div class="field"><label for="proposed-date">Proposed start date</label><input id="proposed-date" type="date" /></div>
+        <div class="field"><label for="proposed-date">Proposed start date & time</label><input id="proposed-date" type="datetime-local" /></div>
         <div id="route-box" class="route-box" style="display:none;">
           <div class="row"><span>From home base</span><b id="route-from">—</b></div>
           <div class="row"><span>Distance</span><b id="route-distance">—</b></div>
@@ -370,8 +370,9 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
           <button class="btn btn-primary" id="sheet-sync">Sync now</button>
         </div>
         <div class="tip">
-          System tabs: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. Any other tab in the sheet becomes an Extras subsection automatically (requires Sheets API enabled on your Google Maps key — otherwise falls back to <b>Cable, Conduit, Misc</b>).
-          Product columns: <b>Type, Price, Favourite, Discount Cap, Notes</b>.
+          System tabs: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. Any other tab in the sheet becomes an Extras subsection automatically.
+          Two ways to enable that: (1) enable <b>Google Sheets API</b> on your Maps API key (auto-detect every tab); or (2) add a row to the <b>Rates</b> tab with Key=<b>extra_tabs</b> and Value=<b>Cable, Conduit, Misc, GPOs, Switch</b> (comma-separated list of every extras tab).
+          Product columns (case-insensitive, aliases supported): <b>Type, Price, Favourite, Discount Cap, Notes</b>.
         </div>
       </div>
 
@@ -636,7 +637,9 @@ function buildSelectOptions(section, items, currentKey) {
   decorated.forEach(({ it, fav }) => {
     const key = section + ':' + it.type;
     const sel = key === currentKey ? ' selected' : '';
-    const label = (fav ? '★ ' : '') + it.type + '  ·  ' + fmtShort(Number(it.price) || 0);
+    const capStr = (it.discountCap !== null && it.discountCap !== undefined && it.discountCap !== '')
+      ? `  · cap ${it.discountCap}%` : '';
+    const label = (fav ? '★ ' : '') + it.type + '  ·  ' + fmtShort(Number(it.price) || 0) + capStr;
     html += `<option value="${escapeAttr(key)}"${sel}>${escapeHtml(label)}</option>`;
   });
   return html;
@@ -748,10 +751,12 @@ function renderListSection(targetEl, section) {
     const sub = unit * qty;
     const row = document.createElement('div');
     row.className = 'item-row' + (fav ? ' fav' : '') + (qty > 0 ? ' has-qty' : '');
+    const capBadge = (item.discountCap !== null && item.discountCap !== undefined && item.discountCap !== '')
+      ? ` <span style="background:rgba(49,208,255,0.15);color:var(--brand);padding:1px 6px;border-radius:999px;font-size:0.7rem;font-weight:700;margin-left:6px;">cap ${item.discountCap}%</span>` : '';
     row.innerHTML = `
       <button class="item-star ${fav ? 'on' : ''}" data-key="${escapeAttr(key)}" data-sheetfav="${item.favourite ? 1 : 0}">${fav ? '★' : '☆'}</button>
       <div class="item-info">
-        <div class="item-name">${escapeHtml(item.type)}${section === 'favourites' ? ` <span style="color:var(--muted);font-weight:500;font-size:0.8em;">· ${sec}</span>` : ''}</div>
+        <div class="item-name">${escapeHtml(item.type)}${capBadge}${section === 'favourites' ? ` <span style="color:var(--muted);font-weight:500;font-size:0.8em;">· ${sec}</span>` : ''}</div>
         ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
       </div>
       ${renderQtyControlsHTML(key, qty)}
@@ -1046,13 +1051,25 @@ async function syncFromSheet(silent) {
     const data = {};
     for (const [tab, p] of Object.entries(fetches)) data[tab] = await p;
 
-    const parseProduct = (csv) => parseCsv(csv).filter(r => r.Type).map(r => ({
-      type: r.Type,
-      price: Number(r.Price) || 0,
-      favourite: ['true','yes','y','1','✓','x'].includes(String(r.Favourite || '').trim().toLowerCase()),
-      discountCap: r['Discount Cap'] !== undefined && r['Discount Cap'] !== '' ? Number(r['Discount Cap']) : (r.DiscountCap !== undefined && r.DiscountCap !== '' ? Number(r.DiscountCap) : null),
-      notes: r.Notes || ''
-    }));
+    const findKey = (row, candidates) => {
+      const keys = Object.keys(row);
+      for (const c of candidates) {
+        const found = keys.find(k => k.toLowerCase().trim() === c.toLowerCase().trim());
+        if (found && row[found] !== '') return row[found];
+      }
+      return '';
+    };
+    const parseProduct = (csv) => parseCsv(csv).filter(r => findKey(r, ['Type','Name','Item'])).map(r => {
+      const capRaw = findKey(r, ['Discount Cap','DiscountCap','Cap','Max Discount','MaxDiscount']);
+      const capNum = capRaw === '' ? null : Number(capRaw);
+      return {
+        type: findKey(r, ['Type','Name','Item']),
+        price: Number(findKey(r, ['Price','Cost','Amount'])) || 0,
+        favourite: ['true','yes','y','1','✓','x'].includes(String(findKey(r, ['Favourite','Favorite','Fav','Star'])).trim().toLowerCase()),
+        discountCap: (capNum !== null && !isNaN(capNum)) ? capNum : null,
+        notes: findKey(r, ['Notes','Note','Description','Comment']) || ''
+      };
+    });
 
     if (data.Cameras) settings.cameras = parseProduct(data.Cameras);
     settings.extras = {};
@@ -1065,8 +1082,12 @@ async function syncFromSheet(silent) {
       const rows = parseCsv(data.Travel).filter(r => r['Max km']);
       if (rows.length) settings.travelBands = rows.map(r => ({ maxKm: Number(r['Max km']) || 0, price: Number(r.Price) || 0 }));
     }
+    let manualExtras = null;
     if (data.Rates) {
       const map = {}; parseCsv(data.Rates).forEach(r => { if (r.Key) map[r.Key.trim()] = r.Value; });
+      if (map.extra_tabs) {
+        manualExtras = map.extra_tabs.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      }
       if (map.hourly_rate !== undefined) settings.hourlyRate = Number(map.hourly_rate) || 0;
       if (map.day_rate    !== undefined) settings.dayRate    = Number(map.day_rate)    || 0;
       if (map.gst_percent !== undefined) settings.gstPct     = Number(map.gst_percent) || 0;
@@ -1076,7 +1097,21 @@ async function syncFromSheet(silent) {
       if (map.camera_discount_cap  !== undefined) settings.discountCaps.cameras = Number(map.camera_discount_cap)  || 0;
       if (map.misc_discount_cap    !== undefined) settings.discountCaps.misc    = Number(map.misc_discount_cap)    || 100;
     }
-    settings.sheetLastStatus = '✓ Synced from sheet at ' + new Date().toLocaleTimeString() + (allTabs ? ' (auto-discovered ' + tabsList.length + ' tabs)' : ' (used fallback tab list)');
+    // If Sheets API didn't work and the user listed extra_tabs in Rates, fetch those now and merge
+    if (!allTabs && manualExtras && manualExtras.length) {
+      const newOnes = manualExtras.filter(t => !tabsList.includes(t));
+      if (newOnes.length) {
+        const more = await Promise.all(newOnes.map(t => fetch(sheetCsvUrl(id, t)).then(r => r.ok ? r.text() : null).catch(() => null)));
+        newOnes.forEach((t, i) => {
+          if (more[i]) {
+            const items = parseProduct(more[i]);
+            if (items.length) settings.extras[t.toLowerCase()] = items;
+          }
+        });
+      }
+    }
+    settings.sheetLastStatus = '✓ Synced from sheet at ' + new Date().toLocaleTimeString() +
+      (allTabs ? ' (auto-discovered ' + tabsList.length + ' tabs)' : (manualExtras ? ' (used extra_tabs from Rates)' : ' (used fallback tab list)'));
     saveSettings(); syncQuoteFromSettings(); renderAll();
     if (status) { status.style.display='block'; status.className='tip ok'; status.innerHTML='<b>✓</b> ' + settings.sheetLastStatus.slice(2); }
   } catch (e) {
@@ -1204,22 +1239,31 @@ document.getElementById('clear-history').onclick = () => {
    ===================================================== */
 function icsEscape(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
 document.getElementById('add-to-calendar').onclick = () => {
-  if (!currentQuote.proposedDate) { alert('Set a proposed start date first.'); return; }
-  const date = currentQuote.proposedDate.replace(/-/g, '');
-  const next = new Date(currentQuote.proposedDate + 'T00:00:00');
-  next.setDate(next.getDate() + 1);
-  const dateEnd = next.toISOString().slice(0, 10).replace(/-/g, '');
+  if (!currentQuote.proposedDate) { alert('Set a proposed start date & time first.'); return; }
+  const startStr = currentQuote.proposedDate; // 'YYYY-MM-DDTHH:mm' or 'YYYY-MM-DD'
+  const hasTime = startStr.includes('T');
+  const startDt = new Date(hasTime ? startStr : startStr + 'T09:00');
+  const endDt = new Date(startDt.getTime() + 2 * 3600 * 1000); // default 2-hour install
+  const fmtIcs = d => d.getFullYear().toString().padStart(4,'0') + (d.getMonth()+1).toString().padStart(2,'0') + d.getDate().toString().padStart(2,'0') + 'T' + d.getHours().toString().padStart(2,'0') + d.getMinutes().toString().padStart(2,'0') + '00';
   const uid = (currentQuote.id || 'Q-' + Date.now()) + '@neilldata';
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
   const summary = `Install — ${currentQuote.client.name || 'client'}`;
   const location = currentQuote.client.address || '';
-  const desc = `Quote ref ${currentQuote.id || ''}\nTotal: ${fmt(currentQuote.grand || calcQuote().grand)}\n${currentQuote.client.phone || ''}`;
+  const desc = `Quote ref ${currentQuote.id || ''}\\nTotal: ${fmt(currentQuote.grand || calcQuote().grand)}\\n${currentQuote.client.phone || ''}`;
   const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//NeillData//Quote//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
-    'BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${stamp}`,`DTSTART;VALUE=DATE:${date}`,`DTEND;VALUE=DATE:${dateEnd}`,
+    'BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${stamp}`,`DTSTART:${fmtIcs(startDt)}`,`DTEND:${fmtIcs(endDt)}`,
     `SUMMARY:${icsEscape(summary)}`,`LOCATION:${icsEscape(location)}`,`DESCRIPTION:${icsEscape(desc)}`,
     'END:VEVENT','END:VCALENDAR'].join('\r\n');
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  downloadBlob(blob, `install-${(currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.ics`);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    // Navigate the page to the data URI so the OS handler (Calendar.app etc.) takes over
+    window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  } else {
+    // Desktop: download for the user to open in their calendar app
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    downloadBlob(blob, `install-${(currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.ics`);
+  }
 };
 document.getElementById('route-to-site').onclick = () => {
   const addr = currentQuote.client.address || document.getElementById('client-address').value;
@@ -1316,7 +1360,10 @@ function generatePDF(style) {
     if (currentQuote.id) { doc.text('Ref: ' + currentQuote.id, M, y); y += 14; }
   }
   if (currentQuote.proposedDate) {
-    const pd = new Date(currentQuote.proposedDate + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+    const hasTime = currentQuote.proposedDate.includes('T');
+    const pdDate = new Date(hasTime ? currentQuote.proposedDate : currentQuote.proposedDate + 'T00:00');
+    const pd = pdDate.toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }) +
+      (hasTime ? ', ' + pdDate.toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit' }) : '');
     doc.text('Proposed start: ' + pd, M, y); y += 14;
   }
 
@@ -1355,7 +1402,10 @@ function generatePDF(style) {
       const cap = effectiveCap(sec, item);
       const eff = Math.min(c.d, cap);
       const net = raw * (1 - eff / 100);
-      lineOut(rest.join(':'), qty, item.price, net, raw);
+      // If global discount got capped down for this item, hide the strikethrough on the PDF
+      // (in-app totals breakdown still shows it for transparency)
+      const isCapped = cap < c.d && c.d > 0;
+      lineOut(rest.join(':'), qty, item.price, net, isCapped ? null : raw);
     });
   });
   currentQuote.customLines.forEach(o => { if (!Number(o.amount)) return; lineOut(o.label || 'Custom', null, null, Number(o.amount) * (1 - c.d / 100), Number(o.amount)); });
