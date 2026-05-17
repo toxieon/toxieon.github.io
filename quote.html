@@ -42,6 +42,12 @@ header { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); bac
 .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 4px; border-radius: 999px; border: 1px solid var(--card-border); }
 .tab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 8px 14px; border-radius: 999px; transition: 0.15s; font-family: inherit; }
 .tab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
+.user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 14px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.user-chip-avatar { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; display: grid; place-items: center; font-size: 0.78rem; font-weight: 900; margin-left: -6px; }
+.user-chip-name { color: var(--text); letter-spacing: -0.01em; }
+.user-chip-role { font-size: 0.65rem; padding: 2px 7px; border-radius: 999px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.user-chip-role.master { background: rgba(255,209,102,0.15); color: var(--warning); border: 1px solid rgba(255,209,102,0.3); }
+.user-chip-role.staff  { background: rgba(106,255,184,0.12); color: var(--brand-2); border: 1px solid rgba(106,255,184,0.25); }
 
 main { padding: 24px 0 80px; }
 .panel { display: none; }
@@ -186,6 +192,8 @@ input[type="date"] { color-scheme: dark; }
   .head-row { flex-wrap: wrap; }
   .tabs { width: 100%; justify-content: space-between; }
   .tab { flex: 1; }
+  .user-chip { order: 1; margin-left: auto; padding: 4px 10px 4px 12px; font-size: 0.78rem; }
+  .user-chip-avatar { width: 22px; height: 22px; font-size: 0.7rem; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .toggles-row { grid-template-columns: 1fr; }
   .item-row {
@@ -250,6 +258,11 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
         <button class="tab" data-tab="history">History</button>
         <button class="tab" data-tab="staff" style="display:none;">Staff</button>
         <button class="tab" data-tab="settings">Settings</button>
+      </div>
+      <div id="user-chip" class="user-chip" hidden>
+        <span class="user-chip-avatar" id="user-chip-avatar">—</span>
+        <span class="user-chip-name" id="user-chip-name">—</span>
+        <span class="user-chip-role staff" id="user-chip-role">staff</span>
       </div>
     </div>
   </header>
@@ -662,6 +675,20 @@ function finishUnlock() {
   } else if (currentUser) {
     const settingsTab = document.querySelector('.tab[data-tab="settings"]');
     if (settingsTab) settingsTab.style.display = 'none';
+  }
+  // Populate the user chip in the header
+  if (currentUser) {
+    const chip = document.getElementById('user-chip');
+    if (chip) {
+      const name = currentUser.username || 'User';
+      const initials = name.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || 'U';
+      document.getElementById('user-chip-avatar').textContent = initials;
+      document.getElementById('user-chip-name').textContent = name;
+      const roleEl = document.getElementById('user-chip-role');
+      roleEl.textContent = currentUser.role || 'staff';
+      roleEl.className = 'user-chip-role ' + (currentUser.role || 'staff');
+      chip.hidden = false;
+    }
   }
   init();
 }
@@ -1184,6 +1211,22 @@ function loadGoogleMaps() {
   document.body.appendChild(s);
 }
 window.__ndMapsReady = () => initMapsServices();
+function attachSimpleAutocomplete(id) {
+  const field = document.getElementById(id);
+  if (!field || !window.google?.maps?.places) return;
+  // Idempotent — won't attach twice
+  if (field.dataset.acAttached === '1') return;
+  field.dataset.acAttached = '1';
+  const ac = new google.maps.places.Autocomplete(field, { componentRestrictions: { country: 'au' }, fields: ['formatted_address'] });
+  ac.addListener('place_changed', () => {
+    const p = ac.getPlace();
+    if (p.formatted_address) {
+      field.value = p.formatted_address;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+}
+
 function initMapsServices() {
   if (!window.google?.maps?.places) return;
   distanceMatrixSvc = new google.maps.DistanceMatrixService();
@@ -1201,6 +1244,9 @@ function initMapsServices() {
     const p = homeAutocomplete.getPlace();
     if (p.formatted_address) { settings.business.homeAddress = p.formatted_address; homeField.value = p.formatted_address; saveSettings(); }
   });
+  // Staff form address fields (Add staff + Edit staff)
+  attachSimpleAutocomplete('ns-address');
+  attachSimpleAutocomplete('sd-address');
 }
 function computeRoute() {
   const home = getHomeAddress(), client = currentQuote.client.address;
