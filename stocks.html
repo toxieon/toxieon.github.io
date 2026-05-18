@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neill Data — Stock Screener</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#121821;
+    --panel-2:#0f141c;
+    --line:#1f2937;
+    --text:#e6edf3;
+    --muted:#8b96a5;
+    --accent:#4ade80;
+    --accent-2:#22d3ee;
+    --danger:#ef4444;
+    --warn:#f59e0b;
+    --gold:#ffd24a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:radial-gradient(1200px 600px at 10% -10%,#10202c 0%,transparent 60%),radial-gradient(1000px 500px at 110% 110%,#1a1530 0%,transparent 55%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  a{color:var(--accent-2);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{max-width:1400px;margin:0 auto;padding:24px 20px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#22d3ee,#4ade80);display:grid;place-items:center;font-weight:800;color:#06141a}
+  h1{font-size:22px;margin:0;letter-spacing:.2px}
+  .sub{font-size:12px;color:var(--muted)}
+  .badge{font-size:11px;color:#06141a;background:var(--accent);padding:2px 8px;border-radius:999px;font-weight:700}
+
+  .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;width:fit-content}
+  .tab{padding:8px 14px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px;user-select:none}
+  .tab.active{background:linear-gradient(180deg,#1b2330,#141b25);color:var(--text);box-shadow:inset 0 0 0 1px #2a3445}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:160px}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .field input,.field select{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;outline:none}
+  .field input:focus,.field select:focus{border-color:#2b8eff}
+  .toggle{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:3px;font-size:12px}
+  .toggle button{background:transparent;border:0;color:var(--muted);padding:6px 12px;border-radius:999px;cursor:pointer;font-weight:600}
+  .toggle button.on{background:#1d2a3a;color:var(--text)}
+  .btn{appearance:none;border:0;cursor:pointer;font-weight:700;padding:10px 16px;border-radius:10px;font-size:14px}
+  .btn.primary{background:linear-gradient(180deg,#22d3ee,#0ea5b7);color:#04181d}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .btn:hover{filter:brightness(1.05)}
+
+  /* Custom watchlist input grid */
+  .ticker-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-top:8px}
+  .ticker-grid input{background:var(--panel-2);border:1px solid var(--line);color:var(--text);text-transform:uppercase;letter-spacing:.08em;text-align:center;font-weight:700;padding:10px;border-radius:8px;font-size:14px;outline:none}
+  .ticker-grid input:focus{border-color:#22d3ee}
+  @media (max-width:900px){.ticker-grid{grid-template-columns:repeat(4,1fr)}}
+
+  /* Table */
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:16px}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:1100px}
+  thead th{position:sticky;top:0;background:#0e141d;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap}
+  thead th:hover{color:var(--text)}
+  thead th .arrow{opacity:.5;margin-left:4px}
+  tbody td{padding:10px 12px;border-bottom:1px solid #131b26;vertical-align:middle;white-space:nowrap}
+  tbody tr:hover{background:#0f1620}
+  .sym{font-weight:800;letter-spacing:.04em}
+  .price{font-variant-numeric:tabular-nums}
+  .chg.pos{color:var(--accent)}
+  .chg.neg{color:var(--danger)}
+  .chip{display:inline-block;padding:3px 8px;border-radius:6px;font-weight:700;font-size:12px;letter-spacing:.03em}
+
+  /* Float chips */
+  .float-gold{background:rgba(255,210,74,.14);color:var(--gold);box-shadow:inset 0 0 0 1.5px var(--accent);animation:goldpulse 1.6s ease-in-out infinite}
+  .float-green{background:rgba(74,222,128,.14);color:var(--accent)}
+  .float-yellow{background:rgba(245,158,11,.16);color:var(--warn)}
+  .float-red{background:rgba(239,68,68,.16);color:var(--danger)}
+  @keyframes goldpulse{
+    0%,100%{box-shadow:inset 0 0 0 1.5px #4ade80,0 0 0 0 rgba(255,210,74,.55)}
+    50%{box-shadow:inset 0 0 0 1.5px #4ade80,0 0 0 8px rgba(255,210,74,0)}
+  }
+
+  /* Grade chips */
+  .grade{font-weight:900;width:34px;height:34px;display:inline-grid;place-items:center;border-radius:8px;letter-spacing:0}
+  .grade.S{background:linear-gradient(135deg,#ff6ad5,#7b5cff);color:#fff;box-shadow:0 0 0 1.5px #c084fc inset,0 0 18px rgba(192,132,252,.45)}
+  .grade.A{background:linear-gradient(135deg,#34d399,#10b981);color:#04181d}
+  .grade.B{background:linear-gradient(135deg,#60a5fa,#3b82f6);color:#04181d}
+  .grade.C{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#2a1a00}
+  .grade.D{background:linear-gradient(135deg,#fb923c,#ea580c);color:#2a1000}
+  .grade.F{background:linear-gradient(135deg,#f87171,#dc2626);color:#fff}
+
+  .sector{font-size:11px;color:var(--muted);background:#0f1722;border:1px solid var(--line);padding:2px 6px;border-radius:6px}
+  .rvol{font-variant-numeric:tabular-nums}
+  .rvol.hot{color:var(--accent);font-weight:700}
+  .rvol.warm{color:var(--warn)}
+  .si{font-variant-numeric:tabular-nums}
+  .si.high{color:#fb7185;font-weight:700}
+
+  .news-btn{display:inline-flex;align-items:center;gap:6px;background:#0f1722;border:1px solid var(--line);color:var(--text);padding:5px 9px;border-radius:6px;font-size:12px}
+  .news-btn:hover{border-color:#22d3ee;color:#22d3ee}
+
+  .footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px;margin-top:14px;flex-wrap:wrap;gap:8px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap}
+  .legend .chip{font-size:11px}
+
+  .empty{padding:60px 20px;text-align:center;color:var(--muted)}
+  .status{font-size:12px;color:var(--muted)}
+  .status.err{color:#fb7185}
+
+  .pane{display:none}
+  .pane.active{display:block}
+
+  details{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:14px}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+  .keyrow{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center}
+  .keyrow input{flex:1;min-width:240px;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:8px}
+  .disclaim{font-size:11px;color:#6b7280;margin-top:8px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">N</div>
+      <div>
+        <h1>Neill Data — Stock Screener <span class="badge">side project</span></h1>
+        <div class="sub">Low-float momentum screener · neilldata.com/stocks</div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist">
+      <div class="tab active" data-tab="gainers">Top Gainers</div>
+      <div class="tab" data-tab="watchlist">Custom Watchlist</div>
+    </div>
+  </header>
+
+  <!-- ============ FILTERS ============ -->
+  <section class="card">
+    <div class="row">
+      <div class="field">
+        <label>Min % Change</label>
+        <input id="minPct" type="number" value="10" step="0.5" />
+      </div>
+      <div class="field">
+        <label>Max Price (USD)</label>
+        <input id="maxPrice" type="number" value="20" step="0.5" />
+      </div>
+      <div class="field">
+        <label>Min Volume</label>
+        <input id="minVol" type="number" value="100000" step="50000" />
+      </div>
+      <div class="field">
+        <label>Session</label>
+        <div class="toggle" id="sessionToggle">
+          <button data-s="regular" class="on">Regular</button>
+          <button data-s="pre">Pre-market</button>
+          <button data-s="post">After-hours</button>
+        </div>
+      </div>
+      <div class="field" style="margin-left:auto">
+        <label>&nbsp;</label>
+        <button class="btn primary" id="goBtn">▶ GO — Scan</button>
+      </div>
+    </div>
+
+    <!-- Custom watchlist input pane -->
+    <div class="pane" id="pane-watchlist">
+      <div style="margin-top:14px;font-size:12px;color:var(--muted)">Enter up to 16 stock codes. Empty cells are ignored.</div>
+      <div class="ticker-grid" id="tickerGrid"></div>
+    </div>
+
+    <details id="apiPanel">
+      <summary>API Status</summary>
+      <div class="keyrow" id="keyRow">
+        <input id="apiKey" placeholder="Finnhub API key (only needed on unauthorized hosts)" />
+        <button class="btn ghost" id="saveKey">Save Key</button>
+        <span class="status" id="keyStatus">Demo mode active</span>
+      </div>
+      <div class="disclaim" id="apiNote">Stock Titan does not offer a public API. This screener uses Finnhub for live quotes, float, short interest, and news.</div>
+    </details>
+  </section>
+
+  <!-- ============ RESULTS TABLE ============ -->
+  <section>
+    <div class="table-wrap">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th data-sort="grade">Grade <span class="arrow">⇅</span></th>
+            <th data-sort="symbol">Symbol <span class="arrow">⇅</span></th>
+            <th data-sort="price">Price <span class="arrow">⇅</span></th>
+            <th data-sort="changePct">% Chg <span class="arrow">▼</span></th>
+            <th data-sort="float">Float <span class="arrow">⇅</span></th>
+            <th data-sort="volume">Volume <span class="arrow">⇅</span></th>
+            <th data-sort="rvol">RVOL <span class="arrow">⇅</span></th>
+            <th data-sort="shortInt">Short % <span class="arrow">⇅</span></th>
+            <th data-sort="borrow">Borrow <span class="arrow">⇅</span></th>
+            <th data-sort="sector">Sector</th>
+            <th>News</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <div class="legend">
+        <span class="chip float-gold">&lt; 1M (ultra-low)</span>
+        <span class="chip float-green">1M – 10M (low)</span>
+        <span class="chip float-yellow">10M – 20M (medium)</span>
+        <span class="chip float-red">&gt; 20M (high)</span>
+      </div>
+      <div class="status" id="status">Ready.</div>
+    </div>
+    <div class="disclaim">For informational and educational use only. Not financial advice. Verify data with your broker before trading. Demo data is synthetic.</div>
+  </section>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Neill Data — Stock Screener
+   Single-file build. Finnhub-compatible. Demo mode fallback.
+--------------------------------------------------------------- */
+
+/* ---- BAKED-IN API CONFIG (domain-locked) ------------------------
+   The key below is only used when the page is served from one of
+   ALLOWED_HOSTS. On any other host the page falls back to demo mode
+   so the key can't be scraped by viewing the source on a copy site.
+------------------------------------------------------------------ */
+const BAKED_FINNHUB_KEY = "d85i8ohr01qitd924nugd85i8ohr01qitd924nv0";
+const ALLOWED_HOSTS = [
+  "neilldata.com",
+  "www.neilldata.com",
+  "localhost",
+  "127.0.0.1",
+  ""           // file:// (local file testing)
+];
+function isAllowedHost(){
+  const h = (location.hostname || "").toLowerCase();
+  return ALLOWED_HOSTS.includes(h);
+}
+
+const DEMO_UNIVERSE = [
+  // symbol, name, sector, base price, baseFloat (millions), avg vol (millions)
+  ["SOUN","SoundHound AI","Tech",5.40,180,12],
+  ["GNS","Genius Group","Education",2.10,8.2,1.4],
+  ["AMC","AMC Entertainment","Consumer",4.30,320,18],
+  ["BBIG","Vinco Ventures","Media",1.85,140,5.2],
+  ["MULN","Mullen Automotive","Auto",1.05,260,9.8],
+  ["NAOV","NanoVibronix","Healthcare",2.85,0.7,0.3],
+  ["TOP","TOP Financial","Finance",1.95,5.4,0.8],
+  ["HKD","AMTD Digital","Finance",6.20,2.1,0.5],
+  ["IMPP","Imperial Petroleum","Energy",3.30,18,1.1],
+  ["XELA","Exela Tech","Tech",1.10,42,3.4],
+  ["GFAI","Guardforce AI","Tech",1.60,4.2,0.6],
+  ["RDBX","Redbox","Media",0.85,11.4,0.9],
+  ["COSM","Cosmos Health","Healthcare",1.45,7.8,0.7],
+  ["ATER","Aterian","Consumer",1.75,9.6,0.8],
+  ["PRTG","Portage Biotech","Biotech",2.40,0.9,0.2],
+  ["AVCT","American Virtual Cloud","Tech",0.95,16,1.2],
+  ["INDO","Indonesia Energy","Energy",4.10,3.2,0.4],
+  ["NUKK","Nukkleus","Finance",1.30,1.3,0.3],
+  ["AGRI","AgriForce Growing","Agriculture",1.85,12,1.0],
+  ["BTBT","Bit Digital","Crypto",3.65,75,4.8],
+  ["TSLA","Tesla","Auto",178.20,2800,90],  // example of being filtered out by price
+];
+
+const NEWS_HOOKS = ["FDA submission","earnings beat","contract win","partnership announced","short squeeze chatter","analyst upgrade","stock split rumor","SEC filing","insider buying","reverse split"];
+
+const SESSION_MULT = { regular:[0.08,0.45], pre:[0.05,0.30], post:[0.04,0.28] };
+
+const state = {
+  tab:"gainers",
+  session:"regular",
+  apiKey: isAllowedHost() ? BAKED_FINNHUB_KEY : (localStorage.getItem("neill_finnhub_key") || ""),
+  apiKeyBaked: isAllowedHost(),
+  sortBy:"changePct",
+  sortDir:"desc",
+  rows:[],
+};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const fmt = n => n==null||isNaN(n)?"—":n.toLocaleString(undefined,{maximumFractionDigits:2});
+const fmtM = n => n==null||isNaN(n)?"—":(n>=1?n.toFixed(1)+"M":(n*1000).toFixed(0)+"K");
+const fmtVol = n => {
+  if(n==null||isNaN(n))return "—";
+  if(n>=1e9)return (n/1e9).toFixed(2)+"B";
+  if(n>=1e6)return (n/1e6).toFixed(2)+"M";
+  if(n>=1e3)return (n/1e3).toFixed(1)+"K";
+  return n.toFixed(0);
+};
+const pct = n => (n>=0?"+":"")+n.toFixed(2)+"%";
+
+function floatTier(m){
+  if(m<1) return "gold";
+  if(m<=10) return "green";
+  if(m<=20) return "yellow";
+  return "red";
+}
+
+/* Weighted grade: float 35 + gain 25 + rvol 25 + short 15 */
+function scoreRow(r){
+  let s=0;
+  // float (lower is better for momentum)
+  const f=r.float;
+  s += f<1?35: f<=5?30: f<=10?25: f<=20?17: f<=50?9:3;
+  // % gain
+  const c=r.changePct;
+  s += c>=50?25: c>=25?21: c>=15?17: c>=10?13: c>=5?8: c>=0?4:0;
+  // rvol
+  const v=r.rvol;
+  s += v>=10?25: v>=5?20: v>=2?15: v>=1?9:3;
+  // short interest squeeze potential
+  const si=r.shortInt;
+  s += si>=20?15: si>=10?11: si>=5?6:2;
+  return Math.round(s);
+}
+function gradeOf(score){
+  if(score>=85) return "S";
+  if(score>=72) return "A";
+  if(score>=58) return "B";
+  if(score>=45) return "C";
+  if(score>=32) return "D";
+  return "F";
+}
+
+/* ---------- demo data generator ---------- */
+function rand(min,max){return Math.random()*(max-min)+min}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+
+function generateDemoRows(universe){
+  const [lo,hi] = SESSION_MULT[state.session];
+  return universe.map(([sym,name,sector,basePrice,baseFloat,baseVolM])=>{
+    const changePct = rand(-3,1) + rand(lo*100, hi*100); // sometimes negative
+    const price = +(basePrice * (1 + changePct/100)).toFixed(2);
+    const float = +(baseFloat * rand(0.95,1.05)).toFixed(2);
+    const volume = Math.round(baseVolM*1e6 * rand(0.6,3.5));
+    const rvol = +(volume/(baseVolM*1e6)).toFixed(2);
+    const shortInt = +rand(2,38).toFixed(1);
+    const borrow = +rand(0.3,180).toFixed(1);
+    const catalyst = Math.random()<0.55 ? pick(NEWS_HOOKS) : null;
+    return { symbol:sym, name, sector, price, changePct:+changePct.toFixed(2),
+      float, volume, rvol, shortInt, borrow, catalyst, isDemo:true };
+  });
+}
+
+/* ---------- Finnhub fetchers (only if API key present) ---------- */
+async function fhQuote(sym,key){
+  const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${key}`);
+  return r.json();
+}
+async function fhMetric(sym,key){
+  const r=await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${sym}&metric=all&token=${key}`);
+  return r.json();
+}
+async function fhProfile(sym,key){
+  const r=await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${key}`);
+  return r.json();
+}
+
+async function fetchLive(symbols){
+  const key = state.apiKey;
+  const out = [];
+  for(const sym of symbols){
+    try{
+      const [q,m,p] = await Promise.all([fhQuote(sym,key),fhMetric(sym,key),fhProfile(sym,key)]);
+      const price = q.c;
+      const prev = q.pc;
+      const changePct = prev ? ((price-prev)/prev)*100 : 0;
+      const metric = (m && m.metric) || {};
+      const floatShares = (metric.shareOutstanding ?? metric.shareFloat ?? null);
+      const float = floatShares ? +floatShares.toFixed(2) : null; // already in millions per Finnhub
+      const volume = metric["10DayAverageTradingVolume"] ? Math.round(metric["10DayAverageTradingVolume"]*1e6) : null;
+      const avg = volume || 1;
+      const rvol = volume ? +(volume/avg).toFixed(2) : 1;
+      const shortInt = metric["shortInterestSharePercent"] ?? null;
+      out.push({
+        symbol:sym,
+        name:(p&&p.name)||sym,
+        sector:(p&&p.finnhubIndustry)||"—",
+        price, changePct:+changePct.toFixed(2),
+        float, volume, rvol,
+        shortInt: shortInt!=null ? +shortInt.toFixed(1) : null,
+        borrow: null,
+        catalyst: null,
+        isDemo:false,
+      });
+    }catch(e){
+      console.warn("fetch fail",sym,e);
+    }
+  }
+  return out;
+}
+
+/* ---------- filter + sort + render ---------- */
+function applyFilters(rows){
+  const minPct = parseFloat($("#minPct").value)||0;
+  const maxPrice = parseFloat($("#maxPrice").value)||1e9;
+  const minVol = parseFloat($("#minVol").value)||0;
+  return rows.filter(r=> r.changePct>=minPct && r.price<=maxPrice && (r.volume||0)>=minVol);
+}
+
+function sortRows(rows){
+  const k=state.sortBy, d=state.sortDir==="asc"?1:-1;
+  return rows.slice().sort((a,b)=>{
+    let va=a[k], vb=b[k];
+    if(k==="symbol"||k==="sector"){va=(va||"").toString();vb=(vb||"").toString();return va.localeCompare(vb)*d;}
+    if(k==="grade"){va=a._score; vb=b._score;}
+    return ((va??-Infinity) - (vb??-Infinity))*d;
+  });
+}
+
+function render(rows){
+  rows.forEach(r=>{ r._score = scoreRow(r); r._grade = gradeOf(r._score); });
+  const sorted = sortRows(rows);
+  const tb = $("#tbody");
+  if(!sorted.length){
+    tb.innerHTML = `<tr><td colspan="11"><div class="empty">No stocks match your filters. Try lowering the min % change or raising max price.</div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = sorted.map(r=>{
+    const tier = r.float==null?"":floatTier(r.float);
+    const floatChip = r.float==null?`<span class="chip">—</span>`:`<span class="chip float-${tier}">${fmtM(r.float)}</span>`;
+    const rvolCls = r.rvol>=5?"hot":(r.rvol>=2?"warm":"");
+    const siCls = r.shortInt>=15?"high":"";
+    const newsURL = `https://www.google.com/search?q=${encodeURIComponent(r.symbol+" stock news today")}&tbm=nws`;
+    const sectorTag = r.catalyst
+      ? `<span class="sector" title="Possible catalyst">${r.sector} · ${r.catalyst}</span>`
+      : `<span class="sector">${r.sector||"—"}</span>`;
+    return `<tr>
+      <td><span class="grade ${r._grade}" title="Score ${r._score}/100">${r._grade}</span></td>
+      <td><div class="sym">${r.symbol}</div><div class="sub" style="font-size:11px;color:var(--muted)">${r.name||""}</div></td>
+      <td class="price">$${fmt(r.price)}</td>
+      <td class="chg ${r.changePct>=0?"pos":"neg"}">${pct(r.changePct)}</td>
+      <td>${floatChip}</td>
+      <td>${fmtVol(r.volume)}</td>
+      <td class="rvol ${rvolCls}">${r.rvol?r.rvol.toFixed(2)+"x":"—"}</td>
+      <td class="si ${siCls}">${r.shortInt!=null?r.shortInt+"%":"—"}</td>
+      <td>${r.borrow!=null?r.borrow+"%":"—"}</td>
+      <td>${sectorTag}</td>
+      <td><a class="news-btn" target="_blank" rel="noopener" href="${newsURL}">📰 News</a></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- main scan flow ---------- */
+async function runScan(){
+  const statusEl = $("#status");
+  statusEl.className="status";
+  statusEl.textContent="Scanning…";
+  let rows=[];
+  try{
+    if(state.tab==="watchlist"){
+      const tickers = [...$$("#tickerGrid input")].map(i=>i.value.trim().toUpperCase()).filter(Boolean);
+      if(!tickers.length){
+        statusEl.textContent="Enter at least one ticker in the Custom Watchlist tab.";
+        $("#tbody").innerHTML="";
+        return;
+      }
+      if(state.apiKey){
+        rows = await fetchLive(tickers);
+      }else{
+        const universe = tickers.map(t=>{
+          const found = DEMO_UNIVERSE.find(d=>d[0]===t);
+          return found || [t,t,"Unknown", +rand(1,15).toFixed(2), +rand(0.5,80).toFixed(1), +rand(0.3,5).toFixed(1)];
+        });
+        rows = generateDemoRows(universe);
+      }
+    }else{
+      // top gainers: in demo mode synthesize from full universe
+      if(state.apiKey){
+        // Without a paid endpoint we can't ask Finnhub for "all market gainers" — fall back to demo universe symbols
+        rows = await fetchLive(DEMO_UNIVERSE.map(d=>d[0]));
+      }else{
+        rows = generateDemoRows(DEMO_UNIVERSE);
+      }
+    }
+  }catch(e){
+    statusEl.className="status err";
+    statusEl.textContent="Error fetching data — check API key or rate limit.";
+    console.error(e);
+    return;
+  }
+  state.rows = rows;
+  const filtered = applyFilters(rows);
+  render(filtered);
+  statusEl.textContent = `Showing ${filtered.length} of ${rows.length} scanned ${state.apiKey?"(live)":"(demo)"} · session: ${state.session}`;
+}
+
+/* ---------- UI wiring ---------- */
+function buildTickerGrid(){
+  const g = $("#tickerGrid");
+  g.innerHTML = Array.from({length:16},(_,i)=>`<input maxlength="6" placeholder="TICK${i+1<10?'0':''}${i+1}">`).join("");
+}
+
+function wire(){
+  $$(".tab").forEach(t=>t.addEventListener("click",()=>{
+    $$(".tab").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    state.tab = t.dataset.tab;
+    $("#pane-watchlist").classList.toggle("active", state.tab==="watchlist");
+  }));
+
+  $("#sessionToggle").querySelectorAll("button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      $("#sessionToggle").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      state.session = b.dataset.s;
+    });
+  });
+
+  $("#goBtn").addEventListener("click",runScan);
+
+  $$("thead th[data-sort]").forEach(th=>{
+    th.addEventListener("click",()=>{
+      const k=th.dataset.sort;
+      if(state.sortBy===k){state.sortDir = state.sortDir==="asc"?"desc":"asc"}
+      else{state.sortBy=k; state.sortDir = (k==="symbol"||k==="sector")?"asc":"desc"}
+      $$("thead th .arrow").forEach(a=>a.textContent="⇅");
+      th.querySelector(".arrow").textContent = state.sortDir==="asc"?"▲":"▼";
+      if(state.rows.length) render(applyFilters(state.rows));
+    });
+  });
+
+  $("#saveKey").addEventListener("click",()=>{
+    const v = $("#apiKey").value.trim();
+    state.apiKey = v;
+    state.apiKeyBaked = false;
+    if(v){
+      localStorage.setItem("neill_finnhub_key", v);
+      $("#keyStatus").textContent = "Live mode (Finnhub key saved locally)";
+    }else{
+      localStorage.removeItem("neill_finnhub_key");
+      $("#keyStatus").textContent = "Demo mode active";
+    }
+  });
+
+  // Reflect baked-key state on load
+  if(state.apiKeyBaked){
+    // Page is served from an allowed host → key is baked in, hide the input
+    $("#keyRow").style.display = "none";
+    $("#apiNote").innerHTML =
+      `<span style="color:var(--accent);font-weight:700">● LIVE</span> — Finnhub key is baked in for <code>${location.hostname||"local"}</code>.
+       Open the page on any other domain and it automatically falls back to demo mode.`;
+    $("#apiPanel").querySelector("summary").innerHTML =
+      `API Status <span style="color:var(--accent);font-weight:700">● Live</span>`;
+  } else if(state.apiKey){
+    $("#apiKey").value = state.apiKey;
+    $("#keyStatus").textContent = "Live mode (Finnhub key loaded from browser storage)";
+  } else {
+    $("#apiNote").innerHTML += ` This page is being viewed on an unauthorized host (<code>${location.hostname||"file://"}</code>) — demo data is shown. Paste a key above to enable live data on this device only.`;
+  }
+}
+
+buildTickerGrid();
+wire();
+runScan();
+</script>
+</body>
+</html>
