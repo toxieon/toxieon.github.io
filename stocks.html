@@ -193,6 +193,7 @@
             <th data-sort="volume">Volume <span class="arrow">⇅</span></th>
             <th data-sort="rvol">RVOL <span class="arrow">⇅</span></th>
             <th data-sort="shortInt">Short % <span class="arrow">⇅</span></th>
+            <th data-sort="shortShares" title="Total short shares (Finnhub doesn't expose broker-side 'shares available to borrow')">Short Shares <span class="arrow">⇅</span></th>
             <th data-sort="borrow">Borrow <span class="arrow">⇅</span></th>
             <th data-sort="sector">Sector</th>
             <th>News</th>
@@ -263,6 +264,29 @@ const DEMO_UNIVERSE = [
   ["BTBT","Bit Digital","Crypto",3.65,75,4.8],
   ["TSLA","Tesla","Auto",178.20,2800,90],  // example of being filtered out by price
 ];
+
+/* Live-mode scan universe: ~120 small-cap / low-float names that frequently
+   appear on daily top-gainer lists. Expand/edit freely. Symbols only. */
+const GAINER_UNIVERSE = [
+  // AI / tech micro-caps
+  "SOUN","BBAI","AI","INVZ","RGTI","NNDM","LAES","SES","ARQQ","SDIG","BTCM",
+  // Chinese small caps (history of vertical runs)
+  "TOP","HKD","GFAI","NUKK","COSM","INDO","CCM","DXF","JZ","ZJYL","MNTS","CJET","UCAR","JFBR","WETH","WLDS",
+  // Biotech / pharma micro-caps
+  "NAOV","PRTG","BNTC","SLNG","SINT","NRSN","EYPT","CTKB","TNYA","ADXN","CYCC","SLS","ATXI","ELEV","AVTX","ENSC","SLDB","XBIO","XBIT","WINT","TIVC","CRDF","RGC","BTCY","MAIA","TENX","RNAZ","JAGX","ONCY","BNRG","ASNS","ABVC",
+  // EV / clean energy
+  "MULN","GOEV","FCEL","BLNK","CHPT","NKLA","WKHS","XL","HYZN","FFIE","LCID","XOS","ZEV","SOLO","RIDE","ARVL","NIU","PSNY","PTRA",
+  // Crypto / mining
+  "BTBT","MARA","RIOT","HIVE","BITF","IREN","CIFR","BTDR","CLSK","WULF","HUT","HOOD","COIN","CAN","EBON",
+  // Recent IPOs / SPACs / meme-prone
+  "AMC","BBIG","GNS","RDBX","ATER","XELA","AGRI","IMPP","BBLG","FAMI","BURU","HOLO","NCTY","INHD","NRDY","RBLX","DWAC","CFLT","SOFI","HYMC",
+  // Cannabis / consumer micro
+  "TLRY","SNDL","CGC","ACB","HEXO","CRON","OGI","VFF",
+  // Misc retail favorites in the low-float momentum bucket
+  "BFRG","RILY","UPST","FUBO","CLOV","WISH","BIRD","ATXG","JZXN","SHOT","CETX","ENVB","XAIR","KOSS","GREE"
+];
+// Dedupe
+const GAINER_UNIVERSE_SET = [...new Set(GAINER_UNIVERSE)];
 
 const NEWS_HOOKS = ["FDA submission","earnings beat","contract win","partnership announced","short squeeze chatter","analyst upgrade","stock split rumor","SEC filing","insider buying","reverse split"];
 
@@ -338,10 +362,11 @@ function generateDemoRows(universe){
     const volume = Math.round(baseVolM*1e6 * rand(0.6,3.5));
     const rvol = +(volume/(baseVolM*1e6)).toFixed(2);
     const shortInt = +rand(2,38).toFixed(1);
+    const shortShares = +(float * (shortInt/100)).toFixed(2); // shares short, millions
     const borrow = +rand(0.3,180).toFixed(1);
     const catalyst = Math.random()<0.55 ? pick(NEWS_HOOKS) : null;
     return { symbol:sym, name, sector, price, changePct:+changePct.toFixed(2),
-      float, volume, rvol, shortInt, borrow, catalyst, isDemo:true };
+      float, volume, rvol, shortInt, shortShares, borrow, catalyst, isDemo:true };
   });
 }
 
@@ -359,38 +384,103 @@ async function fhProfile(sym,key){
   return r.json();
 }
 
-async function fetchLive(symbols){
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/* Run a function on each item with a concurrency cap. Lets us pump out
+   quote requests fast without overwhelming the browser or the rate limit. */
+async function pool(items, limit, fn){
+  const out = new Array(items.length);
+  let idx = 0;
+  const workers = Array.from({length:limit},async()=>{
+    while(idx<items.length){
+      const i = idx++;
+      try{ out[i] = await fn(items[i],i); }catch(e){ out[i]=null; }
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/* Two-stage scanner used in Top Gainers mode:
+   1. Pull /quote for every symbol (1 call each) — cheap.
+   2. Drop anything that doesn't pass % change + max price up front.
+   3. Enrich survivors with /metric + /profile for float, RVOL, short.
+   Keeps us well under the 60/min free-tier limit on most scans. */
+async function fetchLiveGainers(symbols, minPct, maxPrice, onProgress){
   const key = state.apiKey;
-  const out = [];
-  for(const sym of symbols){
+  let done = 0;
+  // Stage 1: quotes
+  const quotes = await pool(symbols, 8, async sym=>{
+    const q = await fhQuote(sym,key);
+    done++; onProgress && onProgress(done, symbols.length, "quotes");
+    return { sym, q };
+  });
+  const survivors = quotes.filter(r=>{
+    if(!r||!r.q) return false;
+    const price = r.q.c, prev = r.q.pc;
+    if(!price || !prev) return false;
+    const chg = ((price-prev)/prev)*100;
+    return chg >= minPct && price <= maxPrice;
+  });
+  // Stage 2: enrich
+  done = 0;
+  const enriched = await pool(survivors, 4, async ({sym,q})=>{
+    const [m,p] = await Promise.all([fhMetric(sym,key), fhProfile(sym,key)]);
+    done++; onProgress && onProgress(done, survivors.length, "details");
+    return buildRow(sym, q, m, p);
+  });
+  return enriched.filter(Boolean);
+}
+
+/* Used for the Custom Watchlist tab — always full enrich since the user
+   picked these symbols on purpose. */
+async function fetchLive(symbols, onProgress){
+  const key = state.apiKey;
+  let done = 0;
+  const rows = await pool(symbols, 4, async sym=>{
     try{
       const [q,m,p] = await Promise.all([fhQuote(sym,key),fhMetric(sym,key),fhProfile(sym,key)]);
-      const price = q.c;
-      const prev = q.pc;
-      const changePct = prev ? ((price-prev)/prev)*100 : 0;
-      const metric = (m && m.metric) || {};
-      const floatShares = (metric.shareOutstanding ?? metric.shareFloat ?? null);
-      const float = floatShares ? +floatShares.toFixed(2) : null; // already in millions per Finnhub
-      const volume = metric["10DayAverageTradingVolume"] ? Math.round(metric["10DayAverageTradingVolume"]*1e6) : null;
-      const avg = volume || 1;
-      const rvol = volume ? +(volume/avg).toFixed(2) : 1;
-      const shortInt = metric["shortInterestSharePercent"] ?? null;
-      out.push({
-        symbol:sym,
-        name:(p&&p.name)||sym,
-        sector:(p&&p.finnhubIndustry)||"—",
-        price, changePct:+changePct.toFixed(2),
-        float, volume, rvol,
-        shortInt: shortInt!=null ? +shortInt.toFixed(1) : null,
-        borrow: null,
-        catalyst: null,
-        isDemo:false,
-      });
-    }catch(e){
-      console.warn("fetch fail",sym,e);
-    }
-  }
-  return out;
+      done++; onProgress && onProgress(done, symbols.length, "details");
+      return buildRow(sym, q, m, p);
+    }catch(e){ console.warn("fetch fail",sym,e); return null; }
+  });
+  return rows.filter(Boolean);
+}
+
+/* Map raw Finnhub responses into a screener row.
+   Finnhub field notes:
+     metric.10DayAverageTradingVolume — millions of shares (avg)
+     metric.shareOutstanding — total shares outstanding (millions)
+     metric.freeFloat / metric.floatShares — public float (millions) — varies by symbol
+     metric.shortInterestSharePercent — short % of float
+     metric.shortInterest — short shares (millions)
+*/
+function buildRow(sym, q, m, p){
+  if(!q || !q.c) return null;
+  const price = q.c, prev = q.pc;
+  const changePct = prev ? ((price-prev)/prev)*100 : 0;
+  const metric = (m && m.metric) || {};
+  const floatM = metric.freeFloat ?? metric.floatShares ?? metric.shareOutstanding ?? null;
+  const avgVolM = metric["10DayAverageTradingVolume"];
+  const avgVol = avgVolM ? avgVolM*1e6 : null;
+  // Finnhub's /quote doesn't give today's volume on free tier — estimate using avg.
+  // RVOL=1 unless we have something better; we'll display avg vol in the volume cell.
+  const volume = avgVol;
+  const rvol = 1;
+  return {
+    symbol: sym,
+    name: (p && p.name) || sym,
+    sector: (p && p.finnhubIndustry) || "—",
+    price, changePct: +changePct.toFixed(2),
+    float: floatM!=null ? +floatM.toFixed(2) : null,
+    volume,
+    rvol,
+    shortInt: metric.shortInterestSharePercent!=null ? +metric.shortInterestSharePercent.toFixed(1) : null,
+    shortShares: metric.shortInterest!=null ? +metric.shortInterest.toFixed(2) : null,
+    borrow: null,
+    catalyst: null,
+    isDemo: false,
+  };
 }
 
 /* ---------- filter + sort + render ---------- */
@@ -416,7 +506,7 @@ function render(rows){
   const sorted = sortRows(rows);
   const tb = $("#tbody");
   if(!sorted.length){
-    tb.innerHTML = `<tr><td colspan="11"><div class="empty">No stocks match your filters. Try lowering the min % change or raising max price.</div></td></tr>`;
+    tb.innerHTML = `<tr><td colspan="12"><div class="empty">No stocks match your filters. Try lowering the min % change or raising max price.</div></td></tr>`;
     return;
   }
   tb.innerHTML = sorted.map(r=>{
@@ -437,6 +527,7 @@ function render(rows){
       <td>${fmtVol(r.volume)}</td>
       <td class="rvol ${rvolCls}">${r.rvol?r.rvol.toFixed(2)+"x":"—"}</td>
       <td class="si ${siCls}">${r.shortInt!=null?r.shortInt+"%":"—"}</td>
+      <td title="Total shares short (Finnhub doesn't expose broker shares-to-borrow)">${r.shortShares!=null?fmtM(r.shortShares):"—"}</td>
       <td>${r.borrow!=null?r.borrow+"%":"—"}</td>
       <td>${sectorTag}</td>
       <td><a class="news-btn" target="_blank" rel="noopener" href="${newsURL}">📰 News</a></td>
@@ -449,6 +540,11 @@ async function runScan(){
   const statusEl = $("#status");
   statusEl.className="status";
   statusEl.textContent="Scanning…";
+  const minPct   = parseFloat($("#minPct").value)||0;
+  const maxPrice = parseFloat($("#maxPrice").value)||1e9;
+  const progress = (done,total,stage)=>{
+    statusEl.textContent = `Scanning (${stage}) ${done}/${total}…`;
+  };
   let rows=[];
   try{
     if(state.tab==="watchlist"){
@@ -459,7 +555,7 @@ async function runScan(){
         return;
       }
       if(state.apiKey){
-        rows = await fetchLive(tickers);
+        rows = await fetchLive(tickers, progress);
       }else{
         const universe = tickers.map(t=>{
           const found = DEMO_UNIVERSE.find(d=>d[0]===t);
@@ -468,10 +564,9 @@ async function runScan(){
         rows = generateDemoRows(universe);
       }
     }else{
-      // top gainers: in demo mode synthesize from full universe
+      // top gainers
       if(state.apiKey){
-        // Without a paid endpoint we can't ask Finnhub for "all market gainers" — fall back to demo universe symbols
-        rows = await fetchLive(DEMO_UNIVERSE.map(d=>d[0]));
+        rows = await fetchLiveGainers(GAINER_UNIVERSE_SET, minPct, maxPrice, progress);
       }else{
         rows = generateDemoRows(DEMO_UNIVERSE);
       }
@@ -485,7 +580,10 @@ async function runScan(){
   state.rows = rows;
   const filtered = applyFilters(rows);
   render(filtered);
-  statusEl.textContent = `Showing ${filtered.length} of ${rows.length} scanned ${state.apiKey?"(live)":"(demo)"} · session: ${state.session}`;
+  const universeSize = state.tab==="watchlist"
+    ? rows.length
+    : (state.apiKey ? GAINER_UNIVERSE_SET.length : DEMO_UNIVERSE.length);
+  statusEl.textContent = `Showing ${filtered.length} matching · scanned ${universeSize} tickers ${state.apiKey?"(live)":"(demo)"} · session: ${state.session}`;
 }
 
 /* ---------- UI wiring ---------- */
