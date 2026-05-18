@@ -403,10 +403,13 @@ async function pool(items, limit, fn){
 
 /* Two-stage scanner used in Top Gainers mode:
    1. Pull /quote for every symbol (1 call each) — cheap.
-   2. Drop anything that doesn't pass % change + max price up front.
-   3. Enrich survivors with /metric + /profile for float, RVOL, short.
-   Keeps us well under the 60/min free-tier limit on most scans. */
-async function fetchLiveGainers(symbols, minPct, maxPrice, onProgress){
+   2. Apply ONLY the max-price hard filter, then sort by % change desc.
+   3. Enrich the top N by % change with /metric + /profile.
+   Display-side filtering (min %, min volume) happens later in applyFilters,
+   so even when no stock meets the threshold the user still sees today's
+   top movers and can adjust the slider. */
+const TOP_N_TO_ENRICH = 30;
+async function fetchLiveGainers(symbols, maxPrice, onProgress){
   const key = state.apiKey;
   let done = 0;
   // Stage 1: quotes
@@ -415,18 +418,24 @@ async function fetchLiveGainers(symbols, minPct, maxPrice, onProgress){
     done++; onProgress && onProgress(done, symbols.length, "quotes");
     return { sym, q };
   });
-  const survivors = quotes.filter(r=>{
+  // Only drop tickers with no data or outside max-price band; keep everything else.
+  const valid = quotes.filter(r=>{
     if(!r||!r.q) return false;
     const price = r.q.c, prev = r.q.pc;
     if(!price || !prev) return false;
-    const chg = ((price-prev)/prev)*100;
-    return chg >= minPct && price <= maxPrice;
+    return price <= maxPrice;
+  }).map(r=>{
+    const chg = ((r.q.c - r.q.pc)/r.q.pc)*100;
+    return { ...r, chg };
   });
+  // Sort by % change desc, take top N
+  valid.sort((a,b)=>b.chg - a.chg);
+  const top = valid.slice(0, TOP_N_TO_ENRICH);
   // Stage 2: enrich
   done = 0;
-  const enriched = await pool(survivors, 4, async ({sym,q})=>{
+  const enriched = await pool(top, 4, async ({sym,q})=>{
     const [m,p] = await Promise.all([fhMetric(sym,key), fhProfile(sym,key)]);
-    done++; onProgress && onProgress(done, survivors.length, "details");
+    done++; onProgress && onProgress(done, top.length, "details");
     return buildRow(sym, q, m, p);
   });
   return enriched.filter(Boolean);
@@ -501,12 +510,22 @@ function sortRows(rows){
   });
 }
 
-function render(rows){
+function render(rows, unfilteredAll){
   rows.forEach(r=>{ r._score = scoreRow(r); r._grade = gradeOf(r._score); });
   const sorted = sortRows(rows);
   const tb = $("#tbody");
   if(!sorted.length){
-    tb.innerHTML = `<tr><td colspan="12"><div class="empty">No stocks match your filters. Try lowering the min % change or raising max price.</div></td></tr>`;
+    // Helpful empty state: show top 5 movers from the unfiltered set so user
+    // knows whether to lower their threshold or accept that the market is quiet.
+    const hint = (unfilteredAll && unfilteredAll.length)
+      ? unfilteredAll.slice().sort((a,b)=>b.changePct - a.changePct).slice(0,5)
+                     .map(r=>`<b style="color:var(--text)">${r.symbol}</b> ${pct(r.changePct)} @ $${fmt(r.price)}`).join(" &nbsp;·&nbsp; ")
+      : "";
+    tb.innerHTML = `<tr><td colspan="12"><div class="empty">
+        <div style="font-size:14px;margin-bottom:8px">No stocks match your current filters.</div>
+        ${hint?`<div style="font-size:12px;line-height:1.7">Today's top movers in the scanned universe:<br>${hint}</div>`:""}
+        <div style="font-size:12px;margin-top:10px;color:#6b7280">Try lowering Min % Change or raising Max Price.</div>
+      </div></td></tr>`;
     return;
   }
   tb.innerHTML = sorted.map(r=>{
@@ -566,7 +585,7 @@ async function runScan(){
     }else{
       // top gainers
       if(state.apiKey){
-        rows = await fetchLiveGainers(GAINER_UNIVERSE_SET, minPct, maxPrice, progress);
+        rows = await fetchLiveGainers(GAINER_UNIVERSE_SET, maxPrice, progress);
       }else{
         rows = generateDemoRows(DEMO_UNIVERSE);
       }
@@ -579,7 +598,7 @@ async function runScan(){
   }
   state.rows = rows;
   const filtered = applyFilters(rows);
-  render(filtered);
+  render(filtered, rows);
   const universeSize = state.tab==="watchlist"
     ? rows.length
     : (state.apiKey ? GAINER_UNIVERSE_SET.length : DEMO_UNIVERSE.length);
@@ -617,7 +636,7 @@ function wire(){
       else{state.sortBy=k; state.sortDir = (k==="symbol"||k==="sector")?"asc":"desc"}
       $$("thead th .arrow").forEach(a=>a.textContent="⇅");
       th.querySelector(".arrow").textContent = state.sortDir==="asc"?"▲":"▼";
-      if(state.rows.length) render(applyFilters(state.rows));
+      if(state.rows.length) render(applyFilters(state.rows), state.rows);
     });
   });
 
