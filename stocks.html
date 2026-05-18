@@ -129,6 +129,7 @@
     </div>
     <div class="tabs" role="tablist">
       <div class="tab active" data-tab="gainers">Top Gainers</div>
+      <div class="tab" data-tab="all">All Available</div>
       <div class="tab" data-tab="watchlist">Custom Watchlist</div>
     </div>
   </header>
@@ -265,27 +266,27 @@ const DEMO_UNIVERSE = [
   ["TSLA","Tesla","Auto",178.20,2800,90],  // example of being filtered out by price
 ];
 
-/* Live-mode scan universe: ~120 small-cap / low-float names that frequently
-   appear on daily top-gainer lists. Expand/edit freely. Symbols only. */
+/* Live-mode scan universe: ~55 currently-listed small-cap / low-float
+   momentum names. Edit freely — keep symbols that are actually trading.
+   Names commonly seen on daily gainer lists. */
 const GAINER_UNIVERSE = [
   // AI / tech micro-caps
-  "SOUN","BBAI","AI","INVZ","RGTI","NNDM","LAES","SES","ARQQ","SDIG","BTCM",
-  // Chinese small caps (history of vertical runs)
-  "TOP","HKD","GFAI","NUKK","COSM","INDO","CCM","DXF","JZ","ZJYL","MNTS","CJET","UCAR","JFBR","WETH","WLDS",
+  "SOUN","BBAI","AI","RGTI","INVZ","LAES","ARQQ",
+  // Chinese small caps
+  "TOP","GFAI","NUKK","COSM","CCM","MNTS","WLDS",
   // Biotech / pharma micro-caps
-  "NAOV","PRTG","BNTC","SLNG","SINT","NRSN","EYPT","CTKB","TNYA","ADXN","CYCC","SLS","ATXI","ELEV","AVTX","ENSC","SLDB","XBIO","XBIT","WINT","TIVC","CRDF","RGC","BTCY","MAIA","TENX","RNAZ","JAGX","ONCY","BNRG","ASNS","ABVC",
+  "NAOV","CYCC","SLS","ATXI","ENSC","JAGX","ONCY","BTCY","MAIA","TENX","ABVC",
   // EV / clean energy
-  "MULN","GOEV","FCEL","BLNK","CHPT","NKLA","WKHS","XL","HYZN","FFIE","LCID","XOS","ZEV","SOLO","RIDE","ARVL","NIU","PSNY","PTRA",
+  "MULN","FCEL","BLNK","CHPT","NKLA","FFIE","LCID","HYZN",
   // Crypto / mining
-  "BTBT","MARA","RIOT","HIVE","BITF","IREN","CIFR","BTDR","CLSK","WULF","HUT","HOOD","COIN","CAN","EBON",
-  // Recent IPOs / SPACs / meme-prone
-  "AMC","BBIG","GNS","RDBX","ATER","XELA","AGRI","IMPP","BBLG","FAMI","BURU","HOLO","NCTY","INHD","NRDY","RBLX","DWAC","CFLT","SOFI","HYMC",
-  // Cannabis / consumer micro
-  "TLRY","SNDL","CGC","ACB","HEXO","CRON","OGI","VFF",
-  // Misc retail favorites in the low-float momentum bucket
-  "BFRG","RILY","UPST","FUBO","CLOV","WISH","BIRD","ATXG","JZXN","SHOT","CETX","ENVB","XAIR","KOSS","GREE"
+  "BTBT","MARA","RIOT","HIVE","BITF","IREN","CIFR","CLSK","WULF","HUT","COIN",
+  // Recent IPOs / meme-prone
+  "AMC","GNS","ATER","AGRI","IMPP","BURU","HOLO","NRDY","SOFI",
+  // Cannabis
+  "TLRY","SNDL","CGC","ACB","CRON","VFF",
+  // Misc small-cap movers
+  "RILY","FUBO","CLOV","KOSS","GREE","CETX"
 ];
-// Dedupe
 const GAINER_UNIVERSE_SET = [...new Set(GAINER_UNIVERSE)];
 
 const NEWS_HOOKS = ["FDA submission","earnings beat","contract win","partnership announced","short squeeze chatter","analyst upgrade","stock split rumor","SEC filing","insider buying","reverse split"];
@@ -370,24 +371,47 @@ function generateDemoRows(universe){
   });
 }
 
-/* ---------- Finnhub fetchers (only if API key present) ---------- */
+/* ---------- Finnhub fetchers (only if API key present) ----------
+   Every API call goes through rateLimitedCall so we never exceed the
+   free tier limit. Tracks counts globally for the status bar. */
+const apiStats = { calls:0, errors:0, rate429:0 };
+async function fhFetch(url){
+  return rateLimitedCall(async ()=>{
+    apiStats.calls++;
+    try{
+      const r = await fetch(url);
+      if(r.status===429){ apiStats.rate429++; return {}; }
+      if(!r.ok){ apiStats.errors++; return {}; }
+      return await r.json();
+    }catch(e){ apiStats.errors++; return {}; }
+  });
+}
 async function fhQuote(sym,key){
-  const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${key}`);
-  return r.json();
+  return fhFetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${key}`);
 }
 async function fhMetric(sym,key){
-  const r=await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${sym}&metric=all&token=${key}`);
-  return r.json();
+  return fhFetch(`https://finnhub.io/api/v1/stock/metric?symbol=${sym}&metric=all&token=${key}`);
 }
 async function fhProfile(sym,key){
-  const r=await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${key}`);
-  return r.json();
+  return fhFetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${key}`);
 }
 
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
-/* Run a function on each item with a concurrency cap. Lets us pump out
-   quote requests fast without overwhelming the browser or the rate limit. */
+/* Token-bucket rate limiter. Finnhub free tier = 60 calls/min. We target
+   55 calls/min (~917ms between calls) to leave headroom for retries. */
+const RATE_LIMIT_MS = 1100;          // gap between dispatches
+let _lastCall = 0;
+async function rateLimitedCall(fn){
+  const now = performance.now();
+  const wait = Math.max(0, _lastCall + RATE_LIMIT_MS - now);
+  _lastCall = now + wait;
+  if(wait>0) await sleep(wait);
+  return fn();
+}
+
+/* Run a function on each item. Concurrency cap is mostly cosmetic now —
+   the real serialization happens inside fhFetch via the rate limiter. */
 async function pool(items, limit, fn){
   const out = new Array(items.length);
   let idx = 0;
@@ -559,12 +583,13 @@ async function runScan(){
   const statusEl = $("#status");
   statusEl.className="status";
   statusEl.textContent="Scanning…";
-  const minPct   = parseFloat($("#minPct").value)||0;
+  // Reset diagnostic counters for this scan
+  apiStats.calls=0; apiStats.errors=0; apiStats.rate429=0;
   const maxPrice = parseFloat($("#maxPrice").value)||1e9;
   const progress = (done,total,stage)=>{
-    statusEl.textContent = `Scanning (${stage}) ${done}/${total}…`;
+    statusEl.textContent = `Scanning (${stage}) ${done}/${total}… · API calls: ${apiStats.calls}${apiStats.rate429?" · 429s: "+apiStats.rate429:""}`;
   };
-  let rows=[];
+  let rows=[], universeSize=0, bypassFilters=false;
   try{
     if(state.tab==="watchlist"){
       const tickers = [...$$("#tickerGrid input")].map(i=>i.value.trim().toUpperCase()).filter(Boolean);
@@ -573,6 +598,7 @@ async function runScan(){
         $("#tbody").innerHTML="";
         return;
       }
+      universeSize = tickers.length;
       if(state.apiKey){
         rows = await fetchLive(tickers, progress);
       }else{
@@ -582,8 +608,19 @@ async function runScan(){
         });
         rows = generateDemoRows(universe);
       }
-    }else{
-      // top gainers
+    } else if(state.tab==="all"){
+      // ALL AVAILABLE — every ticker in the universe that returned valid data,
+      // no max-price cap, no % change requirement.
+      bypassFilters = true;
+      universeSize = state.apiKey ? GAINER_UNIVERSE_SET.length : DEMO_UNIVERSE.length;
+      if(state.apiKey){
+        rows = await fetchLiveGainers(GAINER_UNIVERSE_SET, 1e9, progress);
+      }else{
+        rows = generateDemoRows(DEMO_UNIVERSE);
+      }
+    } else {
+      // TOP GAINERS — apply max-price cap during quote stage, enrich top 30.
+      universeSize = state.apiKey ? GAINER_UNIVERSE_SET.length : DEMO_UNIVERSE.length;
       if(state.apiKey){
         rows = await fetchLiveGainers(GAINER_UNIVERSE_SET, maxPrice, progress);
       }else{
@@ -597,12 +634,14 @@ async function runScan(){
     return;
   }
   state.rows = rows;
-  const filtered = applyFilters(rows);
+  const filtered = bypassFilters ? rows : applyFilters(rows);
   render(filtered, rows);
-  const universeSize = state.tab==="watchlist"
-    ? rows.length
-    : (state.apiKey ? GAINER_UNIVERSE_SET.length : DEMO_UNIVERSE.length);
-  statusEl.textContent = `Showing ${filtered.length} matching · scanned ${universeSize} tickers ${state.apiKey?"(live)":"(demo)"} · session: ${state.session}`;
+  const diag = state.apiKey
+    ? ` · ${apiStats.calls} API calls${apiStats.rate429?", "+apiStats.rate429+" rate-limited":""}${apiStats.errors?", "+apiStats.errors+" errors":""}`
+    : "";
+  statusEl.textContent =
+    `Showing ${filtered.length} of ${rows.length} valid · scanned ${universeSize} tickers `
+    + `${state.apiKey?"(live)":"(demo)"} · session: ${state.session}${diag}`;
 }
 
 /* ---------- UI wiring ---------- */
