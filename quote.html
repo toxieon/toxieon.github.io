@@ -252,6 +252,63 @@ input[type=number] { -moz-appearance: textfield; }
 .pac-matched { color: var(--brand-2); }
 
 footer-note { display: block; text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 24px; opacity: 0.6; }
+
+/* Skeleton loading on unlock */
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.loading-skeleton { pointer-events: none; }
+.loading-skeleton main { opacity: 0.4; filter: blur(1px); }
+.loading-skeleton::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0;
+  height: 3px; z-index: 1000;
+  background: linear-gradient(90deg, transparent 0%, var(--brand) 40%, var(--brand-2) 60%, transparent 100%);
+  background-size: 50% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+.loading-skeleton::after {
+  content: 'Loading your data…'; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); color: var(--text);
+  background: var(--card); padding: 14px 22px; border-radius: 999px;
+  border: 1px solid var(--card-border); font-weight: 700;
+  box-shadow: var(--shadow); z-index: 1001;
+}
+
+/* Collapsible Settings cards (uses <details>) */
+details.card { padding: 0; overflow: hidden; transition: 0.2s; }
+details.card[open] { box-shadow: 0 24px 80px rgba(0,0,0,0.4); }
+details.card > summary { padding: 18px 20px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; user-select: none; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: '▾'; color: var(--muted); transition: transform 0.2s; font-size: 1rem; }
+details.card:not([open]) > summary::after { transform: rotate(-90deg); }
+details.card > summary > h3 { margin: 0; }
+details.card > summary:hover h3 { color: var(--brand); }
+details.card > .card-body { padding: 0 20px 20px; }
+
+/* Draft auto-save indicator */
+.draft-indicator {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.85); color: var(--brand-2); padding: 6px 14px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  border: 1px solid rgba(106,255,184,0.3); z-index: 200;
+}
+.draft-indicator.show { opacity: 1; }
+
+/* Phone book */
+.phonebook-entry { background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); margin-bottom: 8px; overflow: hidden; }
+.phonebook-entry[open] { border-color: rgba(49,208,255,0.35); background: rgba(49,208,255,0.04); }
+.phonebook-entry > summary { padding: 12px 14px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.phonebook-entry > summary::-webkit-details-marker { display: none; }
+.phonebook-entry > summary::after { content: '▾'; color: var(--muted); transition: transform 0.2s; font-size: 0.9rem; }
+.phonebook-entry:not([open]) > summary::after { transform: rotate(-90deg); }
+.pb-meta { flex: 1; min-width: 0; }
+.pb-name { font-weight: 800; color: var(--text); font-size: 0.95rem; line-height: 1.2; }
+.pb-sub { color: var(--muted); font-size: 0.78rem; line-height: 1.3; margin-top: 2px; }
+.pb-body { padding: 4px 14px 14px; border-top: 1px dashed rgba(255,255,255,0.08); }
+.pb-info { color: var(--muted); font-size: 0.85rem; margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.pb-info a { color: var(--brand); }
+.pb-quotes { display: flex; flex-direction: column; gap: 4px; }
+.pb-quote-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+.pb-quote-row:hover { border-color: var(--brand); background: rgba(49,208,255,0.06); }
+#phonebook-search { margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -487,39 +544,54 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
     <!-- SETTINGS -->
     <section class="panel" data-panel="settings">
       <h2 class="panel-title">Settings</h2>
-      <p class="panel-sub">Pricing comes from your Google Sheet. Edit it there.</p>
+      <p class="panel-sub">Tap any section to expand. Business info is at the top — most-used settings first.</p>
 
-      <div class="card">
-        <h3>Google Sheet (pricing)</h3>
-        <div class="field"><label>Sheet ID or URL</label><input id="sheet-id" type="text" /></div>
-        <div id="sheet-status" class="tip" style="display:none;"></div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="sheet-sync">Sync now</button>
+      <details class="card" open>
+        <summary><h3>Business info</h3></summary>
+        <div class="card-body">
+          <div class="grid-2">
+            <div class="field"><label>Business name</label><input id="biz-name" type="text" /></div>
+            <div class="field"><label>ABN</label><input id="biz-abn" type="text" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Phone</label><input id="biz-phone" type="tel" /></div>
+            <div class="field"><label>Email</label><input id="biz-email" type="email" /></div>
+          </div>
+          <div class="field"><label>Home base address (travel measured from)</label><input id="home-address" type="text" autocomplete="off" /></div>
         </div>
-        <div class="tip">
-          System tabs: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. Any other tab in the sheet becomes an Extras subsection automatically.
-          Two ways to enable that: (1) enable <b>Google Sheets API</b> on your Maps API key (auto-detect every tab); or (2) add a row to the <b>Rates</b> tab with Key=<b>extra_tabs</b> and Value=<b>Cable, Conduit, Misc, GPOs, Switch</b> (comma-separated list of every extras tab).
-          Product columns (case-insensitive, aliases supported): <b>Type, Price, Favourite, Discount Cap, Notes</b>.
-        </div>
-      </div>
+      </details>
 
-      <div class="card">
-        <h3>Business info</h3>
-        <div class="grid-2">
-          <div class="field"><label>Business name</label><input id="biz-name" type="text" /></div>
-          <div class="field"><label>ABN</label><input id="biz-abn" type="text" /></div>
+      <details class="card" id="phonebook-card">
+        <summary><h3>Phone book</h3></summary>
+        <div class="card-body">
+          <p class="panel-sub" style="margin-bottom:10px;">Clients aggregated from your quote history. Same address = same client. Sorted alphabetically by name.</p>
+          <input id="phonebook-search" type="text" placeholder="Search by name, address, phone, email..." />
+          <div id="phonebook-list"></div>
         </div>
-        <div class="grid-2">
-          <div class="field"><label>Phone</label><input id="biz-phone" type="tel" /></div>
-          <div class="field"><label>Email</label><input id="biz-email" type="email" /></div>
-        </div>
-        <div class="field"><label>Home base address (travel measured from)</label><input id="home-address" type="text" autocomplete="off" /></div>
-      </div>
+      </details>
 
-      <div class="card">
-        <h3>Security</h3>
-        <div class="field"><label>Passcode</label><input id="passcode-new" type="text" /></div>
-      </div>
+      <details class="card">
+        <summary><h3>Google Sheet (pricing)</h3></summary>
+        <div class="card-body">
+          <div class="field"><label>Sheet ID or URL</label><input id="sheet-id" type="text" /></div>
+          <div id="sheet-status" class="tip" style="display:none;"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="sheet-sync">Sync now</button>
+          </div>
+          <div class="tip">
+            System tabs: <b>Cameras</b>, <b>Travel</b>, <b>Rates</b>. Any other tab becomes an Extras subsection automatically.
+            Two options: enable <b>Google Sheets API</b> on your Maps key (auto-detect every tab), or add a row to the Rates tab with Key=<b>extra_tabs</b> Value=<b>Cable, Conduit, Misc, GPOs, Switch</b>.
+            Product columns: <b>Type, Price, Favourite, Discount Cap, Notes</b>.
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><h3>Security</h3></summary>
+        <div class="card-body">
+          <div class="field"><label>Passcode</label><input id="passcode-new" type="text" /></div>
+        </div>
+      </details>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="save-settings">Save settings</button>
@@ -643,6 +715,39 @@ function saveHistory() { localStorage.setItem(HISTORY_KEY, JSON.stringify(histor
 function loadFavs() { try { return JSON.parse(localStorage.getItem(FAVS_KEY) || '{}'); } catch(e) { return {}; } }
 function saveFavs() { localStorage.setItem(FAVS_KEY, JSON.stringify(userFavs)); }
 
+// Auto-save draft (debounced)
+const DRAFT_KEY = 'nd_quote_draft_v1';
+let _draftTimer = null;
+function scheduleDraftSave() {
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(saveDraft, 700);
+}
+function saveDraft() {
+  try {
+    const has = currentQuote && (currentQuote.client.name || currentQuote.client.address || Object.keys(currentQuote.itemQty || {}).length || (currentQuote.customLines || []).length || currentQuote.notes);
+    if (has) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(currentQuote));
+      showDraftIndicator();
+    } else {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  } catch (e) { console.warn('draft save failed:', e); }
+}
+function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+function showDraftIndicator() {
+  let el = document.getElementById('draft-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'draft-indicator';
+    el.className = 'draft-indicator';
+    el.textContent = '✓ Saved';
+    document.body.appendChild(el);
+  }
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1200);
+}
+
 /* =====================================================
    PASSCODE
    ===================================================== */
@@ -655,12 +760,18 @@ passcodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnloc
 async function tryUnlock() {
   const passcode = passcodeInput.value;
   if (!passcode) return;
-  lockErr.textContent = 'Checking…';
+  lockErr.textContent = '';
   let hash;
   try { hash = await sha256Hex(passcode); }
   catch (e) { lockErr.textContent = 'Hash error: ' + e.message; return; }
 
-  // Try backend login first
+  // Show the app shell IMMEDIATELY with a skeleton/shimmer state while we verify
+  document.body.classList.add('loading-skeleton');
+  lockScreen.style.display = 'none';
+  document.getElementById('app').hidden = false;
+
+  // Try backend login
+  let backendOk = false, locked = false;
   try {
     const r = await fetch(getBackendUrl(), {
       method: 'POST',
@@ -673,37 +784,58 @@ async function tryUnlock() {
       if (data.ok && data.user) {
         currentUser = Object.assign({}, data.user, { passwordHash: hash });
         backendOnline = true;
-        finishUnlock();
-        return;
+        backendOk = true;
+      } else if (data && data.locked) {
+        locked = true;
       }
-      // Server reachable but rejected
-      if (data && data.locked) {
-        lockErr.textContent = 'Account locked. Contact admin.';
-        wipeLocalCache();
-        passcodeInput.value = '';
-        return;
-      }
-      // 'invalid passcode' or similar - fall through to offline fallback below
     }
-  } catch (e) {
-    // Network error - fall through to offline fallback
-    backendOnline = false;
+  } catch (e) { backendOnline = false; }
+
+  if (backendOk) { finishUnlock(); return; }
+  if (locked) {
+    document.body.classList.remove('loading-skeleton');
+    document.getElementById('app').hidden = true;
+    lockScreen.style.display = 'grid';
+    wipeLocalCache();
+    lockErr.textContent = 'Account locked. Contact your admin.';
+    passcodeInput.value = '';
+    return;
   }
 
-  // Offline fallback: local passcode check
+  // Offline fallback
   if (passcode === getPasscode()) {
     currentUser = { username: 'local', role: 'master', passwordHash: hash };
     finishUnlock();
     return;
   }
+
+  // Kick back to lock screen
+  document.body.classList.remove('loading-skeleton');
+  document.getElementById('app').hidden = true;
+  lockScreen.style.display = 'grid';
   lockErr.textContent = 'Wrong passcode';
   passcodeInput.value = '';
   passcodeInput.focus();
 }
 
 function finishUnlock() {
+  document.body.classList.remove('loading-skeleton');
   lockScreen.style.display = 'none';
   document.getElementById('app').hidden = false;
+  // Make sure favourites is an object. Merge any local-only favs as a one-time migration.
+  if (currentUser) {
+    if (!currentUser.favourites || typeof currentUser.favourites !== 'object') {
+      if (typeof currentUser.favourites === 'string') {
+        try { currentUser.favourites = JSON.parse(currentUser.favourites); } catch (e) { currentUser.favourites = {}; }
+      }
+      if (!currentUser.favourites || typeof currentUser.favourites !== 'object') currentUser.favourites = {};
+    }
+    let mergedAny = false;
+    Object.entries(userFavs || {}).forEach(([k, v]) => {
+      if (currentUser.favourites[k] === undefined) { currentUser.favourites[k] = v; mergedAny = true; }
+    });
+    if (mergedAny) pushFavouritesToBackend();
+  }
   // Hide Settings tab for staff (master sees everything)
   if (currentUser && currentUser.role === 'master') {
     const staffTab = document.querySelector('.tab[data-tab="staff"]');
@@ -833,12 +965,34 @@ function customLineFinal(line) {
 function customLineTotal(line) { return (Number(line.qty) || 0) * customLineFinal(line); }
 
 function isFav(itemKey, sheetFav) {
+  // Priority: this user's cloud-synced favourites → local-only override → sheet default
+  if (currentUser && currentUser.favourites && currentUser.favourites[itemKey] !== undefined) return !!currentUser.favourites[itemKey];
   if (userFavs[itemKey] !== undefined) return !!userFavs[itemKey];
   return !!sheetFav;
 }
 function toggleFav(itemKey, sheetFav) {
-  userFavs[itemKey] = !isFav(itemKey, sheetFav);
-  saveFavs();
+  const newVal = !isFav(itemKey, sheetFav);
+  if (currentUser) {
+    if (!currentUser.favourites || typeof currentUser.favourites !== 'object') currentUser.favourites = {};
+    currentUser.favourites[itemKey] = newVal;
+    pushFavouritesToBackend();
+  } else {
+    userFavs[itemKey] = newVal;
+    saveFavs();
+  }
+}
+
+let _favsSyncTimer = null;
+function pushFavouritesToBackend() {
+  clearTimeout(_favsSyncTimer);
+  _favsSyncTimer = setTimeout(async () => {
+    if (!currentUser || !currentUser.passwordHash) return;
+    try {
+      await backendCall('set_favourites', { favourites: currentUser.favourites || {} });
+    } catch (e) {
+      console.warn('favourites sync failed:', e.message);
+    }
+  }, 500);
 }
 function findItem(itemKey) {
   const [section, ...rest] = itemKey.split(':');
@@ -1051,24 +1205,47 @@ function renderListSection(targetEl, section) {
   wireStars(targetEl);
 }
 
+function updateRowSubtotal(qtyInput) {
+  if (!qtyInput) return;
+  const row = qtyInput.closest('.item-row, .picker-line'); if (!row) return;
+  const key = qtyInput.dataset.key;
+  const item = findItem(key); if (!item) return;
+  const qty = Number(qtyInput.value) || 0;
+  const unit = Number(item.price) || 0;
+  const sub = qty * unit;
+  const subEl = row.querySelector('.item-sub');
+  if (subEl) subEl.textContent = sub > 0 ? fmt(sub) : '';
+  row.classList.toggle('has-qty', qty > 0);
+}
 function wireQtyControls(rootEl) {
-  rootEl.querySelectorAll('.qty-input').forEach(inp => inp.oninput = e => {
-    const key = e.target.dataset.key; const v = e.target.value;
-    if (v === '' || Number(v) === 0) delete currentQuote.itemQty[key]; else currentQuote.itemQty[key] = Number(v);
-    renderAll();
+  rootEl.querySelectorAll('.qty-input').forEach(inp => {
+    // Use oninput to update model + subtotal in place (do NOT re-render the whole list — that destroys focus)
+    inp.oninput = e => {
+      const key = e.target.dataset.key; const v = e.target.value;
+      if (v === '' || Number(v) === 0) delete currentQuote.itemQty[key]; else currentQuote.itemQty[key] = Number(v);
+      updateRowSubtotal(e.target);
+      renderTotals();
+      scheduleDraftSave();
+    };
   });
   rootEl.querySelectorAll('.qty-btn.plus').forEach(b => b.onclick = () => {
     const key = b.dataset.key; if (!key) return;
     const cur = Number(currentQuote.itemQty[key]) || 0;
     currentQuote.itemQty[key] = cur + 1;
-    renderAll();
+    const row = b.closest('.item-row, .picker-line');
+    if (row) { const inp = row.querySelector('.qty-input'); if (inp) { inp.value = currentQuote.itemQty[key]; updateRowSubtotal(inp); } }
+    renderTotals();
+    scheduleDraftSave();
   });
   rootEl.querySelectorAll('.qty-btn.minus').forEach(b => b.onclick = () => {
     const key = b.dataset.key; if (!key) return;
     const cur = Number(currentQuote.itemQty[key]) || 0;
     const next = Math.max(0, cur - 1);
     if (next === 0) delete currentQuote.itemQty[key]; else currentQuote.itemQty[key] = next;
-    renderAll();
+    const row = b.closest('.item-row, .picker-line');
+    if (row) { const inp = row.querySelector('.qty-input'); if (inp) { inp.value = currentQuote.itemQty[key] || ''; updateRowSubtotal(inp); } }
+    renderTotals();
+    scheduleDraftSave();
   });
 }
 function wireStars(rootEl) {
@@ -1225,21 +1402,22 @@ function renderTotals() {
   document.getElementById(id).addEventListener('input', e => {
     const key = ({ hours:'hours', days:'days', discount:'discountPct' })[id];
     currentQuote[key] = e.target.value;
-    renderTotals();
+    renderTotals(); scheduleDraftSave();
   });
 });
-document.getElementById('travel-override').addEventListener('input', e => { currentQuote.travelOverride = e.target.value === '' ? null : e.target.value; renderTotals(); });
-document.getElementById('gst-toggle').addEventListener('change', e => { currentQuote.gst = e.target.checked; renderTotals(); });
+document.getElementById('travel-override').addEventListener('input', e => { currentQuote.travelOverride = e.target.value === '' ? null : e.target.value; renderTotals(); scheduleDraftSave(); });
+document.getElementById('gst-toggle').addEventListener('change', e => { currentQuote.gst = e.target.checked; renderTotals(); scheduleDraftSave(); });
 document.getElementById('cash-toggle').addEventListener('change', e => {
   currentQuote.cashMode = e.target.checked;
   if (e.target.checked) { currentQuote.gst = false; document.getElementById('gst-toggle').checked = false; }
   document.getElementById('save-cash-pdf').style.display = e.target.checked ? '' : 'none';
-  renderTotals();
+  renderTotals(); scheduleDraftSave();
 });
-document.getElementById('notes').addEventListener('input', e => currentQuote.notes = e.target.value);
-document.getElementById('client-name').addEventListener('input', e => currentQuote.client.name = e.target.value);
-document.getElementById('client-phone').addEventListener('input', e => currentQuote.client.phone = e.target.value);
-document.getElementById('proposed-date').addEventListener('change', e => currentQuote.proposedDate = e.target.value);
+document.getElementById('notes').addEventListener('input', e => { currentQuote.notes = e.target.value; scheduleDraftSave(); });
+document.getElementById('client-name').addEventListener('input', e => { currentQuote.client.name = e.target.value; scheduleDraftSave(); });
+document.getElementById('client-phone').addEventListener('input', e => { currentQuote.client.phone = e.target.value; scheduleDraftSave(); });
+document.getElementById('client-address').addEventListener('input', e => { currentQuote.client.address = e.target.value; scheduleDraftSave(); });
+document.getElementById('proposed-date').addEventListener('change', e => { currentQuote.proposedDate = e.target.value; scheduleDraftSave(); });
 document.getElementById('use-location-btn').onclick = () => {
   if (!navigator.geolocation) { alert('Geolocation not supported by this browser.'); return; }
   if (!window.google || !window.google.maps) { alert('Maps not loaded yet. Try again in a second.'); return; }
@@ -1268,6 +1446,7 @@ document.getElementById('use-location-btn').onclick = () => {
 document.getElementById('clear-quote').onclick = () => { if (confirm('Clear this quote? Anything not saved will be lost.')) { currentQuote = blankQuote(); resetQuoteUI(); } };
 
 function resetQuoteUI() {
+  clearDraft();
   document.getElementById('client-name').value = '';
   document.getElementById('client-phone').value = '';
   document.getElementById('client-address').value = '';
@@ -1631,7 +1810,7 @@ function saveCurrentQuote(style) {
   const snap = JSON.parse(JSON.stringify(currentQuote));
   if (idx >= 0) history[idx] = snap; else history.push(snap);
   saveHistory();
-  // Push to backend (fire and forget - never blocks the UI)
+  clearDraft();  // committed -> no longer a draft
   pushQuoteToBackend(snap);
 }
 document.getElementById('export-history').onclick = () => {
@@ -1684,6 +1863,123 @@ document.getElementById('route-to-site').onclick = () => {
   const url = `https://maps.apple.com/?daddr=${encodeURIComponent(addr)}`;
   window.open(url, '_blank');
 };
+
+/* =====================================================
+   PHONE BOOK
+   ===================================================== */
+function buildPhoneBook() {
+  const map = {}; // address(lower) -> client
+  history.forEach(q => {
+    const addr = ((q.client && q.client.address) || '').trim();
+    if (!addr) return;
+    const key = addr.toLowerCase();
+    if (!map[key]) map[key] = { name: '', phone: '', email: '', address: addr, quotes: [] };
+    if (q.client.name)  map[key].name  = q.client.name;
+    if (q.client.phone) map[key].phone = q.client.phone;
+    if (q.client.email) map[key].email = q.client.email;
+    map[key].quotes.push({ id: q.id, createdAt: q.createdAt, grand: q.grand, completed: q.completed, cashMode: q.cashMode });
+  });
+  Object.values(map).forEach(c => c.quotes.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+  return Object.values(map).sort((a, b) => (a.name || a.address).localeCompare(b.name || b.address, undefined, { sensitivity: 'base' }));
+}
+
+function renderPhoneBook() {
+  const target = document.getElementById('phonebook-list'); if (!target) return;
+  const all = buildPhoneBook();
+  const term = (document.getElementById('phonebook-search').value || '').toLowerCase().trim();
+  const filtered = term ? all.filter(c =>
+    (c.name || '').toLowerCase().includes(term) ||
+    (c.address || '').toLowerCase().includes(term) ||
+    (c.phone || '').toLowerCase().includes(term) ||
+    (c.email || '').toLowerCase().includes(term)
+  ) : all;
+  target.innerHTML = '';
+  if (!filtered.length) {
+    target.innerHTML = '<div class="tip">' + (all.length ? 'No clients match the search.' : 'No clients yet. Save a quote with a client name + address and it will appear here.') + '</div>';
+    return;
+  }
+  filtered.forEach(c => {
+    const total = c.quotes.reduce((s, q) => s + (q.grand || 0), 0);
+    const det = document.createElement('details');
+    det.className = 'phonebook-entry';
+    det.dataset.address = c.address;
+    det.innerHTML = '<summary>' +
+      '<div class="pb-meta">' +
+        '<div class="pb-name">' + escapeHtml(c.name || '(no name)') + '</div>' +
+        '<div class="pb-sub">' + escapeHtml(c.address) + ' &bull; ' + c.quotes.length + ' quote' + (c.quotes.length === 1 ? '' : 's') + ' &bull; ' + fmt(total) + '</div>' +
+      '</div>' +
+      '</summary>' +
+      '<div class="pb-body">' +
+        '<div class="pb-info">' +
+          (c.phone ? '<div>Phone: <a href="tel:' + escapeAttr(c.phone) + '">' + escapeHtml(c.phone) + '</a></div>' : '') +
+          (c.email ? '<div>Email: <a href="mailto:' + escapeAttr(c.email) + '">' + escapeHtml(c.email) + '</a></div>' : '') +
+          '<div>Address: ' + escapeHtml(c.address) + '</div>' +
+        '</div>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-utility" data-act="vcard">+ Add to contacts</button>' +
+          (c.phone ? '<a class="btn btn-utility" href="tel:' + escapeAttr(c.phone) + '">Call</a>' : '') +
+          (c.phone ? '<a class="btn btn-utility" href="sms:' + escapeAttr(c.phone) + '">SMS</a>' : '') +
+        '</div>' +
+        '<h4 style="margin:14px 0 8px;font-size:0.8rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">Quotes for this client</h4>' +
+        '<div class="pb-quotes">' +
+          c.quotes.map(q => {
+            const dt = q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+            const tag = q.completed
+              ? '<span class="tag-cash" style="background:rgba(49,208,255,0.15);color:var(--brand);">invoice</span>'
+              : (q.cashMode ? '<span class="tag-cash">cash</span>' : '');
+            return '<div class="pb-quote-row" data-id="' + escapeAttr(q.id) + '">' +
+              '<span>' + dt + ' ' + tag + '</span>' +
+              '<b style="color:var(--brand-2);">' + fmt(q.grand || 0) + '</b>' +
+              '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    target.appendChild(det);
+  });
+  // Wire vCard buttons
+  target.querySelectorAll('button[data-act="vcard"]').forEach(b => b.onclick = (ev) => {
+    ev.stopPropagation();
+    const entry = b.closest('details.phonebook-entry');
+    const addr = entry.dataset.address;
+    const c = all.filter(x => x.address === addr)[0];
+    if (c) downloadVCard(c);
+  });
+  // Wire quote click → open in Quote tab
+  target.querySelectorAll('.pb-quote-row').forEach(row => row.onclick = () => {
+    const id = row.dataset.id;
+    const q = history.find(x => x.id === id);
+    if (!q) return;
+    currentQuote = JSON.parse(JSON.stringify(q));
+    if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+    hydrateQuoteUI();
+    document.querySelector('.tab[data-tab="quote"]').click();
+  });
+}
+
+function downloadVCard(c) {
+  const esc = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    'FN:' + esc(c.name || ''),
+    'N:' + esc(c.name || '') + ';;;;'
+  ];
+  if (c.phone)   lines.push('TEL;TYPE=CELL,VOICE:' + esc(c.phone));
+  if (c.email)   lines.push('EMAIL;TYPE=INTERNET:' + esc(c.email));
+  if (c.address) lines.push('ADR;TYPE=HOME:;;' + esc(c.address) + ';;;;');
+  lines.push('NOTE:' + esc('Imported from Neill Data quote tool'));
+  lines.push('END:VCARD');
+  const vcard = lines.join('\r\n');
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (isIOS || isAndroid) {
+    // Navigate to data URI so the OS handler offers "Add to Contacts"
+    window.location.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcard);
+  } else {
+    const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
+    downloadBlob(blob, ((c.name || 'contact').replace(/[^a-z0-9]+/gi,'-').toLowerCase()) + '.vcf');
+  }
+}
 
 /* =====================================================
    STAFF (master only)
@@ -1865,6 +2161,7 @@ document.getElementById('ns-submit').onclick = async () => {
    SETTINGS
    ===================================================== */
 function renderSettings() {
+  renderPhoneBook();  // refresh phone book each time Settings is opened
   const setVal = (id, saved, hard) => {
     const el = document.getElementById(id);
     el.value = saved || '';
@@ -1884,6 +2181,12 @@ function renderSettings() {
     else { status.className = 'tip warn'; status.innerHTML = '<b>!</b> ' + settings.sheetLastStatus; }
   }
 }
+// Wire phone book search + initial render when Settings opens
+(function () {
+  const searchEl = document.getElementById('phonebook-search');
+  if (searchEl) searchEl.addEventListener('input', renderPhoneBook);
+})();
+
 document.getElementById('save-settings').onclick = () => {
   settings.business.name = document.getElementById('biz-name').value;
   settings.business.abn = document.getElementById('biz-abn').value;
@@ -1914,6 +2217,21 @@ document.getElementById('import-settings-file').addEventListener('change', e => 
 /* =====================================================
    PDF
    ===================================================== */
+async function sharePDF(blob, filename) {
+  // iOS share sheet supports SMS, email, AirDrop, etc.
+  if (!navigator.canShare || !navigator.share) {
+    return false; // caller can fall back to download
+  }
+  try {
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Quote', text: 'Your quote from ' + getBizName() });
+      return true;
+    }
+  } catch (e) { /* user cancelled or share unsupported */ }
+  return false;
+}
+
 function generatePDF(style) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'a4' });
@@ -2042,7 +2360,17 @@ function generatePDF(style) {
   const slug = (currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
   const docTag = isCash ? '-cash' : (isInvoice ? '' : '');
   const docKind = isCash ? 'quote' : (isInvoice ? 'invoice' : 'quote');
-  doc.save(`${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.pdf`);
+  const filename = `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.pdf`;
+  // Always trigger the file download
+  doc.save(filename);
+  // On supported devices (mobile especially), also offer to share via SMS / AirDrop / Mail
+  if (navigator.canShare && navigator.share) {
+    try {
+      const blob = doc.output('blob');
+      // Tiny delay so the download fires first
+      setTimeout(() => { sharePDF(blob, filename); }, 250);
+    } catch (e) { /* ignore */ }
+  }
 }
 
 /* =====================================================
@@ -2053,8 +2381,22 @@ function init() {
   resetQuoteUI();
   loadGoogleMaps();
   syncFromSheet(true);
-  // Pull cloud quotes + push any local-only ones (non-blocking)
   syncQuotesFromBackend();
+  // Restore unsaved draft if present
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      const hasData = draft && (draft.client.name || draft.client.address || Object.keys(draft.itemQty || {}).length || (draft.customLines || []).length);
+      if (hasData && confirm('Restore unsaved draft from your last session?')) {
+        currentQuote = draft;
+        if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+        hydrateQuoteUI();
+      } else {
+        clearDraft();
+      }
+    }
+  } catch (e) { /* ignore corrupt draft */ }
 }
 </script>
 </body>
