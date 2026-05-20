@@ -309,6 +309,43 @@ details.card > .card-body { padding: 0 20px 20px; }
 .pb-quote-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
 .pb-quote-row:hover { border-color: var(--brand); background: rgba(49,208,255,0.06); }
 #phonebook-search { margin-bottom: 12px; }
+
+/* Hide the "Here" geolocation button on hover-capable devices (desktop with mouse) */
+@media (hover: hover) and (pointer: fine) {
+  #use-location-btn { display: none !important; }
+}
+
+/* Calendar */
+.cal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.cal-header h3 { margin: 0; font-size: 1.05rem; }
+.cal-title { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: center; }
+.cal-nav-btn { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); color: var(--text); width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; font-weight: 800; padding: 0; display: grid; place-items: center; }
+.cal-nav-btn:hover { background: rgba(255,255,255,0.12); color: var(--brand); }
+.cal-stats { display: flex; gap: 14px; font-size: 0.78rem; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; justify-content: center; padding: 8px 12px; background: rgba(0,0,0,0.18); border-radius: var(--radius-sm); }
+.cal-stats b { color: var(--brand-2); font-weight: 800; }
+.cal-stats span { display: flex; align-items: center; gap: 6px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-dow { text-align: center; font-size: 0.65rem; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 0 4px; }
+.cal-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; position: relative; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); font-weight: 700; font-size: 0.95rem; transition: 0.15s; }
+.cal-day:hover { border-color: var(--brand); }
+.cal-day.out-of-month { opacity: 0.25; }
+.cal-day.today { border-color: var(--brand); color: var(--brand); }
+.cal-day.selected { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; border-color: var(--brand); }
+.cal-day.has-jobs { border-color: var(--brand-2); animation: pulseGlow 2.4s infinite; }
+.cal-day.completed-only { border-color: rgba(74,222,128,0.55); background: rgba(74,222,128,0.06); animation: none; }
+.cal-day.conflict { border-color: var(--warning); animation: pulseWarn 2s infinite; }
+@keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(106,255,184,0.55); } 50% { box-shadow: 0 0 0 6px rgba(106,255,184,0); } }
+@keyframes pulseWarn { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,209,102,0.55); } 50% { box-shadow: 0 0 0 7px rgba(255,209,102,0); } }
+.cal-day-num { font-size: 1.05rem; line-height: 1; }
+.cal-day-count { font-size: 0.62rem; color: var(--brand-2); font-weight: 800; margin-top: 1px; line-height: 1; }
+.cal-day.conflict .cal-day-count { color: var(--warning); }
+.cal-day.completed-only .cal-day-count { color: var(--cash); }
+.cal-legend { display: flex; gap: 12px; font-size: 0.72rem; color: var(--muted); justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.cal-legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.cal-legend-dot.pending { background: var(--brand-2); }
+.cal-legend-dot.completed { background: var(--cash); }
+.cal-legend-dot.conflict { background: var(--warning); }
+.cal-legend-dot.today { background: var(--brand); }
 </style>
 </head>
 <body>
@@ -335,8 +372,9 @@ details.card > .card-body { padding: 0 20px 20px; }
       <div class="tabs" role="tablist">
         <button class="tab active" data-tab="quote">Quote</button>
         <button class="tab" data-tab="history">History</button>
+        <button class="tab" data-tab="calendar">Calendar</button>
         <button class="tab" data-tab="staff" style="display:none;">Staff</button>
-        <button class="tab" data-tab="settings">Settings</button>
+        <button class="tab" data-tab="settings" style="display:none;">Settings</button>
       </div>
       <div id="user-chip" class="user-chip" hidden>
         <span class="user-chip-avatar" id="user-chip-avatar">—</span>
@@ -445,6 +483,39 @@ details.card > .card-body { padding: 0 20px 20px; }
       <div class="btn-row">
         <button class="btn btn-utility" id="add-to-calendar">📅 Add to Calendar</button>
         <button class="btn btn-utility" id="route-to-site">🗺️ Route to site</button>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="panel" data-panel="calendar">
+      <h2 class="panel-title">Calendar</h2>
+      <p class="panel-sub">Upcoming jobs by date. Days with jobs pulse softly. Days with two or more jobs warn in yellow.</p>
+
+      <div class="card">
+        <div class="cal-header">
+          <button class="cal-nav-btn" id="cal-prev" type="button">‹</button>
+          <div class="cal-title">
+            <h3 id="cal-month-title">—</h3>
+            <button class="btn btn-ghost" id="cal-today" type="button" style="min-height:32px;padding:0 12px;font-size:0.78rem;">Today</button>
+          </div>
+          <button class="cal-nav-btn" id="cal-next" type="button">›</button>
+        </div>
+        <div class="cal-stats" id="cal-stats"></div>
+        <div class="cal-grid" id="calendar-grid"></div>
+        <div class="cal-legend">
+          <span><span class="cal-legend-dot today"></span>Today</span>
+          <span><span class="cal-legend-dot pending"></span>Job scheduled</span>
+          <span><span class="cal-legend-dot completed"></span>All completed</span>
+          <span><span class="cal-legend-dot conflict"></span>Multiple jobs</span>
+        </div>
+      </div>
+
+      <div class="card" id="cal-day-card" style="display:none;">
+        <h3 id="cal-day-title">Selected day</h3>
+        <div id="calendar-day-jobs"></div>
+        <div class="btn-row" id="cal-day-actions" style="display:none;">
+          <button class="btn btn-utility" id="cal-day-export" type="button">📅 Add this day to my calendar</button>
+        </div>
       </div>
     </section>
 
@@ -839,10 +910,9 @@ function finishUnlock() {
   // Hide Settings tab for staff (master sees everything)
   if (currentUser && currentUser.role === 'master') {
     const staffTab = document.querySelector('.tab[data-tab="staff"]');
-    if (staffTab) staffTab.style.display = '';
-  } else if (currentUser) {
     const settingsTab = document.querySelector('.tab[data-tab="settings"]');
-    if (settingsTab) settingsTab.style.display = 'none';
+    if (staffTab) staffTab.style.display = '';
+    if (settingsTab) settingsTab.style.display = '';
   }
   // Populate the user chip in the header
   if (currentUser) {
@@ -874,6 +944,7 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'history')  renderHistory();
     if (t.dataset.tab === 'settings') renderSettings();
     if (t.dataset.tab === 'staff')    loadStaffList();
+    if (t.dataset.tab === 'calendar') renderCalendar();
   };
 });
 
@@ -1434,6 +1505,12 @@ document.getElementById('use-location-btn').onclick = () => {
         document.getElementById('client-address').value = addr;
         currentQuote.client.address = addr;
         computeRoute();
+      } else if (status === 'REQUEST_DENIED') {
+        alert('Geocoding API isn\'t enabled on your Maps key.\n\nFix:\n1. Google Cloud Console → APIs & Services → Library → search "Geocoding API" → Enable\n2. Credentials → click your Maps Platform API Key → API restrictions → tick "Geocoding API" → Save\n\nGive it ~1 minute to propagate, then try again.');
+      } else if (status === 'OVER_QUERY_LIMIT') {
+        alert('Too many location lookups. Try again in a moment.');
+      } else if (status === 'ZERO_RESULTS') {
+        alert('Could not find any address near your current location. Try typing the address manually.');
       } else {
         alert('Could not resolve address from your location (' + status + ')');
       }
@@ -1862,6 +1939,155 @@ document.getElementById('route-to-site').onclick = () => {
   // Apple Maps URL — opens Apple Maps on iOS, falls back to web on other platforms
   const url = `https://maps.apple.com/?daddr=${encodeURIComponent(addr)}`;
   window.open(url, '_blank');
+};
+
+/* =====================================================
+   CALENDAR
+   ===================================================== */
+let calendarMonth = new Date();
+calendarMonth.setDate(1);
+let selectedCalDay = null;
+
+function getJobsForDate(date) {
+  const dStr = date.toISOString().slice(0, 10);
+  return history.filter(q => {
+    if (!q.proposedDate) return false;
+    const pd = String(q.proposedDate).includes('T') ? String(q.proposedDate).slice(0, 10) : String(q.proposedDate);
+    return pd === dStr;
+  });
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendar-grid'); if (!grid) return;
+  const title = document.getElementById('cal-month-title');
+  const stats = document.getElementById('cal-stats');
+  const m = calendarMonth;
+  title.textContent = m.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  grid.innerHTML = '';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow'; el.textContent = d;
+    grid.appendChild(el);
+  });
+  const firstDow = new Date(m.getFullYear(), m.getMonth(), 1).getDay();
+  const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sel = selectedCalDay ? new Date(selectedCalDay) : null;
+
+  // Month stats
+  let monthJobs = 0, monthRevenue = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(m.getFullYear(), m.getMonth(), d);
+    const jobs = getJobsForDate(date);
+    monthJobs += jobs.length;
+    jobs.forEach(q => monthRevenue += (q.grand || 0));
+  }
+  stats.innerHTML = '<span><b>' + monthJobs + '</b> job' + (monthJobs === 1 ? '' : 's') + ' this month</span>' +
+                    '<span><b>' + fmt(monthRevenue) + '</b> scheduled revenue</span>';
+
+  for (let i = 0; i < 42; i++) {
+    const dayNum = i - firstDow + 1;
+    const cellDate = new Date(m.getFullYear(), m.getMonth(), dayNum);
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    if (dayNum < 1 || dayNum > daysInMonth) cell.classList.add('out-of-month');
+    if (cellDate.getTime() === today.getTime()) cell.classList.add('today');
+    if (sel && cellDate.getTime() === sel.getTime()) cell.classList.add('selected');
+    const jobs = getJobsForDate(cellDate);
+    if (jobs.length) {
+      const allCompleted = jobs.every(q => q.completed);
+      if (jobs.length >= 2) cell.classList.add('conflict');
+      else if (allCompleted) cell.classList.add('completed-only');
+      else cell.classList.add('has-jobs');
+      cell.innerHTML = '<span class="cal-day-num">' + cellDate.getDate() + '</span>' +
+        '<span class="cal-day-count">' + jobs.length + ' job' + (jobs.length === 1 ? '' : 's') + '</span>';
+    } else {
+      cell.innerHTML = '<span class="cal-day-num">' + cellDate.getDate() + '</span>';
+    }
+    cell.onclick = (function (d) { return function () { selectCalDay(d); }; })(new Date(cellDate));
+    grid.appendChild(cell);
+  }
+}
+
+function selectCalDay(date) {
+  selectedCalDay = date;
+  renderCalendar(); // re-render to highlight selection
+  const card = document.getElementById('cal-day-card');
+  const title = document.getElementById('cal-day-title');
+  const target = document.getElementById('calendar-day-jobs');
+  const actions = document.getElementById('cal-day-actions');
+  card.style.display = 'block';
+  title.textContent = date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const jobs = getJobsForDate(date);
+  target.innerHTML = '';
+  if (!jobs.length) {
+    target.innerHTML = '<div class="tip">No jobs scheduled for this day.</div>';
+    actions.style.display = 'none';
+    return;
+  }
+  // Sort by time
+  jobs.sort((a, b) => String(a.proposedDate).localeCompare(String(b.proposedDate)));
+  jobs.forEach(q => {
+    const hasTime = q.proposedDate && q.proposedDate.includes('T');
+    const timeStr = hasTime ? new Date(q.proposedDate).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : 'All day';
+    const tag = q.completed ? '<span class="tag-cash" style="background:rgba(49,208,255,0.15);color:var(--brand);">invoice</span>' : (q.cashMode ? '<span class="tag-cash">cash</span>' : '');
+    const item = document.createElement('div');
+    item.className = 'history-item' + (q.cashMode ? ' cash' : '') + (q.completed ? ' completed' : '');
+    item.style.cursor = 'pointer';
+    item.innerHTML = '<div class="history-item-meta">' +
+      '<span class="history-item-name">' + escapeHtml(timeStr) + ' &nbsp;·&nbsp; ' + escapeHtml(q.client.name || '(no name)') + tag + '</span>' +
+      '<span class="history-item-sub">' + escapeHtml(q.client.address || 'no address') + '</span>' +
+      '</div>' +
+      '<span class="history-item-total">' + fmt(q.grand || 0) + '</span>';
+    item.onclick = () => {
+      currentQuote = JSON.parse(JSON.stringify(q));
+      if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+      hydrateQuoteUI();
+      document.querySelector('.tab[data-tab="quote"]').click();
+    };
+    target.appendChild(item);
+  });
+  actions.style.display = 'flex';
+}
+
+document.getElementById('cal-prev').onclick = () => { calendarMonth.setMonth(calendarMonth.getMonth() - 1); renderCalendar(); };
+document.getElementById('cal-next').onclick = () => { calendarMonth.setMonth(calendarMonth.getMonth() + 1); renderCalendar(); };
+document.getElementById('cal-today').onclick = () => {
+  calendarMonth = new Date(); calendarMonth.setDate(1);
+  const t = new Date(); t.setHours(0,0,0,0); selectCalDay(t);
+};
+document.getElementById('cal-day-export').onclick = () => {
+  if (!selectedCalDay) return;
+  const jobs = getJobsForDate(selectedCalDay);
+  if (!jobs.length) { alert('No jobs to export.'); return; }
+  // Build a multi-event ICS file
+  const icsEscapeL = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+  const fmtIcs = d => d.getFullYear().toString().padStart(4,'0') + (d.getMonth()+1).toString().padStart(2,'0') + d.getDate().toString().padStart(2,'0') + 'T' + d.getHours().toString().padStart(2,'0') + d.getMinutes().toString().padStart(2,'0') + '00';
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//NeillData//Quote//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+  jobs.forEach(q => {
+    const hasTime = q.proposedDate && q.proposedDate.includes('T');
+    const start = hasTime ? new Date(q.proposedDate) : new Date(q.proposedDate + 'T09:00');
+    const end = new Date(start.getTime() + 2 * 3600 * 1000);
+    lines.push('BEGIN:VEVENT',
+      'UID:' + (q.id || 'Q-' + Date.now()) + '@neilldata',
+      'DTSTAMP:' + stamp,
+      'DTSTART:' + fmtIcs(start),
+      'DTEND:' + fmtIcs(end),
+      'SUMMARY:' + icsEscapeL('Install — ' + (q.client.name || 'client')),
+      'LOCATION:' + icsEscapeL(q.client.address || ''),
+      'DESCRIPTION:' + icsEscapeL('Quote ref ' + (q.id || '') + '. Total ' + fmt(q.grand || 0)),
+      'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const ics = lines.join('\r\n');
+  const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  } else {
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    downloadBlob(blob, 'jobs-' + selectedCalDay.toISOString().slice(0,10) + '.ics');
+  }
 };
 
 /* =====================================================
