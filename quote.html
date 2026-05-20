@@ -69,7 +69,7 @@ textarea { resize: vertical; min-height: 70px; }
 .field:last-child { margin-bottom: 0; }
 .inline-row { display: flex; align-items: center; gap: 10px; }
 .inline-row input[type="checkbox"] { width: auto; }
-.toggles-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: center; }
+.toggles-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; }
 .toggles-row .toggle-cell { display: flex; align-items: center; gap: 8px; padding: 11px 12px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); }
 .toggles-row .toggle-cell label { margin: 0; color: var(--text); font-size: 0.92rem; font-weight: 700; }
 .toggles-row .toggle-cell small { color: var(--muted); font-size: 0.7rem; font-weight: 500; }
@@ -133,8 +133,18 @@ textarea { resize: vertical; min-height: 70px; }
 .subtab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
 
 /* custom items (Misc) */
-.custom-row { display: grid; grid-template-columns: 1fr 100px 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
-.custom-row input { padding: 9px 10px; font-size: 0.92rem; }
+.custom-row { display: grid; grid-template-columns: 1.5fr 60px 80px 60px 90px 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.custom-row input { padding: 8px 8px; font-size: 0.88rem; }
+.custom-row .custom-final { text-align: right; font-weight: 800; color: var(--brand-2); font-size: 0.9rem; padding-right: 4px; }
+@media (max-width: 640px) {
+  .custom-row { grid-template-columns: 1fr 1fr 28px; grid-template-areas: 'label label del' 'qty cost mark' 'final final final'; gap: 6px; }
+  .custom-row .custom-label { grid-area: label; }
+  .custom-row .custom-qty { grid-area: qty; }
+  .custom-row .custom-cost { grid-area: cost; }
+  .custom-row .custom-markup { grid-area: mark; }
+  .custom-row .custom-final { grid-area: final; text-align: center; padding: 4px 0; background: rgba(0,0,0,0.18); border-radius: 6px; }
+  .custom-row .del-btn { grid-area: del; }
+}
 
 /* totals */
 .totals-card { background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09)); border: 1px solid rgba(106,255,184,0.32); }
@@ -170,6 +180,18 @@ textarea { resize: vertical; min-height: 70px; }
 .history-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .history-actions button { padding: 6px 10px; font-size: 0.78rem; min-height: 0; border-radius: 10px; }
 .tag-cash { display: inline-block; background: rgba(74,222,128,0.15); color: var(--cash); padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; margin-left: 6px; vertical-align: middle; }
+.tag-expires { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; margin-left: 6px; vertical-align: middle; }
+.tag-expires.ok    { background: rgba(106,255,184,0.12); color: var(--brand-2); }
+.tag-expires.warn  { background: rgba(255,209,102,0.15); color: var(--warning); }
+.tag-expires.bad   { background: rgba(255,107,136,0.15); color: var(--danger); }
+.tag-expires.done  { background: rgba(49,208,255,0.15); color: var(--brand); }
+.history-filters { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); margin-bottom: 12px; flex-wrap: wrap; }
+.history-filters label { margin: 0; color: var(--text); font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.history-filters input[type="checkbox"] { width: auto; }
+.history-item.completed { border-color: rgba(49,208,255,0.4); background: rgba(49,208,255,0.06); }
+.history-item.completed .history-item-total { color: var(--brand); }
+.btn-complete { background: rgba(106,255,184,0.18); border-color: rgba(106,255,184,0.35); color: var(--brand-2); }
+.btn-uncomplete { background: rgba(255,209,102,0.15); border-color: rgba(255,209,102,0.3); color: var(--warning); }
 
 /* route */
 .route-box { background: rgba(0,0,0,0.22); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
@@ -281,7 +303,13 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
           <div class="field"><label for="client-name">Client name</label><input id="client-name" type="text" placeholder="e.g. John Smith" /></div>
           <div class="field"><label for="client-phone">Client phone</label><input id="client-phone" type="tel" placeholder="04xx xxx xxx" /></div>
         </div>
-        <div class="field"><label for="client-address">Site address</label><input id="client-address" type="text" placeholder="Start typing the address..." autocomplete="off" /></div>
+        <div class="field">
+          <label for="client-address">Site address</label>
+          <div style="display:flex;gap:6px;">
+            <input id="client-address" type="text" placeholder="Start typing the address..." autocomplete="off" style="flex:1;" />
+            <button class="btn btn-utility" id="use-location-btn" type="button" title="Use my current location" style="min-height:42px;padding:0 12px;flex-shrink:0;">Here</button>
+          </div>
+        </div>
         <div class="field"><label for="proposed-date">Proposed start date & time</label><input id="proposed-date" type="datetime-local" /></div>
         <div id="route-box" class="route-box" style="display:none;">
           <div class="row"><span>From home base</span><b id="route-from">—</b></div>
@@ -334,9 +362,7 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
         <div class="toggles-row">
           <div class="toggle-cell"><input id="gst-toggle" type="checkbox" /><label for="gst-toggle">GST <small>(<span id="gst-pct-label">10</span>%)</small></label></div>
           <div class="toggle-cell"><input id="cash-toggle" type="checkbox" /><label for="cash-toggle">Cash mode <small>(hides GST)</small></label></div>
-          <div class="toggle-cell" style="opacity:0.5;"><label style="color:var(--muted);">More flags soon</label></div>
         </div>
-        <div class="field" style="margin-top:12px;"><label>Internal notes (NOT shown on any PDF)</label><textarea id="notes" placeholder="Site access notes, reminders, anything..."></textarea></div>
       </div>
 
       <!-- Totals -->
@@ -347,6 +373,12 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
       </div>
 
       <!-- Actions -->
+      <div class="card">
+        <h3>In-house notes <span class="pill" style="background:rgba(255,209,102,0.15);color:var(--warning);border-color:rgba(255,209,102,0.3);">Never on PDF</span></h3>
+        <p class="panel-sub" style="margin:0 0 10px;">Site access, reminders, internal stuff. Stays on this device + cloud, never appears on any PDF.</p>
+        <textarea id="notes" rows="3" placeholder="Anything..." style="min-height:80px;"></textarea>
+      </div>
+
       <div class="btn-row">
         <button class="btn btn-primary" id="save-pdf">Save &amp; download PDF</button>
         <button class="btn btn-cash" id="save-cash-pdf" style="display:none;">Save &amp; download Cash PDF</button>
@@ -362,7 +394,11 @@ footer-note { display: block; text-align: center; color: var(--muted); font-size
     <!-- HISTORY -->
     <section class="panel" data-panel="history">
       <h2 class="panel-title">Quote history</h2>
-      <p class="panel-sub">Saved on this device. Cross-device sync coming in Phase 2.</p>
+      <p class="panel-sub">Quotes auto-expire 30 days after creation unless marked complete (then they become Invoices).</p>
+      <div class="history-filters">
+        <label><input id="filter-invoices" type="checkbox" /> Show only completed (invoices)</label>
+        <label><input id="filter-hide-expired" type="checkbox" /> Hide expired</label>
+      </div>
       <div id="history-list"></div>
       <div id="history-empty" class="tip" style="display:none;">No saved quotes yet. Build one in the Quote tab and tap "Save".</div>
       <div class="btn-row">
@@ -785,6 +821,17 @@ function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
 function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
+function migrateCustomLine(line) {
+  if (line && (line.qty !== undefined || line.purchasePrice !== undefined)) return line;
+  return { label: (line && line.label) || '', qty: 1, purchasePrice: (line && Number(line.amount)) || 0, markupPct: 0 };
+}
+function customLineFinal(line) {
+  const cost = Number(line.purchasePrice) || 0;
+  const pct  = Number(line.markupPct) || 0;
+  return cost * (1 + pct / 100);
+}
+function customLineTotal(line) { return (Number(line.qty) || 0) * customLineFinal(line); }
+
 function isFav(itemKey, sheetFav) {
   if (userFavs[itemKey] !== undefined) return !!userFavs[itemKey];
   return !!sheetFav;
@@ -827,7 +874,7 @@ function calcQuote() {
     sections[section] = (sections[section] || 0) + (raw * (1 - effective / 100));
   });
 
-  let customRaw = 0; q.customLines.forEach(c => customRaw += (Number(c.amount) || 0));
+  let customRaw = 0; q.customLines.forEach(c => customRaw += customLineTotal(migrateCustomLine(c)));
   const customNet = customRaw * (1 - d / 100);
 
   const labourRaw = settings.hourlyRate * (Number(q.hours) || 0) + settings.dayRate * (Number(q.days) || 0);
@@ -864,9 +911,9 @@ function ensurePickerLines(section, sectionItems) {
 }
 
 function buildSelectOptions(section, items, currentKey) {
-  // Sort favourites first
-  const decorated = items.map(it => ({ it, fav: isFav(section + ':' + it.type, it.favourite) }));
-  decorated.sort((a, b) => (b.fav - a.fav) || a.it.type.localeCompare(b.it.type));
+  // Favourites first, then preserve sheet order (no alphabetical sort)
+  const decorated = items.map((it, idx) => ({ it, idx, fav: isFav(section + ':' + it.type, it.favourite) }));
+  decorated.sort((a, b) => (b.fav - a.fav) || (a.idx - b.idx));
   let html = `<option value="">— select an item —</option>`;
   decorated.forEach(({ it, fav }) => {
     const key = section + ':' + it.type;
@@ -965,12 +1012,13 @@ function renderListSection(targetEl, section) {
   } else {
     (settings.extras[section] || []).forEach(it => entries.push({ section, item: it }));
   }
-  // Sort favourites first within their own section
+  // Favourites first, then preserve sheet order (no alphabetical sort)
+  entries = entries.map((e, idx) => Object.assign({}, e, { _idx: idx }));
   entries.sort((a, b) => {
     const fa = isFav(a.section + ':' + a.item.type, a.item.favourite);
     const fb = isFav(b.section + ':' + b.item.type, b.item.favourite);
     if (fa !== fb) return fb - fa;
-    return a.item.type.localeCompare(b.item.type);
+    return a._idx - b._idx;
   });
   targetEl.innerHTML = '';
   if (!entries.length) {
@@ -1084,25 +1132,33 @@ function renderExtras() {
       customWrap.innerHTML = `<div style="margin-top:16px;font-size:0.8rem;color:var(--muted);font-weight:700;">Custom one-off items</div><div id="custom-lines"></div><button class="add-line-btn" id="add-custom">+ Add custom item</button>`;
       target.appendChild(customWrap);
       renderCustomLines();
-      document.getElementById('add-custom').onclick = () => { currentQuote.customLines.push({ label:'', amount:'' }); renderCustomLines(); renderTotals(); };
+      document.getElementById('add-custom').onclick = () => { currentQuote.customLines.push({ label:'', qty: 1, purchasePrice:'', markupPct: 0 }); renderCustomLines(); renderTotals(); };
     }
   }
 }
 function renderCustomLines() {
   const wrap = document.getElementById('custom-lines'); if (!wrap) return;
   wrap.innerHTML = '';
+  // Migrate any old-style lines first
+  currentQuote.customLines = currentQuote.customLines.map(migrateCustomLine);
   currentQuote.customLines.forEach((line, i) => {
+    const total = customLineTotal(line);
     const row = document.createElement('div');
     row.className = 'custom-row';
     row.innerHTML = `
       <input data-i="${i}" class="custom-label" type="text" value="${escapeAttr(line.label || '')}" placeholder="Description" />
-      <input data-i="${i}" class="custom-amount" type="number" min="0" step="any" value="${line.amount || ''}" placeholder="$" />
+      <input data-i="${i}" class="custom-qty" type="number" min="0" step="any" value="${line.qty === '' || line.qty == null ? '' : line.qty}" placeholder="Qty" title="Quantity" />
+      <input data-i="${i}" class="custom-cost" type="number" min="0" step="any" value="${line.purchasePrice === '' || line.purchasePrice == null ? '' : line.purchasePrice}" placeholder="$ cost" title="Purchase price (your cost)" />
+      <input data-i="${i}" class="custom-markup" type="number" min="0" step="any" value="${line.markupPct === '' || line.markupPct == null ? '' : line.markupPct}" placeholder="% +" title="Markup %" />
+      <div class="custom-final" title="Customer cost = qty × (cost × (1 + markup%))">${total > 0 ? fmt(total) : '—'}</div>
       <button class="del-btn" data-i="${i}" type="button">×</button>
     `;
     wrap.appendChild(row);
   });
-  wrap.querySelectorAll('.custom-label').forEach(el => el.oninput = e => { currentQuote.customLines[+e.target.dataset.i].label = e.target.value; });
-  wrap.querySelectorAll('.custom-amount').forEach(el => el.oninput = e => { currentQuote.customLines[+e.target.dataset.i].amount = e.target.value; renderTotals(); });
+  wrap.querySelectorAll('.custom-label').forEach(el => el.oninput  = e => { currentQuote.customLines[+e.target.dataset.i].label         = e.target.value; });
+  wrap.querySelectorAll('.custom-qty').forEach(el => el.oninput    = e => { currentQuote.customLines[+e.target.dataset.i].qty           = e.target.value; renderCustomLines(); renderTotals(); });
+  wrap.querySelectorAll('.custom-cost').forEach(el => el.oninput   = e => { currentQuote.customLines[+e.target.dataset.i].purchasePrice = e.target.value; renderCustomLines(); renderTotals(); });
+  wrap.querySelectorAll('.custom-markup').forEach(el => el.oninput = e => { currentQuote.customLines[+e.target.dataset.i].markupPct     = e.target.value; renderCustomLines(); renderTotals(); });
   wrap.querySelectorAll('.del-btn').forEach(el => el.onclick = e => { currentQuote.customLines.splice(+e.currentTarget.dataset.i, 1); renderCustomLines(); renderTotals(); });
 }
 
@@ -1123,13 +1179,28 @@ document.getElementById('add-camera-line').onclick = () => {
    ===================================================== */
 function renderTotals() {
   const c = calcQuote();
+  const d = c.d;
   const rows = [];
-  Object.keys(c.sectionRaws).sort().forEach(sec => {
-    const label = sec.charAt(0).toUpperCase() + sec.slice(1);
-    const cap = settings.discountCaps[sec] !== undefined ? settings.discountCaps[sec] : 100;
-    rows.push([`${label} ${cap < 100 ? `(${cap}% cap)` : ''}`.trim(), c.sections[sec] || 0, c.sectionRaws[sec] || 0]);
+  // Show every individual item (in-app) — invoice/PDF still groups by category
+  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
+  sectionOrder.forEach(sec => {
+    Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
+      const [section, ...rest] = key.split(':');
+      if (section !== sec) return;
+      const item = findItem(key); if (!item || !qty) return;
+      const raw = (Number(item.price) || 0) * Number(qty);
+      const cap = effectiveCap(sec, item);
+      const eff = Math.min(d, cap);
+      const net = raw * (1 - eff / 100);
+      rows.push([`${rest.join(':')} × ${qty}`, net, raw]);
+    });
   });
-  if (c.customRaw) rows.push(['Custom items', c.customNet, c.customRaw]);
+  currentQuote.customLines.forEach(line => {
+    const ml = migrateCustomLine(line);
+    const total = customLineTotal(ml); if (!total) return;
+    const net = total * (1 - d / 100);
+    rows.push([`${ml.label || 'Custom'} × ${ml.qty}`, net, total]);
+  });
   if (c.labourRaw) rows.push(['Labour', c.labourNet, c.labourRaw]);
   if (c.travelRaw) rows.push([`Travel (${settings.discountCaps.travel}% cap)`, c.travelNet, c.travelRaw]);
   let html = '';
@@ -1169,6 +1240,31 @@ document.getElementById('notes').addEventListener('input', e => currentQuote.not
 document.getElementById('client-name').addEventListener('input', e => currentQuote.client.name = e.target.value);
 document.getElementById('client-phone').addEventListener('input', e => currentQuote.client.phone = e.target.value);
 document.getElementById('proposed-date').addEventListener('change', e => currentQuote.proposedDate = e.target.value);
+document.getElementById('use-location-btn').onclick = () => {
+  if (!navigator.geolocation) { alert('Geolocation not supported by this browser.'); return; }
+  if (!window.google || !window.google.maps) { alert('Maps not loaded yet. Try again in a second.'); return; }
+  const btn = document.getElementById('use-location-btn');
+  const original = btn.textContent;
+  btn.textContent = 'Locating...';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude }, region: 'au' }, (results, status) => {
+      btn.textContent = original; btn.disabled = false;
+      if (status === 'OK' && results && results[0]) {
+        const addr = results[0].formatted_address;
+        document.getElementById('client-address').value = addr;
+        currentQuote.client.address = addr;
+        computeRoute();
+      } else {
+        alert('Could not resolve address from your location (' + status + ')');
+      }
+    });
+  }, (err) => {
+    btn.textContent = original; btn.disabled = false;
+    alert('Location error: ' + err.message + '. Make sure you allowed location access for this site.');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+};
 document.getElementById('clear-quote').onclick = () => { if (confirm('Clear this quote? Anything not saved will be lost.')) { currentQuote = blankQuote(); resetQuoteUI(); } };
 
 function resetQuoteUI() {
@@ -1395,23 +1491,61 @@ function parseCsv(text) {
 /* =====================================================
    HISTORY
    ===================================================== */
+function quoteExpiresAt(q) {
+  if (!q || !q.createdAt) return null;
+  return new Date(q.createdAt).getTime() + 30 * 86400 * 1000;
+}
+function quoteStatus(q) {
+  if (q && q.completed) return { kind: 'completed', label: 'Invoice', cls: 'done' };
+  const exp = quoteExpiresAt(q); if (!exp) return { kind: 'active', label: '', cls: 'ok' };
+  const ms = exp - Date.now();
+  const days = Math.ceil(ms / (86400 * 1000));
+  if (days < 0)  return { kind: 'expired', label: `Expired ${-days}d ago`, cls: 'bad' };
+  if (days === 0) return { kind: 'expiring', label: 'Expires today', cls: 'warn' };
+  if (days <= 7)  return { kind: 'expiring', label: `Expires in ${days}d`, cls: 'warn' };
+  return { kind: 'active', label: `${days}d left`, cls: 'ok' };
+}
+
+let historyFilterInvoicesOnly = false;
+let historyFilterHideExpired = false;
+document.getElementById('filter-invoices').addEventListener('change', e => { historyFilterInvoicesOnly = e.target.checked; renderHistory(); });
+document.getElementById('filter-hide-expired').addEventListener('change', e => { historyFilterHideExpired = e.target.checked; renderHistory(); });
+
 function renderHistory() {
   const list = document.getElementById('history-list'); list.innerHTML = '';
-  if (!history.length) { document.getElementById('history-empty').style.display = 'block'; return; }
+  // Apply filters
+  let filtered = history.slice();
+  if (historyFilterInvoicesOnly) filtered = filtered.filter(q => q.completed);
+  if (historyFilterHideExpired) filtered = filtered.filter(q => {
+    const s = quoteStatus(q);
+    return s.kind !== 'expired';
+  });
+  if (!filtered.length) {
+    document.getElementById('history-empty').style.display = 'block';
+    document.getElementById('history-empty').textContent = history.length ? 'No quotes match the current filter.' : 'No saved quotes yet. Build one in the Quote tab and tap "Save".';
+    return;
+  }
   document.getElementById('history-empty').style.display = 'none';
-  history.slice().reverse().forEach(q => {
+  filtered.slice().reverse().forEach(q => {
     const date = new Date(q.createdAt).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+    const status = quoteStatus(q);
     const item = document.createElement('div');
-    item.className = 'history-item' + (q.cashMode ? ' cash' : '');
+    item.className = 'history-item' + (q.cashMode ? ' cash' : '') + (q.completed ? ' completed' : '');
+    const tagCash = q.cashMode ? '<span class="tag-cash">cash</span>' : '';
+    const tagStatus = status.label ? `<span class="tag-expires ${status.cls}">${escapeHtml(status.label)}</span>` : '';
+    const completeBtn = q.completed
+      ? `<button class="btn btn-uncomplete" data-id="${q.id}" data-act="uncomplete" title="Move back to open quotes">Undo complete</button>`
+      : `<button class="btn btn-complete" data-id="${q.id}" data-act="complete" title="Mark this job as completed (becomes an Invoice)">Complete</button>`;
     item.innerHTML = `
       <div class="history-item-meta">
-        <span class="history-item-name">${escapeHtml(q.client.name || '(no name)')}${q.cashMode ? '<span class="tag-cash">cash</span>' : ''}</span>
+        <span class="history-item-name">${escapeHtml(q.client.name || '(no name)')}${tagCash}${tagStatus}</span>
         <span class="history-item-sub">${date} • ${escapeHtml(q.client.address || 'no address')}</span>
       </div>
       <span class="history-item-total">${fmt(q.grand || 0)}</span>
       <div class="history-actions">
         <button class="btn btn-secondary" data-id="${q.id}" data-act="open">Open</button>
         <button class="btn btn-secondary" data-id="${q.id}" data-act="pdf">PDF</button>
+        ${completeBtn}
         <button class="btn btn-danger" data-id="${q.id}" data-act="del">×</button>
       </div>`;
     list.appendChild(item);
@@ -1432,9 +1566,26 @@ function renderHistory() {
         history = history.filter(x => x.id !== q.id);
         saveHistory();
         renderHistory();
-        // Also remove from cloud (fire and forget)
         backendCall('delete_quote', { id: q.id }).catch(e => console.warn('cloud delete failed:', e.message));
       }
+    } else if (b.dataset.act === 'complete') {
+      if (!confirm('Mark this quote as completed?\n\nIt becomes an Invoice (PDF will be issued as an Invoice instead of a Quote, and it gets copied to the Invoices tab in your sheet).')) return;
+      q.completed = true;
+      q.completedAt = new Date().toISOString();
+      const idx = history.findIndex(x => x.id === q.id);
+      if (idx >= 0) history[idx] = q;
+      saveHistory();
+      renderHistory();
+      backendCall('complete_quote', { id: q.id }).catch(e => alert('Cloud completion failed: ' + e.message + '\nIt is marked locally but did not sync.'));
+    } else if (b.dataset.act === 'uncomplete') {
+      if (!confirm('Undo completion?\n\nThe quote will go back to being an open Quote and will be removed from the Invoices tab.')) return;
+      q.completed = false;
+      delete q.completedAt;
+      const idx = history.findIndex(x => x.id === q.id);
+      if (idx >= 0) history[idx] = q;
+      saveHistory();
+      renderHistory();
+      backendCall('uncomplete_quote', { id: q.id }).catch(e => alert('Cloud uncomplete failed: ' + e.message + '\nIt is marked locally but did not sync.'));
     }
   });
 }
@@ -1777,24 +1928,33 @@ function generatePDF(style) {
     doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
     doc.text('Estimate', M, 50);
   } else {
+    // Cyan-themed header: dark navy band + cyan accent stripe + cyan business name
     doc.setFillColor(7, 17, 31); doc.rect(0, 0, W, 90, 'F');
-    doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(20);
+    doc.setFillColor(49, 208, 255); doc.rect(0, 88, W, 3, 'F');
+    doc.setTextColor(49, 208, 255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
     doc.text(getBizName(), M, 42);
-    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.setTextColor(255); doc.setFont('helvetica','normal'); doc.setFontSize(10);
     const bizLine = [getBizPhone(), getBizEmail(), getBizAbn() ? 'ABN ' + getBizAbn() : ''].filter(Boolean).join('  •  ');
-    if (bizLine) doc.text(bizLine, M, 62);
+    if (bizLine) doc.text(bizLine, M, 64);
   }
   y = 120;
 
   doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.setFontSize(22);
-  if (!isCash) { doc.text('Quote', M, y); y += 24; }
+  const isInvoice = !isCash && !!currentQuote.completed;
+  if (!isCash) { doc.text(isInvoice ? 'Invoice' : 'Quote', M, y); y += 24; }
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const today = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
   doc.text('Date: ' + today, M, y); y += 14;
   if (!isCash) {
-    const exp = new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
-    doc.text('Valid until: ' + exp, M, y); y += 14;
-    if (currentQuote.id) { doc.text('Ref: ' + currentQuote.id, M, y); y += 14; }
+    if (isInvoice) {
+      const completedAt = currentQuote.completedAt ? new Date(currentQuote.completedAt).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }) : '';
+      if (completedAt) { doc.text('Completed: ' + completedAt, M, y); y += 14; }
+      if (currentQuote.id) { doc.text('Invoice ref: ' + currentQuote.id, M, y); y += 14; }
+    } else {
+      const exp = new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+      doc.text('Valid until: ' + exp, M, y); y += 14;
+      if (currentQuote.id) { doc.text('Ref: ' + currentQuote.id, M, y); y += 14; }
+    }
   }
   if (currentQuote.proposedDate) {
     const hasTime = currentQuote.proposedDate.includes('T');
@@ -1812,7 +1972,8 @@ function generatePDF(style) {
   y += 8;
 
   const colX = [M, M + 280, M + 360, M + 460];
-  doc.setFillColor(isCash ? 220 : 240, isCash ? 252 : 244, isCash ? 231 : 250);
+  if (isCash) doc.setFillColor(220, 252, 231);
+  else doc.setFillColor(225, 247, 255);  // light cyan tint
   doc.rect(M - 8, y - 12, W - M*2 + 16, 22, 'F');
   doc.setFont('helvetica','bold'); doc.setTextColor(0);
   doc.text('Item', colX[0], y); doc.text('Qty', colX[1], y); doc.text('Unit', colX[2], y); doc.text('Total', colX[3], y, { align:'right' });
@@ -1829,23 +1990,33 @@ function generatePDF(style) {
     y += Math.max(14, lbl.length * 12);
   };
 
+  // PDF: collapse items into one line per category. Custom items still appear individually.
   const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
   sectionOrder.forEach(sec => {
+    let raw = 0, net = 0, anyCapped = false, totalQty = 0;
     Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
-      const [section, ...rest] = key.split(':');
+      const [section] = key.split(':');
       if (section !== sec) return;
       const item = findItem(key); if (!item || !qty) return;
-      const raw = (Number(item.price) || 0) * Number(qty);
+      const r = (Number(item.price) || 0) * Number(qty);
       const cap = effectiveCap(sec, item);
       const eff = Math.min(c.d, cap);
-      const net = raw * (1 - eff / 100);
-      // If global discount got capped down for this item, hide the strikethrough on the PDF
-      // (in-app totals breakdown still shows it for transparency)
-      const isCapped = cap < c.d && c.d > 0;
-      lineOut(rest.join(':'), qty, item.price, net, isCapped ? null : raw);
+      raw += r; net += r * (1 - eff / 100);
+      totalQty += Number(qty);
+      if (cap < c.d && c.d > 0) anyCapped = true;
     });
+    if (raw > 0) {
+      const label = sec.charAt(0).toUpperCase() + sec.slice(1);
+      lineOut(label, totalQty || null, null, net, anyCapped ? null : raw);
+    }
   });
-  currentQuote.customLines.forEach(o => { if (!Number(o.amount)) return; lineOut(o.label || 'Custom', null, null, Number(o.amount) * (1 - c.d / 100), Number(o.amount)); });
+  // Custom items: shown individually with qty + final unit price
+  currentQuote.customLines.forEach(line => {
+    const ml = migrateCustomLine(line);
+    const total = customLineTotal(ml); if (!total) return;
+    const net = total * (1 - c.d / 100);
+    lineOut(ml.label || 'Custom', ml.qty || null, customLineFinal(ml), net, null);
+  });
   if (Number(currentQuote.hours)) lineOut(`Labour — ${currentQuote.hours} hr @ ${fmt(settings.hourlyRate)}/hr`, null, null, settings.hourlyRate * Number(currentQuote.hours) * (1 - c.d/100), settings.hourlyRate * Number(currentQuote.hours));
   if (Number(currentQuote.days))  lineOut(`Labour — ${currentQuote.days} day(s) @ ${fmt(settings.dayRate)}/day`, null, null, settings.dayRate * Number(currentQuote.days) * (1 - c.d/100), settings.dayRate * Number(currentQuote.days));
   if (c.travelRaw) lineOut(isCash ? 'Travel' : `Travel${currentQuote.distanceKm ? ' (' + currentQuote.distanceKm.toFixed(1) + ' km)' : ''}`, null, null, c.travelNet, c.travelRaw);
@@ -1855,16 +2026,23 @@ function generatePDF(style) {
   doc.text('Subtotal', W - M - 90, y, { align:'right' }); doc.text(fmt(c.subtotal), W - M, y, { align:'right' }); y += 14;
   if (!isCash && currentQuote.gst) { doc.text(`GST (${settings.gstPct}%)`, W - M - 90, y, { align:'right' }); doc.text(fmt(c.gstAmt), W - M, y, { align:'right' }); y += 14; }
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  if (!isCash) doc.setTextColor(49, 208, 255);
   doc.text('Total', W - M - 90, y + 4, { align:'right' }); doc.text(fmt(c.grand), W - M, y + 4, { align:'right' });
+  doc.setTextColor(0);
   y += 30;
 
   if (!isCash) {
+    doc.setFillColor(49, 208, 255); doc.rect(0, 822, W, 2, 'F');
     doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(120);
-    doc.text('Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.', M, 800, { maxWidth: W - M*2 });
+    const footerText = isInvoice
+      ? 'Tax invoice. Payment due upon receipt. Thank you for your business.'
+      : 'Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.';
+    doc.text(footerText, M, 800, { maxWidth: W - M*2 });
   }
   const slug = (currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
-  const tag = isCash ? '-cash' : '';
-  doc.save(`quote-${slug}-${new Date().toISOString().slice(0,10)}${tag}.pdf`);
+  const docTag = isCash ? '-cash' : (isInvoice ? '' : '');
+  const docKind = isCash ? 'quote' : (isInvoice ? 'invoice' : 'quote');
+  doc.save(`${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.pdf`);
 }
 
 /* =====================================================
