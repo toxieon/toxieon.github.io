@@ -346,6 +346,43 @@ details.card > .card-body { padding: 0 20px 20px; }
 .cal-legend-dot.completed { background: var(--cash); }
 .cal-legend-dot.conflict { background: var(--warning); }
 .cal-legend-dot.today { background: var(--brand); }
+
+/* Today/Tomorrow brief banner */
+.brief-card { background: linear-gradient(135deg, rgba(49,208,255,0.14), rgba(106,255,184,0.07)); border: 1px solid rgba(49,208,255,0.32); }
+.brief-list { display: flex; flex-direction: column; gap: 6px; }
+.brief-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); cursor: pointer; transition: 0.1s; }
+.brief-item:hover { border-color: var(--brand); }
+.brief-item .brief-when { font-weight: 800; color: var(--text); font-size: 0.92rem; }
+.brief-item .brief-when small { color: var(--brand); font-weight: 700; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.7rem; }
+.brief-item .brief-where { color: var(--muted); font-size: 0.78rem; }
+
+/* Calendar job cards */
+.cal-job { background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); margin-bottom: 8px; overflow: hidden; }
+.cal-job.completed { border-color: rgba(49,208,255,0.4); background: rgba(49,208,255,0.05); }
+.cal-job-summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; gap: 12px; cursor: pointer; }
+.cal-job-summary:hover { background: rgba(255,255,255,0.03); }
+.cal-job-time { display: inline-block; background: rgba(49,208,255,0.18); color: var(--brand); padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 800; margin-right: 8px; }
+.cal-job-name { font-weight: 700; }
+.cal-job-total { color: var(--brand-2); font-weight: 800; }
+.cal-job.completed .cal-job-total { color: var(--brand); }
+.cal-job-meta { padding: 0 14px 12px; color: var(--muted); font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; }
+.cal-job-meta b { color: var(--text); }
+.assignee-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+.assignee-chip { display: inline-flex; align-items: center; gap: 3px; background: rgba(106,255,184,0.13); color: var(--brand-2); padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(106,255,184,0.25); }
+
+/* Master edit panel inside calendar job */
+details.cal-job-edit { border-top: 1px dashed rgba(255,255,255,0.08); }
+details.cal-job-edit > summary { padding: 10px 14px; cursor: pointer; color: var(--muted); font-size: 0.82rem; font-weight: 700; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+details.cal-job-edit > summary::-webkit-details-marker { display: none; }
+details.cal-job-edit > summary::after { content: '▾'; transition: transform 0.2s; }
+details.cal-job-edit:not([open]) > summary::after { transform: rotate(-90deg); }
+details.cal-job-edit > summary:hover { color: var(--brand); }
+.cal-job-edit-body { padding: 0 14px 14px; }
+.assignee-edit { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(0,0,0,0.25); border: 1px solid var(--card-border); border-radius: var(--radius-sm); }
+.assignee-tag { display: inline-flex; align-items: center; gap: 4px; background: rgba(106,255,184,0.15); color: var(--brand-2); padding: 4px 4px 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(106,255,184,0.3); }
+.assignee-x { appearance: none; border: 0; background: rgba(255,107,136,0.15); color: var(--danger); width: 18px; height: 18px; border-radius: 50%; font-weight: 900; font-size: 0.85rem; cursor: pointer; padding: 0; display: grid; place-items: center; line-height: 1; }
+.assignee-x:hover { background: rgba(255,107,136,0.35); }
+.assignee-add { background: transparent; border: 0; color: var(--brand); padding: 4px 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; min-width: 140px; }
 </style>
 </head>
 <body>
@@ -390,6 +427,12 @@ details.card > .card-body { padding: 0 20px 20px; }
     <section class="panel active" data-panel="quote">
       <h2 class="panel-title">New quote</h2>
       <p class="panel-sub">Pick items, set quantities, generate PDF.</p>
+
+      <!-- Today/Tomorrow brief -->
+      <div class="card brief-card" id="upcoming-brief" style="display:none;">
+        <h3 id="brief-title" style="margin-bottom:10px;">📅 Upcoming jobs</h3>
+        <div class="brief-list" id="brief-list"></div>
+      </div>
 
       <!-- Client -->
       <div class="card">
@@ -754,6 +797,7 @@ function blankQuote() {
     id:null, createdAt:null,
     client: { name:'', phone:'', address:'' },
     proposedDate: '',
+    assignees: [],
     itemQty: {},                // { 'cameras:Basic 4MP': 2 }
     pickerLines: { cameras: [] }, // ordered keys per picker section; dynamically extended
     customLines: [],
@@ -913,6 +957,8 @@ function finishUnlock() {
     const settingsTab = document.querySelector('.tab[data-tab="settings"]');
     if (staffTab) staffTab.style.display = '';
     if (settingsTab) settingsTab.style.display = '';
+    // Pre-load staff list so the calendar's reassign dropdown has names ready
+    loadStaffList().catch(e => console.warn('staff preload failed:', e.message));
   }
   // Populate the user chip in the header
   if (currentUser) {
@@ -1003,6 +1049,7 @@ async function syncQuotesFromBackend() {
     remoteQuotes.forEach(q => { if (q.id) merged[q.id] = q; });
     history = Object.values(merged).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
     saveHistory();
+    renderUpcomingBrief();
     if (document.querySelector('.tab[data-tab="history"]').classList.contains('active')) renderHistory();
   } catch (e) {
     console.warn('cloud sync failed:', e.message);
@@ -1747,6 +1794,49 @@ function parseCsv(text) {
 /* =====================================================
    HISTORY
    ===================================================== */
+function renderUpcomingBrief() {
+  const banner = document.getElementById('upcoming-brief'); if (!banner) return;
+  const titleEl = document.getElementById('brief-title');
+  const listEl = document.getElementById('brief-list');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayStr = today.toISOString().slice(0, 10);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const upcoming = history.filter(q => {
+    if (!q.proposedDate || q.completed) return false;
+    const pd = String(q.proposedDate).includes('T') ? String(q.proposedDate).slice(0, 10) : String(q.proposedDate);
+    return pd === todayStr || pd === tomorrowStr;
+  }).sort((a, b) => String(a.proposedDate).localeCompare(String(b.proposedDate)));
+  if (!upcoming.length) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  const tc = upcoming.filter(q => String(q.proposedDate).startsWith(todayStr)).length;
+  const mc = upcoming.filter(q => String(q.proposedDate).startsWith(tomorrowStr)).length;
+  let title = '📅 ';
+  if (tc && mc) title += tc + ' job' + (tc === 1 ? '' : 's') + ' today, ' + mc + ' tomorrow';
+  else if (tc) title += tc + ' job' + (tc === 1 ? '' : 's') + ' today';
+  else title += mc + ' job' + (mc === 1 ? '' : 's') + ' tomorrow';
+  titleEl.textContent = title;
+  listEl.innerHTML = '';
+  upcoming.forEach(q => {
+    const isToday = String(q.proposedDate).startsWith(todayStr);
+    const dayLabel = isToday ? 'Today' : 'Tomorrow';
+    const hasTime = String(q.proposedDate).includes('T');
+    const timeStr = hasTime ? new Date(q.proposedDate).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : '';
+    const assignees = Array.isArray(q.assignees) && q.assignees.length ? q.assignees : [];
+    const item = document.createElement('div');
+    item.className = 'brief-item';
+    item.innerHTML = '<div class="brief-when"><small>' + dayLabel + '</small>' + (timeStr ? timeStr + ' · ' : '') + escapeHtml(q.client.name || '(no name)') +
+      (assignees.length ? ' <span class="assignee-chips">' + assignees.map(a => '<span class="assignee-chip">' + escapeHtml(a) + '</span>').join('') + '</span>' : '') + '</div>' +
+      '<div class="brief-where">' + escapeHtml(q.client.address || 'no address') + ' · ' + fmt(q.grand || 0) + '</div>';
+    item.onclick = () => {
+      currentQuote = JSON.parse(JSON.stringify(q));
+      if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+      hydrateQuoteUI();
+    };
+    listEl.appendChild(item);
+  });
+}
+
 function quoteExpiresAt(q) {
   if (!q || !q.createdAt) return null;
   return new Date(q.createdAt).getTime() + 30 * 86400 * 1000;
@@ -1883,6 +1973,11 @@ function saveCurrentQuote(style) {
   if (!currentQuote.createdAt) currentQuote.createdAt = new Date().toISOString();
   currentQuote.grand = c.grand;
   if (style && style !== 'regular') currentQuote.cashStyle = style;
+  // Ensure current user is always in the assignees list (covers new quotes + ones loaded from older versions)
+  if (!Array.isArray(currentQuote.assignees)) currentQuote.assignees = [];
+  if (currentUser && currentUser.username && currentQuote.assignees.indexOf(currentUser.username) === -1) {
+    currentQuote.assignees.push(currentUser.username);
+  }
   const idx = history.findIndex(x => x.id === currentQuote.id);
   const snap = JSON.parse(JSON.stringify(currentQuote));
   if (idx >= 0) history[idx] = snap; else history.push(snap);
@@ -2009,9 +2104,52 @@ function renderCalendar() {
   }
 }
 
+function renderAssigneeEditor(target, current) {
+  target.innerHTML = '';
+  const used = new Set();
+  (current || []).forEach(user => {
+    used.add(String(user).toLowerCase());
+    const tag = document.createElement('span');
+    tag.className = 'assignee-tag';
+    tag.dataset.user = user;
+    tag.innerHTML = escapeHtml(user) + ' <button class="assignee-x" type="button" title="Remove">×</button>';
+    tag.querySelector('.assignee-x').onclick = () => { tag.remove(); };
+    target.appendChild(tag);
+  });
+  const select = document.createElement('select');
+  select.className = 'assignee-add';
+  select.innerHTML = '<option value="">+ Add staff…</option>';
+  if (allStaff && allStaff.length) {
+    allStaff.forEach(u => {
+      if (used.has(u.username.toLowerCase())) return;
+      const opt = document.createElement('option');
+      opt.value = u.username;
+      opt.textContent = u.username + ' (' + u.role + ')';
+      select.appendChild(opt);
+    });
+  } else {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.disabled = true; opt.textContent = '(loading staff…)';
+    select.appendChild(opt);
+  }
+  select.onchange = e => {
+    const v = e.target.value; if (!v) return;
+    const tag = document.createElement('span');
+    tag.className = 'assignee-tag';
+    tag.dataset.user = v;
+    tag.innerHTML = escapeHtml(v) + ' <button class="assignee-x" type="button">×</button>';
+    tag.querySelector('.assignee-x').onclick = () => { tag.remove(); };
+    target.insertBefore(tag, select);
+    const opt = select.querySelector('option[value="' + v.replace(/"/g, '\\"') + '"]');
+    if (opt) opt.remove();
+    e.target.value = '';
+  };
+  target.appendChild(select);
+}
+
 function selectCalDay(date) {
   selectedCalDay = date;
-  renderCalendar(); // re-render to highlight selection
+  renderCalendar();
   const card = document.getElementById('cal-day-card');
   const title = document.getElementById('cal-day-title');
   const target = document.getElementById('calendar-day-jobs');
@@ -2025,26 +2163,71 @@ function selectCalDay(date) {
     actions.style.display = 'none';
     return;
   }
-  // Sort by time
   jobs.sort((a, b) => String(a.proposedDate).localeCompare(String(b.proposedDate)));
+  const isMaster = currentUser && currentUser.role === 'master';
   jobs.forEach(q => {
     const hasTime = q.proposedDate && q.proposedDate.includes('T');
     const timeStr = hasTime ? new Date(q.proposedDate).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : 'All day';
     const tag = q.completed ? '<span class="tag-cash" style="background:rgba(49,208,255,0.15);color:var(--brand);">invoice</span>' : (q.cashMode ? '<span class="tag-cash">cash</span>' : '');
+    const assignees = Array.isArray(q.assignees) && q.assignees.length ? q.assignees : (q.username ? [q.username] : []);
+    const assigneesHtml = assignees.length
+      ? '<span class="assignee-chips">' + assignees.map(a => '<span class="assignee-chip">' + escapeHtml(a) + '</span>').join('') + '</span>'
+      : '<span style="color:var(--muted);font-size:0.78rem;">no one assigned</span>';
     const item = document.createElement('div');
-    item.className = 'history-item' + (q.cashMode ? ' cash' : '') + (q.completed ? ' completed' : '');
-    item.style.cursor = 'pointer';
-    item.innerHTML = '<div class="history-item-meta">' +
-      '<span class="history-item-name">' + escapeHtml(timeStr) + ' &nbsp;·&nbsp; ' + escapeHtml(q.client.name || '(no name)') + tag + '</span>' +
-      '<span class="history-item-sub">' + escapeHtml(q.client.address || 'no address') + '</span>' +
+    item.className = 'cal-job' + (q.completed ? ' completed' : '');
+    item.innerHTML =
+      '<div class="cal-job-summary">' +
+        '<div><span class="cal-job-time">' + escapeHtml(timeStr) + '</span><span class="cal-job-name">' + escapeHtml(q.client.name || '(no name)') + '</span> ' + tag + '</div>' +
+        '<span class="cal-job-total">' + fmt(q.grand || 0) + '</span>' +
       '</div>' +
-      '<span class="history-item-total">' + fmt(q.grand || 0) + '</span>';
-    item.onclick = () => {
+      '<div class="cal-job-meta">' +
+        (q.client.address ? '<div>📍 ' + escapeHtml(q.client.address) + '</div>' : '') +
+        '<div>👤 ' + assigneesHtml + '</div>' +
+      '</div>' +
+      (isMaster ?
+        '<details class="cal-job-edit">' +
+          '<summary>Reschedule / reassign (master)</summary>' +
+          '<div class="cal-job-edit-body">' +
+            '<div class="field"><label>Date &amp; time</label><input type="datetime-local" class="cje-date" value="' + escapeAttr(q.proposedDate || '') + '" /></div>' +
+            '<div class="field"><label>Assigned staff (' + assignees.length + ')</label><div class="assignee-edit"></div></div>' +
+            '<div class="btn-row"><button class="btn btn-primary cje-save" type="button">Save changes</button></div>' +
+          '</div>' +
+        '</details>'
+      : '');
+    // Click summary (not the details) to open the quote
+    const summary = item.querySelector('.cal-job-summary');
+    summary.style.cursor = 'pointer';
+    summary.onclick = () => {
       currentQuote = JSON.parse(JSON.stringify(q));
       if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
       hydrateQuoteUI();
       document.querySelector('.tab[data-tab="quote"]').click();
     };
+    if (isMaster) {
+      const editor = item.querySelector('.assignee-edit');
+      renderAssigneeEditor(editor, assignees);
+      const saveBtn = item.querySelector('.cje-save');
+      const dateInput = item.querySelector('.cje-date');
+      saveBtn.onclick = async () => {
+        saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
+        const newDate = dateInput.value;
+        const newAssignees = Array.from(editor.querySelectorAll('.assignee-tag')).map(el => el.dataset.user);
+        const updated = JSON.parse(JSON.stringify(q));
+        updated.proposedDate = newDate;
+        updated.assignees = newAssignees;
+        const idx = history.findIndex(x => x.id === q.id);
+        if (idx >= 0) history[idx] = updated;
+        saveHistory();
+        try {
+          await backendCall('save_quote', { quote: updated });
+          saveBtn.textContent = 'Saved ✓';
+          setTimeout(() => { renderCalendar(); selectCalDay(date); renderUpcomingBrief(); }, 600);
+        } catch (e) {
+          saveBtn.textContent = 'Save changes'; saveBtn.disabled = false;
+          alert('Save failed: ' + e.message + '. The change is stored locally but did not sync to the cloud.');
+        }
+      };
+    }
     target.appendChild(item);
   });
   actions.style.display = 'flex';
@@ -2608,6 +2791,7 @@ function init() {
   loadGoogleMaps();
   syncFromSheet(true);
   syncQuotesFromBackend();
+  renderUpcomingBrief();
   // Restore unsaved draft if present
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
