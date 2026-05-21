@@ -270,10 +270,21 @@ input[type="date"] { color-scheme: dark; }
 .photo-add-row .btn { flex: 1; min-width: 130px; }
 
 /* Weather widgets */
-.cal-day-rain { position: absolute; top: 3px; right: 4px; font-size: 0.78rem; pointer-events: none; }
+.cal-day-wx { position: absolute; top: 3px; right: 4px; font-size: 0.92rem; pointer-events: none; line-height: 1; filter: drop-shadow(0 0 3px rgba(0,0,0,0.6)); }
+.cal-day-wx.sev-1 { filter: drop-shadow(0 0 4px rgba(120,180,255,0.7)); }
+.cal-day-wx.sev-2 { animation: stormPulse 1.4s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,107,136,0.7)); }
+.cal-day.storm { border-color: rgba(255,107,136,0.5); background: linear-gradient(135deg, rgba(255,107,136,0.07), rgba(120,80,200,0.05)); }
+.cal-day.storm::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,107,136,0.35); pointer-events: none; }
+@keyframes stormPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.85; } }
+
+/* Legacy class kept so old code doesn't break */
+.cal-day-rain { position: absolute; top: 3px; right: 4px; font-size: 0.92rem; pointer-events: none; }
 .cal-day-rain.heavy { filter: drop-shadow(0 0 4px rgba(120,180,255,0.7)); }
+
 .weather-warn { background: rgba(120,180,255,0.08); border: 1px solid rgba(120,180,255,0.3); color: var(--text); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; display: none; }
 .weather-warn b { color: #9fc6ff; }
+.weather-warn.storm { background: rgba(255,107,136,0.08); border-color: rgba(255,107,136,0.35); }
+.weather-warn.storm b { color: #ff9fb1; }
 .weather-warn.show { display: block; }
 
 /* Time questionnaire modal */
@@ -966,10 +977,29 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
         </div>
       </details>
 
+      <details class="card" id="activity-card" style="display:none;">
+        <summary><h3>🪪 Activity log <span class="pill" style="background:rgba(255,209,102,0.15);color:var(--warning);border-color:rgba(255,209,102,0.3);">Master</span></h3></summary>
+        <div class="card-body">
+          <p class="panel-sub" style="margin:0 0 10px;">Every login, delete, photo upload, and user change. Stored in the Activity tab of your sheet for 90 days.</p>
+          <div class="btn-row" style="margin:0 0 10px;">
+            <button class="btn btn-utility" id="activity-refresh" type="button">Refresh</button>
+            <button class="btn btn-danger" id="activity-clear" type="button">Clear log</button>
+          </div>
+          <div id="activity-list" style="max-height:60vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:var(--radius-sm);background:rgba(0,0,0,0.18);">
+            <div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">Tap Refresh to load.</div>
+          </div>
+        </div>
+      </details>
+
       <details class="card">
         <summary><h3>Security</h3></summary>
         <div class="card-body">
-          <div class="field"><label>Passcode</label><input id="passcode-new" type="text" /></div>
+          <div class="field">
+            <label>Passcode</label>
+            <input id="passcode-new" type="text" />
+            <div id="passcode-strength" class="tip" style="display:none;margin-top:6px;"></div>
+          </div>
+          <p class="panel-sub" style="margin:8px 0 0;font-size:0.78rem;">Passcodes must be unique across users. The default <b>1234</b> is fine for testing but <b>change it before sharing the URL with anyone</b>.</p>
         </div>
       </details>
 
@@ -1161,23 +1191,26 @@ async function tryUnlock() {
   lockScreen.style.display = 'none';
   document.getElementById('app').hidden = false;
 
-  // Try backend login
-  let backendOk = false, locked = false;
+  // Try backend login (with device fingerprint for rate limiting)
+  let backendOk = false, locked = false, serverErr = null, serverData = null;
   try {
     const r = await fetch(getBackendUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'login', passwordHash: hash }),
+      body: JSON.stringify({ action: 'login', passwordHash: hash, fingerprint: getDeviceFingerprint() }),
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       redirect: 'follow'
     });
     if (r.ok) {
       const data = await r.json();
+      serverData = data;
       if (data.ok && data.user) {
         currentUser = Object.assign({}, data.user, { passwordHash: hash });
         backendOnline = true;
         backendOk = true;
       } else if (data && data.locked) {
         locked = true;
+      } else if (data && data.error) {
+        serverErr = data.error;
       }
     }
   } catch (e) { backendOnline = false; }
@@ -1192,21 +1225,56 @@ async function tryUnlock() {
     passcodeInput.value = '';
     return;
   }
+  // Surface server-side rate-limit info if present
+  if (serverData && serverData.cooldownMs) {
+    document.body.classList.remove('loading-skeleton');
+    document.getElementById('app').hidden = true;
+    lockScreen.style.display = 'grid';
+    startCooldownCountdown(serverData.cooldownMs);
+    passcodeInput.value = '';
+    return;
+  }
 
-  // Offline fallback
+  // Offline fallback (no network or backend down)
   if (passcode === getPasscode()) {
     currentUser = { username: 'local', role: 'master', passwordHash: hash };
     finishUnlock();
     return;
   }
 
-  // Kick back to lock screen
+  // Kick back to lock screen with attempts-remaining if server told us
   document.body.classList.remove('loading-skeleton');
   document.getElementById('app').hidden = true;
   lockScreen.style.display = 'grid';
-  lockErr.textContent = 'Wrong passcode';
+  let msg = 'Wrong passcode';
+  if (serverData && typeof serverData.attemptsRemaining === 'number') {
+    msg += ' — ' + serverData.attemptsRemaining + ' attempt' + (serverData.attemptsRemaining === 1 ? '' : 's') + ' left before lockout';
+  } else if (serverErr) {
+    msg = serverErr;
+  }
+  lockErr.textContent = msg;
   passcodeInput.value = '';
   passcodeInput.focus();
+}
+
+function startCooldownCountdown(ms) {
+  const endsAt = Date.now() + ms;
+  const submitBtn = document.getElementById('passcode-submit');
+  submitBtn.disabled = true;
+  passcodeInput.disabled = true;
+  function tick() {
+    const remaining = Math.max(0, endsAt - Date.now());
+    if (remaining <= 0) {
+      submitBtn.disabled = false;
+      passcodeInput.disabled = false;
+      lockErr.textContent = '';
+      return;
+    }
+    const s = Math.ceil(remaining / 1000);
+    lockErr.textContent = '🔒 Locked out — try again in ' + (s < 60 ? s + 's' : Math.ceil(s / 60) + 'm');
+    setTimeout(tick, 500);
+  }
+  tick();
 }
 
 function finishUnlock() {
@@ -1267,7 +1335,7 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'settings') renderSettings();
     if (t.dataset.tab === 'staff')    loadStaffList();
     if (t.dataset.tab === 'calendar') renderCalendar();
-    if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showGalleryCardIfMaster(); renderGalleryFilters(); renderGalleryGrid(); }
+    if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showMasterCards(); renderGalleryFilters(); renderGalleryGrid(); }
   };
 });
 
@@ -1279,11 +1347,25 @@ async function sha256Hex(str) {
   const hashBuf = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+function getDeviceFingerprint() {
+  // Stable per-device random string stored in localStorage. Used only by the
+  // backend's rate limiter to track failed attempts per device (not for tracking).
+  const KEY = 'nd_device_fp_v1';
+  let fp = localStorage.getItem(KEY);
+  if (!fp) {
+    const rand = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
+    fp = 'fp-' + Date.now().toString(36) + '-' + rand;
+    try { localStorage.setItem(KEY, fp); } catch (e) { /* ignore */ }
+  }
+  return fp;
+}
+
 async function backendCall(action, body) {
   const url = getBackendUrl();
   if (!url) throw new Error('No backend URL configured');
   body = Object.assign({}, body || {}, { action });
   if (currentUser && currentUser.passwordHash && !body.passwordHash) body.passwordHash = currentUser.passwordHash;
+  if (!body.fingerprint) body.fingerprint = getDeviceFingerprint();
   // Use text/plain to avoid CORS preflight on Apps Script web apps
   const r = await fetch(url, {
     method: 'POST',
@@ -2398,18 +2480,25 @@ function renderCalendar() {
     } else {
       cell.innerHTML = '<span class="cal-day-num">' + cellDate.getDate() + '</span>';
     }
-    if (settings.weatherEnabled !== false && jobs.length) {
-      let maxRain = 0;
-      jobs.forEach(j => {
-        const p = getCachedRainProb(dateToISO(cellDate), j.clientLat, j.clientLng);
-        if (p != null && p > maxRain) maxRain = p;
-      });
-      if (maxRain >= 40) {
-        const r = document.createElement('span');
-        r.className = 'cal-day-rain' + (maxRain >= 70 ? ' heavy' : '');
-        r.textContent = maxRain >= 70 ? '🌧️' : '🌦️';
-        r.title = Math.round(maxRain) + '% chance of rain';
-        cell.appendChild(r);
+    if (settings.weatherEnabled !== false) {
+      // Prefer a job's address-specific weather; else fall back to home base
+      let chosen = null;
+      for (let j = 0; j < jobs.length; j++) {
+        const w = getCachedWeather(dateToISO(cellDate), jobs[j].clientLat, jobs[j].clientLng);
+        if (w) { chosen = w; break; }
+      }
+      if (!chosen && _homeBaseCoords) chosen = getCachedWeather(dateToISO(cellDate), _homeBaseCoords.lat, _homeBaseCoords.lng);
+      if (chosen) {
+        const desc = describeWeatherCode(chosen.weatherCode, chosen.rainProb);
+        if (desc.icon) {
+          const r = document.createElement('span');
+          r.className = 'cal-day-wx sev-' + desc.severity;
+          r.textContent = desc.icon;
+          const probTxt = chosen.rainProb != null ? '  ' + Math.round(chosen.rainProb) + '% rain' : '';
+          r.title = desc.label + probTxt;
+          cell.appendChild(r);
+          if (desc.severity === 2) cell.classList.add('storm');
+        }
       }
     }
     cell.onclick = (function (d) { return function () { selectCalDay(d); }; })(new Date(cellDate));
@@ -2417,18 +2506,24 @@ function renderCalendar() {
   }
   if (settings.weatherEnabled !== false && !renderCalendar._weatherKicked) {
     renderCalendar._weatherKicked = true;
-    const seen = new Set();
-    history.forEach(q => {
-      if (q.clientLat == null) return;
-      const dates = quoteDates(q);
-      if (!dates.length) return;
-      const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
-      if (seen.has(k)) return; seen.add(k);
-      fetchWeatherForDates(q.clientLat, q.clientLng, dates).then(() => {
+    Promise.resolve()
+      .then(prefetchHomeWeatherForCalendar)
+      .then(() => {
+        // Also fetch per-job weather for jobs with their own location
+        const seen = new Set();
+        history.forEach(q => {
+          if (q.clientLat == null) return;
+          const dates = quoteDates(q);
+          if (!dates.length) return;
+          const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
+          if (seen.has(k)) return; seen.add(k);
+          fetchWeatherForDates(q.clientLat, q.clientLng, dates);
+        });
+      })
+      .then(() => {
         if (renderCalendar._rainTimer) clearTimeout(renderCalendar._rainTimer);
-        renderCalendar._rainTimer = setTimeout(() => { renderCalendar._weatherKicked = false; renderCalendar(); }, 800);
+        renderCalendar._rainTimer = setTimeout(() => { renderCalendar._weatherKicked = false; renderCalendar(); }, 600);
       });
-    });
   }
 }
 
@@ -3032,10 +3127,14 @@ function renderMultiDayPicker() {
     const iso = dateToISO(cellDate);
     if (selSet.has(iso)) cell.classList.add('selected');
     cell.textContent = (dn >= 1 && dn <= daysInMonth) ? cellDate.getDate() : '';
-    const rainProb = getCachedRainProb(iso, currentQuote.clientLat, currentQuote.clientLng);
-    if (rainProb != null && rainProb >= 40) {
-      const r = document.createElement('span'); r.className = 'md-rain'; r.textContent = rainProb >= 70 ? '🌧️' : '🌦️';
-      cell.appendChild(r);
+    const w = getCachedWeather(iso, currentQuote.clientLat, currentQuote.clientLng) || (_homeBaseCoords ? getCachedWeather(iso, _homeBaseCoords.lat, _homeBaseCoords.lng) : null);
+    if (w) {
+      const desc = describeWeatherCode(w.weatherCode, w.rainProb);
+      if (desc.icon) {
+        const r = document.createElement('span'); r.className = 'md-rain'; r.textContent = desc.icon;
+        r.title = desc.label + (w.rainProb != null ? '  ' + Math.round(w.rainProb) + '% rain' : '');
+        cell.appendChild(r);
+      }
     }
     if (dn >= 1 && dn <= daysInMonth) {
       cell.onclick = () => toggleMultiDayDate(iso);
@@ -3104,12 +3203,37 @@ function toggleMultiDayDate(iso) {
 const _weatherCache = {};
 const _weatherInflight = {};
 function weatherKey(date, lat, lng) { return (lat||0).toFixed(2) + '|' + (lng||0).toFixed(2) + '|' + date; }
-function getCachedRainProb(date, lat, lng) {
+function getCachedWeather(date, lat, lng) {
   if (lat == null || lng == null) return null;
   const entry = _weatherCache[weatherKey(date, lat, lng)];
   if (!entry) return null;
   if (Date.now() - entry.fetchedAt > 6 * 3600 * 1000) return null;
-  return entry.rainProb;
+  return entry;
+}
+function getCachedRainProb(date, lat, lng) {
+  const e = getCachedWeather(date, lat, lng);
+  return e ? e.rainProb : null;
+}
+// WMO weather code → { icon, label, severity } severity: 0 normal, 1 wet, 2 storm
+function describeWeatherCode(code, rainProb) {
+  const c = Number(code);
+  if (c === 0) return { icon: '☀️', label: 'Sunny', severity: 0 };
+  if (c === 1) return { icon: '🌤️', label: 'Mostly clear', severity: 0 };
+  if (c === 2) return { icon: '⛅', label: 'Partly cloudy', severity: 0 };
+  if (c === 3) return { icon: '☁️', label: 'Overcast', severity: 0 };
+  if (c === 45 || c === 48) return { icon: '🌫️', label: 'Foggy', severity: 0 };
+  if (c >= 51 && c <= 57) return { icon: '🌦️', label: 'Drizzle', severity: 1 };
+  if (c >= 61 && c <= 65) return { icon: '🌧️', label: 'Rain', severity: 1 };
+  if (c === 66 || c === 67) return { icon: '🌧️', label: 'Freezing rain', severity: 1 };
+  if (c >= 71 && c <= 77) return { icon: '❄️', label: 'Snow', severity: 1 };
+  if (c >= 80 && c <= 82) return { icon: '🌧️', label: 'Showers', severity: 1 };
+  if (c === 85 || c === 86) return { icon: '🌨️', label: 'Snow showers', severity: 1 };
+  if (c === 95) return { icon: '⛈️', label: 'Thunderstorm', severity: 2 };
+  if (c === 96 || c === 99) return { icon: '⛈️', label: 'Thunderstorm w/ hail', severity: 2 };
+  // Unknown — fall back to precip probability heuristic
+  if (rainProb != null && rainProb >= 70) return { icon: '🌧️', label: Math.round(rainProb) + '% rain', severity: 1 };
+  if (rainProb != null && rainProb >= 40) return { icon: '🌦️', label: Math.round(rainProb) + '% rain', severity: 1 };
+  return { icon: '', label: '', severity: 0 };
 }
 async function geocodeForWeather(addr) {
   if (!addr || !window.google || !window.google.maps) return null;
@@ -3135,7 +3259,7 @@ async function fetchWeatherForDates(lat, lng, isoDates) {
   if (_weatherInflight[key]) return _weatherInflight[key];
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
     '&longitude=' + encodeURIComponent(lng) +
-    '&daily=precipitation_probability_max,precipitation_sum&timezone=auto' +
+    '&daily=weathercode,precipitation_probability_max,precipitation_sum&timezone=auto' +
     '&start_date=' + startDate + '&end_date=' + endDate;
   _weatherInflight[key] = (async () => {
     try {
@@ -3144,7 +3268,14 @@ async function fetchWeatherForDates(lat, lng, isoDates) {
       const json = await r.json();
       const days = (json.daily && json.daily.time) || [];
       const probs = (json.daily && json.daily.precipitation_probability_max) || [];
-      days.forEach((d, i) => { _weatherCache[weatherKey(d, lat, lng)] = { rainProb: probs[i] != null ? probs[i] : 0, fetchedAt: Date.now() }; });
+      const codes = (json.daily && json.daily.weathercode) || [];
+      days.forEach((d, i) => {
+        _weatherCache[weatherKey(d, lat, lng)] = {
+          rainProb: probs[i] != null ? probs[i] : 0,
+          weatherCode: codes[i] != null ? codes[i] : null,
+          fetchedAt: Date.now()
+        };
+      });
     } catch (e) { console.warn('weather lookup failed:', e.message); }
     finally { delete _weatherInflight[key]; }
   })();
@@ -3166,15 +3297,18 @@ async function refreshWeatherForQuote() {
   const dates = quoteDates(currentQuote);
   if (!dates.length) return;
   await fetchWeatherForDates(currentQuote.clientLat, currentQuote.clientLng, dates);
-  const rainy = dates.map(d => ({ d, p: getCachedRainProb(d, currentQuote.clientLat, currentQuote.clientLng) }))
-    .filter(x => x.p != null && x.p >= 40);
-  if (rainy.length) {
-    const lines = rainy.map(r => {
-      const niceDate = new Date(r.d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
-      const icon = r.p >= 70 ? '🌧️' : '🌦️';
-      return icon + ' <b>' + niceDate + '</b> — ' + Math.round(r.p) + '% chance of rain';
+  const flagged = dates.map(d => ({ d, w: getCachedWeather(d, currentQuote.clientLat, currentQuote.clientLng) }))
+    .filter(x => x.w && describeWeatherCode(x.w.weatherCode, x.w.rainProb).severity >= 1);
+  if (flagged.length) {
+    const anyStorm = flagged.some(f => describeWeatherCode(f.w.weatherCode, f.w.rainProb).severity === 2);
+    const lines = flagged.map(f => {
+      const desc = describeWeatherCode(f.w.weatherCode, f.w.rainProb);
+      const niceDate = new Date(f.d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      const probTxt = f.w.rainProb != null ? ' — ' + Math.round(f.w.rainProb) + '% rain' : '';
+      return desc.icon + ' <b>' + niceDate + '</b> · ' + desc.label + probTxt;
     });
-    warn.innerHTML = '<b>Heads up:</b> rain forecast for this job.<br>' + lines.join('<br>');
+    warn.innerHTML = (anyStorm ? '<b>⚠️ Thunderstorms forecast.</b> Plan around them.<br>' : '<b>Heads up:</b> wet weather forecast.<br>') + lines.join('<br>');
+    warn.classList.toggle('storm', anyStorm);
     warn.classList.add('show');
   }
   if (currentQuote.multiDay) renderMultiDayPicker();
@@ -3183,6 +3317,33 @@ function quoteDates(q) {
   if (q.multiDay && Array.isArray(q.schedule) && q.schedule.length) return q.schedule.map(s => s.date);
   if (q.proposedDate) { const pd = String(q.proposedDate); return [pd.includes('T') ? pd.slice(0,10) : pd]; }
   return [];
+}
+
+let _homeBaseCoords = null; // { lat, lng } cached per session
+async function getHomeBaseCoords() {
+  if (_homeBaseCoords) return _homeBaseCoords;
+  const addr = getHomeAddress();
+  if (!addr) return null;
+  const ll = await geocodeForWeather(addr);
+  if (ll) _homeBaseCoords = ll;
+  return _homeBaseCoords;
+}
+
+// Pre-fetch home-base weather for the visible calendar month plus its overflow days.
+async function prefetchHomeWeatherForCalendar() {
+  if (!settings.weatherEnabled) return;
+  const home = await getHomeBaseCoords();
+  if (!home) return;
+  // Build the full grid of 42 cells for the current calendarMonth view
+  const m = calendarMonth;
+  const firstDow = new Date(m.getFullYear(), m.getMonth(), 1).getDay();
+  const isoDates = [];
+  for (let i = 0; i < 42; i++) {
+    const dn = i - firstDow + 1;
+    const d = new Date(m.getFullYear(), m.getMonth(), dn);
+    isoDates.push(dateToISO(d));
+  }
+  await fetchWeatherForDates(home.lat, home.lng, isoDates);
 }
 ['client-address', 'proposed-date'].forEach(id => {
   const el = document.getElementById(id);
@@ -3377,6 +3538,91 @@ function saveWatermarkUI() {
   settings.weatherEnabled = we ? !!we.checked : true;
 }
 
+
+
+/* =====================================================
+   v12: ACTIVITY LOG + PASSCODE STRENGTH
+   ===================================================== */
+function showMasterCards() {
+  const ids = ['gallery-card', 'activity-card'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (currentUser && currentUser.role === 'master') ? '' : 'none';
+  });
+}
+
+async function loadActivityLog() {
+  const target = document.getElementById('activity-list');
+  if (!target) return;
+  target.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">Loading…</div>';
+  try {
+    const r = await backendCall('get_activity', { limit: 200 });
+    const rows = (r && r.activity) || [];
+    if (!rows.length) {
+      target.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">No activity yet.</div>';
+      return;
+    }
+    target.innerHTML = rows.map(a => {
+      const t = a.timestamp ? new Date(a.timestamp).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+      const okBadge = a.result === 'ok'
+        ? '<span style="background:rgba(106,255,184,0.16);color:var(--brand-2);padding:1px 7px;border-radius:999px;font-size:0.7rem;font-weight:800;">OK</span>'
+        : '<span style="background:rgba(255,107,136,0.16);color:var(--danger);padding:1px 7px;border-radius:999px;font-size:0.7rem;font-weight:800;">' + escapeHtml(a.result || 'fail').toUpperCase() + '</span>';
+      return '<div style="display:grid;grid-template-columns:90px 110px 1fr 60px;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--card-border);font-size:0.82rem;">' +
+        '<div style="color:var(--muted);">' + escapeHtml(t) + '</div>' +
+        '<div><b>' + escapeHtml(a.username || '—') + '</b><br><span style="color:var(--muted);font-size:0.7rem;">' + escapeHtml(a.role || '') + '</span></div>' +
+        '<div><b>' + escapeHtml(a.action) + '</b><br><span style="color:var(--muted);font-size:0.78rem;">' + escapeHtml(a.detail || '') + '</span></div>' +
+        '<div style="text-align:right;">' + okBadge + '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    target.innerHTML = '<div style="padding:14px;color:var(--danger);font-size:0.85rem;text-align:center;">Failed: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+(function wireActivity() {
+  const refresh = document.getElementById('activity-refresh');
+  if (refresh) refresh.onclick = loadActivityLog;
+  const clear = document.getElementById('activity-clear');
+  if (clear) clear.onclick = async () => {
+    if (!confirm('Clear the entire activity log?\nThis cannot be undone. (A new log entry will record that you cleared it.)')) return;
+    try { await backendCall('clear_activity', {}); loadActivityLog(); }
+    catch (e) { alert('Failed: ' + e.message); }
+  };
+})();
+
+/* ---------- Passcode strength meter ---------- */
+function scorePasscode(p) {
+  if (!p) return { score: 0, label: '' };
+  const length = p.length;
+  const sets = (/[a-z]/.test(p) ? 1 : 0) + (/[A-Z]/.test(p) ? 1 : 0) + (/\d/.test(p) ? 1 : 0) + (/[^\w]/.test(p) ? 1 : 0);
+  let score = 0;
+  if (length >= 4) score = 1;
+  if (length >= 6) score = 2;
+  if (length >= 8 || sets >= 2) score = 3;
+  if (length >= 10 && sets >= 2) score = 4;
+  if (length >= 12 && sets >= 3) score = 5;
+  const labels = ['', 'Very weak', 'Weak', 'OK', 'Strong', 'Excellent'];
+  const colors = ['', '#ff6b88', '#ff9f6b', '#ffd166', '#6affb8', '#31d0ff'];
+  return { score, label: labels[score], color: colors[score], sets, length };
+}
+(function wirePasscodeMeter() {
+  const inp = document.getElementById('passcode-new');
+  const out = document.getElementById('passcode-strength');
+  if (!inp || !out) return;
+  function refresh() {
+    const v = inp.value || '';
+    if (!v) { out.style.display = 'none'; return; }
+    const s = scorePasscode(v);
+    out.style.display = 'block';
+    out.className = 'tip ' + (s.score >= 3 ? 'ok' : s.score >= 2 ? 'warn' : '');
+    const dots = '●'.repeat(s.score) + '○'.repeat(5 - s.score);
+    let warning = '';
+    if (v === '1234' || v === '0000' || v === '1111') warning = ' — that is one of the most common passcodes in the world, please pick another.';
+    out.innerHTML = '<b style="color:' + s.color + ';">' + dots + '</b> ' + s.label + ' · ' + s.length + ' chars · ' + s.sets + ' char set(s)' + warning;
+  }
+  inp.addEventListener('input', refresh);
+})();
 
 /* =====================================================
    v11: PHOTO CLOUD SYNC + TAGS + GALLERY
@@ -4251,7 +4497,7 @@ function init() {
   loadGoogleMaps();
   syncFromSheet(true);
   syncQuotesFromBackend();
-  syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { showGalleryCardIfMaster(); renderGalleryFilters(); });
+  syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { showMasterCards(); renderGalleryFilters(); });
   renderUpcomingBrief();
   // Restore unsaved draft if present
   try {
