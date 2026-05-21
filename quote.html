@@ -290,6 +290,36 @@ input[type="date"] { color-scheme: dark; }
 .timeq-box .timeq-overrun.show { display: block; }
 .timeq-box .timeq-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 
+/* Tag pills + editor */
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 36px; }
+.tag-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: rgba(106,255,184,0.14); border: 1px solid rgba(106,255,184,0.32); color: var(--brand-2); font-size: 0.78rem; font-weight: 800; }
+.tag-pill .tag-x { background: transparent; border: 0; color: inherit; cursor: pointer; font-weight: 900; font-size: 1rem; line-height: 1; padding: 0 0 0 4px; }
+.tag-pill .tag-x:hover { color: var(--danger); }
+.tag-pill.muted { background: rgba(255,255,255,0.06); border-color: var(--card-border); color: var(--muted); }
+.tag-pill.muted.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; border-color: transparent; }
+.tag-add-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.tag-add-row select, .tag-add-row input { flex: 1; min-width: 120px; padding: 6px 10px; font-size: 0.85rem; }
+.tag-add-row .btn { min-height: 34px; padding: 0 12px; font-size: 0.78rem; }
+.photo-ref { position: absolute; bottom: 4px; right: 6px; background: rgba(0,0,0,0.65); color: #fff; padding: 1px 7px; border-radius: 999px; font-size: 0.62rem; font-weight: 700; backdrop-filter: blur(4px); letter-spacing: 0.04em; }
+.photo-tile .photo-tag-strip { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; flex-wrap: nowrap; max-width: calc(100% - 70px); overflow: hidden; }
+.photo-tile .photo-tag-strip .tag-mini { background: rgba(0,0,0,0.65); color: #fff; padding: 1px 6px; border-radius: 999px; font-size: 0.6rem; font-weight: 700; backdrop-filter: blur(4px); white-space: nowrap; }
+.photo-tile.lazy-loading::before { content: 'Loading…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.78rem; font-weight: 700; background: rgba(0,0,0,0.45); z-index: 1; }
+.photo-tile.lazy-placeholder img { filter: blur(8px) brightness(0.4); }
+
+/* Gallery (Settings, master only) */
+.gallery-toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.gallery-toolbar input[type="search"] { padding: 8px 12px; font-size: 0.9rem; }
+.gallery-status { font-size: 0.78rem; color: var(--muted); }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-height: 64vh; overflow-y: auto; padding-right: 4px; }
+.gallery-empty { text-align: center; padding: 20px; color: var(--muted); font-size: 0.85rem; background: rgba(0,0,0,0.15); border: 1px dashed var(--card-border); border-radius: var(--radius-sm); }
+.gallery-jump { background: rgba(49,208,255,0.12); border: 1px solid rgba(49,208,255,0.3); color: var(--brand); border-radius: 8px; padding: 6px 12px; font-weight: 700; font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+.gallery-jump:hover { background: rgba(49,208,255,0.22); }
+.lb-tags-block { width: 100%; max-width: 560px; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px; color: var(--text); }
+.lb-tags-block h4 { margin: 0 0 8px; font-size: 0.85rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.lb-tags-block .lb-jump-quote { margin-top: 10px; display: flex; gap: 8px; align-items: center; font-size: 0.78rem; color: var(--muted); }
+.lb-tags-block .lb-jump-quote button { background: rgba(255,255,255,0.1); border: 0; color: var(--text); border-radius: 6px; padding: 4px 10px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.78rem; }
+.lb-tags-block .lb-jump-quote button:hover { background: rgba(49,208,255,0.25); color: var(--brand); }
+
 /* photos */
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 10px; }
 .photo-tile { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 1px solid var(--card-border); background: rgba(0,0,0,0.25); cursor: pointer; transition: 0.15s; }
@@ -695,6 +725,15 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
       <div class="photo-lightbox" id="photo-lightbox">
         <button class="pl-close" id="photo-lightbox-close" type="button">✕</button>
         <img id="photo-lightbox-img" alt="">
+        <div class="lb-tags-block" id="lb-tags-block">
+          <h4>Tags</h4>
+          <div class="tag-list" id="lb-current-tags"></div>
+          <div class="tag-add-row" id="lb-add-row"></div>
+          <div class="lb-jump-quote" id="lb-jump-quote" style="display:none;">
+            <span id="lb-quote-info">—</span>
+            <button type="button" id="lb-jump-btn">Open quote</button>
+          </div>
+        </div>
         <div class="pl-actions">
           <button class="btn btn-utility" id="photo-share" type="button">📲 Share / Save to Photos</button>
           <button class="btn btn-danger" id="photo-delete" type="button">Delete photo</button>
@@ -906,6 +945,23 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
           <div class="field" style="margin-top:12px;">
             <div class="toggle-cell"><input id="weather-enabled" type="checkbox" /><label for="weather-enabled">Show rain forecast on Calendar &amp; warn before scheduling rainy days</label></div>
             <p class="panel-sub" style="margin:8px 0 0;font-size:0.78rem;">Uses Open-Meteo (free, no API key needed). Looks up the site address once and remembers it on each quote.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="gallery-card" style="display:none;">
+        <summary><h3>📷 Photo gallery <span class="pill" style="background:rgba(255,209,102,0.15);color:var(--warning);border-color:rgba(255,209,102,0.3);">Master</span></h3></summary>
+        <div class="card-body">
+          <p class="panel-sub" style="margin:0 0 10px;">Every photo across every quote. Filter by tags or search by client, ref, or notes.</p>
+          <div class="gallery-toolbar">
+            <input id="gallery-search" type="search" placeholder="Search by ref, client name, notes, quote ID..." />
+            <div class="tag-list" id="gallery-tag-filters"></div>
+            <div class="gallery-status" id="gallery-status">—</div>
+          </div>
+          <div class="gallery-grid" id="gallery-grid"></div>
+          <div class="btn-row">
+            <button class="btn btn-utility" id="gallery-refresh" type="button">Refresh</button>
+            <button class="btn btn-utility" id="gallery-manage-tags" type="button">Manage tags</button>
           </div>
         </div>
       </details>
@@ -1211,6 +1267,7 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'settings') renderSettings();
     if (t.dataset.tab === 'staff')    loadStaffList();
     if (t.dataset.tab === 'calendar') renderCalendar();
+    if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showGalleryCardIfMaster(); renderGalleryFilters(); renderGalleryGrid(); }
   };
 });
 
@@ -3212,9 +3269,11 @@ async function snapPhoto() {
   ctx.drawImage(video, 0, 0, w, h);
   await drawWatermark(ctx, w, h);
   const url = canvas.toDataURL('image/jpeg', PHOTO_JPEG_Q);
-  currentQuote.photos.push({ url: url, w: w, h: h, customerVisible: true });
+  const photo = { url: url, w: w, h: h, customerVisible: true, ref: genPhotoRef(), tags: [], createdAt: new Date().toISOString() };
+  currentQuote.photos.push(photo);
   renderPhotos();
   scheduleDraftSave();
+  pushPhotoToBackend(photo);
   status.textContent = 'Saved. Tap shutter for another, or ✕ to close.';
   shutter.disabled = false;
 }
@@ -3318,6 +3377,423 @@ function saveWatermarkUI() {
   settings.weatherEnabled = we ? !!we.checked : true;
 }
 
+
+/* =====================================================
+   v11: PHOTO CLOUD SYNC + TAGS + GALLERY
+   ===================================================== */
+
+// In-memory: all photo metadata across every quote (master = everyone's)
+let allPhotoMeta = [];     // [{ ref, quoteId, username, tags, customerVisible, w, h, createdAt }]
+let knownTags = [];        // [{ name, color, createdBy, createdAt }]
+// dataUrl cache so we don't re-fetch the same photo twice
+const photoDataCache = {}; // ref -> dataUrl
+
+function findLocalPhotoByRef(ref) {
+  for (let qi = 0; qi < history.length; qi++) {
+    const ps = (history[qi].photos || []).map(migratePhoto);
+    for (let pi = 0; pi < ps.length; pi++) {
+      if (ps[pi].ref === ref) return { quote: history[qi], photo: ps[pi], qi, pi };
+    }
+  }
+  if (Array.isArray(currentQuote.photos)) {
+    const ps = currentQuote.photos.map(migratePhoto);
+    for (let pi = 0; pi < ps.length; pi++) {
+      if (ps[pi].ref === ref) return { quote: currentQuote, photo: ps[pi], qi: -1, pi };
+    }
+  }
+  return null;
+}
+
+async function pushPhotoToBackend(photo) {
+  if (!photo || !photo.ref || !photo.url) return;
+  if (photo._syncing) return;
+  photo._syncing = true;
+  try {
+    await backendCall('save_photo', {
+      photo: {
+        ref: photo.ref,
+        quoteId: currentQuote.id || '',
+        width: photo.w || 0,
+        height: photo.h || 0,
+        tags: photo.tags || [],
+        notes: photo.notes || '',
+        customerVisible: photo.customerVisible !== false,
+        createdAt: photo.createdAt || new Date().toISOString(),
+        dataUrl: photo.url
+      }
+    });
+    photo.synced = true;
+    photoDataCache[photo.ref] = photo.url;
+  } catch (e) {
+    console.warn('photo upload failed for', photo.ref, e.message);
+    photo.synced = false;
+  } finally {
+    photo._syncing = false;
+  }
+}
+
+async function syncPhotoMetaFromBackend() {
+  if (!currentUser || !currentUser.passwordHash) return;
+  try {
+    const r = await backendCall('get_photos_meta', {});
+    allPhotoMeta = (r && r.photos) || [];
+    // Merge cloud metadata into local quotes that don't have these photos yet.
+    // (Lazy: keep them as placeholders without a url.)
+    const byQuote = {};
+    allPhotoMeta.forEach(p => { (byQuote[p.quoteId] = byQuote[p.quoteId] || []).push(p); });
+    history.forEach(q => {
+      if (!q.id) return;
+      const cloudPhotos = byQuote[q.id] || [];
+      if (!Array.isArray(q.photos)) q.photos = [];
+      const localRefs = new Set(q.photos.map(p => migratePhoto(p).ref).filter(Boolean));
+      cloudPhotos.forEach(meta => {
+        if (!localRefs.has(meta.ref)) {
+          q.photos.push({
+            ref: meta.ref,
+            url: '',                     // lazy — will fetch on demand
+            w: meta.width, h: meta.height,
+            tags: meta.tags || [],
+            customerVisible: meta.customerVisible !== false,
+            synced: true,
+            placeholder: true,
+            createdAt: meta.createdAt
+          });
+        } else {
+          // Update tags/visibility for already-known refs
+          const idx = q.photos.findIndex(p => migratePhoto(p).ref === meta.ref);
+          if (idx >= 0) {
+            const m = migratePhoto(q.photos[idx]);
+            m.tags = meta.tags || m.tags || [];
+            m.customerVisible = meta.customerVisible !== false;
+            q.photos[idx] = m;
+          }
+        }
+      });
+    });
+    saveHistory();
+    // If current quote is loaded, refresh its display
+    if (currentQuote && currentQuote.id) {
+      const cur = history.find(q => q.id === currentQuote.id);
+      if (cur) currentQuote.photos = JSON.parse(JSON.stringify(cur.photos || []));
+      renderPhotos();
+    }
+  } catch (e) {
+    console.warn('photo meta sync failed:', e.message);
+  }
+}
+
+async function fetchPhotoData(ref) {
+  if (!ref) return null;
+  if (photoDataCache[ref]) return photoDataCache[ref];
+  try {
+    const r = await backendCall('get_photo_data', { ref });
+    if (r && r.dataUrl) {
+      photoDataCache[ref] = r.dataUrl;
+      // Also stash into the corresponding local photo so we don't refetch
+      const found = findLocalPhotoByRef(ref);
+      if (found) {
+        found.photo.url = r.dataUrl;
+        // Persist back into the array element (migratePhoto returns the object reference for non-string)
+        if (found.qi >= 0) history[found.qi].photos[found.pi] = found.photo;
+        else if (Array.isArray(currentQuote.photos)) currentQuote.photos[found.pi] = found.photo;
+        saveHistory();
+      }
+      return r.dataUrl;
+    }
+  } catch (e) {
+    console.warn('photo data fetch failed for', ref, e.message);
+  }
+  return null;
+}
+
+async function ensurePhotoLoaded(ref) {
+  const found = findLocalPhotoByRef(ref);
+  if (!found) return null;
+  const m = found.photo;
+  if (m.url) return m.url;
+  return await fetchPhotoData(ref);
+}
+
+async function setPhotoTags(ref, tags) {
+  if (!ref) return false;
+  try {
+    await backendCall('set_photo_tags', { ref, tags });
+    // Mirror into local state
+    const found = findLocalPhotoByRef(ref);
+    if (found) {
+      found.photo.tags = tags;
+      if (found.qi >= 0) history[found.qi].photos[found.pi] = found.photo;
+      saveHistory();
+    }
+    const meta = allPhotoMeta.find(p => p.ref === ref);
+    if (meta) meta.tags = tags;
+    return true;
+  } catch (e) {
+    alert('Failed to update tags: ' + e.message);
+    return false;
+  }
+}
+
+async function syncKnownTags() {
+  if (!currentUser || !currentUser.passwordHash) return;
+  try {
+    const r = await backendCall('list_tags', {});
+    knownTags = (r && r.tags) || [];
+  } catch (e) { console.warn('tag list failed:', e.message); }
+}
+
+/* ---------- Tag editor in lightbox ---------- */
+function renderLightboxTags() {
+  const current = document.getElementById('lb-current-tags');
+  const addRow = document.getElementById('lb-add-row');
+  const jumpRow = document.getElementById('lb-jump-quote');
+  const quoteInfo = document.getElementById('lb-quote-info');
+  if (!current || !addRow) return;
+  current.innerHTML = '';
+  addRow.innerHTML = '';
+  const idx = _currentLightboxIdx;
+  if (idx < 0) return;
+  const m = migratePhoto(currentQuote.photos[idx]);
+  const tags = m.tags || [];
+  if (!tags.length) {
+    current.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">No tags yet.</span>';
+  } else {
+    tags.forEach(t => {
+      const pill = document.createElement('span');
+      pill.className = 'tag-pill';
+      pill.innerHTML = escapeHtml(t) + '<button class="tag-x" type="button" title="Remove">×</button>';
+      pill.querySelector('.tag-x').onclick = async () => {
+        const next = tags.filter(x => x !== t);
+        const ok = await setPhotoTags(m.ref, next);
+        if (ok) { m.tags = next; currentQuote.photos[idx] = m; renderLightboxTags(); renderPhotos(); }
+      };
+      current.appendChild(pill);
+    });
+  }
+  // Dropdown of available tags + (master only) input to create new
+  const available = knownTags.filter(kt => !tags.some(t => String(t).toLowerCase() === kt.name.toLowerCase()));
+  const select = document.createElement('select');
+  select.innerHTML = '<option value="">+ Add tag…</option>' + available.map(kt => '<option value="' + escapeAttr(kt.name) + '">' + escapeHtml(kt.name) + '</option>').join('');
+  select.onchange = async (e) => {
+    const v = e.target.value; if (!v) return;
+    const next = tags.concat([v]);
+    const ok = await setPhotoTags(m.ref, next);
+    if (ok) { m.tags = next; currentQuote.photos[idx] = m; renderLightboxTags(); renderPhotos(); }
+  };
+  addRow.appendChild(select);
+  if (currentUser && currentUser.role === 'master') {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'New tag…';
+    addRow.appendChild(inp);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary';
+    btn.textContent = 'Create + apply';
+    btn.onclick = async () => {
+      const name = inp.value.trim();
+      if (!name) return;
+      try {
+        await backendCall('create_tag', { name });
+      } catch (e) {
+        if (!/already/i.test(e.message)) { alert('Could not create tag: ' + e.message); return; }
+      }
+      await syncKnownTags();
+      const next = tags.concat([name]);
+      const ok = await setPhotoTags(m.ref, next);
+      if (ok) { m.tags = next; currentQuote.photos[idx] = m; renderLightboxTags(); renderPhotos(); }
+    };
+    addRow.appendChild(btn);
+  }
+  // If the photo came from a different quote (gallery view), show jump button
+  const found = findLocalPhotoByRef(m.ref);
+  if (found && found.quote.id && found.quote.id !== (currentQuote.id || '')) {
+    jumpRow.style.display = 'flex';
+    quoteInfo.textContent = (found.quote.client && found.quote.client.name ? found.quote.client.name + ' — ' : '') + (found.quote.id || '');
+    document.getElementById('lb-jump-btn').onclick = () => {
+      currentQuote = JSON.parse(JSON.stringify(found.quote));
+      if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+      hydrateQuoteUI();
+      closePhotoLightbox();
+      document.querySelector('.tab[data-tab="quote"]').click();
+    };
+  } else {
+    jumpRow.style.display = 'none';
+  }
+}
+
+/* ---------- Gallery (master only) ---------- */
+let galleryFilterTags = new Set();
+
+function showGalleryCardIfMaster() {
+  const card = document.getElementById('gallery-card');
+  if (!card) return;
+  card.style.display = (currentUser && currentUser.role === 'master') ? '' : 'none';
+}
+
+function buildPhotoIndex() {
+  // Build a flat list of every photo across all quotes the current user can see
+  const out = [];
+  history.forEach(q => {
+    (q.photos || []).forEach(p => {
+      const m = migratePhoto(p);
+      if (!m.ref) return;
+      out.push({
+        ref: m.ref,
+        url: m.url || '',
+        tags: m.tags || [],
+        w: m.w, h: m.h,
+        quoteId: q.id || '',
+        clientName: (q.client && q.client.name) || '',
+        clientAddress: (q.client && q.client.address) || '',
+        createdAt: m.createdAt || q.createdAt || ''
+      });
+    });
+  });
+  // Also include cloud-only metadata that isn't already linked to a known quote
+  const seen = new Set(out.map(x => x.ref));
+  allPhotoMeta.forEach(meta => {
+    if (seen.has(meta.ref)) return;
+    out.push({
+      ref: meta.ref, url: '', tags: meta.tags || [],
+      w: meta.width, h: meta.height,
+      quoteId: meta.quoteId || '', clientName: '', clientAddress: '',
+      createdAt: meta.createdAt || ''
+    });
+  });
+  return out;
+}
+
+function renderGalleryFilters() {
+  const wrap = document.getElementById('gallery-tag-filters');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!knownTags.length) {
+    wrap.innerHTML = '<span style="color:var(--muted);font-size:0.78rem;">No tags created yet — open a photo to start tagging.</span>';
+    return;
+  }
+  knownTags.forEach(t => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill muted' + (galleryFilterTags.has(t.name) ? ' active' : '');
+    pill.style.cursor = 'pointer';
+    pill.textContent = t.name;
+    pill.onclick = () => {
+      if (galleryFilterTags.has(t.name)) galleryFilterTags.delete(t.name);
+      else galleryFilterTags.add(t.name);
+      renderGalleryFilters();
+      renderGalleryGrid();
+    };
+    wrap.appendChild(pill);
+  });
+  if (galleryFilterTags.size) {
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'gallery-jump';
+    clear.textContent = 'Clear filters';
+    clear.onclick = () => { galleryFilterTags.clear(); renderGalleryFilters(); renderGalleryGrid(); };
+    wrap.appendChild(clear);
+  }
+}
+
+function renderGalleryGrid() {
+  const grid = document.getElementById('gallery-grid');
+  const status = document.getElementById('gallery-status');
+  if (!grid) return;
+  const q = (document.getElementById('gallery-search') || {}).value || '';
+  const qLower = q.trim().toLowerCase();
+  let photos = buildPhotoIndex();
+  if (galleryFilterTags.size) {
+    photos = photos.filter(p => p.tags.some(t => galleryFilterTags.has(t)));
+  }
+  if (qLower) {
+    photos = photos.filter(p =>
+      p.ref.toLowerCase().includes(qLower) ||
+      p.quoteId.toLowerCase().includes(qLower) ||
+      p.clientName.toLowerCase().includes(qLower) ||
+      p.clientAddress.toLowerCase().includes(qLower) ||
+      p.tags.some(t => String(t).toLowerCase().includes(qLower))
+    );
+  }
+  photos.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  status.textContent = photos.length + ' photo' + (photos.length === 1 ? '' : 's') + (galleryFilterTags.size ? ' • filtered: ' + Array.from(galleryFilterTags).join(', ') : '');
+  grid.innerHTML = '';
+  if (!photos.length) {
+    grid.innerHTML = '<div class="gallery-empty">No photos match. Try clearing filters or adjusting the search.</div>';
+    return;
+  }
+  photos.forEach(p => {
+    const tile = document.createElement('div');
+    tile.className = 'photo-tile' + (p.url ? '' : ' lazy-placeholder lazy-loading');
+    tile.style.aspectRatio = '1';
+    tile.innerHTML =
+      '<img src="' + (p.url || transparentPx()) + '" alt="' + escapeAttr(p.ref) + '">' +
+      '<span class="photo-ref">' + escapeHtml(p.ref) + '</span>' +
+      (p.tags.length ? '<div class="photo-tag-strip">' + p.tags.slice(0, 2).map(t => '<span class="tag-mini">' + escapeHtml(t) + '</span>').join('') + '</div>' : '');
+    tile.onclick = async () => {
+      // Open in lightbox; this opens against currentQuote, so first promote the parent quote if known
+      const parent = history.find(qq => qq.id === p.quoteId);
+      if (parent && parent.id !== currentQuote.id) {
+        currentQuote = JSON.parse(JSON.stringify(parent));
+        if (!currentQuote.pickerLines) currentQuote.pickerLines = { cameras: [] };
+        hydrateQuoteUI();
+      }
+      const idx = (currentQuote.photos || []).findIndex(x => migratePhoto(x).ref === p.ref);
+      if (idx >= 0) openPhotoLightbox(idx);
+    };
+    grid.appendChild(tile);
+    // Lazy-load the image data for the gallery thumb itself
+    if (!p.url) {
+      fetchPhotoData(p.ref).then(url => {
+        if (!url) return;
+        const img = tile.querySelector('img');
+        if (img) img.src = url;
+        tile.classList.remove('lazy-loading','lazy-placeholder');
+      });
+    }
+  });
+}
+
+function transparentPx() {
+  return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+}
+
+// Wire up gallery interactions (idempotent — guarded by existence)
+(function wireGallery() {
+  const search = document.getElementById('gallery-search');
+  if (search) search.addEventListener('input', () => renderGalleryGrid());
+  const refresh = document.getElementById('gallery-refresh');
+  if (refresh) refresh.onclick = async () => {
+    refresh.disabled = true; refresh.textContent = 'Refreshing…';
+    await syncPhotoMetaFromBackend();
+    await syncKnownTags();
+    renderGalleryFilters();
+    renderGalleryGrid();
+    refresh.disabled = false; refresh.textContent = 'Refresh';
+  };
+  const manage = document.getElementById('gallery-manage-tags');
+  if (manage) manage.onclick = manageTagsPrompt;
+})();
+
+async function manageTagsPrompt() {
+  await syncKnownTags();
+  const list = knownTags.map(t => '• ' + t.name).join('\n') || '(none yet)';
+  const action = prompt('Existing tags:\n' + list + '\n\nType a new tag name to create it. Prefix with "-" to delete (e.g. "-cable").', '');
+  if (action === null || !action.trim()) return;
+  const s = action.trim();
+  try {
+    if (s.startsWith('-')) {
+      const name = s.slice(1).trim();
+      if (!name) return;
+      await backendCall('delete_tag', { name });
+    } else {
+      await backendCall('create_tag', { name: s });
+    }
+    await syncKnownTags();
+    renderGalleryFilters();
+    alert('Tags updated.');
+  } catch (e) { alert('Tag update failed: ' + e.message); }
+}
+
 /* =====================================================
    PHOTOS — capture, compress, attach to quote + PDF
    ===================================================== */
@@ -3367,13 +3843,18 @@ async function compressImage(file) {
   return { url: cv.toDataURL('image/jpeg', PHOTO_JPEG_Q), w: w, h: h };
 }
 
-// Migrate older photo records (plain strings) to { url, w, h }
+// Migrate older photo records (plain strings) to { url, w, h, ref, tags, customerVisible }
 function migratePhoto(p) {
   if (!p) return null;
-  if (typeof p === 'string') return { url: p, w: 0, h: 0 };
+  if (typeof p === 'string') return { url: p, w: 0, h: 0, ref: null, tags: [], customerVisible: true };
+  if (!Array.isArray(p.tags)) p.tags = [];
+  if (p.customerVisible === undefined) p.customerVisible = true;
   return p;
 }
-function photoUrl(p) { const m = migratePhoto(p); return m ? m.url : ''; }
+function photoUrl(p) { const m = migratePhoto(p); return m ? (m.url || '') : ''; }
+function genPhotoRef() {
+  return 'P-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
 
 let _currentLightboxIdx = -1;
 
@@ -3394,9 +3875,17 @@ function renderPhotos() {
     const tile = document.createElement('div');
     tile.className = 'photo-tile' + (visible ? '' : ' hidden-from-customer');
     const showEye = currentQuote.includePhotosInPdf !== false;
+    const imgSrc = m.url || transparentPx();
+    const isLazy = !m.url && m.ref;
+    if (isLazy) tile.classList.add('lazy-placeholder', 'lazy-loading');
+    const tagStrip = (m.tags && m.tags.length)
+      ? '<div class="photo-tag-strip">' + m.tags.slice(0, 2).map(t => '<span class="tag-mini">' + escapeHtml(t) + '</span>').join('') + '</div>'
+      : '';
     tile.innerHTML =
-      '<img src="' + photoUrl(p) + '" alt="Site photo ' + (i+1) + '">' +
+      '<img src="' + imgSrc + '" alt="Site photo ' + (i+1) + '">' +
       '<span class="photo-num">' + (i+1) + '</span>' +
+      (m.ref ? '<span class="photo-ref">' + escapeHtml(m.ref) + '</span>' : '') +
+      tagStrip +
       (showEye ? '<button class="photo-eye' + (visible ? '' : ' off') + '" type="button" data-i="' + i + '" title="' + (visible ? 'On customer PDF — tap to hide' : 'Hidden from customer PDF — tap to show') + '">' + (visible ? '👁' : '🚫') + '</button>' : '') +
       '<button class="photo-x" type="button" data-i="' + i + '" aria-label="Remove">✕</button>';
     tile.addEventListener('click', e => {
@@ -3404,6 +3893,16 @@ function renderPhotos() {
       openPhotoLightbox(i);
     });
     grid.appendChild(tile);
+    // Kick off lazy fetch if needed
+    const m2 = migratePhoto(p);
+    if (!m2.url && m2.ref) {
+      fetchPhotoData(m2.ref).then(url => {
+        if (!url) return;
+        const img = tile.querySelector('img');
+        if (img) img.src = url;
+        tile.classList.remove('lazy-loading', 'lazy-placeholder');
+      });
+    }
   });
   const add = document.createElement('button');
   add.type = 'button';
@@ -3419,10 +3918,12 @@ function renderPhotos() {
     btn.onclick = (e) => {
       e.stopPropagation();
       const i = +btn.dataset.i;
-      if (confirm('Remove this photo from the quote?')) {
+      if (confirm('Remove this photo from the quote? It will also be removed from cloud storage.')) {
+        const m = migratePhoto(currentQuote.photos[i]);
         currentQuote.photos.splice(i, 1);
         renderPhotos();
         scheduleDraftSave();
+        if (m && m.ref) backendCall('delete_photo', { ref: m.ref }).catch(e => console.warn('cloud delete failed:', e.message));
       }
     };
   });
@@ -3435,6 +3936,8 @@ function renderPhotos() {
       currentQuote.photos[i] = m;
       renderPhotos();
       scheduleDraftSave();
+      // Re-push so cloud copy mirrors the new visibility flag
+      if (m.ref && m.url) pushPhotoToBackend(m);
     };
   });
 }
@@ -3448,8 +3951,13 @@ async function addPhotosFromFiles(files) {
     if (currentQuote.photos.length >= PHOTO_MAX_PER_QUOTE) { errs.push('Reached the ' + PHOTO_MAX_PER_QUOTE + '-photo cap.'); break; }
     try {
       const photo = await compressImage(f);
+      photo.ref = genPhotoRef();
+      photo.tags = [];
+      photo.customerVisible = true;
+      photo.createdAt = new Date().toISOString();
       currentQuote.photos.push(photo);
       added++;
+      pushPhotoToBackend(photo);
     } catch (e) {
       errs.push(f.name + ': ' + e.message);
     }
@@ -3460,16 +3968,28 @@ async function addPhotosFromFiles(files) {
   if (errs.length) alert('Some photos didn\'t make it:\n' + errs.join('\n'));
 }
 
-function openPhotoLightbox(idx) {
+async function openPhotoLightbox(idx) {
   if (idx < 0 || idx >= currentQuote.photos.length) return;
   _currentLightboxIdx = idx;
-  document.getElementById('photo-lightbox-img').src = photoUrl(currentQuote.photos[idx]);
+  const m = migratePhoto(currentQuote.photos[idx]);
+  const imgEl = document.getElementById('photo-lightbox-img');
   document.getElementById('photo-lightbox').classList.add('open');
+  if (m.url) {
+    imgEl.src = m.url;
+  } else if (m.ref) {
+    imgEl.src = transparentPx();
+    const url = await fetchPhotoData(m.ref);
+    if (url) { m.url = url; currentQuote.photos[idx] = m; imgEl.src = url; renderPhotos(); }
+  }
+  renderLightboxTags();
 }
 function closePhotoLightbox() {
   document.getElementById('photo-lightbox').classList.remove('open');
   document.getElementById('photo-lightbox-img').src = '';
   _currentLightboxIdx = -1;
+  const ct = document.getElementById('lb-current-tags'); if (ct) ct.innerHTML = '';
+  const ar = document.getElementById('lb-add-row'); if (ar) ar.innerHTML = '';
+  const jr = document.getElementById('lb-jump-quote'); if (jr) jr.style.display = 'none';
 }
 
 function dataUrlToBlob(dataUrl) {
@@ -3501,11 +4021,13 @@ async function shareCurrentLightboxPhoto() {
 
 function deleteCurrentLightboxPhoto() {
   if (_currentLightboxIdx < 0) return;
-  if (!confirm('Remove this photo from the quote?')) return;
+  if (!confirm('Remove this photo from the quote? It will also be removed from cloud storage.')) return;
+  const m = migratePhoto(currentQuote.photos[_currentLightboxIdx]);
   currentQuote.photos.splice(_currentLightboxIdx, 1);
   closePhotoLightbox();
   renderPhotos();
   scheduleDraftSave();
+  if (m && m.ref) backendCall('delete_photo', { ref: m.ref }).catch(e => console.warn('cloud delete failed:', e.message));
 }
 
 (function wirePhotos(){
@@ -3729,6 +4251,7 @@ function init() {
   loadGoogleMaps();
   syncFromSheet(true);
   syncQuotesFromBackend();
+  syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { showGalleryCardIfMaster(); renderGalleryFilters(); });
   renderUpcomingBrief();
   // Restore unsaved draft if present
   try {
