@@ -1334,7 +1334,7 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'history')  renderHistory();
     if (t.dataset.tab === 'settings') renderSettings();
     if (t.dataset.tab === 'staff')    loadStaffList();
-    if (t.dataset.tab === 'calendar') renderCalendar();
+    if (t.dataset.tab === 'calendar') { renderCalendar(); if (settings.weatherEnabled !== false) scheduleCalendarWeatherFetch(); }
     if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showMasterCards(); renderGalleryFilters(); renderGalleryGrid(); }
   };
 });
@@ -2504,27 +2504,52 @@ function renderCalendar() {
     cell.onclick = (function (d) { return function () { selectCalDay(d); }; })(new Date(cellDate));
     grid.appendChild(cell);
   }
-  if (settings.weatherEnabled !== false && !renderCalendar._weatherKicked) {
-    renderCalendar._weatherKicked = true;
-    Promise.resolve()
-      .then(prefetchHomeWeatherForCalendar)
-      .then(() => {
-        // Also fetch per-job weather for jobs with their own location
-        const seen = new Set();
-        history.forEach(q => {
-          if (q.clientLat == null) return;
-          const dates = quoteDates(q);
-          if (!dates.length) return;
-          const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
-          if (seen.has(k)) return; seen.add(k);
-          fetchWeatherForDates(q.clientLat, q.clientLng, dates);
-        });
-      })
-      .then(() => {
-        if (renderCalendar._rainTimer) clearTimeout(renderCalendar._rainTimer);
-        renderCalendar._rainTimer = setTimeout(() => { renderCalendar._weatherKicked = false; renderCalendar(); }, 600);
-      });
+  // Schedule a weather fetch if needed. Re-runs each calendar paint without an
+  // arming flag so a navigation back to Calendar always tries again.
+  if (settings.weatherEnabled !== false) {
+    scheduleCalendarWeatherFetch();
   }
+}
+
+let _calWeatherInflight = false;
+async function scheduleCalendarWeatherFetch() {
+  if (_calWeatherInflight) return;
+  _calWeatherInflight = true;
+  setCalendarWeatherStatus('Loading weather…');
+  try {
+    await prefetchHomeWeatherForCalendar();
+    const seen = new Set();
+    const jobFetches = [];
+    history.forEach(q => {
+      if (q.clientLat == null) return;
+      const dates = quoteDates(q);
+      if (!dates.length) return;
+      const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
+      if (seen.has(k)) return; seen.add(k);
+      jobFetches.push(fetchWeatherForDates(q.clientLat, q.clientLng, dates));
+    });
+    if (jobFetches.length) await Promise.all(jobFetches);
+    setCalendarWeatherStatus(_homeBaseCoords ? '' : 'Weather off — set a Home base address in Settings.');
+  } catch (e) {
+    setCalendarWeatherStatus('Weather lookup failed: ' + (e.message || 'unknown'));
+  } finally {
+    _calWeatherInflight = false;
+    // Repaint so newly-cached weather shows up
+    renderCalendar();
+  }
+}
+
+function setCalendarWeatherStatus(msg) {
+  let el = document.getElementById('cal-weather-status');
+  if (!el) {
+    const stats = document.getElementById('cal-stats');
+    if (!stats) return;
+    el = document.createElement('span');
+    el.id = 'cal-weather-status';
+    el.style.cssText = 'color:var(--muted);font-size:0.78rem;flex-basis:100%;text-align:center;';
+    stats.appendChild(el);
+  }
+  el.textContent = msg || '';
 }
 
 function renderAssigneeEditor(target, current) {
@@ -3235,7 +3260,20 @@ function describeWeatherCode(code, rainProb) {
   if (rainProb != null && rainProb >= 40) return { icon: '🌦️', label: Math.round(rainProb) + '% rain', severity: 1 };
   return { icon: '', label: '', severity: 0 };
 }
-async function geocodeForWeather(addr) {
+async function geocodeWithOpenMeteo(addr) {
+  // Free geocoding service from open-meteo.com — no API key needed.
+  try {
+    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&country=AU&name=' + encodeURIComponent(addr);
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j && Array.isArray(j.results) && j.results[0]) {
+      return { lat: j.results[0].latitude, lng: j.results[0].longitude };
+    }
+  } catch (e) { console.warn('open-meteo geocode failed:', e.message); }
+  return null;
+}
+async function geocodeWithGoogle(addr) {
   if (!addr || !window.google || !window.google.maps) return null;
   return new Promise(resolve => {
     const g = new google.maps.Geocoder();
@@ -3246,6 +3284,15 @@ async function geocodeForWeather(addr) {
       } else resolve(null);
     });
   });
+}
+async function geocodeForWeather(addr) {
+  if (!addr) return null;
+  // Try Open-Meteo first — works even before Google Maps is loaded and doesn't need
+  // the Geocoding API enabled on the Maps key.
+  const om = await geocodeWithOpenMeteo(addr);
+  if (om) return om;
+  // Fallback to Google Maps geocoder (requires Geocoding API enabled on key).
+  return await geocodeWithGoogle(addr);
 }
 async function fetchWeatherForDates(lat, lng, isoDates) {
   if (!settings.weatherEnabled || lat == null || lng == null || !isoDates.length) return;
@@ -3319,13 +3366,25 @@ function quoteDates(q) {
   return [];
 }
 
-let _homeBaseCoords = null; // { lat, lng } cached per session
+let _homeBaseCoords = null;
 async function getHomeBaseCoords() {
   if (_homeBaseCoords) return _homeBaseCoords;
+  // Restore from settings if we geocoded the same address before
   const addr = getHomeAddress();
   if (!addr) return null;
+  const cached = settings._homeCoordsCache;
+  if (cached && cached.addr === addr && typeof cached.lat === 'number' && typeof cached.lng === 'number') {
+    _homeBaseCoords = { lat: cached.lat, lng: cached.lng };
+    return _homeBaseCoords;
+  }
   const ll = await geocodeForWeather(addr);
-  if (ll) _homeBaseCoords = ll;
+  if (ll) {
+    _homeBaseCoords = ll;
+    try {
+      settings._homeCoordsCache = { addr, lat: ll.lat, lng: ll.lng };
+      saveSettings();
+    } catch (e) { /* ignore */ }
+  }
   return _homeBaseCoords;
 }
 
