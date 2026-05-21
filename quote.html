@@ -39,7 +39,8 @@ header { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); bac
 .head-row { display: flex; justify-content: space-between; align-items: center; min-height: 64px; gap: 12px; }
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 850; letter-spacing: -0.03em; font-size: 1.05rem; }
 .logo-mark { width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; display: grid; place-items: center; font-weight: 950; font-size: 0.85rem; box-shadow: 0 8px 24px rgba(49,208,255,0.24); }
-.tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 4px; border-radius: 999px; border: 1px solid var(--card-border); }
+.tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 4px; border-radius: 999px; border: 1px solid var(--card-border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
 .tab { appearance: none; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.85rem; padding: 8px 14px; border-radius: 999px; transition: 0.15s; font-family: inherit; }
 .tab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
 .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 14px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
@@ -209,11 +210,115 @@ textarea { resize: vertical; min-height: 70px; }
 /* date input */
 input[type="date"] { color-scheme: dark; }
 
+/* multi-day picker */
+.md-toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 0.85rem; color: var(--text); }
+.md-toggle-row input[type="checkbox"] { width: auto; }
+.md-picker { background: rgba(0,0,0,0.18); border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 14px; margin-top: 10px; }
+.md-picker-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.md-picker-month { font-weight: 800; font-size: 0.95rem; }
+.md-nav-btn { background: rgba(255,255,255,0.08); border: 1px solid var(--card-border); color: var(--text); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-weight: 900; font-size: 1rem; padding: 0; }
+.md-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.md-dow { font-size: 0.65rem; color: var(--muted); text-align: center; font-weight: 700; padding: 4px 0; text-transform: uppercase; letter-spacing: 0.08em; }
+.md-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid transparent; color: var(--text); transition: 0.12s; user-select: none; position: relative; }
+.md-cell:hover { background: rgba(49,208,255,0.12); border-color: rgba(49,208,255,0.3); }
+.md-cell.out { opacity: 0.25; }
+.md-cell.past { opacity: 0.4; cursor: not-allowed; }
+.md-cell.selected { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; }
+.md-cell .md-rain { position: absolute; top: 1px; right: 3px; font-size: 0.65rem; }
+.md-selected-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.md-selected-row { display: grid; grid-template-columns: 1fr 90px 90px 30px; gap: 6px; align-items: center; background: rgba(106,255,184,0.07); border: 1px solid rgba(106,255,184,0.25); border-radius: 10px; padding: 8px 10px; font-size: 0.85rem; }
+.md-selected-row .md-date { font-weight: 700; }
+.md-selected-row input[type="time"] { padding: 6px 8px; font-size: 0.85rem; min-height: 0; }
+.md-selected-row .md-x { background: rgba(255,107,136,0.18); border: 0; color: var(--danger); border-radius: 6px; cursor: pointer; height: 28px; font-weight: 900; padding: 0; }
+@media (max-width: 640px) {
+  .md-selected-row { grid-template-columns: 1fr 1fr 30px; grid-template-areas: "date date x" "tin tout x"; }
+  .md-selected-row .md-date { grid-area: date; }
+  .md-selected-row .md-time-in { grid-area: tin; }
+  .md-selected-row .md-time-out { grid-area: tout; }
+  .md-selected-row .md-x { grid-area: x; }
+}
+
+/* Photo customer-copy toggles */
+.photo-pdf-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(49,208,255,0.06); border: 1px solid rgba(49,208,255,0.18); border-radius: var(--radius-sm); margin-bottom: 10px; flex-wrap: wrap; }
+.photo-pdf-toggle input[type="checkbox"] { width: auto; }
+.photo-pdf-toggle label { margin: 0; color: var(--text); font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+.photo-pdf-toggle .pdt-actions { margin-left: auto; display: flex; gap: 6px; }
+.photo-pdf-toggle .pdt-actions button { padding: 4px 10px; font-size: 0.72rem; min-height: 0; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.06); color: var(--text); cursor: pointer; font-weight: 700; font-family: inherit; }
+.photo-pdf-toggle .pdt-actions button:hover { background: rgba(49,208,255,0.15); color: var(--brand); }
+.photo-tile.hidden-from-customer { opacity: 0.45; }
+.photo-tile.hidden-from-customer::after { content: 'NOT ON PDF'; position: absolute; inset: auto 0 6px 0; text-align: center; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: #fff; background: rgba(255,107,136,0.85); padding: 2px 0; }
+.photo-eye { position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.7); color: #fff; border: 0; cursor: pointer; font-size: 0.95rem; display: grid; place-items: center; padding: 0; }
+.photo-eye:hover { background: var(--brand); color: #06101d; }
+.photo-eye.off { background: rgba(255,107,136,0.85); }
+
+/* In-app camera modal */
+.cam-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.96); z-index: 250; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 12px; }
+.cam-modal.open { display: flex; }
+.cam-modal video { max-width: 100%; max-height: calc(100vh - 200px); border-radius: 12px; background: #000; }
+.cam-modal canvas { display: none; }
+.cam-modal .cam-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.cam-modal .cam-shutter { width: 78px; height: 78px; border-radius: 50%; background: #fff; border: 5px solid rgba(255,255,255,0.4); cursor: pointer; transition: 0.1s; padding: 0; }
+.cam-modal .cam-shutter:active { transform: scale(0.92); }
+.cam-modal .cam-shutter:disabled { opacity: 0.5; cursor: wait; }
+.cam-modal .cam-close { position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.12); color: #fff; border: 0; width: 40px; height: 40px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; font-weight: 900; }
+.cam-modal .cam-flip { position: absolute; top: 14px; left: 16px; background: rgba(255,255,255,0.12); color: #fff; border: 0; width: 40px; height: 40px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; font-weight: 900; }
+.cam-modal .cam-status { color: #fff; font-size: 0.85rem; opacity: 0.8; min-height: 1.2em; text-align: center; max-width: 90vw; }
+.cam-modal .cam-wm-info { color: rgba(255,255,255,0.7); font-size: 0.78rem; max-width: 92vw; text-align: center; padding: 6px 10px; background: rgba(255,255,255,0.06); border-radius: 8px; }
+
+/* Multi-row photo button bar */
+.photo-add-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.photo-add-row .btn { flex: 1; min-width: 130px; }
+
+/* Weather widgets */
+.cal-day-rain { position: absolute; top: 3px; right: 4px; font-size: 0.78rem; pointer-events: none; }
+.cal-day-rain.heavy { filter: drop-shadow(0 0 4px rgba(120,180,255,0.7)); }
+.weather-warn { background: rgba(120,180,255,0.08); border: 1px solid rgba(120,180,255,0.3); color: var(--text); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; display: none; }
+.weather-warn b { color: #9fc6ff; }
+.weather-warn.show { display: block; }
+
+/* Time questionnaire modal */
+.timeq-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 260; display: none; align-items: center; justify-content: center; padding: 20px; }
+.timeq-modal.open { display: flex; }
+.timeq-box { background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 18px; padding: 22px; max-width: 440px; width: 100%; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+.timeq-box h3 { margin: 0 0 10px; font-size: 1.1rem; }
+.timeq-box p { color: var(--muted); margin: 0 0 14px; font-size: 0.9rem; line-height: 1.4; }
+.timeq-box .timeq-quoted { background: rgba(0,0,0,0.22); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 0.85rem; }
+.timeq-box .timeq-quoted b { color: var(--brand); }
+.timeq-box .timeq-yn { display: flex; gap: 10px; margin-bottom: 14px; }
+.timeq-box .timeq-yn button { flex: 1; }
+.timeq-box .timeq-overrun { display: none; }
+.timeq-box .timeq-overrun.show { display: block; }
+.timeq-box .timeq-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+/* photos */
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 10px; }
+.photo-tile { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 1px solid var(--card-border); background: rgba(0,0,0,0.25); cursor: pointer; transition: 0.15s; }
+.photo-tile:hover { transform: scale(1.02); border-color: var(--brand); }
+.photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-tile .photo-x { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.7); color: #fff; border: 0; cursor: pointer; font-weight: 900; font-size: 0.95rem; display: grid; place-items: center; line-height: 1; padding: 0; }
+.photo-tile .photo-x:hover { background: var(--danger); }
+.photo-tile .photo-num { position: absolute; bottom: 4px; left: 6px; background: rgba(0,0,0,0.65); color: #fff; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; backdrop-filter: blur(4px); }
+.photo-add-btn { aspect-ratio: 1; border: 1.5px dashed rgba(49,208,255,0.4); border-radius: 12px; background: rgba(49,208,255,0.06); color: var(--brand); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-family: inherit; font-weight: 700; font-size: 0.78rem; transition: 0.15s; padding: 0; }
+.photo-add-btn:hover { background: rgba(49,208,255,0.14); border-color: var(--brand); }
+.photo-add-btn .photo-add-icon { font-size: 1.6rem; line-height: 1; }
+.photo-busy { display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.photo-busy.hidden { display: none; }
+.photo-banner { background: rgba(49,208,255,0.06); border: 1px solid rgba(49,208,255,0.18); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--muted); font-size: 0.78rem; margin-top: 10px; line-height: 1.4; }
+.photo-banner b { color: var(--brand); }
+.photo-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.94); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; flex-direction: column; gap: 16px; }
+.photo-lightbox.open { display: flex; }
+.photo-lightbox img { max-width: 100%; max-height: calc(100vh - 140px); border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.photo-lightbox .pl-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 92vw; }
+.photo-lightbox .pl-close { position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.12); color: #fff; border: 0; width: 40px; height: 40px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; font-weight: 900; }
+.photo-lightbox .pl-close:hover { background: rgba(255,255,255,0.22); }
+
 /* responsive */
 @media (max-width: 640px) {
   .head-row { flex-wrap: wrap; }
-  .tabs { width: 100%; justify-content: space-between; }
-  .tab { flex: 1; }
+  .tabs { width: 100%; justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; padding: 4px; gap: 4px; }
+  .tab { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; padding: 8px 14px; font-size: 0.82rem; }
+  .tab.active { box-shadow: 0 2px 10px rgba(49,208,255,0.25); }
+  .head-row { gap: 8px; }
   .user-chip { order: 1; margin-left: auto; padding: 4px 10px 4px 12px; font-size: 0.78rem; }
   .user-chip-avatar { width: 22px; height: 22px; font-size: 0.7rem; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
@@ -448,7 +553,25 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
             <button class="btn btn-utility" id="use-location-btn" type="button" title="Use my current location" style="min-height:42px;padding:0 12px;flex-shrink:0;">Here</button>
           </div>
         </div>
-        <div class="field"><label for="proposed-date">Proposed start date & time</label><input id="proposed-date" type="datetime-local" /></div>
+        <div class="field">
+          <label for="proposed-date">Proposed start date &amp; time</label>
+          <input id="proposed-date" type="datetime-local" />
+          <div class="md-toggle-row">
+            <input id="multiday-toggle" type="checkbox" />
+            <label for="multiday-toggle" style="margin:0;cursor:pointer;">Spans multiple days</label>
+          </div>
+          <div id="multiday-picker" class="md-picker" style="display:none;">
+            <div class="md-picker-head">
+              <button class="md-nav-btn" id="md-prev" type="button">‹</button>
+              <div class="md-picker-month" id="md-month">—</div>
+              <button class="md-nav-btn" id="md-next" type="button">›</button>
+            </div>
+            <div class="md-grid" id="md-grid"></div>
+            <p class="panel-sub" style="margin:10px 0 0;font-size:0.78rem;">Tap a day to add it; tap again to remove. Set arrival and depart times below.</p>
+            <div class="md-selected-list" id="md-selected-list"></div>
+          </div>
+          <div id="weather-warn" class="weather-warn"></div>
+        </div>
         <div id="route-box" class="route-box" style="display:none;">
           <div class="row"><span>From home base</span><b id="route-from">—</b></div>
           <div class="row"><span>Distance</span><b id="route-distance">—</b></div>
@@ -508,6 +631,74 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
         <h3>Total</h3>
         <div id="totals-breakdown"></div>
         <div class="total-row grand"><span>Total</span><b id="grand-total">$0.00</b></div>
+      </div>
+
+      <!-- Photos -->
+      <div class="card">
+        <h3>📸 Site photos <span class="pill">PDF</span></h3>
+        <p class="panel-sub" style="margin:0 0 8px;">Snap photos of the site, cable runs, mounting points — anything you want on record.</p>
+        <div class="photo-add-row">
+          <button class="btn btn-primary" id="photo-take-btn" type="button">📷 Take photo</button>
+          <button class="btn btn-secondary" id="photo-upload-btn" type="button">📁 Upload photo</button>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" multiple style="display:none;">
+        <div class="photo-pdf-toggle" id="photo-pdf-toggle" style="display:none;">
+          <input id="include-photos-pdf" type="checkbox" checked />
+          <label for="include-photos-pdf">Include photos on customer PDF</label>
+          <div class="pdt-actions" id="photo-allnone" style="display:none;">
+            <button type="button" id="photo-all">All</button>
+            <button type="button" id="photo-none">None</button>
+          </div>
+        </div>
+        <div class="photo-grid" id="photo-grid"></div>
+        <div class="photo-busy hidden" id="photo-busy">⏳ Processing photo…</div>
+        <div class="photo-banner">
+          <b>Tip:</b> Photos live on this device. Tap a photo to view, share to Camera Roll, or hide it from the customer PDF without deleting.
+        </div>
+      </div>
+
+      <!-- In-app camera modal -->
+      <div class="cam-modal" id="cam-modal">
+        <button class="cam-close" id="cam-close" type="button">✕</button>
+        <button class="cam-flip" id="cam-flip" type="button" title="Flip camera">⟳</button>
+        <video id="cam-video" autoplay playsinline muted></video>
+        <canvas id="cam-canvas"></canvas>
+        <div class="cam-wm-info" id="cam-wm-info">Watermark: —</div>
+        <div class="cam-status" id="cam-status">Tap the shutter to capture.</div>
+        <div class="cam-actions">
+          <button class="cam-shutter" id="cam-shutter" type="button" aria-label="Capture"></button>
+        </div>
+      </div>
+
+      <!-- Time questionnaire modal -->
+      <div class="timeq-modal" id="timeq-modal">
+        <div class="timeq-box">
+          <h3>Quick reflection</h3>
+          <p>Now that this job is wrapped, how did the time compare to what you quoted?</p>
+          <div class="timeq-quoted" id="timeq-quoted">Quoted for: <b id="timeq-quoted-val">—</b></div>
+          <p style="margin:0 0 8px;">Was the quote timed accordingly?</p>
+          <div class="timeq-yn">
+            <button class="btn btn-primary" id="timeq-yes" type="button">Yes</button>
+            <button class="btn btn-secondary" id="timeq-no" type="button">No</button>
+          </div>
+          <div class="timeq-overrun" id="timeq-overrun">
+            <div class="field"><label for="timeq-extra">How much longer did the job take? (hours)</label><input id="timeq-extra" type="number" min="0" step="0.25" value="0" /></div>
+            <div class="timeq-actions">
+              <button class="btn btn-ghost" id="timeq-skip" type="button">Skip</button>
+              <button class="btn btn-primary" id="timeq-save" type="button">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Photo lightbox -->
+      <div class="photo-lightbox" id="photo-lightbox">
+        <button class="pl-close" id="photo-lightbox-close" type="button">✕</button>
+        <img id="photo-lightbox-img" alt="">
+        <div class="pl-actions">
+          <button class="btn btn-utility" id="photo-share" type="button">📲 Share / Save to Photos</button>
+          <button class="btn btn-danger" id="photo-delete" type="button">Delete photo</button>
+        </div>
       </div>
 
       <!-- Actions -->
@@ -701,6 +892,25 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
       </details>
 
       <details class="card">
+        <summary><h3>Photo watermark &amp; weather</h3></summary>
+        <div class="card-body">
+          <p class="panel-sub" style="margin:0 0 10px;">What appears as a watermark on photos taken with the in-app camera, and whether to check the forecast for upcoming jobs.</p>
+          <div class="toggles-row" style="grid-template-columns:1fr 1fr;">
+            <div class="toggle-cell"><input id="wm-address" type="checkbox" /><label for="wm-address">Site address</label></div>
+            <div class="toggle-cell"><input id="wm-datetime" type="checkbox" /><label for="wm-datetime">Date &amp; time</label></div>
+            <div class="toggle-cell"><input id="wm-business" type="checkbox" /><label for="wm-business">Business name</label></div>
+            <div class="toggle-cell"><input id="wm-clientName" type="checkbox" /><label for="wm-clientName">Client name</label></div>
+            <div class="toggle-cell"><input id="wm-quoteId" type="checkbox" /><label for="wm-quoteId">Quote ID</label></div>
+            <div class="toggle-cell"><input id="wm-gps" type="checkbox" /><label for="wm-gps">GPS coords</label></div>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <div class="toggle-cell"><input id="weather-enabled" type="checkbox" /><label for="weather-enabled">Show rain forecast on Calendar &amp; warn before scheduling rainy days</label></div>
+            <p class="panel-sub" style="margin:8px 0 0;font-size:0.78rem;">Uses Open-Meteo (free, no API key needed). Looks up the site address once and remembers it on each quote.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
         <summary><h3>Security</h3></summary>
         <div class="card-body">
           <div class="field"><label>Passcode</label><input id="passcode-new" type="text" /></div>
@@ -769,6 +979,8 @@ const FAVS_KEY    = 'nd_user_favs_v3';
 const defaultSettings = {
   passcode: '',
   business: { name:'', abn:'', phone:'', email:'', homeAddress:'' },
+  watermark: { address: true, datetime: true, business: true, clientName: false, quoteId: false, gps: false },
+  weatherEnabled: true,
   mapsKey: '',
   sheetId: '',
   backendUrl: '',
@@ -797,9 +1009,11 @@ function blankQuote() {
     id:null, createdAt:null,
     client: { name:'', phone:'', address:'' },
     proposedDate: '',
+    multiDay: false,
+    schedule: [],   // [{ date:'YYYY-MM-DD', start:'HH:mm', end:'HH:mm' }] when multiDay
     assignees: [],
-    itemQty: {},                // { 'cameras:Basic 4MP': 2 }
-    pickerLines: { cameras: [] }, // ordered keys per picker section; dynamically extended
+    itemQty: {},
+    pickerLines: { cameras: [] },
     customLines: [],
     hours: 0, days: 0,
     travelOverride: null, bandPrice: 0,
@@ -808,7 +1022,12 @@ function blankQuote() {
     cashMode: false,
     cashStyle: null,
     notes: '',
-    distanceKm: null, durationMin: null
+    photos: [],
+    includePhotosInPdf: true,
+    distanceKm: null, durationMin: null,
+    clientLat: null, clientLng: null,
+    quotedHours: 0, quotedDays: 0,
+    timingHonest: null, overrunHours: 0  // filled in on Complete
   };
 }
 
@@ -820,6 +1039,7 @@ function loadSettings() {
     const p = JSON.parse(raw);
     p.business = Object.assign({}, base.business, p.business || {});
     p.extras = Object.assign({}, base.extras, p.extras || {});
+    p.watermark = Object.assign({}, base.watermark, p.watermark || {});
     p.discountCaps = Object.assign({}, base.discountCaps, p.discountCaps || {});
     return Object.assign(base, p);
   } catch(e) { return JSON.parse(JSON.stringify(defaultSettings)); }
@@ -1041,7 +1261,7 @@ async function syncQuotesFromBackend() {
     // Push local-only quotes up first
     const toPush = history.filter(q => q.id && !remoteIds.has(q.id));
     for (const q of toPush) {
-      try { await backendCall('save_quote', { quote: q }); } catch (e) { console.warn('push failed', q.id, e.message); }
+      try { const qWire = stripPhotosForBackend(q); await backendCall('save_quote', { quote: qWire }); } catch (e) { console.warn('push failed', q.id, e.message); }
     }
     // Merge: remote wins for matching ids
     const merged = {};
@@ -1058,7 +1278,7 @@ async function syncQuotesFromBackend() {
 }
 async function pushQuoteToBackend(quote) {
   if (!currentUser || !currentUser.passwordHash) return;
-  try { await backendCall('save_quote', { quote }); }
+  try { await backendCall('save_quote', { quote: stripPhotosForBackend(quote) }); }
   catch (e) { console.warn('cloud push failed:', e.message); backendOnline = false; }
 }
 
@@ -1586,6 +1806,12 @@ function resetQuoteUI() {
   document.getElementById('save-cash-pdf').style.display = 'none';
   document.getElementById('route-box').style.display = 'none';
   document.getElementById('route-warn').style.display = 'none';
+  if (!Array.isArray(currentQuote.photos)) currentQuote.photos = [];
+  renderPhotos();
+  document.getElementById('multiday-toggle').checked = false;
+  document.getElementById('multiday-picker').style.display = 'none';
+  document.getElementById('include-photos-pdf').checked = true;
+  document.getElementById('weather-warn').classList.remove('show');
   renderAll();
 }
 function syncQuoteFromSettings() {
@@ -1916,13 +2142,16 @@ function renderHistory() {
       }
     } else if (b.dataset.act === 'complete') {
       if (!confirm('Mark this quote as completed?\n\nIt becomes an Invoice (PDF will be issued as an Invoice instead of a Quote, and it gets copied to the Invoices tab in your sheet).')) return;
-      q.completed = true;
-      q.completedAt = new Date().toISOString();
-      const idx = history.findIndex(x => x.id === q.id);
-      if (idx >= 0) history[idx] = q;
-      saveHistory();
-      renderHistory();
-      backendCall('complete_quote', { id: q.id }).catch(e => alert('Cloud completion failed: ' + e.message + '\nIt is marked locally but did not sync.'));
+      // Ask the timing questionnaire first; if user cancels we still complete but with no answers
+      openTimeQuestionnaire(q).finally(() => {
+        q.completed = true;
+        q.completedAt = new Date().toISOString();
+        const idx = history.findIndex(x => x.id === q.id);
+        if (idx >= 0) history[idx] = q;
+        saveHistory();
+        renderHistory();
+        backendCall('complete_quote', { id: q.id }).catch(e => alert('Cloud completion failed: ' + e.message + '\nIt is marked locally but did not sync.'));
+      });
     } else if (b.dataset.act === 'uncomplete') {
       if (!confirm('Undo completion?\n\nThe quote will go back to being an open Quote and will be removed from the Invoices tab.')) return;
       q.completed = false;
@@ -1949,6 +2178,13 @@ function hydrateQuoteUI() {
   document.getElementById('gst-toggle').checked  = !!currentQuote.gst;
   document.getElementById('cash-toggle').checked = !!currentQuote.cashMode;
   document.getElementById('save-cash-pdf').style.display = currentQuote.cashMode ? '' : 'none';
+  if (!Array.isArray(currentQuote.photos)) currentQuote.photos = [];
+  renderPhotos();
+  document.getElementById('multiday-toggle').checked = !!currentQuote.multiDay;
+  document.getElementById('multiday-picker').style.display = currentQuote.multiDay ? 'block' : 'none';
+  document.getElementById('include-photos-pdf').checked = currentQuote.includePhotosInPdf !== false;
+  if (currentQuote.multiDay) renderMultiDayPicker();
+  refreshWeatherForQuote();
   if (currentQuote.distanceKm) {
     document.getElementById('route-box').style.display = 'flex';
     document.getElementById('route-from').textContent = getHomeAddress();
@@ -1972,6 +2208,9 @@ function saveCurrentQuote(style) {
   if (!currentQuote.id) currentQuote.id = 'Q-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
   if (!currentQuote.createdAt) currentQuote.createdAt = new Date().toISOString();
   currentQuote.grand = c.grand;
+  // Remember the hours/days quoted so we can compare to actuals on completion
+  if (currentQuote.quotedHours == null || currentQuote.quotedHours === 0) currentQuote.quotedHours = Number(currentQuote.hours) || 0;
+  if (currentQuote.quotedDays  == null || currentQuote.quotedDays  === 0) currentQuote.quotedDays  = Number(currentQuote.days)  || 0;
   if (style && style !== 'regular') currentQuote.cashStyle = style;
   // Ensure current user is always in the assignees list (covers new quotes + ones loaded from older versions)
   if (!Array.isArray(currentQuote.assignees)) currentQuote.assignees = [];
@@ -2044,8 +2283,11 @@ calendarMonth.setDate(1);
 let selectedCalDay = null;
 
 function getJobsForDate(date) {
-  const dStr = date.toISOString().slice(0, 10);
+  const dStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
   return history.filter(q => {
+    if (q.multiDay && Array.isArray(q.schedule) && q.schedule.length) {
+      return q.schedule.some(s => s.date === dStr);
+    }
     if (!q.proposedDate) return false;
     const pd = String(q.proposedDate).includes('T') ? String(q.proposedDate).slice(0, 10) : String(q.proposedDate);
     return pd === dStr;
@@ -2099,8 +2341,37 @@ function renderCalendar() {
     } else {
       cell.innerHTML = '<span class="cal-day-num">' + cellDate.getDate() + '</span>';
     }
+    if (settings.weatherEnabled !== false && jobs.length) {
+      let maxRain = 0;
+      jobs.forEach(j => {
+        const p = getCachedRainProb(dateToISO(cellDate), j.clientLat, j.clientLng);
+        if (p != null && p > maxRain) maxRain = p;
+      });
+      if (maxRain >= 40) {
+        const r = document.createElement('span');
+        r.className = 'cal-day-rain' + (maxRain >= 70 ? ' heavy' : '');
+        r.textContent = maxRain >= 70 ? '🌧️' : '🌦️';
+        r.title = Math.round(maxRain) + '% chance of rain';
+        cell.appendChild(r);
+      }
+    }
     cell.onclick = (function (d) { return function () { selectCalDay(d); }; })(new Date(cellDate));
     grid.appendChild(cell);
+  }
+  if (settings.weatherEnabled !== false && !renderCalendar._weatherKicked) {
+    renderCalendar._weatherKicked = true;
+    const seen = new Set();
+    history.forEach(q => {
+      if (q.clientLat == null) return;
+      const dates = quoteDates(q);
+      if (!dates.length) return;
+      const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
+      if (seen.has(k)) return; seen.add(k);
+      fetchWeatherForDates(q.clientLat, q.clientLng, dates).then(() => {
+        if (renderCalendar._rainTimer) clearTimeout(renderCalendar._rainTimer);
+        renderCalendar._rainTimer = setTimeout(() => { renderCalendar._weatherKicked = false; renderCalendar(); }, 800);
+      });
+    });
   }
 }
 
@@ -2219,7 +2490,7 @@ function selectCalDay(date) {
         if (idx >= 0) history[idx] = updated;
         saveHistory();
         try {
-          await backendCall('save_quote', { quote: updated });
+          await backendCall('save_quote', { quote: stripPhotosForBackend(updated) });
           saveBtn.textContent = 'Saved ✓';
           setTimeout(() => { renderCalendar(); selectCalDay(date); renderUpcomingBrief(); }, 600);
         } catch (e) {
@@ -2583,6 +2854,7 @@ function renderSettings() {
   setVal('home-address', settings.business.homeAddress, HARDCODED_HOME_ADDRESS);
   setVal('passcode-new', settings.passcode,             HARDCODED_PASSCODE || '1234');
   setVal('sheet-id',     settings.sheetId,              HARDCODED_SHEET_ID);
+  loadWatermarkUI();
   const status = document.getElementById('sheet-status');
   if (settings.sheetLastStatus) {
     status.style.display = 'block';
@@ -2604,6 +2876,7 @@ document.getElementById('save-settings').onclick = () => {
   settings.business.homeAddress = document.getElementById('home-address').value;
   settings.passcode = document.getElementById('passcode-new').value;
   settings.sheetId = extractSheetId(document.getElementById('sheet-id').value);
+  saveWatermarkUI();
   saveSettings(); syncQuoteFromSettings(); renderTotals();
   alert('Settings saved.');
 };
@@ -2639,6 +2912,669 @@ async function sharePDF(blob, filename) {
     }
   } catch (e) { /* user cancelled or share unsupported */ }
   return false;
+}
+
+
+
+/* =====================================================
+   v10: MULTI-DAY, IN-APP CAMERA + WATERMARK,
+        TIME QUESTIONNAIRE, WEATHER
+   ===================================================== */
+
+/* ---------- Multi-day scheduling ---------- */
+let mdViewMonth = new Date(); mdViewMonth.setDate(1);
+
+function dateToISO(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+document.getElementById('multiday-toggle').addEventListener('change', e => {
+  currentQuote.multiDay = !!e.target.checked;
+  document.getElementById('multiday-picker').style.display = currentQuote.multiDay ? 'block' : 'none';
+  if (currentQuote.multiDay) {
+    if (!Array.isArray(currentQuote.schedule)) currentQuote.schedule = [];
+    if (!currentQuote.schedule.length && currentQuote.proposedDate) {
+      const pd = currentQuote.proposedDate;
+      const dPart = pd.includes('T') ? pd.slice(0,10) : pd;
+      const tPart = pd.includes('T') ? pd.slice(11,16) : '09:00';
+      currentQuote.schedule.push({ date: dPart, start: tPart, end: '' });
+    }
+    renderMultiDayPicker();
+  } else {
+    if (Array.isArray(currentQuote.schedule) && currentQuote.schedule.length) {
+      const s = currentQuote.schedule[0];
+      currentQuote.proposedDate = s.start ? (s.date + 'T' + s.start) : s.date;
+      document.getElementById('proposed-date').value = currentQuote.proposedDate;
+    }
+  }
+  scheduleDraftSave();
+  refreshWeatherForQuote();
+});
+
+document.getElementById('md-prev').onclick = () => { mdViewMonth.setMonth(mdViewMonth.getMonth() - 1); renderMultiDayPicker(); };
+document.getElementById('md-next').onclick = () => { mdViewMonth.setMonth(mdViewMonth.getMonth() + 1); renderMultiDayPicker(); };
+
+function renderMultiDayPicker() {
+  const grid = document.getElementById('md-grid');
+  const monthLabel = document.getElementById('md-month');
+  const list = document.getElementById('md-selected-list');
+  if (!grid) return;
+  if (!Array.isArray(currentQuote.schedule)) currentQuote.schedule = [];
+  monthLabel.textContent = mdViewMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  grid.innerHTML = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => { const el = document.createElement('div'); el.className = 'md-dow'; el.textContent = d; grid.appendChild(el); });
+  const firstDow = new Date(mdViewMonth.getFullYear(), mdViewMonth.getMonth(), 1).getDay();
+  const daysInMonth = new Date(mdViewMonth.getFullYear(), mdViewMonth.getMonth() + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const selSet = new Set(currentQuote.schedule.map(s => s.date));
+  for (let i = 0; i < 42; i++) {
+    const dn = i - firstDow + 1;
+    const cellDate = new Date(mdViewMonth.getFullYear(), mdViewMonth.getMonth(), dn);
+    const cell = document.createElement('div');
+    cell.className = 'md-cell';
+    if (dn < 1 || dn > daysInMonth) cell.classList.add('out');
+    else if (cellDate < today) cell.classList.add('past');
+    const iso = dateToISO(cellDate);
+    if (selSet.has(iso)) cell.classList.add('selected');
+    cell.textContent = (dn >= 1 && dn <= daysInMonth) ? cellDate.getDate() : '';
+    const rainProb = getCachedRainProb(iso, currentQuote.clientLat, currentQuote.clientLng);
+    if (rainProb != null && rainProb >= 40) {
+      const r = document.createElement('span'); r.className = 'md-rain'; r.textContent = rainProb >= 70 ? '🌧️' : '🌦️';
+      cell.appendChild(r);
+    }
+    if (dn >= 1 && dn <= daysInMonth) {
+      cell.onclick = () => toggleMultiDayDate(iso);
+    }
+    grid.appendChild(cell);
+  }
+  list.innerHTML = '';
+  const sorted = [...currentQuote.schedule].sort((a, b) => a.date.localeCompare(b.date));
+  currentQuote.schedule = sorted;
+  if (!sorted.length) {
+    list.innerHTML = '<div class="tip" style="margin:0;">No days selected yet — tap dates above to add them.</div>';
+  } else {
+    sorted.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'md-selected-row';
+      const niceDate = new Date(s.date + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      row.innerHTML =
+        '<div class="md-date">' + escapeHtml(niceDate) + '</div>' +
+        '<input class="md-time-in"  type="time" value="' + escapeAttr(s.start || '') + '" data-i="' + i + '" data-fld="start" />' +
+        '<input class="md-time-out" type="time" value="' + escapeAttr(s.end   || '') + '" data-i="' + i + '" data-fld="end"   />' +
+        '<button class="md-x" type="button" data-i="' + i + '" title="Remove">✕</button>';
+      list.appendChild(row);
+    });
+    list.querySelectorAll('input[type="time"]').forEach(el => {
+      el.oninput = e => {
+        const i = +e.target.dataset.i, fld = e.target.dataset.fld;
+        currentQuote.schedule[i][fld] = e.target.value;
+        if (i === 0 && fld === 'start') {
+          const s = currentQuote.schedule[0];
+          currentQuote.proposedDate = s.start ? (s.date + 'T' + s.start) : s.date;
+          document.getElementById('proposed-date').value = currentQuote.proposedDate;
+        }
+        scheduleDraftSave();
+      };
+    });
+    list.querySelectorAll('.md-x').forEach(el => {
+      el.onclick = () => { const i = +el.dataset.i; currentQuote.schedule.splice(i, 1); renderMultiDayPicker(); scheduleDraftSave(); refreshWeatherForQuote(); };
+    });
+  }
+}
+
+function toggleMultiDayDate(iso) {
+  if (!Array.isArray(currentQuote.schedule)) currentQuote.schedule = [];
+  const i = currentQuote.schedule.findIndex(s => s.date === iso);
+  if (i >= 0) {
+    currentQuote.schedule.splice(i, 1);
+  } else {
+    const start = prompt('Arrival time for ' + iso + ' (e.g. 09:00). Leave blank for none.', '09:00');
+    if (start === null) return;
+    const end = prompt('Depart time for ' + iso + ' (e.g. 17:00). Leave blank for none.', '17:00');
+    if (end === null) return;
+    currentQuote.schedule.push({ date: iso, start: start || '', end: end || '' });
+  }
+  if (currentQuote.schedule.length) {
+    const sorted = [...currentQuote.schedule].sort((a, b) => a.date.localeCompare(b.date));
+    const s0 = sorted[0];
+    currentQuote.proposedDate = s0.start ? (s0.date + 'T' + s0.start) : s0.date;
+    document.getElementById('proposed-date').value = currentQuote.proposedDate;
+  }
+  renderMultiDayPicker();
+  scheduleDraftSave();
+  refreshWeatherForQuote();
+}
+
+/* ---------- Weather (Open-Meteo, no API key) ---------- */
+const _weatherCache = {};
+const _weatherInflight = {};
+function weatherKey(date, lat, lng) { return (lat||0).toFixed(2) + '|' + (lng||0).toFixed(2) + '|' + date; }
+function getCachedRainProb(date, lat, lng) {
+  if (lat == null || lng == null) return null;
+  const entry = _weatherCache[weatherKey(date, lat, lng)];
+  if (!entry) return null;
+  if (Date.now() - entry.fetchedAt > 6 * 3600 * 1000) return null;
+  return entry.rainProb;
+}
+async function geocodeForWeather(addr) {
+  if (!addr || !window.google || !window.google.maps) return null;
+  return new Promise(resolve => {
+    const g = new google.maps.Geocoder();
+    g.geocode({ address: addr, region: 'au' }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        const ll = results[0].geometry.location;
+        resolve({ lat: ll.lat(), lng: ll.lng() });
+      } else resolve(null);
+    });
+  });
+}
+async function fetchWeatherForDates(lat, lng, isoDates) {
+  if (!settings.weatherEnabled || lat == null || lng == null || !isoDates.length) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const horizon = new Date(today.getTime() + 16 * 86400 * 1000);
+  const useful = isoDates.filter(d => { const dt = new Date(d + 'T00:00'); return dt >= today && dt <= horizon; });
+  if (!useful.length) return;
+  useful.sort();
+  const startDate = useful[0], endDate = useful[useful.length - 1];
+  const key = lat.toFixed(2) + '|' + lng.toFixed(2) + '|' + startDate + '~' + endDate;
+  if (_weatherInflight[key]) return _weatherInflight[key];
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lat) +
+    '&longitude=' + encodeURIComponent(lng) +
+    '&daily=precipitation_probability_max,precipitation_sum&timezone=auto' +
+    '&start_date=' + startDate + '&end_date=' + endDate;
+  _weatherInflight[key] = (async () => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('weather fetch ' + r.status);
+      const json = await r.json();
+      const days = (json.daily && json.daily.time) || [];
+      const probs = (json.daily && json.daily.precipitation_probability_max) || [];
+      days.forEach((d, i) => { _weatherCache[weatherKey(d, lat, lng)] = { rainProb: probs[i] != null ? probs[i] : 0, fetchedAt: Date.now() }; });
+    } catch (e) { console.warn('weather lookup failed:', e.message); }
+    finally { delete _weatherInflight[key]; }
+  })();
+  return _weatherInflight[key];
+}
+async function refreshWeatherForQuote() {
+  const warn = document.getElementById('weather-warn');
+  if (!warn) return;
+  warn.classList.remove('show'); warn.innerHTML = '';
+  if (!settings.weatherEnabled) return;
+  const addr = currentQuote.client.address;
+  if (!addr) return;
+  if (currentQuote.clientLat == null || currentQuote.clientLng == null) {
+    const ll = await geocodeForWeather(addr);
+    if (!ll) return;
+    currentQuote.clientLat = ll.lat;
+    currentQuote.clientLng = ll.lng;
+  }
+  const dates = quoteDates(currentQuote);
+  if (!dates.length) return;
+  await fetchWeatherForDates(currentQuote.clientLat, currentQuote.clientLng, dates);
+  const rainy = dates.map(d => ({ d, p: getCachedRainProb(d, currentQuote.clientLat, currentQuote.clientLng) }))
+    .filter(x => x.p != null && x.p >= 40);
+  if (rainy.length) {
+    const lines = rainy.map(r => {
+      const niceDate = new Date(r.d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      const icon = r.p >= 70 ? '🌧️' : '🌦️';
+      return icon + ' <b>' + niceDate + '</b> — ' + Math.round(r.p) + '% chance of rain';
+    });
+    warn.innerHTML = '<b>Heads up:</b> rain forecast for this job.<br>' + lines.join('<br>');
+    warn.classList.add('show');
+  }
+  if (currentQuote.multiDay) renderMultiDayPicker();
+}
+function quoteDates(q) {
+  if (q.multiDay && Array.isArray(q.schedule) && q.schedule.length) return q.schedule.map(s => s.date);
+  if (q.proposedDate) { const pd = String(q.proposedDate); return [pd.includes('T') ? pd.slice(0,10) : pd]; }
+  return [];
+}
+['client-address', 'proposed-date'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => {
+    if (id === 'client-address') { currentQuote.clientLat = null; currentQuote.clientLng = null; }
+    refreshWeatherForQuote();
+  });
+});
+
+/* ---------- Photo customer-copy controls ---------- */
+document.getElementById('include-photos-pdf').addEventListener('change', e => {
+  currentQuote.includePhotosInPdf = !!e.target.checked;
+  document.getElementById('photo-allnone').style.display = currentQuote.includePhotosInPdf ? 'flex' : 'none';
+  renderPhotos();
+  scheduleDraftSave();
+});
+document.getElementById('photo-all').onclick = () => {
+  currentQuote.photos = currentQuote.photos.map(p => { const m = migratePhoto(p); m.customerVisible = true; return m; });
+  renderPhotos(); scheduleDraftSave();
+};
+document.getElementById('photo-none').onclick = () => {
+  currentQuote.photos = currentQuote.photos.map(p => { const m = migratePhoto(p); m.customerVisible = false; return m; });
+  renderPhotos(); scheduleDraftSave();
+};
+
+/* ---------- In-app camera with watermark ---------- */
+let _camStream = null;
+let _camFacing = 'environment';
+function watermarkSummary() {
+  const w = settings.watermark || {};
+  const parts = [];
+  if (w.address) parts.push('Address');
+  if (w.datetime) parts.push('Date+time');
+  if (w.business) parts.push('Business');
+  if (w.clientName) parts.push('Client');
+  if (w.quoteId) parts.push('Quote ID');
+  if (w.gps) parts.push('GPS');
+  return parts.length ? parts.join(' • ') : '(none)';
+}
+async function openCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Your browser does not support in-app camera capture. Use the Upload button instead.');
+    return;
+  }
+  const modal = document.getElementById('cam-modal');
+  const video = document.getElementById('cam-video');
+  const status = document.getElementById('cam-status');
+  document.getElementById('cam-wm-info').textContent = 'Watermark: ' + watermarkSummary();
+  modal.classList.add('open');
+  status.textContent = 'Starting camera…';
+  try {
+    _camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: _camFacing }, audio: false });
+    video.srcObject = _camStream;
+    status.textContent = 'Tap the shutter to capture.';
+  } catch (e) {
+    status.textContent = 'Camera blocked: ' + (e.message || e.name) + '. Use Upload instead, or grant camera permission.';
+  }
+}
+function closeCamera() {
+  document.getElementById('cam-modal').classList.remove('open');
+  if (_camStream) { _camStream.getTracks().forEach(t => t.stop()); _camStream = null; }
+  document.getElementById('cam-video').srcObject = null;
+}
+async function flipCamera() {
+  _camFacing = _camFacing === 'environment' ? 'user' : 'environment';
+  if (_camStream) { _camStream.getTracks().forEach(t => t.stop()); _camStream = null; }
+  try {
+    _camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: _camFacing }, audio: false });
+    document.getElementById('cam-video').srcObject = _camStream;
+  } catch (e) { /* keep going */ }
+}
+async function snapPhoto() {
+  const video = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  const shutter = document.getElementById('cam-shutter');
+  const status = document.getElementById('cam-status');
+  if (!video.videoWidth) { status.textContent = 'Camera not ready yet — wait a moment.'; return; }
+  shutter.disabled = true; status.textContent = 'Captured. Processing…';
+  let w = video.videoWidth, h = video.videoHeight;
+  const longest = Math.max(w, h);
+  if (longest > PHOTO_MAX_DIM) { const s = PHOTO_MAX_DIM / longest; w = Math.round(w * s); h = Math.round(h * s); }
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, w, h);
+  await drawWatermark(ctx, w, h);
+  const url = canvas.toDataURL('image/jpeg', PHOTO_JPEG_Q);
+  currentQuote.photos.push({ url: url, w: w, h: h, customerVisible: true });
+  renderPhotos();
+  scheduleDraftSave();
+  status.textContent = 'Saved. Tap shutter for another, or ✕ to close.';
+  shutter.disabled = false;
+}
+async function drawWatermark(ctx, w, h) {
+  const wm = settings.watermark || {};
+  const lines = [];
+  if (wm.business) lines.push((getBizName() || 'Neill Data & Security'));
+  if (wm.clientName && currentQuote.client.name) lines.push('Client: ' + currentQuote.client.name);
+  if (wm.address && currentQuote.client.address) lines.push(currentQuote.client.address);
+  if (wm.quoteId && currentQuote.id) lines.push('Ref: ' + currentQuote.id);
+  if (wm.datetime) {
+    const now = new Date();
+    lines.push(now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' +
+               now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }));
+  }
+  if (wm.gps) {
+    const gps = await new Promise(resolve => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve(pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5)),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 4000 }
+      );
+    });
+    if (gps) lines.push('GPS ' + gps);
+  }
+  if (!lines.length) return;
+  const pad = Math.max(8, Math.round(h * 0.012));
+  const fontSize = Math.max(14, Math.round(h * 0.025));
+  const lineGap = Math.round(fontSize * 1.25);
+  const stripH = lineGap * lines.length + pad * 2;
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, h - stripH * 1.4, 0, h);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, h - stripH * 1.4, w, stripH * 1.4);
+  ctx.font = '600 ' + fontSize + 'px -apple-system, system-ui, sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = 3; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+  let y = h - stripH + pad;
+  lines.forEach(line => { ctx.fillText(line, pad, y); y += lineGap; });
+  ctx.restore();
+}
+document.getElementById('photo-take-btn').onclick = openCamera;
+document.getElementById('photo-upload-btn').onclick = () => document.getElementById('photo-input').click();
+document.getElementById('cam-close').onclick = closeCamera;
+document.getElementById('cam-flip').onclick = flipCamera;
+document.getElementById('cam-shutter').onclick = snapPhoto;
+document.getElementById('cam-modal').addEventListener('click', e => { if (e.target.id === 'cam-modal') closeCamera(); });
+
+/* ---------- Time questionnaire ---------- */
+function openTimeQuestionnaire(q) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('timeq-modal');
+    const overrun = document.getElementById('timeq-overrun');
+    const extraInp = document.getElementById('timeq-extra');
+    const valEl = document.getElementById('timeq-quoted-val');
+    const qh = Number(q.quotedHours || q.hours || 0);
+    const qd = Number(q.quotedDays  || q.days  || 0);
+    const parts = [];
+    if (qh) parts.push(qh + ' hr' + (qh === 1 ? '' : 's'));
+    if (qd) parts.push(qd + ' day' + (qd === 1 ? '' : 's'));
+    valEl.textContent = parts.length ? parts.join(' + ') : '(no labour set)';
+    overrun.classList.remove('show');
+    extraInp.value = '0';
+    modal.classList.add('open');
+    function cleanup() {
+      modal.classList.remove('open');
+      document.getElementById('timeq-yes').onclick = null;
+      document.getElementById('timeq-no').onclick = null;
+      document.getElementById('timeq-skip').onclick = null;
+      document.getElementById('timeq-save').onclick = null;
+    }
+    document.getElementById('timeq-yes').onclick = () => { q.timingHonest = true; q.overrunHours = 0; cleanup(); resolve(); };
+    document.getElementById('timeq-no').onclick = () => { overrun.classList.add('show'); extraInp.focus(); };
+    document.getElementById('timeq-skip').onclick = () => { q.timingHonest = null; q.overrunHours = 0; cleanup(); resolve(); };
+    document.getElementById('timeq-save').onclick = () => { q.timingHonest = false; q.overrunHours = Number(extraInp.value) || 0; cleanup(); resolve(); };
+  });
+}
+
+/* ---------- Watermark settings UI load/save ---------- */
+function loadWatermarkUI() {
+  const w = settings.watermark || {};
+  ['address','datetime','business','clientName','quoteId','gps'].forEach(k => {
+    const el = document.getElementById('wm-' + k);
+    if (el) el.checked = !!w[k];
+  });
+  const we = document.getElementById('weather-enabled');
+  if (we) we.checked = settings.weatherEnabled !== false;
+}
+function saveWatermarkUI() {
+  settings.watermark = settings.watermark || {};
+  ['address','datetime','business','clientName','quoteId','gps'].forEach(k => {
+    const el = document.getElementById('wm-' + k);
+    if (el) settings.watermark[k] = !!el.checked;
+  });
+  const we = document.getElementById('weather-enabled');
+  settings.weatherEnabled = we ? !!we.checked : true;
+}
+
+/* =====================================================
+   PHOTOS — capture, compress, attach to quote + PDF
+   ===================================================== */
+// Stored as JPEG data URLs in currentQuote.photos. Backend payload strips photos
+// because Google Sheets caps each cell at ~50,000 chars.
+const PHOTO_MAX_DIM = 1280;     // longest side
+const PHOTO_JPEG_Q  = 0.72;     // quality
+const PHOTO_MAX_PER_QUOTE = 24;
+
+function stripPhotosForBackend(q) {
+  if (!q) return q;
+  const copy = JSON.parse(JSON.stringify(q));
+  if (Array.isArray(copy.photos) && copy.photos.length) copy.photoCount = copy.photos.length;
+  copy.photos = [];
+  return copy;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Could not read file.'));
+    r.readAsDataURL(file);
+  });
+}
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode image (unsupported format?).'));
+    img.src = dataUrl;
+  });
+}
+async function compressImage(file) {
+  const raw = await readFileAsDataURL(file);
+  const img = await loadImage(raw);
+  let w = img.naturalWidth, h = img.naturalHeight;
+  const longest = Math.max(w, h);
+  if (longest > PHOTO_MAX_DIM) {
+    const s = PHOTO_MAX_DIM / longest;
+    w = Math.round(w * s); h = Math.round(h * s);
+  }
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  return { url: cv.toDataURL('image/jpeg', PHOTO_JPEG_Q), w: w, h: h };
+}
+
+// Migrate older photo records (plain strings) to { url, w, h }
+function migratePhoto(p) {
+  if (!p) return null;
+  if (typeof p === 'string') return { url: p, w: 0, h: 0 };
+  return p;
+}
+function photoUrl(p) { const m = migratePhoto(p); return m ? m.url : ''; }
+
+let _currentLightboxIdx = -1;
+
+function renderPhotos() {
+  const grid = document.getElementById('photo-grid');
+  if (!grid) return;
+  if (!Array.isArray(currentQuote.photos)) currentQuote.photos = [];
+  grid.innerHTML = '';
+  const pdfBar = document.getElementById('photo-pdf-toggle');
+  const allNone = document.getElementById('photo-allnone');
+  if (pdfBar) {
+    pdfBar.style.display = currentQuote.photos.length ? 'flex' : 'none';
+    if (allNone) allNone.style.display = (currentQuote.photos.length && currentQuote.includePhotosInPdf !== false) ? 'flex' : 'none';
+  }
+  currentQuote.photos.forEach((p, i) => {
+    const m = migratePhoto(p);
+    const visible = m.customerVisible !== false;
+    const tile = document.createElement('div');
+    tile.className = 'photo-tile' + (visible ? '' : ' hidden-from-customer');
+    const showEye = currentQuote.includePhotosInPdf !== false;
+    tile.innerHTML =
+      '<img src="' + photoUrl(p) + '" alt="Site photo ' + (i+1) + '">' +
+      '<span class="photo-num">' + (i+1) + '</span>' +
+      (showEye ? '<button class="photo-eye' + (visible ? '' : ' off') + '" type="button" data-i="' + i + '" title="' + (visible ? 'On customer PDF — tap to hide' : 'Hidden from customer PDF — tap to show') + '">' + (visible ? '👁' : '🚫') + '</button>' : '') +
+      '<button class="photo-x" type="button" data-i="' + i + '" aria-label="Remove">✕</button>';
+    tile.addEventListener('click', e => {
+      if (e.target.classList.contains('photo-x') || e.target.classList.contains('photo-eye')) return;
+      openPhotoLightbox(i);
+    });
+    grid.appendChild(tile);
+  });
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'photo-add-btn';
+  const atCap = currentQuote.photos.length >= PHOTO_MAX_PER_QUOTE;
+  add.innerHTML = atCap
+    ? '<span class="photo-add-icon">🚫</span><span>Max ' + PHOTO_MAX_PER_QUOTE + '</span>'
+    : '<span class="photo-add-icon">＋</span><span>Add photo</span>';
+  add.disabled = atCap;
+  add.onclick = () => { if (!atCap) document.getElementById('photo-input').click(); };
+  grid.appendChild(add);
+  grid.querySelectorAll('.photo-x').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const i = +btn.dataset.i;
+      if (confirm('Remove this photo from the quote?')) {
+        currentQuote.photos.splice(i, 1);
+        renderPhotos();
+        scheduleDraftSave();
+      }
+    };
+  });
+  grid.querySelectorAll('.photo-eye').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const i = +btn.dataset.i;
+      const m = migratePhoto(currentQuote.photos[i]);
+      m.customerVisible = !(m.customerVisible !== false);
+      currentQuote.photos[i] = m;
+      renderPhotos();
+      scheduleDraftSave();
+    };
+  });
+}
+
+async function addPhotosFromFiles(files) {
+  if (!files || !files.length) return;
+  const busy = document.getElementById('photo-busy');
+  busy.classList.remove('hidden');
+  let added = 0, errs = [];
+  for (const f of Array.from(files)) {
+    if (currentQuote.photos.length >= PHOTO_MAX_PER_QUOTE) { errs.push('Reached the ' + PHOTO_MAX_PER_QUOTE + '-photo cap.'); break; }
+    try {
+      const photo = await compressImage(f);
+      currentQuote.photos.push(photo);
+      added++;
+    } catch (e) {
+      errs.push(f.name + ': ' + e.message);
+    }
+  }
+  busy.classList.add('hidden');
+  renderPhotos();
+  if (added) scheduleDraftSave();
+  if (errs.length) alert('Some photos didn\'t make it:\n' + errs.join('\n'));
+}
+
+function openPhotoLightbox(idx) {
+  if (idx < 0 || idx >= currentQuote.photos.length) return;
+  _currentLightboxIdx = idx;
+  document.getElementById('photo-lightbox-img').src = photoUrl(currentQuote.photos[idx]);
+  document.getElementById('photo-lightbox').classList.add('open');
+}
+function closePhotoLightbox() {
+  document.getElementById('photo-lightbox').classList.remove('open');
+  document.getElementById('photo-lightbox-img').src = '';
+  _currentLightboxIdx = -1;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',');
+  const mime = (meta.match(/data:(.*?);base64/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+async function shareCurrentLightboxPhoto() {
+  if (_currentLightboxIdx < 0) return;
+  const dataUrl = photoUrl(currentQuote.photos[_currentLightboxIdx]);
+  const blob = dataUrlToBlob(dataUrl);
+  const slug = (currentQuote.client.name || 'site').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+  const fname = slug + '-photo-' + (_currentLightboxIdx + 1) + '.jpg';
+  const file = new File([blob], fname, { type: 'image/jpeg' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Site photo' }); return; }
+    catch (e) { /* fall through to download */ }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+
+function deleteCurrentLightboxPhoto() {
+  if (_currentLightboxIdx < 0) return;
+  if (!confirm('Remove this photo from the quote?')) return;
+  currentQuote.photos.splice(_currentLightboxIdx, 1);
+  closePhotoLightbox();
+  renderPhotos();
+  scheduleDraftSave();
+}
+
+(function wirePhotos(){
+  const inp = document.getElementById('photo-input');
+  if (inp) {
+    inp.addEventListener('change', async (e) => {
+      await addPhotosFromFiles(e.target.files);
+      e.target.value = '';
+    });
+  }
+  const closeBtn = document.getElementById('photo-lightbox-close');
+  if (closeBtn) closeBtn.onclick = closePhotoLightbox;
+  const box = document.getElementById('photo-lightbox');
+  if (box) box.addEventListener('click', (e) => { if (e.target === box) closePhotoLightbox(); });
+  const shareBtn = document.getElementById('photo-share');
+  if (shareBtn) shareBtn.onclick = shareCurrentLightboxPhoto;
+  const delBtn = document.getElementById('photo-delete');
+  if (delBtn) delBtn.onclick = deleteCurrentLightboxPhoto;
+  document.addEventListener('keydown', (e) => {
+    const lb = document.getElementById('photo-lightbox');
+    if (e.key === 'Escape' && lb && lb.classList.contains('open')) closePhotoLightbox();
+  });
+})();
+
+function appendPhotosToPdf(doc, M) {
+  if (!Array.isArray(currentQuote.photos) || !currentQuote.photos.length) return;
+  if (currentQuote.includePhotosInPdf === false) return;
+  const visiblePhotos = currentQuote.photos.map(migratePhoto).filter(p => p.customerVisible !== false);
+  if (!visiblePhotos.length) return;
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const cols = 2, rows = 2;
+  const gap = 18;
+  const cellW = (W - M*2 - gap*(cols-1)) / cols;
+  const cellH = (H - M*2 - 60 - gap*(rows-1)) / rows;
+
+  let n = 0;
+  while (n < visiblePhotos.length) {
+    doc.addPage();
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0);
+    doc.text('Site photos', M, M + 6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(120);
+    doc.text((currentQuote.client.name || '') + (currentQuote.client.address ? ' — ' + currentQuote.client.address : ''), M, M + 22, { maxWidth: W - M*2 });
+    doc.setTextColor(0);
+
+    let placed = 0;
+    while (placed < cols*rows && n < visiblePhotos.length) {
+      const r = Math.floor(placed / cols);
+      const c = placed % cols;
+      const x = M + c * (cellW + gap);
+      const y = M + 40 + r * (cellH + gap);
+      try {
+        const ph = visiblePhotos[n];
+        const dataUrl = ph.url;
+        const iw = ph.w || 4, ih = ph.h || 3;
+        const s = Math.min(cellW / iw, cellH / ih);
+        const w = iw * s, h = ih * s;
+        const dx = x + (cellW - w) / 2;
+        const dy = y + (cellH - h) / 2;
+        doc.addImage(dataUrl, 'JPEG', dx, dy, w, h);
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110);
+        doc.text('Photo ' + (n + 1), x + 2, y + cellH + 11);
+        doc.setTextColor(0);
+      } catch (e) {
+        console.warn('photo embed failed', n, e.message);
+      }
+      placed++; n++;
+    }
+  }
 }
 
 function generatePDF(style) {
@@ -2769,6 +3705,8 @@ function generatePDF(style) {
   const slug = (currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
   const docTag = isCash ? '-cash' : (isInvoice ? '' : '');
   const docKind = isCash ? 'quote' : (isInvoice ? 'invoice' : 'quote');
+  // Append site photos (4 per page, 2x2 grid)
+  appendPhotosToPdf(doc, M);
   const filename = `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.pdf`;
   // Always trigger the file download
   doc.save(filename);
