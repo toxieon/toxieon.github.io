@@ -1061,6 +1061,7 @@ function getBackendUrl()   { return (settings.backendUrl && settings.backendUrl.
 const LS_KEY      = 'nd_quote_tool_v3';
 const HISTORY_KEY = 'nd_quote_history_v3';
 const FAVS_KEY    = 'nd_user_favs_v3';
+const WEATHER_CACHE_KEY = 'nd_weather_cache_v1';
 
 const defaultSettings = {
   passcode: '',
@@ -2512,31 +2513,61 @@ function renderCalendar() {
 }
 
 let _calWeatherInflight = false;
+function calendarHasCachedWeather() {
+  // Quick check: do we have *any* cached entry for the currently visible month?
+  if (!_homeBaseCoords) return false;
+  const m = calendarMonth;
+  const firstDow = new Date(m.getFullYear(), m.getMonth(), 1).getDay();
+  for (let i = 0; i < 42; i++) {
+    const dn = i - firstDow + 1;
+    const d = new Date(m.getFullYear(), m.getMonth(), dn);
+    if (getCachedWeather(dateToISO(d), _homeBaseCoords.lat, _homeBaseCoords.lng)) return true;
+  }
+  return false;
+}
 async function scheduleCalendarWeatherFetch() {
   if (_calWeatherInflight) return;
   _calWeatherInflight = true;
-  setCalendarWeatherStatus('Loading weather…');
-  try {
-    await prefetchHomeWeatherForCalendar();
-    const seen = new Set();
-    const jobFetches = [];
-    history.forEach(q => {
-      if (q.clientLat == null) return;
-      const dates = quoteDates(q);
-      if (!dates.length) return;
-      const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
-      if (seen.has(k)) return; seen.add(k);
-      jobFetches.push(fetchWeatherForDates(q.clientLat, q.clientLng, dates));
-    });
-    if (jobFetches.length) await Promise.all(jobFetches);
-    setCalendarWeatherStatus(_homeBaseCoords ? '' : 'Weather off — set a Home base address in Settings.');
-  } catch (e) {
-    setCalendarWeatherStatus('Weather lookup failed: ' + (e.message || 'unknown'));
-  } finally {
-    _calWeatherInflight = false;
-    // Repaint so newly-cached weather shows up
+  const hadCache = calendarHasCachedWeather();
+  // Only show the spinner if we have nothing to paint — otherwise revalidate silently
+  if (!hadCache) setCalendarWeatherStatus('Loading weather…');
+
+  const tasks = [];
+  // Home base fetch — paint as soon as it lands
+  tasks.push((async () => {
+    const home = await getHomeBaseCoords();
+    if (!home) return;
+    const m = calendarMonth;
+    const firstDow = new Date(m.getFullYear(), m.getMonth(), 1).getDay();
+    const isoDates = [];
+    for (let i = 0; i < 42; i++) {
+      const dn = i - firstDow + 1;
+      const d = new Date(m.getFullYear(), m.getMonth(), dn);
+      isoDates.push(dateToISO(d));
+    }
+    await fetchWeatherForDates(home.lat, home.lng, isoDates);
     renderCalendar();
-  }
+  })());
+  // Per-job fetches — each paints independently when it completes
+  const seen = new Set();
+  history.forEach(q => {
+    if (q.clientLat == null) return;
+    const dates = quoteDates(q);
+    if (!dates.length) return;
+    const k = q.clientLat.toFixed(2) + '|' + q.clientLng.toFixed(2) + '|' + dates.join(',');
+    if (seen.has(k)) return; seen.add(k);
+    tasks.push(fetchWeatherForDates(q.clientLat, q.clientLng, dates).then(() => renderCalendar()));
+  });
+
+  Promise.allSettled(tasks).then(results => {
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length && !hadCache) {
+      setCalendarWeatherStatus('Weather lookup failed: ' + (failed[0].reason && failed[0].reason.message || 'unknown'));
+    } else {
+      setCalendarWeatherStatus(_homeBaseCoords ? '' : 'Weather off — set a Home base address in Settings.');
+    }
+    _calWeatherInflight = false;
+  });
 }
 
 function setCalendarWeatherStatus(msg) {
@@ -3225,8 +3256,29 @@ function toggleMultiDayDate(iso) {
 }
 
 /* ---------- Weather (Open-Meteo, no API key) ---------- */
-const _weatherCache = {};
+const _weatherCache = (function loadWeatherCacheFromDisk() {
+  try {
+    const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    // Drop stale entries (older than 6h) to keep the cache lean
+    const cutoff = Date.now() - 6 * 3600 * 1000;
+    const fresh = {};
+    Object.keys(parsed).forEach(k => {
+      if (parsed[k] && parsed[k].fetchedAt > cutoff) fresh[k] = parsed[k];
+    });
+    return fresh;
+  } catch (e) { return {}; }
+})();
 const _weatherInflight = {};
+let _weatherCacheSaveTimer = null;
+function persistWeatherCache() {
+  // Debounce so we don't write on every individual fetch
+  clearTimeout(_weatherCacheSaveTimer);
+  _weatherCacheSaveTimer = setTimeout(() => {
+    try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(_weatherCache)); } catch (e) { /* ignore quota */ }
+  }, 400);
+}
 function weatherKey(date, lat, lng) { return (lat||0).toFixed(2) + '|' + (lng||0).toFixed(2) + '|' + date; }
 function getCachedWeather(date, lat, lng) {
   if (lat == null || lng == null) return null;
@@ -3323,6 +3375,7 @@ async function fetchWeatherForDates(lat, lng, isoDates) {
           fetchedAt: Date.now()
         };
       });
+      persistWeatherCache();
     } catch (e) { console.warn('weather lookup failed:', e.message); }
     finally { delete _weatherInflight[key]; }
   })();
@@ -4557,6 +4610,10 @@ function init() {
   syncFromSheet(true);
   syncQuotesFromBackend();
   syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { showMasterCards(); renderGalleryFilters(); });
+  // Pre-warm weather so the Calendar tab paints instantly when first opened
+  if (settings.weatherEnabled !== false) {
+    setTimeout(() => scheduleCalendarWeatherFetch(), 50);
+  }
   renderUpcomingBrief();
   // Restore unsaved draft if present
   try {
