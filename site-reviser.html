@@ -1,0 +1,2721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b2545" />
+<title>Site Reviser — Electrical Site Tracking</title>
+<style>
+  /* ============================================================
+     SITE REVISER  —  styled to match Neill Data (neilldata.com)
+     Blue / white / light grey, navy text, rounded cards, clean.
+     ============================================================ */
+  :root{
+    --navy:#0b2545;
+    --navy-2:#13315c;
+    --blue:#1e6091;
+    --blue-2:#3a86ff;
+    --blue-soft:#e6f0fa;
+    --grey-50:#f6f8fb;
+    --grey-100:#eef2f7;
+    --grey-200:#dde4ee;
+    --grey-300:#c5cfdd;
+    --grey-500:#7a8699;
+    --text:#0b2545;
+    --text-soft:#48576e;
+    --white:#ffffff;
+    --green:#2e9c5a;
+    --green-soft:#e3f5ea;
+    --amber:#d98e00;
+    --amber-soft:#fbf0d6;
+    --red:#c0392b;
+    --red-soft:#fbe6e3;
+    --shadow: 0 2px 8px rgba(11,37,69,.06), 0 8px 24px rgba(11,37,69,.06);
+    --radius:14px;
+    --radius-sm:10px;
+    --maxw:1100px;
+    --tap:46px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:var(--grey-50);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  a{color:var(--blue)}
+  button{font:inherit}
+  input,select,textarea{
+    font:inherit; color:var(--text);
+    background:var(--white);
+    border:1px solid var(--grey-200);
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    width:100%;
+    min-height:var(--tap);
+  }
+  textarea{min-height:90px; resize:vertical}
+  input:focus, select:focus, textarea:focus{
+    outline:none; border-color:var(--blue-2);
+    box-shadow:0 0 0 3px rgba(58,134,255,.15);
+  }
+  label{display:block;font-size:13px;color:var(--text-soft);margin:10px 0 4px}
+
+  /* ---- HEADER ---- */
+  header.app-header{
+    position:sticky; top:0; z-index:50;
+    background:var(--navy);
+    color:#fff;
+    padding:10px 14px;
+    display:flex; align-items:center; gap:12px;
+    box-shadow:0 1px 0 rgba(255,255,255,.04), 0 2px 8px rgba(0,0,0,.15);
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,var(--blue-2),var(--blue));
+    display:grid;place-items:center;color:#fff;font-weight:800;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+  }
+  .brand-title{font-size:16px}
+  .brand-sub{font-size:11px; opacity:.7; font-weight:500; letter-spacing:.4px; text-transform:uppercase}
+  .header-spacer{flex:1}
+  .header-chip{
+    background:rgba(255,255,255,.08); padding:6px 10px;border-radius:999px;
+    font-size:12px; display:flex; align-items:center; gap:6px;
+    border:1px solid rgba(255,255,255,.1); cursor:pointer;
+  }
+  .header-chip:hover{background:rgba(255,255,255,.15)}
+  .site-pill{
+    background:var(--blue-2);
+    border-color:transparent;
+    color:#fff; font-weight:600;
+  }
+
+  /* ---- MAIN ---- */
+  main{max-width:var(--maxw); margin:0 auto; padding:14px}
+  .page{display:none}
+  .page.active{display:block; animation:fade .2s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+
+  /* ---- CARDS ---- */
+  .card{
+    background:var(--white);
+    border:1px solid var(--grey-200);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h2, .card h3{margin:0 0 10px 0}
+  .card h2{font-size:17px}
+  .card h3{font-size:15px; color:var(--navy-2)}
+  .muted{color:var(--text-soft); font-size:13px}
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  .row > *{flex:1 1 180px}
+
+  /* ---- BUTTONS ---- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--blue-2); color:#fff; border:none;
+    padding:12px 16px; border-radius:var(--radius-sm); font-weight:600;
+    cursor:pointer; min-height:var(--tap); text-decoration:none;
+    transition:transform .05s ease, box-shadow .15s ease, background .15s;
+    box-shadow:0 1px 0 rgba(0,0,0,.05);
+  }
+  .btn:hover{background:var(--blue)}
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:var(--grey-100); color:var(--navy); border:1px solid var(--grey-200)}
+  .btn.secondary:hover{background:var(--grey-200)}
+  .btn.ghost{background:transparent;color:var(--blue); border:1px solid var(--grey-200)}
+  .btn.danger{background:var(--red); color:#fff}
+  .btn.success{background:var(--green); color:#fff}
+  .btn.warn{background:var(--amber); color:#fff}
+  .btn.sm{padding:7px 11px; font-size:13px; min-height:34px; border-radius:8px}
+  .btn.block{width:100%}
+  .btn-row{display:flex; gap:8px; flex-wrap:wrap}
+
+  /* ---- BADGES / PILLS ---- */
+  .pill{display:inline-flex; align-items:center; gap:6px;
+    padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600;
+    background:var(--grey-100); color:var(--navy);
+  }
+  .pill.blue{background:var(--blue-soft); color:var(--blue)}
+  .pill.green{background:var(--green-soft); color:var(--green)}
+  .pill.amber{background:var(--amber-soft); color:var(--amber)}
+  .pill.red{background:var(--red-soft); color:var(--red)}
+  .pill.navy{background:var(--navy); color:#fff}
+
+  /* ---- PROGRESS ---- */
+  .progress{
+    background:var(--grey-100); border-radius:999px; overflow:hidden;
+    height:10px; width:100%;
+  }
+  .progress > i{display:block; height:100%;
+    background:linear-gradient(90deg, var(--blue-2), var(--blue));
+    border-radius:999px;}
+  .progress.green > i{background:linear-gradient(90deg, #4cc38a, var(--green))}
+  .progress.amber > i{background:linear-gradient(90deg, #f0b248, var(--amber))}
+  .progress.red > i{background:linear-gradient(90deg, #ee6b5a, var(--red))}
+
+  /* ---- GRID ---- */
+  .grid{display:grid; gap:12px}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr)}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:760px){
+    .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:480px){
+    .grid.cols-3,.grid.cols-4{grid-template-columns:1fr 1fr}
+  }
+
+  /* ---- LIST ---- */
+  .list-row{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border:1px solid var(--grey-200);
+    border-radius:10px; background:#fff; margin-bottom:8px;
+  }
+  .list-row .grow{flex:1; min-width:0}
+  .list-row .title{font-weight:600; color:var(--navy)}
+  .list-row .sub{font-size:12px; color:var(--text-soft)}
+
+  /* ---- BOTTOM NAV ---- */
+  nav.bottom-nav{
+    position:fixed; left:0; right:0; bottom:0; z-index:60;
+    background:#fff; border-top:1px solid var(--grey-200);
+    display:flex; justify-content:space-around;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 12px rgba(11,37,69,.05);
+  }
+  nav.bottom-nav button{
+    border:0; background:transparent; flex:1;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    color:var(--text-soft); font-size:11px; padding:4px 2px;
+    min-width:0; cursor:pointer; min-height:54px;
+  }
+  nav.bottom-nav button .ico{font-size:22px; line-height:1}
+  nav.bottom-nav button.active{color:var(--blue)}
+  nav.bottom-nav button.active .ico{filter:drop-shadow(0 2px 4px rgba(58,134,255,.4))}
+
+  /* fab for camera */
+  .fab{
+    position:fixed; right:14px; bottom:calc(82px + env(safe-area-inset-bottom));
+    width:58px; height:58px; border-radius:50%;
+    background:var(--blue-2); color:#fff; border:0; cursor:pointer; z-index:55;
+    box-shadow:0 6px 18px rgba(58,134,255,.4);
+    font-size:24px; display:grid; place-items:center;
+  }
+  .fab:hover{background:var(--blue)}
+
+  /* ---- TABLE ---- */
+  table.t{
+    width:100%; border-collapse:collapse; font-size:13px;
+  }
+  table.t th, table.t td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--grey-200)}
+  table.t th{background:var(--grey-50); color:var(--text-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.4px}
+  table.t tr:last-child td{border-bottom:0}
+  .scroll-x{overflow-x:auto; -webkit-overflow-scrolling:touch}
+
+  /* ---- MODAL ---- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(11,37,69,.45);
+    display:none; align-items:center; justify-content:center;
+    z-index:100; padding:14px;
+  }
+  .modal-backdrop.open{display:flex}
+  .modal{
+    background:#fff; width:100%; max-width:560px;
+    border-radius:16px; padding:18px; box-shadow:var(--shadow);
+    max-height:90vh; overflow:auto;
+  }
+  .modal h2{margin:0 0 10px}
+  .modal .actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px}
+
+  /* ---- LOGIN ---- */
+  .login-wrap{
+    min-height:90vh; display:grid; place-items:center; padding:20px;
+    background:radial-gradient(circle at top, var(--blue-soft), var(--grey-50));
+  }
+  .login-card{
+    background:#fff; border-radius:18px; padding:24px;
+    max-width:420px; width:100%; box-shadow:var(--shadow);
+    border:1px solid var(--grey-200);
+  }
+
+  /* ---- PHOTO TILES ---- */
+  .photo-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px}
+  .photo-tile{
+    aspect-ratio:1/1; background:var(--grey-100);
+    border-radius:10px; overflow:hidden; position:relative; cursor:pointer;
+    border:1px solid var(--grey-200);
+  }
+  .photo-tile img{width:100%; height:100%; object-fit:cover; display:block}
+  .photo-tile .ptag{
+    position:absolute; bottom:4px; left:4px; right:4px;
+    background:rgba(11,37,69,.7); color:#fff;
+    padding:3px 6px; border-radius:6px; font-size:10px;
+    display:flex; justify-content:space-between; gap:4px;
+  }
+
+  /* ---- ELECTRICAL ICONS / REBUILDER CANVAS ---- */
+  .canvas-wrap{
+    position:relative; width:100%; aspect-ratio:4/3;
+    background:repeating-linear-gradient(0deg, transparent 0 39px, rgba(11,37,69,.06) 39px 40px),
+               repeating-linear-gradient(90deg, transparent 0 39px, rgba(11,37,69,.06) 39px 40px),
+               var(--white);
+    border:1px solid var(--grey-200); border-radius:12px; overflow:hidden;
+  }
+  .canvas-room{
+    position:absolute; border:2px dashed var(--blue);
+    background:rgba(58,134,255,.06); border-radius:8px;
+    padding:4px 6px;
+  }
+  .canvas-room .room-label{
+    font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase;
+  }
+  .canvas-icon{
+    position:absolute; width:28px; height:28px;
+    border-radius:8px; background:#fff; border:1px solid var(--navy);
+    display:grid; place-items:center; font-size:14px;
+    cursor:grab; transition:transform .1s;
+    box-shadow:0 1px 4px rgba(0,0,0,.1);
+  }
+  .canvas-icon.selected{box-shadow:0 0 0 3px rgba(58,134,255,.4); transform:scale(1.1)}
+  .symbol-palette{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+  .sym-btn{
+    background:var(--grey-50); border:1px solid var(--grey-200);
+    padding:6px 8px; border-radius:8px; cursor:pointer; font-size:13px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .sym-btn:hover{background:var(--blue-soft); border-color:var(--blue)}
+
+  /* ---- TASK TREE ---- */
+  .task-room{margin-bottom:12px}
+  .task-room > .head{
+    display:flex; align-items:center; gap:10px; padding:8px 10px;
+    background:var(--navy); color:#fff; border-radius:10px; cursor:pointer;
+    font-weight:700;
+  }
+  .task-circuit{
+    margin:6px 0 6px 14px; padding-left:8px;
+    border-left:3px solid var(--blue-2);
+  }
+  .task-circuit > .head{padding:6px 8px; color:var(--blue); font-weight:600; cursor:pointer}
+  .task-item{
+    display:flex; align-items:flex-start; gap:8px;
+    background:var(--white); border:1px solid var(--grey-200);
+    border-radius:8px; padding:8px 10px; margin:5px 0;
+  }
+  .task-item.done{background:var(--green-soft); border-color:#bfe5cd}
+  .task-item.issue{background:var(--red-soft); border-color:#f1c4be}
+  .task-item.progress{background:#fff7e0; border-color:#f0d99a}
+  .task-check{
+    width:22px; height:22px; border-radius:6px;
+    border:2px solid var(--grey-300); background:#fff; cursor:pointer;
+    display:grid; place-items:center; font-size:14px; color:#fff;
+    flex:0 0 22px;
+  }
+  .task-check.done{background:var(--green); border-color:var(--green)}
+  .task-sub{margin-left:30px; margin-top:6px; display:none}
+  .task-sub.open{display:block}
+  .sub-row{
+    display:flex; gap:8px; align-items:center;
+    font-size:13px; padding:4px 0; color:var(--text-soft);
+  }
+  .sub-row input[type=checkbox]{width:18px; height:18px; min-height:0}
+
+  /* ---- AI ASSISTANT ---- */
+  .chat{display:flex; flex-direction:column; gap:8px; max-height:280px; overflow:auto; padding:8px; background:var(--grey-50); border-radius:10px}
+  .msg{padding:8px 10px; border-radius:10px; max-width:85%; font-size:14px; line-height:1.4}
+  .msg.user{align-self:flex-end; background:var(--blue-2); color:#fff}
+  .msg.bot{align-self:flex-start; background:#fff; border:1px solid var(--grey-200)}
+
+  /* ---- HELPERS ---- */
+  .right{margin-left:auto}
+  .center{text-align:center}
+  .small{font-size:12px}
+  .tag{display:inline-block; background:var(--grey-100); color:var(--text); padding:2px 7px; border-radius:6px; font-size:11px; margin-right:4px}
+  .divider{height:1px; background:var(--grey-200); margin:14px 0}
+  .empty{padding:24px; text-align:center; color:var(--text-soft); border:1px dashed var(--grey-300); border-radius:12px; background:var(--grey-50)}
+  .badge-status{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px}
+
+  /* sticky page header for sub-pages with back button */
+  .page-bar{
+    display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  }
+  .back-btn{
+    background:var(--white); border:1px solid var(--grey-200); border-radius:10px;
+    padding:8px 10px; cursor:pointer; color:var(--blue); font-weight:600;
+  }
+  .page-title{font-size:18px; font-weight:700; color:var(--navy)}
+
+  /* print styles for handover */
+  @media print{
+    header.app-header, nav.bottom-nav, .fab, .no-print{display:none !important}
+    body{background:#fff; padding:0}
+    .card{box-shadow:none; border:1px solid #ddd; break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<!-- =========================================================
+     LOGIN / USER SELECT
+     ========================================================= -->
+<div id="login-screen" class="login-wrap">
+  <div class="login-card">
+    <div class="brand" style="margin-bottom:12px">
+      <div class="brand-mark">SR</div>
+      <div>
+        <div class="brand-title" style="color:var(--navy); font-size:18px">Site Reviser</div>
+        <div class="brand-sub" style="color:var(--text-soft)">Electrical Site Tracking</div>
+      </div>
+    </div>
+    <p class="muted">Sign in as one of your team. Roles control which screens are read-only. Auth is local-only for now — wire to real auth later.</p>
+    <label>Select user</label>
+    <select id="login-user"></select>
+    <label>Or quick-add yourself</label>
+    <div class="row">
+      <input id="login-newname" placeholder="Display name" />
+      <select id="login-newrole">
+        <option value="admin">Admin</option>
+        <option value="leading">Leading Hand</option>
+        <option value="apprentice">Apprentice</option>
+        <option value="contractor">Contractor</option>
+        <option value="client">Builder / Client (view only)</option>
+      </select>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn block" onclick="doLogin()">Enter Site Reviser</button>
+    </div>
+    <p class="small muted" style="margin-top:14px">Tip: this app saves to your browser. For multi-device sync, connect a backend later (see TODO comments in source).</p>
+  </div>
+</div>
+
+<!-- =========================================================
+     APP SHELL
+     ========================================================= -->
+<div id="app" style="display:none">
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">SR</div>
+      <div>
+        <div class="brand-title">Site Reviser</div>
+        <div class="brand-sub" id="hdr-sub">Electrical Site Tracking</div>
+      </div>
+    </div>
+    <div class="header-spacer"></div>
+    <div class="header-chip site-pill" id="hdr-site" onclick="go('projects')">No site selected</div>
+    <div class="header-chip" id="hdr-user" onclick="go('settings')"></div>
+  </header>
+
+  <main id="main">
+
+    <!-- ===== DASHBOARD ===== -->
+    <section class="page" id="page-dashboard">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0">Dashboard</h2>
+          <span class="muted" id="dash-hello"></span>
+          <div class="right btn-row">
+            <button class="btn" onclick="newProjectModal()">+ New Site</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid cols-4" id="dash-kpis"></div>
+
+      <div class="card">
+        <h3>Active Sites</h3>
+        <div id="dash-sites"></div>
+      </div>
+
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>Recent Photos</h3>
+          <div id="dash-photos" class="photo-grid"></div>
+        </div>
+        <div class="card">
+          <h3>Outstanding Tasks</h3>
+          <div id="dash-tasks"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Material Estimates</h3>
+        <div id="dash-materials"></div>
+      </div>
+    </section>
+
+    <!-- ===== PROJECTS LIST ===== -->
+    <section class="page" id="page-projects">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0">Projects</h2>
+          <div class="right btn-row">
+            <button class="btn" onclick="newProjectModal()">+ New Site</button>
+          </div>
+        </div>
+      </div>
+      <div id="projects-list"></div>
+    </section>
+
+    <!-- ===== PROJECT OVERVIEW ===== -->
+    <section class="page" id="page-project">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('projects')">← Projects</button>
+        <div class="page-title" id="proj-title">Project</div>
+      </div>
+      <div id="project-overview"></div>
+    </section>
+
+    <!-- ===== PLAN UPLOAD ===== -->
+    <section class="page" id="page-plan">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Plan Upload</div>
+      </div>
+      <div id="plan-upload-content"></div>
+    </section>
+
+    <!-- ===== PLAN REBUILDER ===== -->
+    <section class="page" id="page-rebuild">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Plan Rebuilder</div>
+      </div>
+      <div id="rebuild-content"></div>
+    </section>
+
+    <!-- ===== CIRCUIT PLANNER ===== -->
+    <section class="page" id="page-circuits">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Circuit Planner</div>
+      </div>
+      <div id="circuit-content"></div>
+    </section>
+
+    <!-- ===== MAX DEMAND ===== -->
+    <section class="page" id="page-demand">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Maximum Demand</div>
+      </div>
+      <div id="demand-content"></div>
+    </section>
+
+    <!-- ===== MATERIALS ===== -->
+    <section class="page" id="page-materials">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Materials</div>
+      </div>
+      <div id="materials-content"></div>
+    </section>
+
+    <!-- ===== TASKS ===== -->
+    <section class="page" id="page-tasks">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Tasks</div>
+      </div>
+      <div id="tasks-content"></div>
+    </section>
+
+    <!-- ===== PHOTOS ===== -->
+    <section class="page" id="page-photos">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Photos</div>
+      </div>
+      <div id="photos-content"></div>
+    </section>
+
+    <!-- ===== DEFECTS ===== -->
+    <section class="page" id="page-defects">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Defects &amp; Callbacks</div>
+      </div>
+      <div id="defects-content"></div>
+    </section>
+
+    <!-- ===== VARIATIONS ===== -->
+    <section class="page" id="page-variations">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Variations</div>
+      </div>
+      <div id="variations-content"></div>
+    </section>
+
+    <!-- ===== HANDOVER ===== -->
+    <section class="page" id="page-handover">
+      <div class="page-bar no-print">
+        <button class="back-btn" onclick="go('project')">← Project</button>
+        <div class="page-title">Handover Pack</div>
+        <div class="right btn-row">
+          <button class="btn secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+        </div>
+      </div>
+      <div id="handover-content"></div>
+    </section>
+
+    <!-- ===== AI ASSISTANT ===== -->
+    <section class="page" id="page-ai">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('dashboard')">← Dashboard</button>
+        <div class="page-title">AI Assistant <span class="pill amber" style="margin-left:6px">Preview</span></div>
+      </div>
+      <div id="ai-content"></div>
+    </section>
+
+    <!-- ===== SETTINGS / USERS ===== -->
+    <section class="page" id="page-settings">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('dashboard')">← Dashboard</button>
+        <div class="page-title">Settings</div>
+      </div>
+      <div id="settings-content"></div>
+    </section>
+
+  </main>
+
+  <!-- FAB Quick Photo -->
+  <button class="fab" title="Quick photo" onclick="quickPhotoFromFab()">📸</button>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button data-nav="dashboard" onclick="go('dashboard')"><span class="ico">🏠</span><span>Home</span></button>
+    <button data-nav="projects" onclick="go('projects')"><span class="ico">📂</span><span>Sites</span></button>
+    <button data-nav="tasks" onclick="goCurrent('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
+    <button data-nav="photos" onclick="goCurrent('photos')"><span class="ico">📷</span><span>Photos</span></button>
+    <button data-nav="ai" onclick="go('ai')"><span class="ico">🤖</span><span>AI</span></button>
+  </nav>
+
+</div>
+
+<!-- Modal container -->
+<div class="modal-backdrop" id="modal-backdrop"><div class="modal" id="modal"></div></div>
+
+<script>
+/* =========================================================
+   SITE REVISER  —  app.js (inlined)
+   - Pure vanilla JS for portability.
+   - State persisted to localStorage under "siteReviser:v1".
+   - All AI/OCR/PDF/GPS/DB hooks are clearly marked TODO.
+   ========================================================= */
+
+/* ----------------- STATE & SCHEMA ----------------- */
+/*
+   DATA MODEL (one localStorage blob)
+   {
+     users:    [ {id, name, role, color} ],
+     currentUserId: id,
+     projects: [
+        { id, name, address, builder, jobType, notes, startDate, status,
+          createdAt, updatedAt,
+          rooms:    [ {id, name, color} ],
+          devices:  [ {id, roomId, type, label, x, y, circuitId} ],
+          circuits: [ {id, name, type, rating, rooms:[roomId], notes} ],
+          tasks:    [ {id, title, roomId, circuitId, deviceType, status, priority, dueDate, assignedTo, notes,
+                        subtasks: [{key,label,done}] } ],
+          photos:   [ {id, dataUrl, ts, lat, lng, by, notes, tags:[],
+                        stage, roomId, circuitId, deviceId, taskId } ],
+          materials:[ {id, category, item, qty, unit, price, notes, custom} ],
+          defects:  [ {id, title, desc, roomId, taskId, priority, status, assignedTo, notes, before:[photoId], after:[photoId]} ],
+          variations:[ {id, title, desc, roomId, items:[{name,qty,price}], labour, status} ],
+          plan:     { fileName, dataUrl, detected:{gpos,switches,lights,smoke,appliances,data,cameras,boards,rooms,circuits} },
+          demand:   [ {id, room, appliance, watts, qty, diversity, notes} ],
+          asBuiltNotes: ""
+        }
+     ],
+     currentProjectId: id,
+     settings: { theme, brand },
+   }
+   TODO: when wiring a backend, replace persist() with API sync.
+*/
+const STORAGE_KEY = 'siteReviser:v1';
+const ELECTRICAL_SYMBOLS = [
+  {k:'gpo',     label:'GPO',          icon:'🔌'},
+  {k:'gpo2',    label:'Double GPO',   icon:'🔌'},
+  {k:'switch',  label:'Switch',       icon:'⏻'},
+  {k:'sw2',     label:'2-way Sw',     icon:'⇄'},
+  {k:'light',   label:'Light',        icon:'💡'},
+  {k:'down',    label:'Downlight',    icon:'◉'},
+  {k:'smoke',   label:'Smoke',        icon:'🚨'},
+  {k:'data',    label:'Data',         icon:'🖧'},
+  {k:'cam',     label:'Camera',       icon:'📹'},
+  {k:'oven',    label:'Oven',         icon:'🔥'},
+  {k:'cook',    label:'Cooktop',      icon:'♨️'},
+  {k:'ac',      label:'A/C',          icon:'❄️'},
+  {k:'board',   label:'Switchboard',  icon:'⚡'},
+  {k:'fan',     label:'Exh. Fan',     icon:'🌀'},
+  {k:'heater',  label:'Heater',       icon:'♻️'},
+];
+const SYMBOL_BY_KEY = Object.fromEntries(ELECTRICAL_SYMBOLS.map(s=>[s.k,s]));
+
+const ROLE_LABELS = {
+  admin:'Admin', leading:'Leading Hand', apprentice:'Apprentice',
+  contractor:'Contractor', client:'Builder / Client (view only)'
+};
+
+const STAGE_LIST = ['Rough In','Fit Off','Callback','Defect','Completed','Hidden Services','Pre-Plaster','Misc'];
+const PROJECT_STATUSES = ['planning','rough-in','fit-off','callback','completed'];
+const PROJECT_STATUS_LABEL = {
+  'planning':'Planning','rough-in':'Rough-In','fit-off':'Fit-Off','callback':'Callback','completed':'Completed'
+};
+const JOB_TYPES = ['new build','renovation','commercial','residential'];
+
+let DB = loadDB();
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // light migration safety
+      parsed.users     = parsed.users || [];
+      parsed.projects  = parsed.projects || [];
+      parsed.settings  = parsed.settings || {};
+      return parsed;
+    }
+  }catch(e){ console.warn('loadDB failed',e); }
+  // initial seed — gives the user something tangible on first open
+  return seedDB();
+}
+
+function seedDB(){
+  const users = [
+    {id:uid(), name:'Brandon', role:'admin', color:'#1e6091'},
+    {id:uid(), name:'Mick (Leading Hand)', role:'leading', color:'#3a86ff'},
+    {id:uid(), name:'Sam (Apprentice)', role:'apprentice', color:'#2e9c5a'},
+  ];
+  const demoProject = makeDemoProject(users[0].id);
+  return {
+    users,
+    currentUserId: users[0].id,
+    projects: [demoProject],
+    currentProjectId: demoProject.id,
+    settings: { showDisclaimer:true }
+  };
+}
+
+function persist(){
+  // TODO(backend): replace with API sync. Keep local copy for offline.
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
+  catch(e){ console.warn('persist failed', e); }
+}
+
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+function currentUser(){ return DB.users.find(u=>u.id===DB.currentUserId) || null; }
+function currentProject(){ return DB.projects.find(p=>p.id===DB.currentProjectId) || null; }
+function readOnly(){ const u=currentUser(); return u && u.role==='client'; }
+
+/* ----------------- DEMO PROJECT FACTORY ----------------- */
+function makeDemoProject(uId){
+  const rooms = [
+    {id:uid(), name:'Kitchen',    color:'#3a86ff'},
+    {id:uid(), name:'Lounge',     color:'#2e9c5a'},
+    {id:uid(), name:'Bedroom 1',  color:'#d98e00'},
+    {id:uid(), name:'Bathroom',   color:'#c0392b'},
+  ];
+  const circuits = [
+    {id:uid(), name:'C1 Lighting',  type:'lighting', rating:10, rooms:[rooms[0].id,rooms[1].id,rooms[2].id,rooms[3].id], notes:''},
+    {id:uid(), name:'C2 GPOs',      type:'power',    rating:20, rooms:[rooms[0].id,rooms[1].id,rooms[2].id], notes:''},
+    {id:uid(), name:'C3 Oven',      type:'oven',     rating:32, rooms:[rooms[0].id], notes:''},
+    {id:uid(), name:'C4 Cooktop',   type:'cooktop',  rating:32, rooms:[rooms[0].id], notes:''},
+    {id:uid(), name:'C5 Smoke',     type:'smoke alarm', rating:6, rooms:rooms.map(r=>r.id), notes:'Interlinked'},
+  ];
+  const devices = [
+    {id:uid(), roomId:rooms[0].id, type:'gpo2',   label:'Fridge GPO',     x:20, y:20, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[0].id, type:'gpo2',   label:'Dishwasher GPO', x:50, y:25, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[0].id, type:'gpo2',   label:'Island GPO',     x:30, y:60, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[0].id, type:'down',   label:'Down 1',         x:25, y:50, circuitId:circuits[0].id},
+    {id:uid(), roomId:rooms[0].id, type:'down',   label:'Down 2',         x:50, y:50, circuitId:circuits[0].id},
+    {id:uid(), roomId:rooms[0].id, type:'oven',   label:'Oven',           x:60, y:35, circuitId:circuits[2].id},
+    {id:uid(), roomId:rooms[0].id, type:'cook',   label:'Cooktop',        x:65, y:55, circuitId:circuits[3].id},
+    {id:uid(), roomId:rooms[0].id, type:'smoke',  label:'Smoke',          x:40, y:10, circuitId:circuits[4].id},
+    {id:uid(), roomId:rooms[1].id, type:'gpo2',   label:'TV GPO',         x:20, y:30, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[1].id, type:'down',   label:'Down 1',         x:30, y:50, circuitId:circuits[0].id},
+    {id:uid(), roomId:rooms[1].id, type:'switch', label:'Light SW',       x:10, y:20, circuitId:circuits[0].id},
+    {id:uid(), roomId:rooms[2].id, type:'gpo2',   label:'Bed L GPO',      x:20, y:40, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[2].id, type:'gpo2',   label:'Bed R GPO',      x:60, y:40, circuitId:circuits[1].id},
+    {id:uid(), roomId:rooms[3].id, type:'light',  label:'Bath light',     x:50, y:30, circuitId:circuits[0].id},
+    {id:uid(), roomId:rooms[3].id, type:'fan',    label:'Exh fan',        x:60, y:30, circuitId:circuits[0].id},
+  ];
+  return {
+    id:uid(),
+    name:'24 Example St — New Build',
+    address:'24 Example St, Mornington VIC',
+    builder:'Demo Builders Pty Ltd',
+    jobType:'new build',
+    notes:'Demo project — feel free to edit or delete.',
+    startDate: new Date().toISOString().slice(0,10),
+    status:'rough-in',
+    createdAt: Date.now(), updatedAt: Date.now(),
+    rooms, circuits, devices,
+    tasks: buildAutoTasks(rooms,circuits,devices),
+    photos: [],
+    materials: buildAutoMaterials(devices,circuits),
+    defects: [],
+    variations: [],
+    plan: null,
+    demand: [
+      {id:uid(), room:'Kitchen', appliance:'Oven', watts:3600, qty:1, diversity:'100%', notes:''},
+      {id:uid(), room:'Kitchen', appliance:'Cooktop', watts:7200, qty:1, diversity:'80%', notes:'AS/NZS 3000 — Table C2'},
+      {id:uid(), room:'Whole house', appliance:'GPO outlets', watts:2400, qty:1, diversity:'1st 10A', notes:''},
+    ],
+    asBuiltNotes:''
+  };
+}
+
+/* ----------------- AUTO TASKS / MATERIALS ----------------- */
+function buildAutoTasks(rooms, circuits, devices){
+  const tasks = [];
+  devices.forEach(d=>{
+    const sym = SYMBOL_BY_KEY[d.type];
+    tasks.push({
+      id: uid(),
+      title: d.label || (sym?sym.label:'Device'),
+      roomId: d.roomId,
+      circuitId: d.circuitId,
+      deviceType: d.type,
+      status: 'not-started',
+      priority: 'normal',
+      dueDate: '',
+      assignedTo: '',
+      notes: '',
+      photos: [],
+      subtasks: defaultSubtasks()
+    });
+  });
+  return tasks;
+}
+function defaultSubtasks(){
+  return [
+    {key:'cable',   label:'Cable run complete',    done:false},
+    {key:'box',     label:'Box installed',         done:false},
+    {key:'label',   label:'Labelled',              done:false},
+    {key:'test',    label:'Tested/checked',        done:false},
+    {key:'photo',   label:'Photo uploaded',        done:false},
+    {key:'fitoff',  label:'Fit-off completed',     done:false},
+  ];
+}
+function buildAutoMaterials(devices, circuits){
+  // Roll up device counts into material lines
+  const count = {};
+  devices.forEach(d=>{ count[d.type] = (count[d.type]||0)+1; });
+  const lines = [];
+  const add = (category,item,qty,unit,price=0,notes='')=> lines.push({id:uid(),category,item,qty,unit,price,notes,custom:false});
+  add('Outlets','Double GPO white',     count.gpo2||0,'ea',8.50);
+  add('Outlets','Single GPO white',     count.gpo||0,'ea',7.00);
+  add('Switches','Single switch mech',  (count.switch||0)+(count.sw2||0),'ea',5.50);
+  add('Lighting','Downlight LED 90mm',  count.down||0,'ea',24.00);
+  add('Lighting','Batten / oyster light',count.light||0,'ea',32.00);
+  add('Safety','Smoke alarm (interlinked)', count.smoke||0,'ea',55.00);
+  add('Data','Cat6 data point',         count.data||0,'ea',18.00);
+  add('Security','Camera (4MP)',        count.cam||0,'ea',180.00);
+  add('Cable','TPS 2.5mm twin+earth',   200,'m',2.40,'Estimate — measure on site');
+  add('Cable','TPS 1.5mm twin+earth',   150,'m',1.80,'Estimate — measure on site');
+  add('Cable','TPS 6mm twin+earth (cooktop)', 10,'m',6.20);
+  add('Cable','Cat6 data cable',        80,'m',1.40);
+  add('Accessories','Cable clips (box)',1,'box',9.00);
+  add('Accessories','Conduit 20mm (length)',6,'len',8.50);
+  add('Switchboard','RCBO 16A',         circuits.length, 'ea',38.00);
+  add('Switchboard','Main switch 63A',  1,'ea',45.00);
+  add('Misc','Junction box',            5,'ea',4.00);
+  add('Misc','Cable labels',            1,'pack',12.00);
+  return lines;
+}
+
+/* ----------------- ROUTING ----------------- */
+const PAGE_NAV_MAP = {
+  dashboard:'dashboard', projects:'projects', tasks:'tasks',
+  photos:'photos', ai:'ai'
+};
+function go(page, opts){
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  const el = document.getElementById('page-'+page);
+  if(el) el.classList.add('active');
+  // bottom-nav highlight
+  document.querySelectorAll('nav.bottom-nav button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.nav===page);
+  });
+  // render
+  switch(page){
+    case 'dashboard':  renderDashboard();  break;
+    case 'projects':   renderProjects();   break;
+    case 'project':    renderProject();    break;
+    case 'plan':       renderPlanUpload(); break;
+    case 'rebuild':    renderRebuild();    break;
+    case 'circuits':   renderCircuits();   break;
+    case 'demand':     renderDemand();     break;
+    case 'materials':  renderMaterials();  break;
+    case 'tasks':      renderTasks();      break;
+    case 'photos':     renderPhotos();     break;
+    case 'defects':    renderDefects();    break;
+    case 'variations': renderVariations(); break;
+    case 'handover':   renderHandover();   break;
+    case 'ai':         renderAI();         break;
+    case 'settings':   renderSettings();   break;
+  }
+  window.scrollTo({top:0, behavior:'instant'});
+  location.hash = '#'+page;
+}
+function goCurrent(page){
+  if(!currentProject()){ go('projects'); return; }
+  go(page);
+}
+
+/* ----------------- LOGIN ----------------- */
+function bootLogin(){
+  const sel = document.getElementById('login-user');
+  sel.innerHTML = DB.users.map(u=>`<option value="${u.id}">${escapeHtml(u.name)} — ${ROLE_LABELS[u.role]||u.role}</option>`).join('');
+  if(DB.currentUserId) sel.value = DB.currentUserId;
+}
+function doLogin(){
+  const newName = document.getElementById('login-newname').value.trim();
+  const newRole = document.getElementById('login-newrole').value;
+  if(newName){
+    const u = {id:uid(), name:newName, role:newRole, color:'#3a86ff'};
+    DB.users.push(u);
+    DB.currentUserId = u.id;
+  } else {
+    DB.currentUserId = document.getElementById('login-user').value || (DB.users[0] && DB.users[0].id);
+  }
+  persist();
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='';
+  refreshHeader();
+  go('dashboard');
+}
+function refreshHeader(){
+  const u = currentUser();
+  document.getElementById('hdr-user').innerHTML = u
+    ? `<span>👤</span><span>${escapeHtml(u.name)}</span><span class="pill blue" style="margin-left:6px">${ROLE_LABELS[u.role]||u.role}</span>`
+    : '';
+  const p = currentProject();
+  const sitePill = document.getElementById('hdr-site');
+  if(p){ sitePill.innerHTML = '📍 '+escapeHtml(p.name); }
+  else  { sitePill.innerHTML = 'No site selected'; }
+}
+
+/* ----------------- ESCAPE HELPER ----------------- */
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* Pages render functions are defined below in app modules.
+   They are added at the bottom of this script tag. */
+
+/* ----------------- BOOT ----------------- */
+window.addEventListener('DOMContentLoaded', ()=>{
+  bootLogin();
+  // auto-login if a current user exists already
+  if(DB.currentUserId && DB.users.some(u=>u.id===DB.currentUserId)){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='';
+    refreshHeader();
+    const hash = (location.hash||'').replace('#','');
+    go(hash && document.getElementById('page-'+hash) ? hash : 'dashboard');
+  }
+});
+</script>
+
+<!-- App modules appended in subsequent script tags so the file stays readable -->
+<script id="mod-dashboard">
+/* ===== DASHBOARD ===== */
+function renderDashboard(){
+  const u = currentUser();
+  document.getElementById('dash-hello').textContent = u ? `· G'day ${u.name.split(' ')[0]}` : '';
+
+  // KPIs
+  const projects = DB.projects;
+  const active = projects.filter(p=>p.status!=='completed');
+  const totalTasks = projects.reduce((n,p)=>n+p.tasks.length,0);
+  const doneTasks  = projects.reduce((n,p)=>n+p.tasks.filter(t=>t.status==='done').length,0);
+  const allPhotos  = projects.reduce((n,p)=>n+p.photos.length,0);
+  const callbacks  = projects.reduce((n,p)=>n+p.defects.filter(d=>d.status!=='done').length,0);
+
+  document.getElementById('dash-kpis').innerHTML = `
+    ${kpi('Active Sites', active.length, '📂')}
+    ${kpi('Open Tasks', totalTasks-doneTasks, '✅')}
+    ${kpi('Photos', allPhotos, '📷')}
+    ${kpi('Callbacks', callbacks, '⚠️')}
+  `;
+
+  // Active sites cards with progress bars
+  const sitesEl = document.getElementById('dash-sites');
+  if(!active.length){
+    sitesEl.innerHTML = `<div class="empty">No active sites. <button class="btn sm" onclick="newProjectModal()">+ New Site</button></div>`;
+  } else {
+    sitesEl.innerHTML = active.map(p=>{
+      const pr = progressFor(p);
+      return `
+        <div class="list-row" onclick="openProject('${p.id}')" style="cursor:pointer">
+          <div style="font-size:24px">${jobIcon(p.jobType)}</div>
+          <div class="grow">
+            <div class="title">${escapeHtml(p.name)} <span class="pill ${statusPill(p.status)}" style="margin-left:6px">${PROJECT_STATUS_LABEL[p.status]||p.status}</span></div>
+            <div class="sub">${escapeHtml(p.address||'')} · ${escapeHtml(p.builder||'')}</div>
+            <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap">
+              ${bar('Rough-In', pr.rough)}
+              ${bar('Fit-Off', pr.fit)}
+              ${bar('Callbacks', pr.callback,'red')}
+            </div>
+          </div>
+          <div>›</div>
+        </div>`;
+    }).join('');
+  }
+
+  // Recent photos
+  const allPhotosFlat = [];
+  projects.forEach(p=> p.photos.forEach(ph=> allPhotosFlat.push({...ph, projectId:p.id, projectName:p.name})));
+  allPhotosFlat.sort((a,b)=>b.ts-a.ts);
+  const recent = allPhotosFlat.slice(0,8);
+  const photosEl = document.getElementById('dash-photos');
+  if(!recent.length){
+    photosEl.innerHTML = `<div class="empty" style="grid-column:1/-1">No photos yet. Open a project and tap 📸.</div>`;
+  } else {
+    photosEl.innerHTML = recent.map(ph=>`
+      <div class="photo-tile" title="${escapeHtml(ph.notes||'')}" onclick="openProject('${ph.projectId}','photos')">
+        <img src="${ph.dataUrl}" alt="" />
+        <div class="ptag"><span>${escapeHtml(ph.stage||'')}</span><span>${new Date(ph.ts).toLocaleDateString()}</span></div>
+      </div>`).join('');
+  }
+
+  // Outstanding tasks
+  const allTasks = [];
+  projects.forEach(p=> p.tasks.forEach(t=> allTasks.push({...t, projectId:p.id, projectName:p.name})));
+  const pending = allTasks.filter(t=>t.status!=='done').slice(0,8);
+  const tasksEl = document.getElementById('dash-tasks');
+  if(!pending.length){
+    tasksEl.innerHTML = `<div class="empty">No outstanding tasks. 🎉</div>`;
+  } else {
+    tasksEl.innerHTML = pending.map(t=>{
+      const project = DB.projects.find(p=>p.id===t.projectId);
+      const room = project?.rooms.find(r=>r.id===t.roomId);
+      return `
+        <div class="list-row" onclick="openProject('${t.projectId}','tasks')" style="cursor:pointer">
+          <div style="font-size:18px">${SYMBOL_BY_KEY[t.deviceType]?.icon || '🔧'}</div>
+          <div class="grow">
+            <div class="title">${escapeHtml(t.title)}</div>
+            <div class="sub">${escapeHtml(t.projectName)} · ${escapeHtml(room?.name||'')}</div>
+          </div>
+          <span class="pill ${statusPillTask(t.status)}">${escapeHtml(taskStatusLabel(t.status))}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // Material estimates
+  const matsEl = document.getElementById('dash-materials');
+  const totals = {};
+  let grand = 0;
+  projects.forEach(p=> p.materials.forEach(m=>{
+    totals[m.category] = (totals[m.category]||0) + (m.qty*(m.price||0));
+    grand += m.qty*(m.price||0);
+  }));
+  const categories = Object.keys(totals);
+  if(!categories.length){
+    matsEl.innerHTML = `<div class="empty">No materials yet.</div>`;
+  } else {
+    matsEl.innerHTML = `
+      <div class="grid cols-3">
+        ${categories.map(c=>`
+          <div class="card" style="margin:0">
+            <div class="muted small">${escapeHtml(c)}</div>
+            <div style="font-size:18px; font-weight:700; color:var(--navy)">$${totals[c].toFixed(2)}</div>
+          </div>`).join('')}
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div class="muted">Estimated material total across all projects</div>
+        <div style="font-size:22px; font-weight:800; color:var(--navy)">$${grand.toFixed(2)}</div>
+      </div>
+      <div class="small muted" style="margin-top:6px">Indicative only — confirm pricing with your supplier.</div>`;
+  }
+}
+
+function kpi(label,val,emoji){
+  return `<div class="card" style="margin:0">
+    <div class="muted small">${emoji} ${label}</div>
+    <div style="font-size:24px; font-weight:800; color:var(--navy); line-height:1.1">${val}</div>
+  </div>`;
+}
+function jobIcon(t){
+  return ({'new build':'🏠','renovation':'🔨','commercial':'🏢','residential':'🏡'})[t]||'📋';
+}
+function statusPill(s){
+  return ({'planning':'amber','rough-in':'blue','fit-off':'blue','callback':'red','completed':'green'})[s]||'';
+}
+function statusPillTask(s){
+  return ({'done':'green','in-progress':'amber','issue':'red'})[s]||'';
+}
+function taskStatusLabel(s){
+  return ({'not-started':'Not started','in-progress':'In progress','done':'Completed','issue':'Issue'})[s]||s;
+}
+function progressFor(p){
+  const tasks = p.tasks||[];
+  const cnt = (filter)=>{
+    const list = tasks.filter(filter);
+    if(!list.length) return 0;
+    const done = list.filter(t=>t.status==='done').length;
+    return Math.round((done/list.length)*100);
+  };
+  return {
+    rough: cnt(t=>!['done'].includes(t.status) || t.status==='done'), // all tasks
+    fit:   cnt(t=> t.subtasks?.find(s=>s.key==='fitoff')?.done || t.status==='done'),
+    callback: p.defects && p.defects.length
+              ? Math.round((p.defects.filter(d=>d.status==='done').length/p.defects.length)*100)
+              : 100
+  };
+}
+function bar(label,pct,color){
+  return `<div style="flex:1; min-width:130px">
+    <div class="small muted" style="display:flex; justify-content:space-between"><span>${label}</span><span>${pct}%</span></div>
+    <div class="progress ${color||''}"><i style="width:${pct}%"></i></div>
+  </div>`;
+}
+</script>
+
+<script id="mod-projects">
+/* ===== PROJECTS ===== */
+function renderProjects(){
+  const el = document.getElementById('projects-list');
+  if(!DB.projects.length){
+    el.innerHTML = `<div class="card empty">No projects yet. Tap <b>+ New Site</b> above.</div>`;
+    return;
+  }
+  el.innerHTML = DB.projects.map(p=>`
+    <div class="card" style="cursor:pointer" onclick="openProject('${p.id}')">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-size:28px">${jobIcon(p.jobType)}</div>
+        <div style="flex:1">
+          <div style="font-weight:700; font-size:16px">${escapeHtml(p.name)}</div>
+          <div class="muted small">${escapeHtml(p.address||'')}</div>
+          <div class="small">${escapeHtml(p.builder||'')} · started ${escapeHtml(p.startDate||'—')}</div>
+        </div>
+        <span class="pill ${statusPill(p.status)}">${PROJECT_STATUS_LABEL[p.status]||p.status}</span>
+      </div>
+    </div>`).join('');
+}
+function openProject(id, page){
+  DB.currentProjectId = id;
+  persist();
+  refreshHeader();
+  go(page || 'project');
+}
+
+function newProjectModal(p){
+  if(readOnly()){ alert('Read-only role.'); return; }
+  const editing = !!p;
+  p = p || {
+    id:'', name:'', address:'', builder:'', jobType:'new build',
+    notes:'', startDate: new Date().toISOString().slice(0,10),
+    status:'planning'
+  };
+  openModal(`
+    <h2>${editing?'Edit Site':'New Site'}</h2>
+    <label>Site name</label>
+    <input id="np-name" value="${escapeHtml(p.name)}" placeholder="e.g. 24 Example St" />
+    <label>Address</label>
+    <input id="np-addr" value="${escapeHtml(p.address)}" placeholder="Street, Suburb" />
+    <label>Builder / Client</label>
+    <input id="np-builder" value="${escapeHtml(p.builder)}" placeholder="Builder or client name" />
+    <div class="row">
+      <div>
+        <label>Job type</label>
+        <select id="np-jt">
+          ${JOB_TYPES.map(t=>`<option value="${t}" ${t===p.jobType?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="np-st">
+          ${PROJECT_STATUSES.map(s=>`<option value="${s}" ${s===p.status?'selected':''}>${PROJECT_STATUS_LABEL[s]}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Start date</label>
+        <input type="date" id="np-date" value="${escapeHtml(p.startDate)}"/>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="np-notes" placeholder="Site notes, gate codes, access info...">${escapeHtml(p.notes)}</textarea>
+    <div class="actions">
+      ${editing?`<button class="btn danger" onclick="deleteProject('${p.id}')">Delete</button>`:''}
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveProject('${p.id}')">${editing?'Save':'Create site'}</button>
+    </div>
+  `);
+}
+function saveProject(id){
+  const name = document.getElementById('np-name').value.trim();
+  if(!name){ alert('Site name required'); return; }
+  const data = {
+    name,
+    address: document.getElementById('np-addr').value.trim(),
+    builder: document.getElementById('np-builder').value.trim(),
+    jobType: document.getElementById('np-jt').value,
+    status:  document.getElementById('np-st').value,
+    startDate: document.getElementById('np-date').value,
+    notes:   document.getElementById('np-notes').value,
+    updatedAt: Date.now()
+  };
+  let p;
+  if(id){
+    p = DB.projects.find(x=>x.id===id);
+    Object.assign(p, data);
+  } else {
+    p = {
+      id: uid(),
+      ...data,
+      createdAt: Date.now(),
+      rooms:[], devices:[], circuits:[], tasks:[], photos:[],
+      materials:[], defects:[], variations:[], plan:null, demand:[],
+      asBuiltNotes:''
+    };
+    DB.projects.push(p);
+    DB.currentProjectId = p.id;
+  }
+  persist(); closeModal(); refreshHeader();
+  go(id ? 'project' : 'plan');
+}
+function deleteProject(id){
+  if(!confirm('Delete this project and all its data?')) return;
+  DB.projects = DB.projects.filter(p=>p.id!==id);
+  if(DB.currentProjectId===id) DB.currentProjectId = DB.projects[0]?.id || null;
+  persist(); closeModal(); refreshHeader();
+  go('projects');
+}
+</script>
+
+<script id="mod-project-overview">
+/* ===== PROJECT OVERVIEW ===== */
+function renderProject(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  document.getElementById('proj-title').textContent = p.name;
+  const pr = progressFor(p);
+  const el = document.getElementById('project-overview');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap">
+        <div style="font-size:36px">${jobIcon(p.jobType)}</div>
+        <div style="flex:1; min-width:240px">
+          <div style="font-weight:700; font-size:18px">${escapeHtml(p.name)}</div>
+          <div class="muted">${escapeHtml(p.address||'')}</div>
+          <div class="small">${escapeHtml(p.builder||'')} · ${escapeHtml(p.jobType)} · started ${escapeHtml(p.startDate||'—')}</div>
+          <div style="margin-top:8px">
+            <span class="pill ${statusPill(p.status)}">${PROJECT_STATUS_LABEL[p.status]||p.status}</span>
+            <span class="pill">${p.rooms.length} rooms</span>
+            <span class="pill">${p.devices.length} devices</span>
+            <span class="pill">${p.circuits.length} circuits</span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn secondary sm" onclick='newProjectModal(${JSON.stringify(p).replace(/'/g,"&#39;")})'>✏️ Edit</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="row">
+        ${bar('Rough-In',pr.rough)}
+        ${bar('Fit-Off',pr.fit,'green')}
+        ${bar('Callbacks',pr.callback,'red')}
+      </div>
+      ${p.notes ? `<div class="card" style="background:var(--grey-50); margin-top:10px"><div class="muted small">Notes</div>${escapeHtml(p.notes)}</div>`:''}
+    </div>
+
+    <div class="grid cols-3" id="project-menu">
+      ${menuTile('plan','📐','Plan Upload','Upload &amp; mock-AI detect')}
+      ${menuTile('rebuild','🗺️','Plan Rebuilder','Clean simplified plan')}
+      ${menuTile('circuits','⚡','Circuits','Group devices to circuits')}
+      ${menuTile('demand','📊','Max Demand','Load calculator')}
+      ${menuTile('materials','📦','Materials','Auto-generated list')}
+      ${menuTile('tasks','✅','Tasks','Room &amp; circuit checklists')}
+      ${menuTile('photos','📷','Photos','Site documentation')}
+      ${menuTile('defects','⚠️','Defects &amp; Callbacks','Issue tracking')}
+      ${menuTile('variations','💲','Variations','Extra work tracker')}
+      ${menuTile('handover','📜','Handover Pack','Final compile')}
+    </div>
+  `;
+}
+function menuTile(target,icon,title,sub){
+  return `<div class="card" style="margin:0; cursor:pointer" onclick="go('${target}')">
+    <div style="font-size:30px">${icon}</div>
+    <div style="font-weight:700">${title}</div>
+    <div class="muted small">${sub}</div>
+  </div>`;
+}
+</script>
+
+<script id="mod-plan-upload">
+/* ===== PLAN UPLOAD ===== */
+function renderPlanUpload(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('plan-upload-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Upload Plan</h3>
+      <p class="muted">PDF, PNG or JPG accepted. <b>Best results require flat scanned plans.</b> Photos taken at an angle, with shadows, or partial pages will reduce detection accuracy.</p>
+      <input type="file" id="plan-file" accept=".pdf,image/*" />
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" onclick="handlePlanUpload()">Upload &amp; analyse</button>
+        ${p.plan ? `<button class="btn secondary" onclick="clearPlan()">Remove current plan</button>`:''}
+      </div>
+      ${p.plan ? `
+        <div class="divider"></div>
+        <div class="muted small">Current plan: <b>${escapeHtml(p.plan.fileName||'')}</b></div>
+        ${p.plan.dataUrl?.startsWith('data:image') ? `<img src="${p.plan.dataUrl}" style="width:100%;max-height:380px;object-fit:contain; border-radius:10px; border:1px solid var(--grey-200); margin-top:6px"/>`:''}
+      `:''}
+    </div>
+
+    <div class="card">
+      <h3>AI Detection <span class="pill amber">Mock</span></h3>
+      <p class="muted">Detected items below are placeholders. Confirm or edit before they flow into circuits, tasks and materials. <i>TODO: wire to a real plan-parsing model.</i></p>
+      <div id="ai-detected"></div>
+    </div>
+  `;
+  renderAIDetected();
+}
+function clearPlan(){
+  if(!confirm('Remove uploaded plan?')) return;
+  const p = currentProject(); p.plan = null; persist(); renderPlanUpload();
+}
+function handlePlanUpload(){
+  const f = document.getElementById('plan-file').files[0];
+  if(!f){ alert('Choose a file first.'); return; }
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const p = currentProject();
+    p.plan = { fileName: f.name, dataUrl: e.target.result, detected: makeMockDetections(p) };
+    persist();
+    renderPlanUpload();
+  };
+  reader.readAsDataURL(f);
+}
+function makeMockDetections(p){
+  // TODO(AI): replace with real CV/plan-recognition output.
+  // We generate sensible mock counts from the demo data so the UX is real.
+  const counts = {
+    gpos: 14, switches: 9, lights: 11, smoke: 3,
+    appliances: 4, data: 5, cameras: 2, board: 1, rooms: 6, circuits: 5
+  };
+  return counts;
+}
+function renderAIDetected(){
+  const p = currentProject();
+  const det = (p.plan && p.plan.detected) || {
+    gpos:0,switches:0,lights:0,smoke:0,appliances:0,data:0,cameras:0,board:0,rooms:p.rooms.length,circuits:p.circuits.length
+  };
+  const items = [
+    {k:'gpos',label:'GPOs',icon:'🔌'},
+    {k:'switches',label:'Switches',icon:'⏻'},
+    {k:'lights',label:'Lights',icon:'💡'},
+    {k:'smoke',label:'Smoke alarms',icon:'🚨'},
+    {k:'appliances',label:'Appliances',icon:'🔥'},
+    {k:'data',label:'Data points',icon:'🖧'},
+    {k:'cameras',label:'Cameras',icon:'📹'},
+    {k:'board',label:'Switchboard',icon:'⚡'},
+    {k:'rooms',label:'Rooms',icon:'🏷️'},
+    {k:'circuits',label:'Circuits',icon:'➰'},
+  ];
+  document.getElementById('ai-detected').innerHTML = `
+    <div class="grid cols-3">
+      ${items.map(i=>`
+        <div class="card" style="margin:0">
+          <div style="display:flex; align-items:center; gap:8px">
+            <div style="font-size:22px">${i.icon}</div>
+            <div style="flex:1">
+              <div style="font-weight:600">${i.label}</div>
+              <div class="muted small">Detected ${det[i.k]||0}</div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn secondary sm" onclick="adjustDet('${i.k}',-1)">−</button>
+            <button class="btn secondary sm" onclick="adjustDet('${i.k}',1)">+</button>
+            <button class="btn sm" onclick="acceptDet('${i.k}')">Confirm</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+function adjustDet(k,delta){
+  const p = currentProject();
+  p.plan = p.plan || {fileName:'(none)', dataUrl:'', detected:{}};
+  p.plan.detected[k] = Math.max(0,(p.plan.detected[k]||0)+delta);
+  persist(); renderAIDetected();
+}
+function acceptDet(k){
+  // Mark this detection group as confirmed by adding/normalising into materials estimate.
+  // TODO(AI): properly link detected coords back to devices + rooms.
+  const p = currentProject();
+  alert('Confirmed '+k+'. Wire this up to spawn devices/tasks for each detection in production.');
+}
+</script>
+
+<script id="mod-rebuilder">
+/* ===== PLAN REBUILDER ===== */
+function renderRebuild(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('rebuild-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Plan Rebuilder <span class="pill amber">Preview</span></h3>
+      <p class="muted">Drag devices around the floor. Use the palette below to add new icons. Tap an icon to assign room/circuit or delete.</p>
+      <div class="symbol-palette" id="symbol-palette">
+        ${ELECTRICAL_SYMBOLS.map(s=>`<button class="sym-btn" onclick="addIconToPlan('${s.k}')">${s.icon} ${s.label}</button>`).join('')}
+      </div>
+      <div class="canvas-wrap" id="rebuild-canvas"></div>
+      <div class="small muted" style="margin-top:6px">Tip: each room can be coloured by circuit. Add rooms in Settings → Rooms or directly via "+ Room" below.</div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn secondary" onclick="addRoomToPlan()">+ Room</button>
+        <button class="btn ghost" onclick="autoLayoutRooms()">Auto-layout rooms</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Circuit Colour Key</h3>
+      <div id="circuit-legend" class="row"></div>
+    </div>
+  `;
+  renderCanvas();
+  renderLegend();
+}
+function renderLegend(){
+  const p = currentProject();
+  document.getElementById('circuit-legend').innerHTML =
+    p.circuits.map(c=>`<div class="card" style="margin:0; flex:1 1 160px">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="width:14px;height:14px;border-radius:4px;background:${circuitColor(c)}"></span>
+          <b>${escapeHtml(c.name)}</b>
+        </div>
+        <div class="muted small">${escapeHtml(c.type)}</div>
+      </div>`).join('') || '<div class="empty">No circuits yet — add in Circuit Planner.</div>';
+}
+function circuitColor(c){
+  const palette = ['#3a86ff','#2e9c5a','#d98e00','#c0392b','#9b59b6','#16a085','#34495e','#e67e22'];
+  const idx = (currentProject().circuits.findIndex(x=>x.id===c.id)+8)%palette.length;
+  return palette[idx];
+}
+function renderCanvas(){
+  const p = currentProject();
+  const cv = document.getElementById('rebuild-canvas');
+  cv.innerHTML = '';
+  // Auto-place rooms if none have x,y (we fake a grid for visual layout)
+  const cols = 3;
+  p.rooms.forEach((r,i)=>{
+    if(r.x==null){ r.x = (i%cols)*33+1;  r.y = Math.floor(i/cols)*45+2; r.w = 32; r.h = 42; }
+    const div = document.createElement('div');
+    div.className = 'canvas-room';
+    div.style.left = r.x+'%';
+    div.style.top  = r.y+'%';
+    div.style.width  = (r.w||32)+'%';
+    div.style.height = (r.h||42)+'%';
+    div.style.borderColor = r.color || '#3a86ff';
+    div.innerHTML = `<div class="room-label" style="color:${r.color||'#3a86ff'}">${escapeHtml(r.name)}</div>`;
+    cv.appendChild(div);
+  });
+  p.devices.forEach(d=>{
+    const sym = SYMBOL_BY_KEY[d.type];
+    const ic = document.createElement('div');
+    ic.className = 'canvas-icon';
+    ic.dataset.id = d.id;
+    const c = p.circuits.find(c=>c.id===d.circuitId);
+    if(c){ ic.style.borderColor = circuitColor(c); }
+    ic.style.left = (d.x||10)+'%';
+    ic.style.top  = (d.y||10)+'%';
+    ic.title = `${d.label||sym?.label||''} — ${c?c.name:'no circuit'}`;
+    ic.innerHTML = sym?sym.icon:'?';
+    ic.onclick = (e)=>{ e.stopPropagation(); editDeviceModal(d.id); };
+    enableDrag(ic, d);
+    cv.appendChild(ic);
+  });
+}
+function enableDrag(el,device){
+  let dragging=false;
+  el.addEventListener('pointerdown',e=>{
+    dragging=true; el.setPointerCapture(e.pointerId); el.style.cursor='grabbing';
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!dragging) return;
+    const cv = el.parentElement.getBoundingClientRect();
+    device.x = Math.max(0,Math.min(95, ((e.clientX-cv.left)/cv.width)*100));
+    device.y = Math.max(0,Math.min(92, ((e.clientY-cv.top)/cv.height)*100));
+    el.style.left = device.x+'%';
+    el.style.top  = device.y+'%';
+  });
+  el.addEventListener('pointerup',e=>{
+    if(dragging){ dragging=false; el.style.cursor='grab'; persist(); }
+  });
+}
+function addIconToPlan(type){
+  const p = currentProject();
+  if(!p.rooms.length){ alert('Add a room first.'); return; }
+  const sym = SYMBOL_BY_KEY[type];
+  const d = {
+    id: uid(), type, label: sym.label,
+    roomId: p.rooms[0].id, x: 10, y: 10,
+    circuitId: p.circuits[0]?.id || ''
+  };
+  p.devices.push(d);
+  p.tasks.push({
+    id:uid(), title: sym.label,
+    roomId:d.roomId, circuitId:d.circuitId, deviceType:type,
+    status:'not-started', priority:'normal', dueDate:'', assignedTo:'',
+    notes:'', photos:[], subtasks: defaultSubtasks()
+  });
+  persist(); renderCanvas();
+}
+function addRoomToPlan(){
+  const name = prompt('Room name?');
+  if(!name) return;
+  const p = currentProject();
+  p.rooms.push({id:uid(), name, color:'#3a86ff'});
+  persist(); renderCanvas(); renderLegend();
+}
+function autoLayoutRooms(){
+  const p = currentProject();
+  p.rooms.forEach(r=>{ delete r.x; delete r.y; });
+  persist(); renderCanvas();
+}
+function editDeviceModal(id){
+  const p = currentProject();
+  const d = p.devices.find(x=>x.id===id);
+  if(!d) return;
+  openModal(`
+    <h2>Edit Device</h2>
+    <label>Label</label>
+    <input id="ed-label" value="${escapeHtml(d.label||'')}" />
+    <label>Type</label>
+    <select id="ed-type">
+      ${ELECTRICAL_SYMBOLS.map(s=>`<option value="${s.k}" ${s.k===d.type?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
+    </select>
+    <label>Room</label>
+    <select id="ed-room">
+      ${p.rooms.map(r=>`<option value="${r.id}" ${r.id===d.roomId?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}
+    </select>
+    <label>Circuit</label>
+    <select id="ed-circ">
+      <option value="">(none)</option>
+      ${p.circuits.map(c=>`<option value="${c.id}" ${c.id===d.circuitId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>
+    <div class="actions">
+      <button class="btn danger" onclick="deleteDevice('${id}')">Delete</button>
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveDevice('${id}')">Save</button>
+    </div>`);
+}
+function saveDevice(id){
+  const p = currentProject();
+  const d = p.devices.find(x=>x.id===id);
+  d.label = document.getElementById('ed-label').value;
+  d.type  = document.getElementById('ed-type').value;
+  d.roomId= document.getElementById('ed-room').value;
+  d.circuitId = document.getElementById('ed-circ').value;
+  persist(); closeModal(); renderCanvas();
+}
+function deleteDevice(id){
+  if(!confirm('Delete this device?')) return;
+  const p = currentProject();
+  p.devices = p.devices.filter(d=>d.id!==id);
+  // also remove auto-tasks pointing at it
+  persist(); closeModal(); renderCanvas();
+}
+</script>
+
+<script id="mod-circuits">
+/* ===== CIRCUIT PLANNER ===== */
+const CIRCUIT_TYPES = ['lighting','power','oven','cooktop','AC','data','camera','smoke alarm','spare'];
+function renderCircuits(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('circuit-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Circuits</h3>
+      <p class="muted small">⚠️ Calculations on this page are AI-assisted estimates only and <b>must be verified by a licensed electrician</b> before installation.</p>
+      <div class="btn-row" style="margin-bottom:10px">
+        <button class="btn" onclick="addCircuit()">+ Add Circuit</button>
+      </div>
+      <div id="circuit-list"></div>
+    </div>
+  `;
+  renderCircuitList();
+}
+function renderCircuitList(){
+  const p = currentProject();
+  const list = document.getElementById('circuit-list');
+  if(!p.circuits.length){ list.innerHTML = `<div class="empty">No circuits yet. Tap <b>+ Add Circuit</b>.</div>`; return; }
+  list.innerHTML = p.circuits.map(c=>{
+    const devices = p.devices.filter(d=>d.circuitId===c.id);
+    const est = devices.reduce((sum,d)=> sum + estimatedWatts(d), 0);
+    const ratingWatts = (c.rating||10) * 230; // single phase rough estimate
+    const ratio = ratingWatts ? est/ratingWatts : 0;
+    const overload = ratio > 0.9;
+    return `
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+          <div style="width:14px; height:14px; border-radius:4px; background:${circuitColor(c)}"></div>
+          <b>${escapeHtml(c.name)}</b>
+          <span class="pill">${escapeHtml(c.type)}</span>
+          <span class="pill">${c.rating||10}A</span>
+          ${overload?'<span class="pill red">⚠ Overload risk</span>':''}
+          <div class="right btn-row">
+            <button class="btn secondary sm" onclick="editCircuit('${c.id}')">Edit</button>
+            <button class="btn sm danger" onclick="deleteCircuit('${c.id}')">×</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:6px">
+          Assigned rooms: ${c.rooms.map(rid=>{
+            const r = p.rooms.find(rr=>rr.id===rid); return r?escapeHtml(r.name):'';
+          }).filter(Boolean).join(', ')||'—'}
+        </div>
+        <div class="small">Devices (${devices.length}): ${devices.map(d=>`<span class="tag">${escapeHtml(d.label||'')}</span>`).join('')||'—'}</div>
+        <div class="small" style="margin-top:4px">Estimated load: <b>${est}W</b> of ~<b>${ratingWatts}W</b> max <span class="muted">(${Math.round(ratio*100)}% of rated)</span></div>
+        <div class="progress ${overload?'red':(ratio>0.7?'amber':'green')}" style="margin-top:4px"><i style="width:${Math.min(100,ratio*100)}%"></i></div>
+        ${c.notes?`<div class="small muted" style="margin-top:4px">${escapeHtml(c.notes)}</div>`:''}
+      </div>`;
+  }).join('');
+}
+function estimatedWatts(d){
+  // crude indicative values — real designs come from AS/NZS 3000 and equipment plates
+  const map = {gpo:240, gpo2:240*2, light:100, down:12, switch:0, sw2:0, smoke:5,
+               data:0, cam:8, oven:3600, cook:7200, ac:2500, board:0, fan:60, heater:1800};
+  return map[d.type] || 100;
+}
+function addCircuit(){
+  const p = currentProject();
+  const c = {id:uid(), name:'C'+(p.circuits.length+1)+' New', type:'power', rating:10, rooms:[], notes:''};
+  p.circuits.push(c); persist(); editCircuit(c.id);
+}
+function editCircuit(id){
+  const p = currentProject();
+  const c = p.circuits.find(x=>x.id===id);
+  openModal(`
+    <h2>Edit Circuit</h2>
+    <label>Name</label>
+    <input id="ec-name" value="${escapeHtml(c.name)}" />
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="ec-type">${CIRCUIT_TYPES.map(t=>`<option value="${t}" ${t===c.type?'selected':''}>${t}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Rating (A)</label>
+        <input type="number" id="ec-rating" value="${c.rating||10}" />
+      </div>
+    </div>
+    <label>Assigned rooms</label>
+    <div id="ec-rooms" style="display:flex; flex-wrap:wrap; gap:6px">
+      ${p.rooms.map(r=>`
+        <label class="sym-btn" style="cursor:pointer">
+          <input type="checkbox" value="${r.id}" ${c.rooms.includes(r.id)?'checked':''} style="width:auto; min-height:auto; margin:0"/> ${escapeHtml(r.name)}
+        </label>`).join('')}
+    </div>
+    <label>Notes</label>
+    <textarea id="ec-notes">${escapeHtml(c.notes||'')}</textarea>
+    <div class="actions">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveCircuit('${id}')">Save</button>
+    </div>`);
+}
+function saveCircuit(id){
+  const p = currentProject();
+  const c = p.circuits.find(x=>x.id===id);
+  c.name = document.getElementById('ec-name').value.trim();
+  c.type = document.getElementById('ec-type').value;
+  c.rating = +document.getElementById('ec-rating').value || 10;
+  c.rooms = [...document.querySelectorAll('#ec-rooms input:checked')].map(x=>x.value);
+  c.notes = document.getElementById('ec-notes').value;
+  persist(); closeModal(); renderCircuitList();
+}
+function deleteCircuit(id){
+  if(!confirm('Delete circuit?')) return;
+  const p = currentProject();
+  p.circuits = p.circuits.filter(c=>c.id!==id);
+  p.devices.forEach(d=>{ if(d.circuitId===id) d.circuitId=''; });
+  persist(); renderCircuitList();
+}
+</script>
+
+<script id="mod-demand">
+/* ===== MAX DEMAND ===== */
+function renderDemand(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('demand-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Maximum Demand Calculator</h3>
+      <p class="muted small">For estimating only. Final maximum demand must comply with AS/NZS 3000 and be calculated/verified by a licensed electrician.</p>
+      <div class="scroll-x">
+        <table class="t">
+          <thead><tr>
+            <th>Room</th><th>Appliance</th><th>Watts</th><th>Qty</th><th>Diversity</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="dem-body"></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" onclick="addDemandRow()">+ Add row</button>
+      </div>
+      <div class="divider"></div>
+      <div id="dem-totals"></div>
+    </div>`;
+  renderDemandRows();
+}
+function renderDemandRows(){
+  const p = currentProject();
+  const body = document.getElementById('dem-body');
+  body.innerHTML = p.demand.map(d=>`
+    <tr data-id="${d.id}">
+      <td><input value="${escapeHtml(d.room||'')}" onchange="updDem('${d.id}','room',this.value)"/></td>
+      <td><input value="${escapeHtml(d.appliance||'')}" onchange="updDem('${d.id}','appliance',this.value)"/></td>
+      <td><input type="number" value="${d.watts||0}" onchange="updDem('${d.id}','watts',+this.value)"/></td>
+      <td><input type="number" value="${d.qty||1}" onchange="updDem('${d.id}','qty',+this.value)"/></td>
+      <td><input value="${escapeHtml(d.diversity||'')}" onchange="updDem('${d.id}','diversity',this.value)"/></td>
+      <td><input value="${escapeHtml(d.notes||'')}" onchange="updDem('${d.id}','notes',this.value)"/></td>
+      <td><button class="btn sm danger" onclick="delDem('${d.id}')">×</button></td>
+    </tr>`).join('');
+  // totals
+  const byRoom = {}, byCircuit = {};
+  let total = 0;
+  p.demand.forEach(d=>{
+    const w = (d.watts||0)*(d.qty||1);
+    total += w;
+    byRoom[d.room||'—'] = (byRoom[d.room||'—']||0)+w;
+  });
+  document.getElementById('dem-totals').innerHTML = `
+    <div class="grid cols-3">
+      <div class="card" style="margin:0"><div class="muted small">Total estimated load</div><div style="font-size:22px; font-weight:800">${total} W</div></div>
+      <div class="card" style="margin:0"><div class="muted small">Per-room (top 3)</div>${
+        Object.entries(byRoom).sort((a,b)=>b[1]-a[1]).slice(0,3)
+          .map(([k,v])=>`<div class="small">${escapeHtml(k)}: <b>${v}W</b></div>`).join('')
+      }</div>
+      <div class="card" style="margin:0"><div class="muted small">Reminder</div><div class="small">Apply correct diversity factors per AS/NZS 3000 Table C2. Confirm with licensed electrician.</div></div>
+    </div>`;
+}
+function addDemandRow(){
+  const p = currentProject();
+  p.demand.push({id:uid(), room:'', appliance:'', watts:0, qty:1, diversity:'', notes:''});
+  persist(); renderDemandRows();
+}
+function updDem(id, key, val){
+  const p = currentProject();
+  const d = p.demand.find(x=>x.id===id);
+  d[key] = val; persist(); renderDemandRows();
+}
+function delDem(id){
+  const p = currentProject();
+  p.demand = p.demand.filter(d=>d.id!==id);
+  persist(); renderDemandRows();
+}
+</script>
+
+<script id="mod-materials">
+/* ===== MATERIALS ===== */
+function renderMaterials(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('materials-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Materials List</h3>
+      <p class="muted small">Auto-generated from devices &amp; circuits. Edit qty, price, notes — or add custom items. Click <b>Re-sync from plan</b> after big edits.</p>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn secondary" onclick="resyncMaterials()">🔄 Re-sync from plan</button>
+        <button class="btn" onclick="addMaterial()">+ Add item</button>
+        <button class="btn ghost" onclick="exportMaterialsCSV()">⬇ Export CSV</button>
+      </div>
+      <div class="scroll-x">
+        <table class="t">
+          <thead><tr>
+            <th>Category</th><th>Item</th><th>Qty</th><th>Unit</th><th>Price</th><th>Line $</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="mat-body"></tbody>
+        </table>
+      </div>
+      <div class="divider"></div>
+      <div id="mat-total"></div>
+    </div>`;
+  renderMatRows();
+}
+function renderMatRows(){
+  const p = currentProject();
+  const body = document.getElementById('mat-body');
+  body.innerHTML = p.materials.map(m=>`
+    <tr>
+      <td><input value="${escapeHtml(m.category)}" onchange="updMat('${m.id}','category',this.value)"/></td>
+      <td><input value="${escapeHtml(m.item)}" onchange="updMat('${m.id}','item',this.value)"/></td>
+      <td><input type="number" value="${m.qty}" onchange="updMat('${m.id}','qty',+this.value)"/></td>
+      <td><input value="${escapeHtml(m.unit||'ea')}" onchange="updMat('${m.id}','unit',this.value)"/></td>
+      <td><input type="number" step="0.01" value="${m.price||0}" onchange="updMat('${m.id}','price',+this.value)"/></td>
+      <td>$${(m.qty*(m.price||0)).toFixed(2)}</td>
+      <td><input value="${escapeHtml(m.notes||'')}" onchange="updMat('${m.id}','notes',this.value)"/></td>
+      <td><button class="btn sm danger" onclick="delMat('${m.id}')">×</button></td>
+    </tr>`).join('');
+  const total = p.materials.reduce((s,m)=> s + m.qty*(m.price||0), 0);
+  document.getElementById('mat-total').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <div class="muted small">Indicative material total — verify with supplier pricing.</div>
+      <div style="font-size:22px; font-weight:800">$${total.toFixed(2)}</div>
+    </div>`;
+}
+function updMat(id,key,val){
+  const p = currentProject();
+  const m = p.materials.find(x=>x.id===id);
+  m[key] = val; persist(); renderMatRows();
+}
+function delMat(id){
+  const p = currentProject();
+  p.materials = p.materials.filter(m=>m.id!==id);
+  persist(); renderMatRows();
+}
+function addMaterial(){
+  const p = currentProject();
+  p.materials.push({id:uid(), category:'Misc', item:'New item', qty:1, unit:'ea', price:0, notes:'', custom:true});
+  persist(); renderMatRows();
+}
+function resyncMaterials(){
+  if(!confirm('Rebuild auto items from devices & circuits? Custom rows you added are kept.')) return;
+  const p = currentProject();
+  const custom = p.materials.filter(m=>m.custom);
+  p.materials = buildAutoMaterials(p.devices, p.circuits).concat(custom);
+  persist(); renderMatRows();
+}
+function exportMaterialsCSV(){
+  const p = currentProject();
+  const rows = [['Category','Item','Qty','Unit','Price','Line $','Notes']];
+  let total = 0;
+  p.materials.forEach(m=>{
+    const line = m.qty*(m.price||0); total += line;
+    rows.push([m.category,m.item,m.qty,m.unit||'ea',m.price||0,line.toFixed(2),m.notes||'']);
+  });
+  rows.push(['','','','','Total',total.toFixed(2),'']);
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  download(`${slug(p.name)}-materials.csv`, csv, 'text/csv');
+}
+function slug(s){return String(s||'site').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}
+function download(name, content, type){
+  const blob = new Blob([content], {type});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+</script>
+
+<script id="mod-tasks">
+/* ===== TASKS ===== */
+function renderTasks(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('tasks-content');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <h3 style="margin:0">Tasks</h3>
+        <span class="muted small">Grouped by room → circuit → device. Tap an item to edit, tap the box to mark done.</span>
+        <div class="right btn-row">
+          <button class="btn secondary sm" onclick="regenTasks()">🔄 Re-sync from devices</button>
+          <button class="btn sm" onclick="addManualTask()">+ Task</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <select id="task-filter-status" onchange="renderTaskTree()">
+          <option value="">All statuses</option>
+          <option value="not-started">Not started</option>
+          <option value="in-progress">In progress</option>
+          <option value="done">Completed</option>
+          <option value="issue">Issue</option>
+        </select>
+        <select id="task-filter-room" onchange="renderTaskTree()">
+          <option value="">All rooms</option>
+          ${p.rooms.map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('')}
+        </select>
+        <input id="task-search" placeholder="Search tasks..." oninput="renderTaskTree()"/>
+      </div>
+    </div>
+    <div class="card"><div id="task-tree"></div></div>
+  `;
+  renderTaskTree();
+}
+function regenTasks(){
+  if(!confirm('Rebuild auto tasks from devices? Custom edits to existing tasks may be overwritten.')) return;
+  const p = currentProject();
+  const existing = {};
+  p.tasks.forEach(t=>{ existing[t.deviceType+':'+t.title+':'+t.roomId] = t; });
+  const fresh = buildAutoTasks(p.rooms, p.circuits, p.devices);
+  fresh.forEach(t=>{
+    const ex = existing[t.deviceType+':'+t.title+':'+t.roomId];
+    if(ex){ Object.assign(t, {status:ex.status, notes:ex.notes, dueDate:ex.dueDate, assignedTo:ex.assignedTo, priority:ex.priority, subtasks:ex.subtasks}); }
+  });
+  p.tasks = fresh;
+  persist(); renderTaskTree();
+}
+function renderTaskTree(){
+  const p = currentProject();
+  const st = document.getElementById('task-filter-status')?.value||'';
+  const rm = document.getElementById('task-filter-room')?.value||'';
+  const q = (document.getElementById('task-search')?.value||'').toLowerCase();
+  const filtered = p.tasks.filter(t=>{
+    if(st && t.status!==st) return false;
+    if(rm && t.roomId!==rm) return false;
+    if(q && !(t.title||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const grouped = {};
+  filtered.forEach(t=>{
+    const room = p.rooms.find(r=>r.id===t.roomId);
+    const circ = p.circuits.find(c=>c.id===t.circuitId);
+    const rk = room?room.name:'(No room)';
+    const ck = circ?circ.name:'(No circuit)';
+    grouped[rk] = grouped[rk] || {};
+    grouped[rk][ck] = grouped[rk][ck] || [];
+    grouped[rk][ck].push(t);
+  });
+  const el = document.getElementById('task-tree');
+  if(!Object.keys(grouped).length){ el.innerHTML = `<div class="empty">No tasks match the filters.</div>`; return; }
+  el.innerHTML = Object.entries(grouped).map(([room, circs])=>`
+    <div class="task-room">
+      <div class="head" onclick="this.nextElementSibling.classList.toggle('open')">▾ ${escapeHtml(room)}</div>
+      <div class="open">
+        ${Object.entries(circs).map(([c, list])=>`
+          <div class="task-circuit">
+            <div class="head" onclick="this.nextElementSibling.classList.toggle('open')">${escapeHtml(c)} <span class="muted">(${list.length})</span></div>
+            <div class="open">
+              ${list.map(t=>taskItemHTML(t)).join('')}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function taskItemHTML(t){
+  const cls = t.status==='done'?'done':t.status==='issue'?'issue':t.status==='in-progress'?'progress':'';
+  const subOpen = t._open?'open':'';
+  const sym = SYMBOL_BY_KEY[t.deviceType];
+  return `
+  <div class="task-item ${cls}" id="ti-${t.id}">
+    <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleTaskDone('${t.id}')">${t.status==='done'?'✓':''}</div>
+    <div style="flex:1; min-width:0" onclick="toggleTaskSub('${t.id}')">
+      <div style="font-weight:600">${sym?sym.icon:'🔧'} ${escapeHtml(t.title)}</div>
+      <div class="small muted">${escapeHtml(taskStatusLabel(t.status))}${t.priority&&t.priority!=='normal'?' · '+t.priority:''}${t.dueDate?' · due '+escapeHtml(t.dueDate):''}${t.assignedTo?' · '+escapeHtml(t.assignedTo):''}</div>
+      <div class="task-sub ${subOpen}" id="ts-${t.id}">
+        ${(t.subtasks||defaultSubtasks()).map((s,i)=>`
+          <div class="sub-row">
+            <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtask('${t.id}',${i})"/>
+            <span ${s.done?'style="text-decoration:line-through; opacity:.6"':''}>${escapeHtml(s.label)}</span>
+          </div>`).join('')}
+        ${t.notes?`<div class="small" style="background:var(--grey-50); padding:6px 8px; border-radius:8px; margin-top:6px">${escapeHtml(t.notes)}</div>`:''}
+      </div>
+    </div>
+    <button class="btn sm secondary" onclick="editTaskModal('${t.id}')">Edit</button>
+  </div>`;
+}
+function toggleTaskDone(id){
+  const p = currentProject();
+  const t = p.tasks.find(x=>x.id===id);
+  t.status = t.status==='done' ? 'not-started' : 'done';
+  if(t.status==='done'){ (t.subtasks||[]).forEach(s=>s.done=true); }
+  persist(); renderTaskTree();
+}
+function toggleTaskSub(id){
+  const p = currentProject();
+  const t = p.tasks.find(x=>x.id===id);
+  t._open = !t._open;
+  renderTaskTree();
+}
+function toggleSubtask(id,i){
+  const p = currentProject();
+  const t = p.tasks.find(x=>x.id===id);
+  t.subtasks[i].done = !t.subtasks[i].done;
+  // auto-bump status
+  const allDone = t.subtasks.every(s=>s.done);
+  const someDone= t.subtasks.some(s=>s.done);
+  if(allDone) t.status='done';
+  else if(someDone && t.status==='not-started') t.status='in-progress';
+  persist(); renderTaskTree();
+}
+function addManualTask(){
+  const p = currentProject();
+  const t = {id:uid(), title:'New task', roomId:p.rooms[0]?.id||'', circuitId:p.circuits[0]?.id||'',
+             deviceType:'gpo2', status:'not-started', priority:'normal', dueDate:'', assignedTo:'',
+             notes:'', photos:[], subtasks:defaultSubtasks()};
+  p.tasks.push(t); persist(); editTaskModal(t.id);
+}
+function editTaskModal(id){
+  const p = currentProject();
+  const t = p.tasks.find(x=>x.id===id);
+  openModal(`
+    <h2>Task</h2>
+    <label>Title</label>
+    <input id="et-title" value="${escapeHtml(t.title)}"/>
+    <div class="row">
+      <div>
+        <label>Room</label>
+        <select id="et-room">${p.rooms.map(r=>`<option value="${r.id}" ${r.id===t.roomId?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Circuit</label>
+        <select id="et-circ"><option value="">—</option>${p.circuits.map(c=>`<option value="${c.id}" ${c.id===t.circuitId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Device type</label>
+        <select id="et-type">${ELECTRICAL_SYMBOLS.map(s=>`<option value="${s.k}" ${s.k===t.deviceType?'selected':''}>${s.icon} ${s.label}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Status</label>
+        <select id="et-status">
+          <option value="not-started" ${t.status==='not-started'?'selected':''}>Not started</option>
+          <option value="in-progress" ${t.status==='in-progress'?'selected':''}>In progress</option>
+          <option value="done" ${t.status==='done'?'selected':''}>Completed</option>
+          <option value="issue" ${t.status==='issue'?'selected':''}>Issue</option>
+        </select>
+      </div>
+      <div>
+        <label>Priority</label>
+        <select id="et-prio">${['low','normal','high','urgent'].map(p=>`<option value="${p}" ${p===t.priority?'selected':''}>${p}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Due date</label>
+        <input type="date" id="et-due" value="${escapeHtml(t.dueDate||'')}"/>
+      </div>
+      <div>
+        <label>Assigned to</label>
+        <select id="et-asg"><option value="">—</option>${DB.users.map(u=>`<option value="${escapeHtml(u.name)}" ${u.name===t.assignedTo?'selected':''}>${escapeHtml(u.name)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="et-notes">${escapeHtml(t.notes||'')}</textarea>
+    <div class="actions">
+      <button class="btn danger" onclick="deleteTask('${id}')">Delete</button>
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveTask('${id}')">Save</button>
+    </div>
+  `);
+}
+function saveTask(id){
+  const p = currentProject();
+  const t = p.tasks.find(x=>x.id===id);
+  t.title = document.getElementById('et-title').value;
+  t.roomId= document.getElementById('et-room').value;
+  t.circuitId= document.getElementById('et-circ').value;
+  t.deviceType= document.getElementById('et-type').value;
+  t.status= document.getElementById('et-status').value;
+  t.priority= document.getElementById('et-prio').value;
+  t.dueDate= document.getElementById('et-due').value;
+  t.assignedTo= document.getElementById('et-asg').value;
+  t.notes= document.getElementById('et-notes').value;
+  persist(); closeModal(); renderTaskTree();
+}
+function deleteTask(id){
+  if(!confirm('Delete task?')) return;
+  const p = currentProject();
+  p.tasks = p.tasks.filter(t=>t.id!==id);
+  persist(); closeModal(); renderTaskTree();
+}
+</script>
+
+<script id="mod-photos">
+/* ===== PHOTOS ===== */
+function renderPhotos(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('photos-content');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <h3 style="margin:0">Site Photos</h3>
+        <span class="muted small">${p.photos.length} total</span>
+        <div class="right btn-row">
+          <label class="btn"><span>📸 Capture / Upload</span>
+            <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoFiles(this.files)"/></label>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <select id="pf-stage" onchange="renderPhotoGrid()">
+          <option value="">All stages</option>
+          ${STAGE_LIST.map(s=>`<option>${s}</option>`).join('')}
+        </select>
+        <select id="pf-room" onchange="renderPhotoGrid()">
+          <option value="">All rooms</option>
+          ${p.rooms.map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('')}
+        </select>
+        <select id="pf-circ" onchange="renderPhotoGrid()">
+          <option value="">All circuits</option>
+          ${p.circuits.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+        <input id="pf-q" placeholder="Search notes / tags..." oninput="renderPhotoGrid()" />
+      </div>
+    </div>
+    <div class="card"><div id="photo-grid" class="photo-grid"></div></div>
+  `;
+  renderPhotoGrid();
+}
+function renderPhotoGrid(){
+  const p = currentProject();
+  const stage = document.getElementById('pf-stage')?.value || '';
+  const room  = document.getElementById('pf-room')?.value  || '';
+  const circ  = document.getElementById('pf-circ')?.value  || '';
+  const q     = (document.getElementById('pf-q')?.value||'').toLowerCase();
+  const list  = (p.photos||[]).filter(ph=>{
+    if(stage && ph.stage!==stage) return false;
+    if(room && ph.roomId!==room) return false;
+    if(circ && ph.circuitId!==circ) return false;
+    if(q){
+      const hay = ((ph.notes||'')+' '+(ph.tags||[]).join(' ')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=>b.ts-a.ts);
+  const el = document.getElementById('photo-grid');
+  if(!list.length){ el.innerHTML = `<div class="empty" style="grid-column:1/-1">No photos match. Try clearing filters.</div>`; return; }
+  el.innerHTML = list.map(ph=>`
+    <div class="photo-tile" onclick="viewPhoto('${ph.id}')">
+      <img src="${ph.dataUrl}" alt=""/>
+      <div class="ptag"><span>${escapeHtml(ph.stage||'')}</span><span>${new Date(ph.ts).toLocaleDateString()}</span></div>
+    </div>`).join('');
+}
+function handlePhotoFiles(files){
+  const p = currentProject();
+  if(!p){ alert('Pick a project first.'); return; }
+  const stage = prompt('Stage? '+STAGE_LIST.join(' / '), 'Rough In') || 'Misc';
+  // TODO(GPS): if geolocation permission granted, attach coords
+  const tryLocation = new Promise(res=>{
+    if(!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      pos => res({lat:pos.coords.latitude, lng:pos.coords.longitude}),
+      _   => res(null),
+      {timeout:4000, maximumAge:60000}
+    );
+  });
+  tryLocation.then(loc=>{
+    let pending = files.length;
+    [...files].forEach(f=>{
+      const r = new FileReader();
+      r.onload = e=>{
+        p.photos.push({
+          id:uid(), dataUrl:e.target.result, ts:Date.now(),
+          lat:loc?.lat||null, lng:loc?.lng||null,
+          by: currentUser()?.name||'',
+          notes:'', tags:[], stage,
+          roomId:'', circuitId:'', deviceId:'', taskId:''
+        });
+        if(--pending===0){ persist(); renderPhotoGrid(); }
+      };
+      r.readAsDataURL(f);
+    });
+  });
+}
+function viewPhoto(id){
+  const p = currentProject();
+  const ph = p.photos.find(x=>x.id===id);
+  if(!ph) return;
+  openModal(`
+    <h2>Photo</h2>
+    <img src="${ph.dataUrl}" style="width:100%; max-height:55vh; object-fit:contain; border-radius:10px; background:#000"/>
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label>Stage</label>
+        <select id="ph-stage">${STAGE_LIST.map(s=>`<option ${s===ph.stage?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Room</label>
+        <select id="ph-room"><option value="">—</option>${p.rooms.map(r=>`<option value="${r.id}" ${r.id===ph.roomId?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Circuit</label>
+        <select id="ph-circ"><option value="">—</option>${p.circuits.map(c=>`<option value="${c.id}" ${c.id===ph.circuitId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <label>Tags (comma separated)</label>
+    <input id="ph-tags" value="${escapeHtml((ph.tags||[]).join(', '))}"/>
+    <label>Notes</label>
+    <textarea id="ph-notes">${escapeHtml(ph.notes||'')}</textarea>
+    <div class="small muted">Taken: ${new Date(ph.ts).toLocaleString()} · by ${escapeHtml(ph.by||'—')}${ph.lat?` · GPS ${ph.lat.toFixed(4)},${ph.lng.toFixed(4)}`:''}</div>
+    <div class="actions">
+      <button class="btn danger" onclick="deletePhoto('${id}')">Delete</button>
+      <button class="btn secondary" onclick="closeModal()">Close</button>
+      <button class="btn" onclick="savePhoto('${id}')">Save</button>
+    </div>`);
+}
+function savePhoto(id){
+  const p = currentProject();
+  const ph = p.photos.find(x=>x.id===id);
+  ph.stage = document.getElementById('ph-stage').value;
+  ph.roomId= document.getElementById('ph-room').value;
+  ph.circuitId= document.getElementById('ph-circ').value;
+  ph.tags = document.getElementById('ph-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  ph.notes= document.getElementById('ph-notes').value;
+  persist(); closeModal(); renderPhotoGrid();
+}
+function deletePhoto(id){
+  if(!confirm('Delete photo?')) return;
+  const p = currentProject();
+  p.photos = p.photos.filter(ph=>ph.id!==id);
+  persist(); closeModal(); renderPhotoGrid();
+}
+function quickPhotoFromFab(){
+  const p = currentProject();
+  if(!p){ alert('Open a project first.'); go('projects'); return; }
+  const input = document.createElement('input');
+  input.type='file'; input.accept='image/*'; input.capture='environment'; input.multiple=true;
+  input.onchange = ()=> handlePhotoFiles(input.files);
+  input.click();
+}
+</script>
+
+<script id="mod-defects">
+/* ===== DEFECTS & CALLBACKS ===== */
+function renderDefects(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('defects-content');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <h3 style="margin:0">Callbacks &amp; Defects</h3>
+        <div class="right btn-row">
+          <button class="btn" onclick="newDefect()">+ New Issue</button>
+        </div>
+      </div>
+    </div>
+    <div id="defects-list"></div>
+  `;
+  renderDefectList();
+}
+function renderDefectList(){
+  const p = currentProject();
+  const el = document.getElementById('defects-list');
+  if(!p.defects.length){ el.innerHTML = `<div class="card empty">No defects logged. 🎉</div>`; return; }
+  el.innerHTML = p.defects.map(d=>{
+    const room = p.rooms.find(r=>r.id===d.roomId);
+    return `
+      <div class="card">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <b>${escapeHtml(d.title)}</b>
+          <span class="pill ${d.status==='done'?'green':d.status==='in-progress'?'amber':'red'}">${escapeHtml(d.status)}</span>
+          <span class="pill">${escapeHtml(d.priority||'normal')}</span>
+          <span class="muted small">${escapeHtml(room?room.name:'')}</span>
+          <div class="right btn-row">
+            <button class="btn sm secondary" onclick="editDefect('${d.id}')">Edit</button>
+            <button class="btn sm danger" onclick="deleteDefect('${d.id}')">×</button>
+          </div>
+        </div>
+        <div class="small" style="margin-top:6px">${escapeHtml(d.desc||'')}</div>
+        ${d.assignedTo?`<div class="small muted">Assigned: ${escapeHtml(d.assignedTo)}</div>`:''}
+      </div>`;
+  }).join('');
+}
+function newDefect(){
+  const p = currentProject();
+  const d = {id:uid(), title:'New issue', desc:'', roomId:p.rooms[0]?.id||'', taskId:'',
+             priority:'normal', status:'open', assignedTo:'', notes:'', before:[], after:[]};
+  p.defects.push(d); persist(); editDefect(d.id);
+}
+function editDefect(id){
+  const p = currentProject();
+  const d = p.defects.find(x=>x.id===id);
+  openModal(`
+    <h2>Defect / Callback</h2>
+    <label>Title</label>
+    <input id="ed-title" value="${escapeHtml(d.title)}"/>
+    <label>Description</label>
+    <textarea id="ed-desc">${escapeHtml(d.desc||'')}</textarea>
+    <div class="row">
+      <div>
+        <label>Room</label>
+        <select id="ed-room"><option value="">—</option>${p.rooms.map(r=>`<option value="${r.id}" ${r.id===d.roomId?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Related task</label>
+        <select id="ed-task"><option value="">—</option>${p.tasks.map(t=>`<option value="${t.id}" ${t.id===d.taskId?'selected':''}>${escapeHtml(t.title)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Priority</label>
+        <select id="ed-prio">${['low','normal','high','urgent'].map(x=>`<option value="${x}" ${x===d.priority?'selected':''}>${x}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="ed-status">${['open','in-progress','done'].map(x=>`<option value="${x}" ${x===d.status?'selected':''}>${x}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Assigned to</label>
+        <select id="ed-asg"><option value="">—</option>${DB.users.map(u=>`<option value="${escapeHtml(u.name)}" ${u.name===d.assignedTo?'selected':''}>${escapeHtml(u.name)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <label>Completion notes</label>
+    <textarea id="ed-notes">${escapeHtml(d.notes||'')}</textarea>
+    <p class="small muted">Photos: attach via the Photos page and tag the relevant stage ("Defect" or "Callback").</p>
+    <div class="actions">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveDefect('${id}')">Save</button>
+    </div>`);
+}
+function saveDefect(id){
+  const p = currentProject();
+  const d = p.defects.find(x=>x.id===id);
+  d.title = document.getElementById('ed-title').value;
+  d.desc  = document.getElementById('ed-desc').value;
+  d.roomId= document.getElementById('ed-room').value;
+  d.taskId= document.getElementById('ed-task').value;
+  d.priority = document.getElementById('ed-prio').value;
+  d.status= document.getElementById('ed-status').value;
+  d.assignedTo = document.getElementById('ed-asg').value;
+  d.notes = document.getElementById('ed-notes').value;
+  persist(); closeModal(); renderDefectList();
+}
+function deleteDefect(id){
+  if(!confirm('Delete this defect?')) return;
+  const p = currentProject();
+  p.defects = p.defects.filter(d=>d.id!==id);
+  persist(); renderDefectList();
+}
+</script>
+
+<script id="mod-variations">
+/* ===== VARIATIONS ===== */
+function renderVariations(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('variations-content');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <h3 style="margin:0">Variations</h3>
+        <div class="right btn-row">
+          <button class="btn" onclick="newVariation()">+ New Variation</button>
+        </div>
+      </div>
+    </div>
+    <div id="var-list"></div>
+  `;
+  renderVarList();
+}
+function renderVarList(){
+  const p = currentProject();
+  const el = document.getElementById('var-list');
+  if(!p.variations.length){ el.innerHTML = `<div class="card empty">No variations yet.</div>`; return; }
+  el.innerHTML = p.variations.map(v=>{
+    const matTotal = (v.items||[]).reduce((s,i)=> s+i.qty*i.price, 0);
+    const total = matTotal + (v.labour||0);
+    const room = p.rooms.find(r=>r.id===v.roomId);
+    return `
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>${escapeHtml(v.title)}</b>
+          <span class="pill ${({draft:'',sent:'amber',approved:'green',rejected:'red',completed:'green'})[v.status]||''}">${v.status}</span>
+          <span class="muted small">${escapeHtml(room?room.name:'')}</span>
+          <div class="right btn-row">
+            <button class="btn sm secondary" onclick="editVariation('${v.id}')">Edit</button>
+            <button class="btn sm" onclick="exportVariation('${v.id}')">⬇ Export</button>
+            <button class="btn sm danger" onclick="deleteVariation('${v.id}')">×</button>
+          </div>
+        </div>
+        <div class="small" style="margin-top:6px">${escapeHtml(v.desc||'')}</div>
+        <div class="row" style="margin-top:6px">
+          <div class="card" style="margin:0"><div class="muted small">Material</div><b>$${matTotal.toFixed(2)}</b></div>
+          <div class="card" style="margin:0"><div class="muted small">Labour</div><b>$${(v.labour||0).toFixed(2)}</b></div>
+          <div class="card" style="margin:0"><div class="muted small">Total estimate</div><b style="color:var(--blue)">$${total.toFixed(2)}</b></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+function newVariation(){
+  const p = currentProject();
+  const v = {id:uid(), title:'New variation', desc:'', roomId:p.rooms[0]?.id||'', items:[], labour:0, status:'draft'};
+  p.variations.push(v); persist(); editVariation(v.id);
+}
+function editVariation(id){
+  const p = currentProject();
+  const v = p.variations.find(x=>x.id===id);
+  openModal(`
+    <h2>Variation</h2>
+    <label>Title</label>
+    <input id="ev-title" value="${escapeHtml(v.title)}"/>
+    <label>Description</label>
+    <textarea id="ev-desc">${escapeHtml(v.desc||'')}</textarea>
+    <div class="row">
+      <div>
+        <label>Room</label>
+        <select id="ev-room"><option value="">—</option>${p.rooms.map(r=>`<option value="${r.id}" ${r.id===v.roomId?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="ev-status">${['draft','sent','approved','rejected','completed'].map(s=>`<option value="${s}" ${s===v.status?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Labour estimate ($)</label>
+        <input type="number" step="0.01" id="ev-labour" value="${v.labour||0}"/>
+      </div>
+    </div>
+    <label>Items</label>
+    <div id="ev-items"></div>
+    <div class="btn-row" style="margin-top:6px">
+      <button class="btn secondary sm" onclick="evAddItem()">+ Item</button>
+    </div>
+    <div class="actions">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveVariation('${id}')">Save</button>
+    </div>
+  `);
+  window._evItems = JSON.parse(JSON.stringify(v.items||[]));
+  renderEvItems();
+}
+function renderEvItems(){
+  const el = document.getElementById('ev-items');
+  el.innerHTML = window._evItems.map((it,i)=>`
+    <div class="row" style="margin-bottom:6px">
+      <input value="${escapeHtml(it.name||'')}" placeholder="Item name" onchange="evUpd(${i},'name',this.value)"/>
+      <input type="number" value="${it.qty||1}" placeholder="qty" onchange="evUpd(${i},'qty',+this.value)"/>
+      <input type="number" step="0.01" value="${it.price||0}" placeholder="price" onchange="evUpd(${i},'price',+this.value)"/>
+      <button class="btn sm danger" onclick="evDel(${i})">×</button>
+    </div>`).join('') || '<div class="muted small">No items yet.</div>';
+}
+function evAddItem(){ window._evItems.push({name:'',qty:1,price:0}); renderEvItems(); }
+function evUpd(i,k,v){ window._evItems[i][k]=v; }
+function evDel(i){ window._evItems.splice(i,1); renderEvItems(); }
+function saveVariation(id){
+  const p = currentProject();
+  const v = p.variations.find(x=>x.id===id);
+  v.title = document.getElementById('ev-title').value;
+  v.desc  = document.getElementById('ev-desc').value;
+  v.roomId= document.getElementById('ev-room').value;
+  v.status= document.getElementById('ev-status').value;
+  v.labour= +document.getElementById('ev-labour').value||0;
+  v.items = window._evItems || [];
+  persist(); closeModal(); renderVarList();
+}
+function deleteVariation(id){
+  if(!confirm('Delete variation?')) return;
+  const p = currentProject();
+  p.variations = p.variations.filter(v=>v.id!==id);
+  persist(); renderVarList();
+}
+function exportVariation(id){
+  const p = currentProject();
+  const v = p.variations.find(x=>x.id===id);
+  const matTotal = (v.items||[]).reduce((s,i)=> s+i.qty*i.price, 0);
+  const total = matTotal + (v.labour||0);
+  const lines = [
+    `VARIATION SUMMARY`,
+    `Site: ${p.name}`,
+    `Builder/Client: ${p.builder||''}`,
+    `Date: ${new Date().toLocaleDateString()}`,
+    ``,
+    `Variation: ${v.title}`,
+    `Description: ${v.desc||''}`,
+    ``,
+    `ITEMS:`
+  ];
+  (v.items||[]).forEach(i=> lines.push(`  - ${i.name||'(unnamed)'}: ${i.qty} × $${(i.price||0).toFixed(2)} = $${(i.qty*i.price).toFixed(2)}`));
+  lines.push(``, `Materials subtotal: $${matTotal.toFixed(2)}`,
+                 `Labour estimate:   $${(v.labour||0).toFixed(2)}`,
+                 `TOTAL:             $${total.toFixed(2)}`);
+  download(`${slug(p.name)}-variation-${slug(v.title)}.txt`, lines.join('\n'), 'text/plain');
+}
+</script>
+
+<script id="mod-handover">
+/* ===== HANDOVER ===== */
+function renderHandover(){
+  const p = currentProject();
+  if(!p){ go('projects'); return; }
+  const el = document.getElementById('handover-content');
+  const doneTasks = p.tasks.filter(t=>t.status==='done');
+  const matTotal = p.materials.reduce((s,m)=>s+m.qty*(m.price||0),0);
+  const closedDefects = p.defects.filter(d=>d.status==='done');
+  el.innerHTML = `
+    <div class="card">
+      <h2 style="margin:0">Handover Pack — ${escapeHtml(p.name)}</h2>
+      <div class="muted">${escapeHtml(p.address||'')} · Builder: ${escapeHtml(p.builder||'')} · ${escapeHtml(p.jobType)}</div>
+      <div class="muted small">Generated ${new Date().toLocaleString()} by ${escapeHtml(currentUser()?.name||'')}</div>
+    </div>
+
+    <div class="card">
+      <h3>Completed tasks (${doneTasks.length}/${p.tasks.length})</h3>
+      <ul style="padding-left:16px; margin:6px 0">
+        ${doneTasks.map(t=>{
+          const r = p.rooms.find(r=>r.id===t.roomId);
+          const c = p.circuits.find(c=>c.id===t.circuitId);
+          return `<li>${escapeHtml(t.title)} <span class="muted small">— ${escapeHtml(r?.name||'')}${c?' · '+escapeHtml(c.name):''}</span></li>`;
+        }).join('') || '<li class="muted">No completed tasks yet.</li>'}
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Circuit list</h3>
+      <table class="t"><thead><tr><th>Name</th><th>Type</th><th>Rating</th><th>Rooms</th></tr></thead><tbody>
+        ${p.circuits.map(c=>`<tr>
+          <td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.type)}</td><td>${c.rating||10}A</td>
+          <td>${c.rooms.map(rid=>{const r=p.rooms.find(x=>x.id===rid);return r?escapeHtml(r.name):'';}).filter(Boolean).join(', ')}</td>
+        </tr>`).join('') || `<tr><td colspan="4" class="muted">No circuits.</td></tr>`}
+      </tbody></table>
+    </div>
+
+    <div class="card">
+      <h3>Materials</h3>
+      <table class="t"><thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Unit</th><th>Price</th><th>Line</th></tr></thead><tbody>
+        ${p.materials.map(m=>`<tr><td>${escapeHtml(m.category)}</td><td>${escapeHtml(m.item)}</td><td>${m.qty}</td><td>${escapeHtml(m.unit||'ea')}</td><td>$${(m.price||0).toFixed(2)}</td><td>$${(m.qty*(m.price||0)).toFixed(2)}</td></tr>`).join('')}
+        <tr><td colspan="5" style="text-align:right"><b>Total</b></td><td><b>$${matTotal.toFixed(2)}</b></td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="card">
+      <h3>Defect closeout</h3>
+      ${closedDefects.length?`
+        <ul>${closedDefects.map(d=>`<li>${escapeHtml(d.title)} — ${escapeHtml(d.notes||'')}</li>`).join('')}</ul>`
+        :'<div class="muted small">No closed defects recorded.</div>'}
+    </div>
+
+    <div class="card">
+      <h3>Variations</h3>
+      ${p.variations.length?`
+        <table class="t"><thead><tr><th>Title</th><th>Status</th><th>Total</th></tr></thead><tbody>
+          ${p.variations.map(v=>{const t=(v.items||[]).reduce((s,i)=>s+i.qty*i.price,0)+(v.labour||0);return `<tr><td>${escapeHtml(v.title)}</td><td>${escapeHtml(v.status)}</td><td>$${t.toFixed(2)}</td></tr>`;}).join('')}
+        </tbody></table>`
+        :'<div class="muted small">No variations recorded.</div>'}
+    </div>
+
+    <div class="card">
+      <h3>As-built notes</h3>
+      <textarea class="no-print" rows="4" placeholder="Add as-built notes..." oninput="updateAsBuilt(this.value)">${escapeHtml(p.asBuiltNotes||'')}</textarea>
+      <div class="small" style="white-space:pre-wrap">${escapeHtml(p.asBuiltNotes||'')}</div>
+    </div>
+
+    <div class="card">
+      <h3>Photos</h3>
+      <div class="photo-grid">
+        ${(p.photos||[]).slice(0,24).map(ph=>`<div class="photo-tile"><img src="${ph.dataUrl}"/><div class="ptag"><span>${escapeHtml(ph.stage||'')}</span></div></div>`).join('') || '<div class="muted small">No photos.</div>'}
+      </div>
+    </div>
+
+    <div class="card small muted">
+      Handover prepared for ${escapeHtml(p.builder||'client')}. Disclaimer: estimates and AI-assisted calculations are indicative only. All electrical work must be tested, certified and verified by a licensed electrician (REC) in accordance with AS/NZS 3000.
+    </div>
+  `;
+}
+function updateAsBuilt(val){
+  const p = currentProject(); p.asBuiltNotes = val; persist();
+}
+</script>
+
+<script id="mod-ai">
+/* ===== AI ASSISTANT (mock) ===== */
+function renderAI(){
+  const el = document.getElementById('ai-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>AI Assistant <span class="pill amber">Mock responses</span></h3>
+      <p class="muted small">Ask things like: "Show incomplete kitchen tasks", "How many GPOs are left?", "Create a material list", "Show all rough-in photos for Bedroom 2". <i>TODO: route through a real LLM once backend is connected.</i></p>
+      <div class="chat" id="chat-feed"></div>
+      <div class="row" style="margin-top:8px">
+        <input id="chat-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')chatSend()"/>
+        <button class="btn" onclick="chatSend()">Send</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px;flex-wrap:wrap">
+        <button class="btn sm secondary" onclick="chatQuick('Show incomplete kitchen tasks')">Incomplete kitchen tasks</button>
+        <button class="btn sm secondary" onclick="chatQuick('How many GPOs are left?')">GPOs left?</button>
+        <button class="btn sm secondary" onclick="chatQuick('Create a material list')">Material list</button>
+        <button class="btn sm secondary" onclick="chatQuick('Show all rough-in photos for Bedroom 2')">Rough-in photos Bedroom 2</button>
+      </div>
+    </div>`;
+  window._chat = window._chat || [{from:'bot', text:"G'day! I can search tasks, photos, materials and circuits across your active project. Ask away."}];
+  renderChat();
+}
+function renderChat(){
+  const f = document.getElementById('chat-feed');
+  f.innerHTML = window._chat.map(m=>`<div class="msg ${m.from}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>`).join('');
+  f.scrollTop = f.scrollHeight;
+}
+function chatQuick(q){ document.getElementById('chat-input').value = q; chatSend(); }
+function chatSend(){
+  const i = document.getElementById('chat-input');
+  const q = i.value.trim();
+  if(!q) return;
+  window._chat.push({from:'user', text:q});
+  i.value=''; renderChat();
+  setTimeout(()=>{
+    window._chat.push({from:'bot', text: mockAIAnswer(q)});
+    renderChat();
+  }, 240);
+}
+function mockAIAnswer(q){
+  /* TODO(AI): replace with real model call. Plug in OPENAI/Claude API + tool calls
+     against the same DB structure. The mock below is keyword-driven over local data. */
+  const p = currentProject();
+  if(!p) return "Open a project first, then I can answer questions about it.";
+  const ql = q.toLowerCase();
+  // task / room queries
+  const roomMatch = p.rooms.find(r=> ql.includes(r.name.toLowerCase()));
+  if(/incomplete|outstanding|todo|left/.test(ql) && /task|kitchen|room/.test(ql) || (roomMatch && /task/.test(ql))){
+    const list = p.tasks.filter(t=> t.status!=='done' && (!roomMatch || t.roomId===roomMatch.id));
+    if(!list.length) return "All tasks are completed there. 🎉";
+    return `Found ${list.length} incomplete task${list.length===1?'':'s'}${roomMatch?' in '+roomMatch.name:''}:\n - `+list.slice(0,12).map(t=>t.title).join('\n - ');
+  }
+  if(/gpo/.test(ql)){
+    const total = p.devices.filter(d=>d.type==='gpo'||d.type==='gpo2').length;
+    const done  = p.tasks.filter(t=> (t.deviceType==='gpo'||t.deviceType==='gpo2') && t.status==='done').length;
+    return `You have ${total} GPO outlets across the site. ${done} marked complete, ${total-done} still to go.`;
+  }
+  if(/material|stock/.test(ql)){
+    const top = [...p.materials].sort((a,b)=> (b.qty*(b.price||0))-(a.qty*(a.price||0))).slice(0,8);
+    return `Top material lines for ${p.name}:\n`+top.map(m=>`  ${m.item} × ${m.qty} ${m.unit||'ea'} ($${(m.qty*(m.price||0)).toFixed(2)})`).join('\n');
+  }
+  if(/photo/.test(ql)){
+    let list = p.photos;
+    const stage = STAGE_LIST.find(s=> ql.includes(s.toLowerCase())) || (ql.includes('rough')?'Rough In':null);
+    const room  = roomMatch;
+    if(stage) list = list.filter(ph=>ph.stage===stage);
+    if(room)  list = list.filter(ph=>ph.roomId===room.id);
+    if(!list.length) return "No matching photos. Try uploading some via the Photos page or relaxing the filters.";
+    return `Found ${list.length} photo${list.length===1?'':'s'}${stage?` tagged ${stage}`:''}${room?` in ${room.name}`:''}. Open the Photos page to view.`;
+  }
+  if(/circuit/.test(ql)){
+    return `Project has ${p.circuits.length} circuits: ${p.circuits.map(c=>c.name).join(', ')}.`;
+  }
+  if(/defect|callback/.test(ql)){
+    const open = p.defects.filter(d=>d.status!=='done').length;
+    return `There are ${open} open defects/callbacks and ${p.defects.length-open} closed.`;
+  }
+  return "I'm a mock helper for now — ask about tasks, GPOs, materials, photos, circuits, or defects. Real AI hookups go here later.";
+}
+</script>
+
+<script id="mod-settings">
+/* ===== SETTINGS / USERS ===== */
+function renderSettings(){
+  const el = document.getElementById('settings-content');
+  el.innerHTML = `
+    <div class="card">
+      <h3>Current user</h3>
+      <p class="muted small">Switch user to test role-based views. Client role is read-only.</p>
+      <label>Active user</label>
+      <select id="set-user" onchange="switchUser(this.value)">
+        ${DB.users.map(u=>`<option value="${u.id}" ${u.id===DB.currentUserId?'selected':''}>${escapeHtml(u.name)} — ${ROLE_LABELS[u.role]||u.role}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="card">
+      <h3>Team</h3>
+      <div id="user-list"></div>
+      <div class="row" style="margin-top:8px">
+        <input id="new-user-name" placeholder="Add user — display name"/>
+        <select id="new-user-role">
+          <option value="admin">Admin</option>
+          <option value="leading">Leading Hand</option>
+          <option value="apprentice">Apprentice</option>
+          <option value="contractor">Contractor</option>
+          <option value="client">Builder / Client</option>
+        </select>
+        <button class="btn" onclick="addUser()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Data &amp; offline</h3>
+      <p class="muted small">All your data is currently stored in this browser via <b>localStorage</b>. Cached projects, plans &amp; tasks are editable offline; once a backend is wired up, edits will sync when you're back online. <i>TODO: add service-worker + sync queue.</i></p>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="exportData()">⬇ Export all data (JSON)</button>
+        <label class="btn secondary"><span>⬆ Import data</span><input type="file" accept="application/json" style="display:none" onchange="importData(this.files[0])"/></label>
+        <button class="btn danger" onclick="wipeData()">⚠ Reset everything</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>About</h3>
+      <div class="small muted">Site Reviser v0.1 — branded to match Neill Data &amp; Security style. Built as a working baseline; AI/OCR/PDF export/database integration points are marked in source as <code>TODO(AI)</code>, <code>TODO(GPS)</code>, <code>TODO(backend)</code>.</div>
+    </div>
+  `;
+  renderUserList();
+}
+function renderUserList(){
+  const wrap = document.getElementById('user-list');
+  wrap.innerHTML = DB.users.map(u=>`
+    <div class="list-row">
+      <div style="width:30px; height:30px; border-radius:50%; background:${u.color||'#3a86ff'}; color:#fff; display:grid; place-items:center; font-weight:700">${escapeHtml((u.name||'?').slice(0,1).toUpperCase())}</div>
+      <div class="grow">
+        <div class="title">${escapeHtml(u.name)}</div>
+        <div class="sub">${ROLE_LABELS[u.role]||u.role}</div>
+      </div>
+      <select onchange="updateUserRole('${u.id}',this.value)">
+        ${Object.entries(ROLE_LABELS).map(([k,v])=>`<option value="${k}" ${k===u.role?'selected':''}>${v}</option>`).join('')}
+      </select>
+      <button class="btn sm danger" onclick="removeUser('${u.id}')">×</button>
+    </div>`).join('');
+}
+function switchUser(id){ DB.currentUserId = id; persist(); refreshHeader(); renderSettings(); }
+function updateUserRole(id, role){ const u = DB.users.find(x=>x.id===id); u.role = role; persist(); refreshHeader(); }
+function addUser(){
+  const name = document.getElementById('new-user-name').value.trim();
+  const role = document.getElementById('new-user-role').value;
+  if(!name) return alert('Name required');
+  DB.users.push({id:uid(), name, role, color:'#3a86ff'});
+  persist(); renderSettings();
+}
+function removeUser(id){
+  if(DB.users.length<=1) return alert('Keep at least one user.');
+  if(!confirm('Remove user?')) return;
+  DB.users = DB.users.filter(u=>u.id!==id);
+  if(DB.currentUserId===id) DB.currentUserId = DB.users[0].id;
+  persist(); refreshHeader(); renderSettings();
+}
+function exportData(){
+  download('site-reviser-backup-'+new Date().toISOString().slice(0,10)+'.json',
+           JSON.stringify(DB,null,2),'application/json');
+}
+function importData(file){
+  if(!file) return;
+  const r = new FileReader();
+  r.onload = e=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data.projects || !data.users) throw new Error('Not a Site Reviser backup');
+      if(!confirm('Replace all current data with the imported file?')) return;
+      DB = data; persist(); refreshHeader(); go('dashboard');
+    }catch(err){ alert('Import failed: '+err.message); }
+  };
+  r.readAsText(file);
+}
+function wipeData(){
+  if(!confirm('Reset everything? This wipes projects, photos, tasks…')) return;
+  if(!confirm('Last chance — this can\'t be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  DB = seedDB(); persist();
+  refreshHeader(); go('dashboard');
+}
+</script>
+
+<script id="mod-modal">
+/* ===== MODAL HELPERS ===== */
+function openModal(html){
+  const m = document.getElementById('modal');
+  m.innerHTML = html;
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.getElementById('modal').innerHTML='';
+}
+document.addEventListener('click', e=>{
+  if(e.target.id==='modal-backdrop') closeModal();
+});
+</script>
+
+</body>
+</html>
