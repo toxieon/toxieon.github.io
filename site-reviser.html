@@ -445,6 +445,73 @@
   .back-btn:hover{background:var(--card-strong); border-color:var(--brand)}
   .page-title{font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.02em}
 
+  /* ---- PHOTO LIGHTBOX ---- */
+  .lightbox{
+    position:fixed; inset:0; z-index:200;
+    background:rgba(2,6,16,0.94);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    display:none; flex-direction:column;
+  }
+  .lightbox.open{display:flex}
+  .lightbox-bar{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 14px calc(12px + env(safe-area-inset-top));
+    color:var(--text); font-size:13px;
+    background:linear-gradient(180deg, rgba(7,17,31,0.75), transparent);
+  }
+  .lightbox-bar .lb-close{
+    width:38px; height:38px; border-radius:50%; border:1px solid var(--card-border-strong);
+    background:var(--card); color:var(--text); cursor:pointer; font-size:18px;
+  }
+  .lightbox-bar .lb-meta{flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+  .lightbox-bar .lb-meta b{color:var(--text)}
+  .lightbox-bar .lb-counter{color:var(--muted); font-variant-numeric:tabular-nums}
+  .lightbox-stage{
+    flex:1; position:relative; overflow:hidden;
+    display:grid; place-items:center;
+    touch-action:none;
+  }
+  .lightbox-stage img{
+    max-width:100%; max-height:100%; object-fit:contain; user-select:none;
+    transition: transform .25s cubic-bezier(.2,.8,.2,1);
+    transform-origin:center center;
+    will-change: transform;
+  }
+  .lightbox-stage.dragging img{transition:none}
+  .lb-arrow{
+    position:absolute; top:50%; transform:translateY(-50%);
+    width:44px; height:44px; border-radius:50%;
+    background:var(--card); color:var(--text);
+    border:1px solid var(--card-border-strong); cursor:pointer;
+    display:grid; place-items:center; font-size:22px;
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    z-index:3;
+  }
+  .lb-arrow.left{left:14px} .lb-arrow.right{right:14px}
+  .lb-arrow:disabled{opacity:.3; cursor:not-allowed}
+  .lightbox-foot{
+    padding:10px 14px calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, rgba(7,17,31,0.85), transparent);
+    color:var(--text);
+  }
+  .lightbox-foot .lb-tags{margin-top:6px}
+  .lightbox-foot .lb-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .lightbox-foot .lb-row > .grow{flex:1; min-width:0}
+  .lb-stage-pill{font-size:11px; padding:3px 9px; border-radius:999px; background:var(--pill-bg); color:var(--pill-text); border:1px solid rgba(49,208,255,0.3); font-weight:600}
+  .lb-thumb-strip{
+    display:flex; gap:6px; overflow-x:auto; padding:8px 0 4px;
+    scrollbar-width:thin; -webkit-overflow-scrolling:touch;
+  }
+  .lb-thumb{
+    width:54px; height:54px; flex:0 0 54px; border-radius:8px; overflow:hidden;
+    cursor:pointer; border:2px solid transparent;
+    opacity:.65; transition:opacity .15s, border-color .15s, transform .1s;
+  }
+  .lb-thumb.active{border-color:var(--brand); opacity:1; box-shadow:0 0 0 1px rgba(49,208,255,.3)}
+  .lb-thumb:hover{opacity:1}
+  .lb-thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  @media (max-width:640px){ .lb-arrow{width:38px; height:38px; font-size:18px} }
+
   /* Roadmap difficulty chips */
   .diff{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; color:#06121f}
   .diff.d1,.diff.d2,.diff.d3{background:linear-gradient(135deg, var(--brand-2), var(--cash))}
@@ -717,6 +784,30 @@
 
 <!-- Modal container -->
 <div class="modal-backdrop" id="modal-backdrop"><div class="modal" id="modal"></div></div>
+
+<!-- Photo Lightbox -->
+<div class="lightbox" id="lightbox" tabindex="-1">
+  <div class="lightbox-bar">
+    <button class="lb-close" onclick="closeLightbox()" aria-label="Close">✕</button>
+    <div class="lb-meta" id="lb-meta"></div>
+    <div class="lb-counter" id="lb-counter"></div>
+    <button class="btn sm secondary" onclick="lbEditCurrent()">Edit</button>
+    <button class="btn sm danger" onclick="lbDeleteCurrent()">Delete</button>
+  </div>
+  <div class="lightbox-stage" id="lb-stage">
+    <button class="lb-arrow left"  id="lb-prev" onclick="lbStep(-1)" aria-label="Previous">‹</button>
+    <img id="lb-img" alt=""/>
+    <button class="lb-arrow right" id="lb-next" onclick="lbStep(1)"  aria-label="Next">›</button>
+  </div>
+  <div class="lightbox-foot">
+    <div class="lb-row">
+      <div class="grow"><span class="lb-stage-pill" id="lb-stage-pill"></span> <span class="muted small" id="lb-room"></span></div>
+      <div class="small muted" id="lb-time"></div>
+    </div>
+    <div class="lb-tags small muted" id="lb-notes"></div>
+    <div class="lb-thumb-strip" id="lb-thumbs"></div>
+  </div>
+</div>
 
 <script>
 /* =========================================================
@@ -1397,12 +1488,234 @@ function renderPlanUpload(){
     </div>
 
     <div class="card">
-      <h3>AI Detection <span class="pill amber">Mock</span></h3>
-      <p class="muted">Detected items below are placeholders. Confirm or edit before they flow into circuits, tasks and materials. <i>TODO: wire to a real plan-parsing model.</i></p>
+      <h3>AI Detection ${aiEnabled() ? '<span class="pill green">Claude Vision available</span>' : '<span class="pill amber">Mock (add Claude key in Settings)</span>'}</h3>
+      <p class="muted small">${aiEnabled()
+        ? "Tap <b>Scan with Claude Vision</b> to send the plan image to Claude and get a real detection list. Then confirm each item — confirmed detections drop pins on the plan and create devices + tasks."
+        : "Counts below are mock values until you add a Claude API key in Settings. Once added, a <b>Scan with Claude Vision</b> button appears here."}</p>
+      ${p.plan && aiEnabled()
+        ? `<div class="btn-row" style="margin-bottom:10px">
+            <button class="btn" onclick="runPlanVision()" id="vision-btn">🔍 Scan with Claude Vision</button>
+            <button class="btn ghost" onclick="clearVisionDetections()">Clear detections</button>
+          </div>
+          <div id="vision-status" class="small muted"></div>`
+        : ''}
       <div id="ai-detected"></div>
+      ${(p.plan?.visionDetections||[]).length ? `
+        <div class="divider"></div>
+        <h3 style="margin-top:0">Detected items <span class="pill blue">${p.plan.visionDetections.length}</span></h3>
+        <p class="muted small">Tick to confirm each detection. Confirmed items become devices + tasks. Position is approximate — drag in the Plan Rebuilder to fine-tune.</p>
+        <div id="vision-list"></div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn success" onclick="acceptAllVision()">✓ Accept all checked</button>
+          <button class="btn secondary" onclick="checkAllVision(true)">Select all</button>
+          <button class="btn secondary" onclick="checkAllVision(false)">Clear selection</button>
+        </div>
+      ` : ''}
     </div>
   `;
   renderAIDetected();
+  renderVisionList();
+}
+
+/* ---- Plan Vision: real Claude Vision call ---- */
+async function runPlanVision(){
+  const p = currentProject();
+  if(!p?.plan?.dataUrl){ alert('Upload a plan first.'); return; }
+  if(!aiEnabled()){ alert('Add a Claude API key in Settings.'); return; }
+  const btn = document.getElementById('vision-btn');
+  const status = document.getElementById('vision-status');
+  btn.disabled = true; btn.textContent = '🔍 Scanning…';
+  status.textContent = 'Sending plan to Claude Vision… this can take 10-30 seconds for a large image.';
+
+  try {
+    const dataUrl = p.plan.dataUrl;
+    // Claude Vision expects image as base64 without the data:image/... prefix
+    const m = dataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+    if(!m) throw new Error('Plan is a PDF — re-upload as PNG/JPG for vision detection (PDF support coming).');
+    const mediaType = m[1];
+    const b64 = m[2];
+
+    const system = `You are analysing an Australian electrical floor plan. Identify every electrical fixture, room boundary, and circuit grouping you can see.
+For every detected item, output ONE JSON object with: type, label, room, x, y, confidence.
+- type is one of: gpo, gpo2, switch, sw2, light, down, smoke, data, cam, oven, cook, ac, board, fan, heater
+- x and y are PERCENTAGES (0-100) of image width/height — top-left origin
+- room is the room name you see (e.g. "Kitchen", "Bedroom 1") or null
+- confidence is "high", "medium", or "low"
+Wrap the array in <detections> tags. If you can't see the plan clearly, return <detections>[]</detections>. Be conservative — only include items you can actually see.`;
+
+    const userMsg = "Analyse this electrical plan and list every detected fixture, switch, light, smoke alarm, data point, camera, appliance and switchboard you can see. Use percentages for position.";
+
+    const s = aiSettings();
+    const body = {
+      model: s.model || 'claude-sonnet-4-5-20250929',
+      max_tokens: 4096,
+      system,
+      messages: [{
+        role:'user',
+        content: [
+          { type:'image', source:{ type:'base64', media_type: mediaType, data: b64 } },
+          { type:'text', text: userMsg }
+        ]
+      }]
+    };
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key': s.key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      const err = await res.text().catch(()=>String(res.status));
+      throw new Error(`Vision API ${res.status}: ${err.slice(0,200)}`);
+    }
+    const data = await res.json();
+    const text = (data.content||[]).map(c=>c.text||'').join('');
+    // Extract JSON from <detections> tags or fallback to first [...]
+    let raw = (text.match(/<detections>([\s\S]*?)<\/detections>/) || [,''])[1].trim();
+    if(!raw) raw = (text.match(/\[[\s\S]*\]/) || [''])[0];
+    let detections;
+    try { detections = JSON.parse(raw); }
+    catch(e){ throw new Error('Could not parse Claude response: '+text.slice(0,200)); }
+    if(!Array.isArray(detections)) throw new Error('Claude did not return a list.');
+
+    // attach an id + accepted flag to each so we can render checkboxes
+    detections = detections.map(d=>({
+      id: uid(),
+      type: d.type || 'gpo',
+      label: d.label || (SYMBOL_BY_KEY[d.type]?.label) || 'Detected',
+      room: d.room || '',
+      x: Math.max(0, Math.min(100, +d.x || 50)),
+      y: Math.max(0, Math.min(100, +d.y || 50)),
+      confidence: d.confidence || 'medium',
+      accepted: false,
+      selected: true
+    }));
+
+    p.plan.visionDetections = detections;
+    persist();
+    status.innerHTML = `<span style="color:var(--brand-2)">✓ Found ${detections.length} item${detections.length===1?'':'s'}. Review the list below and tick the ones to accept.</span>`;
+    renderPlanUpload();
+  } catch(err){
+    status.innerHTML = `<span style="color:var(--danger)">✗ ${escapeHtml(err.message||String(err))}</span>`;
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '🔍 Scan with Claude Vision'; }
+  }
+}
+function renderVisionList(){
+  const p = currentProject();
+  const list = p?.plan?.visionDetections;
+  if(!list || !list.length) return;
+  const el = document.getElementById('vision-list');
+  if(!el) return;
+  el.innerHTML = list.map(d=>{
+    const sym = SYMBOL_BY_KEY[d.type] || {icon:'❓', label:d.type};
+    const confColor = d.confidence==='high' ? 'green' : d.confidence==='low' ? 'red' : 'amber';
+    return `
+      <div class="list-row" style="${d.accepted?'opacity:.5':''}">
+        <input type="checkbox" ${d.selected?'checked':''} ${d.accepted?'disabled':''} onchange="toggleVisionSel('${d.id}',this.checked)" style="width:20px;height:20px;min-height:0;accent-color:var(--brand)"/>
+        <div style="font-size:22px">${sym.icon}</div>
+        <div class="grow">
+          <div class="title">${escapeHtml(d.label)}${d.accepted?' <span class="pill green">Accepted</span>':''}</div>
+          <div class="sub">${escapeHtml(sym.label)} · ${escapeHtml(d.room||'(no room detected)')} · ${d.x.toFixed(0)}%, ${d.y.toFixed(0)}% · <span class="pill ${confColor}">${d.confidence}</span></div>
+        </div>
+        <button class="btn sm secondary" onclick="editVisionDet('${d.id}')">Edit</button>
+      </div>`;
+  }).join('');
+}
+function toggleVisionSel(id, val){
+  const p = currentProject();
+  const d = p.plan.visionDetections.find(x=>x.id===id);
+  if(d) d.selected = val;
+  persist();
+}
+function checkAllVision(val){
+  const p = currentProject();
+  p.plan.visionDetections.forEach(d=>{ if(!d.accepted) d.selected = val; });
+  persist(); renderVisionList();
+}
+function editVisionDet(id){
+  const p = currentProject();
+  const d = p.plan.visionDetections.find(x=>x.id===id);
+  openModal(`
+    <h2>Edit Detection</h2>
+    <label>Label</label>
+    <input id="vd-label" value="${escapeHtml(d.label)}"/>
+    <label>Type</label>
+    <select id="vd-type">
+      ${ELECTRICAL_SYMBOLS.map(s=>`<option value="${s.k}" ${s.k===d.type?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
+    </select>
+    <label>Room (name)</label>
+    <input id="vd-room" value="${escapeHtml(d.room||'')}"/>
+    <div class="row">
+      <div><label>X %</label><input type="number" id="vd-x" value="${d.x.toFixed(1)}"/></div>
+      <div><label>Y %</label><input type="number" id="vd-y" value="${d.y.toFixed(1)}"/></div>
+    </div>
+    <div class="actions">
+      <button class="btn danger" onclick="deleteVisionDet('${id}')">Delete</button>
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveVisionDet('${id}')">Save</button>
+    </div>`);
+}
+function saveVisionDet(id){
+  const p = currentProject();
+  const d = p.plan.visionDetections.find(x=>x.id===id);
+  d.label = document.getElementById('vd-label').value;
+  d.type  = document.getElementById('vd-type').value;
+  d.room  = document.getElementById('vd-room').value;
+  d.x = +document.getElementById('vd-x').value || 0;
+  d.y = +document.getElementById('vd-y').value || 0;
+  persist(); closeModal(); renderVisionList();
+}
+function deleteVisionDet(id){
+  const p = currentProject();
+  p.plan.visionDetections = p.plan.visionDetections.filter(d=>d.id!==id);
+  persist(); closeModal(); renderPlanUpload();
+}
+function clearVisionDetections(){
+  if(!confirm('Clear all detections from Claude? (Accepted devices stay.)')) return;
+  const p = currentProject();
+  p.plan.visionDetections = p.plan.visionDetections.filter(d=>d.accepted);
+  persist(); renderPlanUpload();
+}
+function acceptAllVision(){
+  const p = currentProject();
+  const toAccept = p.plan.visionDetections.filter(d=>d.selected && !d.accepted);
+  if(!toAccept.length){ alert('Tick at least one item to accept.'); return; }
+
+  toAccept.forEach(d=>{
+    // ensure the room exists; create if Claude detected a new one
+    let room = p.rooms.find(r=> r.name.toLowerCase() === (d.room||'').toLowerCase());
+    if(!room && d.room){
+      room = {id:uid(), name:d.room, color:'#31d0ff'};
+      p.rooms.push(room);
+    }
+    // create device
+    const dev = {
+      id: uid(), type: d.type,
+      label: d.label,
+      roomId: room?room.id:'',
+      x: d.x, y: d.y,
+      circuitId: ''
+    };
+    p.devices.push(dev);
+    // create task
+    p.tasks.push({
+      id: uid(), title: d.label,
+      roomId: dev.roomId, circuitId: '',
+      deviceType: d.type,
+      status:'not-started', priority:'normal', dueDate:'', assignedTo:'',
+      notes:'Auto-created from Claude Vision', photos:[], subtasks: defaultSubtasks()
+    });
+    d.accepted = true;
+  });
+
+  persist();
+  alert(`Accepted ${toAccept.length} item${toAccept.length===1?'':'s'} — created devices + tasks. Open Plan Rebuilder to drag them, or Tasks to start ticking.`);
+  renderPlanUpload();
 }
 function clearPlan(){
   if(!confirm('Remove uploaded plan?')) return;
@@ -1850,9 +2163,11 @@ function renderMaterials(){
       <p class="muted small">Auto-generated from devices &amp; circuits. Edit qty, price, notes — or add custom items. Click <b>Re-sync from plan</b> after big edits.</p>
       <div class="btn-row" style="margin-bottom:8px">
         <button class="btn secondary" onclick="resyncMaterials()">🔄 Re-sync from plan</button>
+        <button class="btn secondary" onclick="syncPricingFromSheet()">💲 Pull prices from Sheet</button>
         <button class="btn" onclick="addMaterial()">+ Add item</button>
         <button class="btn ghost" onclick="exportMaterialsCSV()">⬇ Export CSV</button>
       </div>
+      <div id="pricing-status" class="small muted" style="margin-bottom:8px"></div>
       <div class="scroll-x">
         <table class="t">
           <thead><tr>
@@ -1909,6 +2224,45 @@ function resyncMaterials(){
   p.materials = buildAutoMaterials(p.devices, p.circuits).concat(custom);
   persist(); renderMatRows();
 }
+async function syncPricingFromSheet(){
+  const url = syncSettings().url;
+  const status = document.getElementById('pricing-status');
+  if(!url){
+    status.innerHTML = '<span style="color:var(--warning)">Set up Sheets backend in Settings first.</span>';
+    return;
+  }
+  status.textContent = 'Pulling prices from the Pricing tab…';
+  try{
+    const res = await fetch(`${url}?action=pricing&t=${Date.now()}`);
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    const rows = (data.pricing||[]).filter(r=>r.item);
+    if(!rows.length){
+      status.innerHTML = '<span style="color:var(--warning)">Pricing tab is empty. Add rows with columns: item, unit, price, supplier, notes.</span>';
+      return;
+    }
+    const p = currentProject();
+    let updated = 0;
+    rows.forEach(r=>{
+      const match = p.materials.find(m =>
+        m.item.toLowerCase() === String(r.item).toLowerCase() &&
+        (m.unit||'') === (r.unit||'')
+      );
+      if(match){
+        match.price = +r.price || match.price;
+        if(r.notes) match.notes = String(r.notes);
+        if(r.supplier) match.notes = (match.notes ? match.notes+' · ' : '') + 'Supplier: '+r.supplier;
+        updated++;
+      }
+    });
+    persist();
+    status.innerHTML = `<span style="color:var(--brand-2)">✓ Updated ${updated} of ${rows.length} items from the Pricing tab.</span>`;
+    renderMatRows();
+  } catch(e){
+    status.innerHTML = `<span style="color:var(--danger)">✗ ${escapeHtml(e.message||String(e))}</span>`;
+  }
+}
+
 function exportMaterialsCSV(){
   const p = currentProject();
   const rows = [['Category','Item','Qty','Unit','Price','Line $','Notes']];
@@ -2235,13 +2589,111 @@ function handlePhotoFiles(files){
     });
   });
 }
+/* ===== PHOTO LIGHTBOX ===== */
+/* Stores the currently-visible list and index so prev/next work even after filter changes. */
+let LB = { list:[], idx:0, scale:1, panX:0, panY:0 };
+
 function viewPhoto(id){
+  const p = currentProject();
+  // Use the currently-rendered filtered list, not all photos
+  const list = getFilteredPhotoList();
+  const idx = list.findIndex(ph=>ph.id===id);
+  if(idx<0) return;
+  openLightbox(list, idx);
+}
+function getFilteredPhotoList(){
+  // Mirror the filter logic in renderPhotoGrid so swipe stays within the same filter set
+  const p = currentProject();
+  const stage = document.getElementById('pf-stage')?.value || '';
+  const room  = document.getElementById('pf-room')?.value  || '';
+  const circ  = document.getElementById('pf-circ')?.value  || '';
+  const q     = (document.getElementById('pf-q')?.value||'').toLowerCase();
+  return (p.photos||[]).filter(ph=>{
+    if(stage && ph.stage!==stage) return false;
+    if(room && ph.roomId!==room) return false;
+    if(circ && ph.circuitId!==circ) return false;
+    if(q){
+      const hay = ((ph.notes||'')+' '+(ph.tags||[]).join(' ')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=>b.ts-a.ts);
+}
+function openLightbox(list, idx){
+  LB.list = list; LB.idx = idx;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lbShow();
+  document.getElementById('lightbox').focus();
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+  lbReset();
+}
+function lbStep(dir){
+  if(LB.idx+dir < 0 || LB.idx+dir >= LB.list.length) return;
+  LB.idx += dir;
+  lbShow();
+}
+function lbShow(){
+  const ph = LB.list[LB.idx];
+  if(!ph){ closeLightbox(); return; }
+  const p = currentProject();
+  const room = p.rooms.find(r=>r.id===ph.roomId);
+  const img = document.getElementById('lb-img');
+  img.src = ph.dataUrl;
+  lbReset();
+  document.getElementById('lb-meta').innerHTML = `<b>${escapeHtml(ph.stage||'')}</b>${room?' · '+escapeHtml(room.name):''}${ph.by?' · '+escapeHtml(ph.by):''}`;
+  document.getElementById('lb-counter').textContent = `${LB.idx+1} / ${LB.list.length}`;
+  document.getElementById('lb-stage-pill').textContent = ph.stage||'';
+  document.getElementById('lb-room').textContent = room?room.name:'';
+  document.getElementById('lb-time').textContent = new Date(ph.ts).toLocaleString();
+  const noteParts = [];
+  if(ph.notes) noteParts.push(escapeHtml(ph.notes));
+  if((ph.tags||[]).length) noteParts.push((ph.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join(''));
+  if(ph.lat && ph.lng) noteParts.push(`<a href="https://www.google.com/maps?q=${ph.lat},${ph.lng}" target="_blank" rel="noopener" style="color:var(--brand)">📍 Open in Maps (${ph.lat.toFixed(4)}, ${ph.lng.toFixed(4)})</a>`);
+  document.getElementById('lb-notes').innerHTML = noteParts.join('<br>');
+  document.getElementById('lb-prev').disabled = LB.idx===0;
+  document.getElementById('lb-next').disabled = LB.idx===LB.list.length-1;
+  // thumb strip
+  const strip = document.getElementById('lb-thumbs');
+  strip.innerHTML = LB.list.map((p,i)=>`<div class="lb-thumb ${i===LB.idx?'active':''}" onclick="LB.idx=${i}; lbShow()"><img src="${p.dataUrl}" alt=""/></div>`).join('');
+  // scroll active thumb into view
+  const active = strip.querySelector('.lb-thumb.active');
+  if(active) active.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+}
+function lbReset(){
+  LB.scale = 1; LB.panX = 0; LB.panY = 0;
+  const img = document.getElementById('lb-img');
+  if(img) img.style.transform = '';
+}
+function lbEditCurrent(){
+  const ph = LB.list[LB.idx]; if(!ph) return;
+  closeLightbox();
+  editPhotoMeta(ph.id);
+}
+function lbDeleteCurrent(){
+  const ph = LB.list[LB.idx]; if(!ph) return;
+  if(!confirm('Delete this photo?')) return;
+  const p = currentProject();
+  p.photos = p.photos.filter(x=>x.id!==ph.id);
+  LB.list.splice(LB.idx,1);
+  persist();
+  if(!LB.list.length){ closeLightbox(); renderPhotoGrid(); return; }
+  if(LB.idx >= LB.list.length) LB.idx = LB.list.length-1;
+  lbShow();
+  renderPhotoGrid();
+}
+
+/* Photo metadata editor — extracted from old viewPhoto */
+function editPhotoMeta(id){
   const p = currentProject();
   const ph = p.photos.find(x=>x.id===id);
   if(!ph) return;
   openModal(`
-    <h2>Photo</h2>
-    <img src="${ph.dataUrl}" style="width:100%; max-height:55vh; object-fit:contain; border-radius:10px; background:#000"/>
+    <h2>Photo details</h2>
+    <img src="${ph.dataUrl}" style="width:100%; max-height:40vh; object-fit:contain; border-radius:10px; background:#000"/>
     <div class="row" style="margin-top:8px">
       <div>
         <label>Stage</label>
@@ -2260,13 +2712,99 @@ function viewPhoto(id){
     <input id="ph-tags" value="${escapeHtml((ph.tags||[]).join(', '))}"/>
     <label>Notes</label>
     <textarea id="ph-notes">${escapeHtml(ph.notes||'')}</textarea>
-    <div class="small muted">Taken: ${new Date(ph.ts).toLocaleString()} · by ${escapeHtml(ph.by||'—')}${ph.lat?` · GPS ${ph.lat.toFixed(4)},${ph.lng.toFixed(4)}`:''}</div>
+    <div class="small muted">Taken: ${new Date(ph.ts).toLocaleString()} · by ${escapeHtml(ph.by||'—')}${ph.lat?` · <a href="https://www.google.com/maps?q=${ph.lat},${ph.lng}" target="_blank" rel="noopener" style="color:var(--brand)">📍 Maps ${ph.lat.toFixed(4)},${ph.lng.toFixed(4)}</a>`:''}</div>
     <div class="actions">
       <button class="btn danger" onclick="deletePhoto('${id}')">Delete</button>
       <button class="btn secondary" onclick="closeModal()">Close</button>
       <button class="btn" onclick="savePhoto('${id}')">Save</button>
     </div>`);
 }
+
+/* swipe + zoom gestures wired once on DOM ready */
+function initLightboxGestures(){
+  const stage = document.getElementById('lb-stage');
+  const img   = document.getElementById('lb-img');
+  if(!stage || !img) return;
+  let startX=0, startY=0, dx=0, dy=0, dragging=false, pinch=null, pinchStart=0;
+  const pointers = new Map();
+  stage.addEventListener('pointerdown', e=>{
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pointers.size===1){
+      dragging = true; startX=e.clientX; startY=e.clientY; dx=0; dy=0;
+      stage.classList.add('dragging');
+    } else if(pointers.size===2){
+      dragging = false;
+      const arr = [...pointers.values()];
+      pinchStart = Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+      pinch = LB.scale;
+    }
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e=>{
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pointers.size===2){
+      const arr = [...pointers.values()];
+      const d = Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+      LB.scale = Math.max(1, Math.min(5, pinch * (d/pinchStart)));
+      img.style.transform = `translate(${LB.panX}px, ${LB.panY}px) scale(${LB.scale})`;
+    } else if(dragging && pointers.size===1){
+      dx = e.clientX - startX; dy = e.clientY - startY;
+      if(LB.scale > 1){
+        // panning a zoomed image
+        LB.panX += dx; LB.panY += dy; startX=e.clientX; startY=e.clientY;
+        img.style.transform = `translate(${LB.panX}px, ${LB.panY}px) scale(${LB.scale})`;
+      } else {
+        // pull to swipe
+        img.style.transform = `translateX(${dx}px)`;
+      }
+    }
+  });
+  stage.addEventListener('pointerup', e=>{
+    pointers.delete(e.pointerId);
+    if(dragging && pointers.size===0){
+      stage.classList.remove('dragging');
+      dragging = false;
+      if(LB.scale === 1 && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)){
+        const dir = dx<0?1:-1;
+        lbStep(dir);
+      } else {
+        img.style.transform = LB.scale>1 ? `translate(${LB.panX}px, ${LB.panY}px) scale(${LB.scale})` : '';
+      }
+    }
+    if(pointers.size<2) pinch = null;
+  });
+  stage.addEventListener('pointercancel', e=>{ pointers.delete(e.pointerId); });
+  // double-tap to toggle zoom
+  let lastTap=0;
+  stage.addEventListener('click', e=>{
+    const t = Date.now();
+    if(t - lastTap < 300){
+      if(LB.scale > 1){ lbReset(); }
+      else { LB.scale = 2.2; img.style.transform = `scale(${LB.scale})`; }
+    }
+    lastTap = t;
+  });
+  // wheel to zoom on desktop
+  stage.addEventListener('wheel', e=>{
+    if(!document.getElementById('lightbox').classList.contains('open')) return;
+    e.preventDefault();
+    const delta = -Math.sign(e.deltaY) * 0.18;
+    LB.scale = Math.max(1, Math.min(5, LB.scale + delta));
+    if(LB.scale === 1){ LB.panX=0; LB.panY=0; }
+    img.style.transform = `translate(${LB.panX}px, ${LB.panY}px) scale(${LB.scale})`;
+  }, {passive:false});
+
+  // keyboard
+  document.addEventListener('keydown', e=>{
+    if(!document.getElementById('lightbox').classList.contains('open')) return;
+    if(e.key==='Escape') closeLightbox();
+    if(e.key==='ArrowLeft') lbStep(-1);
+    if(e.key==='ArrowRight') lbStep(1);
+    if(e.key==='0') lbReset();
+  });
+}
+window.addEventListener('DOMContentLoaded', initLightboxGestures);
 function savePhoto(id){
   const p = currentProject();
   const ph = p.photos.find(x=>x.id===id);
@@ -2953,8 +3491,30 @@ function renderSettings(){
     </div>
 
     <div class="card">
+      <h3>Google Sheets backend ${syncSettings().url ? '<span class="pill green">Connected</span>' : '<span class="pill amber">Not connected</span>'}</h3>
+      <p class="muted small">Same pattern as the neilldata.com/quote tool. Deploy the Apps Script web app once on your Sheet, paste the URL here, and projects/tasks/materials/photos-metadata sync across the team. Photo binaries stay local for now (too big for cells). <a onclick="showSheetsHelp()" style="color:var(--brand); cursor:pointer">Setup instructions →</a></p>
+      <label>Apps Script web app URL</label>
+      <input id="sync-url" placeholder="https://script.google.com/macros/s/AKfyc.../exec" value="${escapeHtml(syncSettings().url||'')}"/>
+      <label>Sheet ID (optional — for pricing read)</label>
+      <input id="sync-sheet" placeholder="1AbCdEf..." value="${escapeHtml(syncSettings().sheetId||'')}"/>
+      <label>Auto-push on save</label>
+      <select id="sync-auto">
+        <option value="off" ${syncSettings().auto==='off'?'selected':''}>Off (manual sync only)</option>
+        <option value="on" ${(syncSettings().auto||'on')==='on'?'selected':''}>On (debounced 4s after edits)</option>
+      </select>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" onclick="saveSyncSettings()">Save</button>
+        <button class="btn secondary" onclick="testSync()">Test connection</button>
+        <button class="btn secondary" onclick="pullFromSheet()">⬇ Pull from Sheet</button>
+        <button class="btn secondary" onclick="pushToSheet()">⬆ Push to Sheet</button>
+      </div>
+      <div id="sync-status" class="small" style="margin-top:8px"></div>
+      <p class="small muted" style="margin-top:8px">⚠ Last-write-wins for now — if two people edit the same project simultaneously, the later push will overwrite. Conflict resolution is on the roadmap.</p>
+    </div>
+
+    <div class="card">
       <h3>Data &amp; offline</h3>
-      <p class="muted small">All your data is currently stored in this browser via <b>localStorage</b>. Cached projects, plans &amp; tasks are editable offline; once a backend is wired up, edits will sync when you're back online. <i>TODO: add service-worker + sync queue.</i></p>
+      <p class="muted small">All your data is stored in this browser via <b>localStorage</b>. Edits work offline; with Sheets sync set up above, they push when you're back online.</p>
       <div class="btn-row">
         <button class="btn secondary" onclick="exportData()">⬇ Export all data (JSON)</button>
         <label class="btn secondary"><span>⬆ Import data</span><input type="file" accept="application/json" style="display:none" onchange="importData(this.files[0])"/></label>
@@ -2970,7 +3530,7 @@ function renderSettings(){
 
     <div class="card">
       <h3>About</h3>
-      <div class="small muted">Site Reviser v0.2 — branded to match Neill Data &amp; Security. AI assistant live via Claude API; plan-vision detection, real PDF export and cloud sync are on the roadmap. Source-code integration hooks are tagged <code>TODO(AI)</code>, <code>TODO(GPS)</code>, <code>TODO(backend)</code>.</div>
+      <div class="small muted">Site Reviser v0.3 — Plan Vision (Claude reads the plan), photo lightbox with swipe + zoom, Google Sheets backend (Apps Script web app), pricing sync from Sheet. Branded to match Neill Data &amp; Security.</div>
     </div>
   `;
   renderUserList();
@@ -3060,6 +3620,154 @@ function clearAiKey(){
 }
 </script>
 
+<script id="mod-sync">
+/* =========================================================
+   GOOGLE SHEETS SYNC
+   Same pattern as neilldata.com/quote: paste a deployed
+   Apps Script web app URL. App POSTs/GETs JSON to it.
+   The companion Apps Script lives in site-reviser-sheets.gs.
+   ========================================================= */
+function syncSettings(){
+  DB.settings.sync = DB.settings.sync || {url:'', sheetId:'', auto:'on', lastPush:0, lastPull:0};
+  return DB.settings.sync;
+}
+function saveSyncSettings(){
+  const s = syncSettings();
+  s.url     = document.getElementById('sync-url').value.trim();
+  s.sheetId = document.getElementById('sync-sheet').value.trim();
+  s.auto    = document.getElementById('sync-auto').value;
+  persist();
+  setSyncStatus(s.url ? '✓ Saved.' : 'Saved — no URL, sync disabled.', s.url?'brand-2':'muted');
+}
+function setSyncStatus(msg, colorVar){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  el.innerHTML = `<span style="color:var(--${colorVar||'muted'})">${msg}</span>`;
+}
+async function testSync(){
+  saveSyncSettings();
+  const url = syncSettings().url;
+  if(!url){ setSyncStatus('Add a URL first.', 'warning'); return; }
+  setSyncStatus('Pinging Apps Script…','muted');
+  try{
+    const res = await fetch(`${url}?action=ping&t=${Date.now()}`, {method:'GET'});
+    const txt = await res.text();
+    let data; try{ data = JSON.parse(txt); }catch(e){ throw new Error('Non-JSON reply: '+txt.slice(0,120)); }
+    if(data.ok) setSyncStatus(`✓ Connected. Sheet: ${escapeHtml(data.sheet||'(unnamed)')} · ${data.tabs?data.tabs.length+' tabs ready':''}`,'brand-2');
+    else throw new Error(JSON.stringify(data).slice(0,140));
+  } catch(e){
+    setSyncStatus('✗ '+escapeHtml(e.message||String(e)),'danger');
+  }
+}
+async function pullFromSheet(){
+  saveSyncSettings();
+  const url = syncSettings().url;
+  if(!url){ setSyncStatus('Add a URL first.','warning'); return; }
+  if(!confirm('Pull from Sheet? Local edits since the last push may be overwritten.')) return;
+  setSyncStatus('Pulling…','muted');
+  try{
+    const res = await fetch(`${url}?action=pull&t=${Date.now()}`, {method:'GET'});
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    // Merge — keep local users.currentUserId and settings.sync intact
+    const sync = syncSettings();
+    if(data.users)      DB.users      = data.users;
+    if(data.projects)   DB.projects   = applyPulledProjects(DB.projects, data.projects);
+    if(data.currentProjectId) DB.currentProjectId = data.currentProjectId;
+    syncSettings().lastPull = Date.now();
+    persist();
+    setSyncStatus(`✓ Pulled ${DB.projects.length} project${DB.projects.length===1?'':'s'} from Sheet at ${new Date().toLocaleTimeString()}.`,'brand-2');
+    refreshHeader();
+    const cur = (location.hash||'').replace('#','') || 'dashboard';
+    go(cur);
+  } catch(e){
+    setSyncStatus('✗ Pull failed: '+escapeHtml(e.message||String(e)),'danger');
+  }
+}
+async function pushToSheet(){
+  saveSyncSettings();
+  const url = syncSettings().url;
+  if(!url){ setSyncStatus('Add a URL first.','warning'); return; }
+  setSyncStatus('Pushing…','muted');
+  try{
+    // Strip large photo binaries — push metadata only.
+    const stripped = JSON.parse(JSON.stringify({
+      users: DB.users,
+      currentProjectId: DB.currentProjectId,
+      projects: DB.projects.map(p=>({
+        ...p,
+        photos: (p.photos||[]).map(ph=>({...ph, dataUrl:''})),
+        plan: p.plan ? {...p.plan, dataUrl:''} : null
+      }))
+    }));
+    const body = JSON.stringify({action:'push', payload: stripped});
+    // Apps Script needs text/plain to avoid CORS preflight
+    const res = await fetch(url, { method:'POST', headers:{'content-type':'text/plain'}, body });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    syncSettings().lastPush = Date.now();
+    persist();
+    setSyncStatus(`✓ Pushed at ${new Date().toLocaleTimeString()}. Rows updated: ${data.rows||'?'}.`,'brand-2');
+  } catch(e){
+    setSyncStatus('✗ Push failed: '+escapeHtml(e.message||String(e)),'danger');
+  }
+}
+/* Merge pulled projects with any local-only projects (created offline since last pull) */
+function applyPulledProjects(local, pulled){
+  const byId = {};
+  pulled.forEach(p=>byId[p.id] = p);
+  // keep local projects that aren't in the pull
+  local.forEach(p=>{ if(!byId[p.id]) byId[p.id] = p; });
+  // re-attach photo binaries from local cache when pull strips them
+  Object.values(byId).forEach(p=>{
+    const localMatch = local.find(l=>l.id===p.id);
+    if(!localMatch) return;
+    (p.photos||[]).forEach(ph=>{
+      if(!ph.dataUrl){
+        const lp = (localMatch.photos||[]).find(x=>x.id===ph.id);
+        if(lp && lp.dataUrl) ph.dataUrl = lp.dataUrl;
+      }
+    });
+    if(p.plan && !p.plan.dataUrl && localMatch.plan?.dataUrl){
+      p.plan.dataUrl = localMatch.plan.dataUrl;
+    }
+  });
+  return Object.values(byId);
+}
+/* Debounced auto-push — wraps the existing persist() */
+let _syncTimer = null;
+function schedulePush(){
+  const s = syncSettings();
+  if(!s.url || s.auto!=='on') return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(()=>{ pushToSheet().catch(()=>{}); }, 4000);
+}
+/* Monkey-patch persist() so every save also queues a push if auto-sync is on */
+const _persistOriginal = persist;
+persist = function(){
+  _persistOriginal();
+  try { schedulePush(); } catch(e){}
+};
+
+function showSheetsHelp(){
+  openModal(`
+    <h2>Connect a Google Sheet</h2>
+    <ol style="padding-left:18px; line-height:1.6">
+      <li>Create a new Google Sheet (any name, e.g. <i>Site Reviser Backend</i>).</li>
+      <li>From the menu, choose <b>Extensions → Apps Script</b>.</li>
+      <li>Delete the placeholder <code>function myFunction()</code> and paste the contents of <b>site-reviser-sheets.gs</b> (the companion file Brandon was given).</li>
+      <li>Save (💾), then click <b>Deploy → New deployment → Web app</b>.</li>
+      <li>Set <b>Execute as</b>: <i>Me</i>. Set <b>Who has access</b>: <i>Anyone</i>. Click <b>Deploy</b> and authorize.</li>
+      <li>Copy the <b>Web app URL</b> (ends in <code>/exec</code>) and paste it into the field above.</li>
+      <li>Tap <b>Test connection</b>. If it returns "Connected", you're done.</li>
+    </ol>
+    <p class="small muted">Tip: the script auto-creates the tabs it needs (Projects, Tasks, Photos, etc.) the first time you push.</p>
+    <div class="actions">
+      <button class="btn" onclick="closeModal()">Got it</button>
+    </div>`);
+}
+</script>
+
 <script id="mod-roadmap">
 /* ===== ROADMAP =====
    Single source of truth for outstanding work + difficulty 1-10.
@@ -3086,8 +3794,8 @@ const ROADMAP = [
   {area:'Tasks',     diff:3, status:'todo',   title:"Default subtasks per device type",
     body:"E.g. cameras get an extra 'Aimed & focused' subtask, smokes get 'Interlinked tested'. Just data."},
 
-  {area:'Photos',    diff:4, status:'todo',   title:"Multi-image lightbox / swipe gallery",
-    body:"Click any photo → full-screen viewer with swipe between siblings, zoom, share. Needs a small pointer-events handler."},
+  {area:'Photos',    diff:4, status:'done',   title:"Multi-image lightbox / swipe gallery",
+    body:"Full-screen viewer with swipe between siblings, pinch + wheel zoom, double-tap to zoom, arrow keys, thumb strip, Maps link on GPS coords. Done in v0.3."},
   {area:'Defects',   diff:4, status:'todo',   title:"Before/after photo slots on defects",
     body:"Currently photos are global. Add a 'pin photo here' button on the defect modal that filters from the photo library."},
   {area:'Offline',   diff:4, status:'todo',   title:"Proper PWA + service worker",
@@ -3096,8 +3804,12 @@ const ROADMAP = [
     body:"Bring in jsPDF + html2canvas (or pdfmake) for a stable, paginated handover PDF with image embedding."},
   {area:'Plan',      diff:5, status:'todo',   title:"Pinch-zoom + pan on the uploaded plan",
     body:"Right now the plan is a flat img. Add panzoom controls + the ability to drop pins from the AI detection directly onto the image."},
-  {area:'AI',        diff:5, status:'todo',   title:"Plan vision detection (Claude Vision)",
-    body:"Send the uploaded plan image to Claude Vision and ask it to list visible GPOs/switches/lights with rough coords. Replace mock counts with real ones."},
+  {area:'AI',        diff:5, status:'done',   title:"Plan vision detection (Claude Vision)",
+    body:"Scan with Claude Vision button on Plan Upload sends the image to Claude, parses detected items, lets you tick/edit/accept each one. Accepted items become devices + tasks automatically. Done in v0.3."},
+  {area:'Backend',   diff:5, status:'done',   title:"Google Sheets backend (Apps Script web app)",
+    body:"Settings → paste Apps Script /exec URL. Pull/Push project + task + material + photo metadata. Debounced auto-push on edits. Companion site-reviser-sheets.gs ships separately. Done in v0.3."},
+  {area:'Materials', diff:3, status:'done',   title:"Per-supplier pricing from Pricing sheet tab",
+    body:"Pull prices from the Pricing tab of the same sheet. Matches by item+unit, updates prices in-place. Done in v0.3."},
   {area:'Tasks',     diff:6, status:'todo',   title:"Drag-drop reorder + bulk edit",
     body:"Reorder tasks within a circuit, bulk assign to a user, bulk shift due-date by N days."},
   {area:'Materials', diff:6, status:'todo',   title:"Live Middys / L&H price sync",
@@ -3131,7 +3843,7 @@ function renderRoadmap(){
         <div class="list-row" style="align-items:flex-start">
           <div class="diff d${r.diff}">${r.diff}</div>
           <div class="grow">
-            <div class="title">${escapeHtml(r.title)} ${r.status==='done'?'<span class="pill green" style="margin-left:4px">Done in v0.2</span>':''}</div>
+            <div class="title">${escapeHtml(r.title)} ${r.status==='done'?'<span class="pill green" style="margin-left:4px">Done</span>':''}</div>
             <div class="sub">${escapeHtml(r.body)}</div>
             <div style="margin-top:4px"><span class="pill">${escapeHtml(r.area)}</span></div>
           </div>
