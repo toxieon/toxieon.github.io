@@ -3,96 +3,144 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0b2545" />
+<meta name="theme-color" content="#07111f" />
 <title>Site Reviser — Electrical Site Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
-     SITE REVISER  —  styled to match Neill Data (neilldata.com)
-     Blue / white / light grey, navy text, rounded cards, clean.
+     SITE REVISER  —  rebranded to match Neill Data (neilldata.com
+     + neilldata.com/quote): dark navy, translucent glass cards,
+     cyan + mint accents, Inter typography.
      ============================================================ */
   :root{
-    --navy:#0b2545;
-    --navy-2:#13315c;
-    --blue:#1e6091;
-    --blue-2:#3a86ff;
-    --blue-soft:#e6f0fa;
-    --grey-50:#f6f8fb;
-    --grey-100:#eef2f7;
-    --grey-200:#dde4ee;
-    --grey-300:#c5cfdd;
-    --grey-500:#7a8699;
-    --text:#0b2545;
-    --text-soft:#48576e;
-    --white:#ffffff;
-    --green:#2e9c5a;
-    --green-soft:#e3f5ea;
-    --amber:#d98e00;
-    --amber-soft:#fbf0d6;
-    --red:#c0392b;
-    --red-soft:#fbe6e3;
-    --shadow: 0 2px 8px rgba(11,37,69,.06), 0 8px 24px rgba(11,37,69,.06);
-    --radius:14px;
-    --radius-sm:10px;
-    --maxw:1100px;
-    --tap:46px;
+    /* core palette pulled straight from neilldata.com/quote */
+    --bg:        #07111f;
+    --bg-soft:   #0d1b2f;
+    --bg-soft-2: #11233b;
+    --card:        rgba(255,255,255,0.06);
+    --card-strong: rgba(255,255,255,0.10);
+    --card-border: rgba(255,255,255,0.14);
+    --card-border-strong: rgba(255,255,255,0.22);
+    --text:    #f6f8fb;
+    --muted:   #b9c5d6;
+    --muted-2: #8694a8;
+    --brand:    #31d0ff;   /* cyan */
+    --brand-2:  #6affb8;   /* mint */
+    --cash:     #4ade80;
+    --cash-2:   #22c55e;
+    --warning:  #ffd166;
+    --danger:   #ff6b88;
+
+    /* derived utility colours */
+    --navy:     #0b2545;
+    --pill-bg:  rgba(49,208,255,0.12);
+    --pill-text:#9ee6ff;
+    --pill-mint-bg:  rgba(106,255,184,0.12);
+    --pill-mint-text:#9affd0;
+    --pill-warn-bg:  rgba(255,209,102,0.13);
+    --pill-warn-text:#ffd97a;
+    --pill-danger-bg:rgba(255,107,136,0.13);
+    --pill-danger-text:#ff96aa;
+
+    /* compatibility aliases — older inline styles reference these names */
+    --grey-50:  rgba(255,255,255,0.04);
+    --grey-100: rgba(255,255,255,0.06);
+    --grey-200: rgba(255,255,255,0.12);
+    --grey-300: rgba(255,255,255,0.20);
+    --grey-500: var(--muted-2);
+    --white:    var(--text);
+    --blue:     var(--brand);
+    --blue-2:   var(--brand);
+    --blue-soft:var(--pill-bg);
+    --navy-2:   #13315c;
+    --text-soft:var(--muted);
+    --green:      var(--cash);
+    --green-soft: var(--pill-mint-bg);
+    --amber:      var(--warning);
+    --amber-soft: var(--pill-warn-bg);
+    --red:        var(--danger);
+    --red-soft:   var(--pill-danger-bg);
+
+    --shadow:    0 20px 70px rgba(0,0,0,0.35);
+    --shadow-sm: 0 6px 20px rgba(0,0,0,0.25);
+    --radius:    18px;
+    --radius-sm: 12px;
+    --maxw:      920px;
+    --tap:       46px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background:var(--grey-50);
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(1100px 600px at -10% -20%, rgba(49,208,255,0.10), transparent 60%),
+      radial-gradient(900px 500px at 110% 0%, rgba(106,255,184,0.08), transparent 60%),
+      radial-gradient(900px 700px at 50% 120%, rgba(49,208,255,0.06), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
     color:var(--text);
     -webkit-font-smoothing:antialiased;
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    text-rendering:optimizeLegibility;
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
     min-height:100vh;
+    letter-spacing:-0.01em;
   }
-  a{color:var(--blue)}
-  button{font:inherit}
+  a{color:var(--brand)}
+  button{font:inherit; color:inherit}
   input,select,textarea{
     font:inherit; color:var(--text);
-    background:var(--white);
-    border:1px solid var(--grey-200);
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--card-border);
     border-radius:var(--radius-sm);
     padding:10px 12px;
     width:100%;
     min-height:var(--tap);
+    transition:border-color .15s, box-shadow .15s, background .15s;
   }
+  input::placeholder, textarea::placeholder{color:var(--muted-2)}
   textarea{min-height:90px; resize:vertical}
   input:focus, select:focus, textarea:focus{
-    outline:none; border-color:var(--blue-2);
-    box-shadow:0 0 0 3px rgba(58,134,255,.15);
+    outline:none; border-color:var(--brand);
+    box-shadow:0 0 0 3px rgba(49,208,255,.20);
+    background:rgba(255,255,255,0.08);
   }
-  label{display:block;font-size:13px;color:var(--text-soft);margin:10px 0 4px}
+  select option{background:var(--bg-soft); color:var(--text)}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px; letter-spacing:.4px; text-transform:uppercase; font-weight:600}
 
   /* ---- HEADER ---- */
   header.app-header{
     position:sticky; top:0; z-index:50;
-    background:var(--navy);
-    color:#fff;
+    background:rgba(7,17,31,0.82);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+    color:var(--text);
     padding:10px 14px;
     display:flex; align-items:center; gap:12px;
-    box-shadow:0 1px 0 rgba(255,255,255,.04), 0 2px 8px rgba(0,0,0,.15);
+    border-bottom:1px solid var(--card-border);
   }
-  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-0.01em}
   .brand-mark{
-    width:34px;height:34px;border-radius:9px;
-    background:linear-gradient(135deg,var(--blue-2),var(--blue));
-    display:grid;place-items:center;color:#fff;font-weight:800;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+    width:36px;height:36px;border-radius:10px;
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    display:grid;place-items:center;color:#06121f;font-weight:800;font-size:13px;
+    box-shadow: 0 8px 24px rgba(49,208,255,0.35), inset 0 0 0 1px rgba(255,255,255,.25);
+    letter-spacing:0;
   }
   .brand-title{font-size:16px}
-  .brand-sub{font-size:11px; opacity:.7; font-weight:500; letter-spacing:.4px; text-transform:uppercase}
+  .brand-sub{font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.6px; text-transform:uppercase}
   .header-spacer{flex:1}
   .header-chip{
-    background:rgba(255,255,255,.08); padding:6px 10px;border-radius:999px;
+    background:var(--card); padding:6px 11px; border-radius:999px;
     font-size:12px; display:flex; align-items:center; gap:6px;
-    border:1px solid rgba(255,255,255,.1); cursor:pointer;
+    border:1px solid var(--card-border); cursor:pointer;
+    color:var(--text); transition:background .15s, border-color .15s;
   }
-  .header-chip:hover{background:rgba(255,255,255,.15)}
+  .header-chip:hover{background:var(--card-strong); border-color:var(--card-border-strong)}
   .site-pill{
-    background:var(--blue-2);
-    border-color:transparent;
-    color:#fff; font-weight:600;
+    background:linear-gradient(135deg, rgba(49,208,255,0.25), rgba(106,255,184,0.15));
+    border-color:rgba(49,208,255,0.4); color:var(--text); font-weight:600;
   }
 
   /* ---- MAIN ---- */
@@ -103,63 +151,72 @@
 
   /* ---- CARDS ---- */
   .card{
-    background:var(--white);
-    border:1px solid var(--grey-200);
+    background:var(--card);
+    border:1px solid var(--card-border);
     border-radius:var(--radius);
     box-shadow:var(--shadow);
     padding:16px;
     margin-bottom:14px;
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
   }
-  .card h2, .card h3{margin:0 0 10px 0}
-  .card h2{font-size:17px}
-  .card h3{font-size:15px; color:var(--navy-2)}
-  .muted{color:var(--text-soft); font-size:13px}
+  .card h2, .card h3{margin:0 0 10px 0; letter-spacing:-0.01em}
+  .card h2{font-size:18px; font-weight:700}
+  .card h3{font-size:15px; color:var(--text); font-weight:700}
+  .muted{color:var(--muted); font-size:13px}
   .row{display:flex; gap:10px; flex-wrap:wrap}
   .row > *{flex:1 1 180px}
 
   /* ---- BUTTONS ---- */
   .btn{
     display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    background:var(--blue-2); color:#fff; border:none;
-    padding:12px 16px; border-radius:var(--radius-sm); font-weight:600;
+    background:linear-gradient(135deg, var(--brand), #1ab9eb);
+    color:#06121f; border:none;
+    padding:11px 16px; border-radius:999px; font-weight:700;
     cursor:pointer; min-height:var(--tap); text-decoration:none;
-    transition:transform .05s ease, box-shadow .15s ease, background .15s;
-    box-shadow:0 1px 0 rgba(0,0,0,.05);
+    transition:transform .05s ease, box-shadow .15s ease, filter .15s;
+    box-shadow:0 8px 24px rgba(49,208,255,0.28), inset 0 0 0 1px rgba(255,255,255,.18);
+    letter-spacing:-0.01em;
   }
-  .btn:hover{background:var(--blue)}
+  .btn:hover{filter:brightness(1.05); box-shadow:0 10px 30px rgba(49,208,255,0.38), inset 0 0 0 1px rgba(255,255,255,.25)}
   .btn:active{transform:translateY(1px)}
-  .btn.secondary{background:var(--grey-100); color:var(--navy); border:1px solid var(--grey-200)}
-  .btn.secondary:hover{background:var(--grey-200)}
-  .btn.ghost{background:transparent;color:var(--blue); border:1px solid var(--grey-200)}
-  .btn.danger{background:var(--red); color:#fff}
-  .btn.success{background:var(--green); color:#fff}
-  .btn.warn{background:var(--amber); color:#fff}
-  .btn.sm{padding:7px 11px; font-size:13px; min-height:34px; border-radius:8px}
+  .btn.secondary{
+    background:var(--card-strong); color:var(--text);
+    border:1px solid var(--card-border-strong); box-shadow:none;
+  }
+  .btn.secondary:hover{background:rgba(255,255,255,0.14); filter:none}
+  .btn.ghost{background:transparent; color:var(--brand); border:1px solid var(--card-border); box-shadow:none}
+  .btn.ghost:hover{background:var(--card); border-color:var(--card-border-strong); filter:none}
+  .btn.danger{background:linear-gradient(135deg, var(--danger), #ff3f6c); color:#1a0a0e; box-shadow:0 8px 24px rgba(255,107,136,0.28), inset 0 0 0 1px rgba(255,255,255,.2)}
+  .btn.success{background:linear-gradient(135deg, var(--brand-2), #2ddf99); color:#04201a; box-shadow:0 8px 24px rgba(106,255,184,0.28), inset 0 0 0 1px rgba(255,255,255,.2)}
+  .btn.warn{background:linear-gradient(135deg, var(--warning), #f5b733); color:#221603; box-shadow:0 8px 24px rgba(255,209,102,0.28), inset 0 0 0 1px rgba(255,255,255,.2)}
+  .btn.sm{padding:6px 12px; font-size:12px; min-height:32px; border-radius:999px}
   .btn.block{width:100%}
   .btn-row{display:flex; gap:8px; flex-wrap:wrap}
 
   /* ---- BADGES / PILLS ---- */
   .pill{display:inline-flex; align-items:center; gap:6px;
-    padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600;
-    background:var(--grey-100); color:var(--navy);
+    padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600;
+    background:var(--card); color:var(--text); border:1px solid var(--card-border);
+    letter-spacing:.2px;
   }
-  .pill.blue{background:var(--blue-soft); color:var(--blue)}
-  .pill.green{background:var(--green-soft); color:var(--green)}
-  .pill.amber{background:var(--amber-soft); color:var(--amber)}
-  .pill.red{background:var(--red-soft); color:var(--red)}
-  .pill.navy{background:var(--navy); color:#fff}
+  .pill.blue{background:var(--pill-bg); color:var(--pill-text); border-color:rgba(49,208,255,0.30)}
+  .pill.green{background:var(--pill-mint-bg); color:var(--pill-mint-text); border-color:rgba(106,255,184,0.30)}
+  .pill.amber{background:var(--pill-warn-bg); color:var(--pill-warn-text); border-color:rgba(255,209,102,0.30)}
+  .pill.red{background:var(--pill-danger-bg); color:var(--pill-danger-text); border-color:rgba(255,107,136,0.30)}
+  .pill.navy{background:rgba(11,37,69,0.6); color:var(--text); border-color:var(--card-border-strong)}
 
   /* ---- PROGRESS ---- */
   .progress{
-    background:var(--grey-100); border-radius:999px; overflow:hidden;
-    height:10px; width:100%;
+    background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden;
+    height:8px; width:100%; border:1px solid var(--card-border);
   }
   .progress > i{display:block; height:100%;
-    background:linear-gradient(90deg, var(--blue-2), var(--blue));
-    border-radius:999px;}
-  .progress.green > i{background:linear-gradient(90deg, #4cc38a, var(--green))}
-  .progress.amber > i{background:linear-gradient(90deg, #f0b248, var(--amber))}
-  .progress.red > i{background:linear-gradient(90deg, #ee6b5a, var(--red))}
+    background:linear-gradient(90deg, var(--brand), var(--brand-2));
+    border-radius:999px; box-shadow:0 0 12px rgba(49,208,255,0.45);}
+  .progress.green > i{background:linear-gradient(90deg, var(--brand-2), var(--cash)); box-shadow:0 0 12px rgba(106,255,184,0.45)}
+  .progress.amber > i{background:linear-gradient(90deg, var(--warning), #f5b733); box-shadow:0 0 12px rgba(255,209,102,0.45)}
+  .progress.red > i{background:linear-gradient(90deg, var(--danger), #ff3f6c); box-shadow:0 0 12px rgba(255,107,136,0.45)}
 
   /* ---- GRID ---- */
   .grid{display:grid; gap:12px}
@@ -176,188 +233,236 @@
   /* ---- LIST ---- */
   .list-row{
     display:flex; align-items:center; gap:10px;
-    padding:10px 12px; border:1px solid var(--grey-200);
-    border-radius:10px; background:#fff; margin-bottom:8px;
+    padding:11px 12px; border:1px solid var(--card-border);
+    border-radius:14px; background:var(--card); margin-bottom:8px;
+    transition: background .15s, border-color .15s, transform .05s;
   }
+  .list-row:hover{background:var(--card-strong); border-color:var(--card-border-strong)}
   .list-row .grow{flex:1; min-width:0}
-  .list-row .title{font-weight:600; color:var(--navy)}
-  .list-row .sub{font-size:12px; color:var(--text-soft)}
+  .list-row .title{font-weight:600; color:var(--text)}
+  .list-row .sub{font-size:12px; color:var(--muted)}
 
   /* ---- BOTTOM NAV ---- */
   nav.bottom-nav{
     position:fixed; left:0; right:0; bottom:0; z-index:60;
-    background:#fff; border-top:1px solid var(--grey-200);
+    background:rgba(7,17,31,0.85);
+    -webkit-backdrop-filter:blur(16px) saturate(140%);
+    backdrop-filter:blur(16px) saturate(140%);
+    border-top:1px solid var(--card-border);
     display:flex; justify-content:space-around;
-    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
-    box-shadow:0 -4px 12px rgba(11,37,69,.05);
+    padding:6px 6px calc(8px + env(safe-area-inset-bottom));
   }
   nav.bottom-nav button{
     border:0; background:transparent; flex:1;
-    display:flex; flex-direction:column; align-items:center; gap:2px;
-    color:var(--text-soft); font-size:11px; padding:4px 2px;
-    min-width:0; cursor:pointer; min-height:54px;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    color:var(--muted-2); font-size:10px; padding:6px 2px;
+    min-width:0; cursor:pointer; min-height:54px; font-weight:600;
+    letter-spacing:.3px;
+    transition: color .15s;
   }
-  nav.bottom-nav button .ico{font-size:22px; line-height:1}
-  nav.bottom-nav button.active{color:var(--blue)}
-  nav.bottom-nav button.active .ico{filter:drop-shadow(0 2px 4px rgba(58,134,255,.4))}
+  nav.bottom-nav button .ico{font-size:22px; line-height:1; filter:grayscale(.3) opacity(.7); transition:filter .15s}
+  nav.bottom-nav button.active{color:var(--brand)}
+  nav.bottom-nav button.active .ico{filter:none; text-shadow:0 0 14px rgba(49,208,255,.55)}
 
   /* fab for camera */
   .fab{
-    position:fixed; right:14px; bottom:calc(82px + env(safe-area-inset-bottom));
-    width:58px; height:58px; border-radius:50%;
-    background:var(--blue-2); color:#fff; border:0; cursor:pointer; z-index:55;
-    box-shadow:0 6px 18px rgba(58,134,255,.4);
+    position:fixed; right:16px; bottom:calc(86px + env(safe-area-inset-bottom));
+    width:60px; height:60px; border-radius:50%;
+    background:linear-gradient(135deg, var(--brand), var(--brand-2));
+    color:#06121f; border:0; cursor:pointer; z-index:55;
+    box-shadow:0 12px 36px rgba(49,208,255,.45), inset 0 0 0 1px rgba(255,255,255,.25);
     font-size:24px; display:grid; place-items:center;
+    transition: transform .15s, box-shadow .15s;
   }
-  .fab:hover{background:var(--blue)}
+  .fab:hover{transform:translateY(-2px); box-shadow:0 16px 44px rgba(49,208,255,.55), inset 0 0 0 1px rgba(255,255,255,.35)}
 
   /* ---- TABLE ---- */
   table.t{
-    width:100%; border-collapse:collapse; font-size:13px;
+    width:100%; border-collapse:collapse; font-size:13px; color:var(--text);
   }
-  table.t th, table.t td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--grey-200)}
-  table.t th{background:var(--grey-50); color:var(--text-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.4px}
+  table.t th, table.t td{padding:9px 10px; text-align:left; border-bottom:1px solid var(--card-border)}
+  table.t th{background:rgba(255,255,255,0.04); color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.6px}
   table.t tr:last-child td{border-bottom:0}
+  table.t td input{background:rgba(255,255,255,0.04); padding:6px 8px; min-height:34px; border-radius:8px}
   .scroll-x{overflow-x:auto; -webkit-overflow-scrolling:touch}
 
   /* ---- MODAL ---- */
   .modal-backdrop{
-    position:fixed; inset:0; background:rgba(11,37,69,.45);
+    position:fixed; inset:0; background:rgba(2,6,16,.65);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     display:none; align-items:center; justify-content:center;
     z-index:100; padding:14px;
   }
   .modal-backdrop.open{display:flex}
   .modal{
-    background:#fff; width:100%; max-width:560px;
-    border-radius:16px; padding:18px; box-shadow:var(--shadow);
+    background:linear-gradient(180deg, rgba(13,27,47,0.95), rgba(7,17,31,0.95));
+    border:1px solid var(--card-border-strong);
+    width:100%; max-width:560px;
+    border-radius:20px; padding:20px; box-shadow:var(--shadow);
     max-height:90vh; overflow:auto;
+    color:var(--text);
   }
-  .modal h2{margin:0 0 10px}
-  .modal .actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px}
+  .modal h2{margin:0 0 10px; letter-spacing:-0.01em}
+  .modal .actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap}
 
   /* ---- LOGIN ---- */
   .login-wrap{
-    min-height:90vh; display:grid; place-items:center; padding:20px;
-    background:radial-gradient(circle at top, var(--blue-soft), var(--grey-50));
+    min-height:100vh; display:grid; place-items:center; padding:24px;
+    background:
+      radial-gradient(900px 600px at 20% 10%, rgba(49,208,255,0.18), transparent 60%),
+      radial-gradient(800px 600px at 80% 90%, rgba(106,255,184,0.14), transparent 60%),
+      var(--bg);
   }
   .login-card{
-    background:#fff; border-radius:18px; padding:24px;
-    max-width:420px; width:100%; box-shadow:var(--shadow);
-    border:1px solid var(--grey-200);
+    background:var(--card-strong);
+    border-radius:24px; padding:28px;
+    max-width:440px; width:100%; box-shadow:var(--shadow);
+    border:1px solid var(--card-border-strong);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
   }
 
   /* ---- PHOTO TILES ---- */
   .photo-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px}
   .photo-tile{
-    aspect-ratio:1/1; background:var(--grey-100);
-    border-radius:10px; overflow:hidden; position:relative; cursor:pointer;
-    border:1px solid var(--grey-200);
+    aspect-ratio:1/1; background:var(--card);
+    border-radius:14px; overflow:hidden; position:relative; cursor:pointer;
+    border:1px solid var(--card-border);
+    transition: transform .15s, border-color .15s, box-shadow .15s;
   }
+  .photo-tile:hover{transform:translateY(-2px); border-color:var(--brand); box-shadow:0 12px 30px rgba(49,208,255,.25)}
   .photo-tile img{width:100%; height:100%; object-fit:cover; display:block}
   .photo-tile .ptag{
     position:absolute; bottom:4px; left:4px; right:4px;
-    background:rgba(11,37,69,.7); color:#fff;
-    padding:3px 6px; border-radius:6px; font-size:10px;
+    background:rgba(7,17,31,0.78); color:var(--text);
+    padding:3px 8px; border-radius:999px; font-size:10px;
     display:flex; justify-content:space-between; gap:4px;
+    border:1px solid var(--card-border);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
   }
 
   /* ---- ELECTRICAL ICONS / REBUILDER CANVAS ---- */
   .canvas-wrap{
     position:relative; width:100%; aspect-ratio:4/3;
-    background:repeating-linear-gradient(0deg, transparent 0 39px, rgba(11,37,69,.06) 39px 40px),
-               repeating-linear-gradient(90deg, transparent 0 39px, rgba(11,37,69,.06) 39px 40px),
-               var(--white);
-    border:1px solid var(--grey-200); border-radius:12px; overflow:hidden;
+    background:repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.06) 39px 40px),
+               repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.06) 39px 40px),
+               linear-gradient(135deg, rgba(13,27,47,0.6), rgba(7,17,31,0.6));
+    border:1px solid var(--card-border); border-radius:16px; overflow:hidden;
   }
   .canvas-room{
-    position:absolute; border:2px dashed var(--blue);
-    background:rgba(58,134,255,.06); border-radius:8px;
+    position:absolute; border:2px dashed var(--brand);
+    background:rgba(49,208,255,.08); border-radius:10px;
     padding:4px 6px;
   }
   .canvas-room .room-label{
-    font-size:11px; color:var(--blue); font-weight:700; text-transform:uppercase;
+    font-size:11px; color:var(--brand); font-weight:700; text-transform:uppercase;
+    letter-spacing:.5px;
   }
   .canvas-icon{
-    position:absolute; width:28px; height:28px;
-    border-radius:8px; background:#fff; border:1px solid var(--navy);
-    display:grid; place-items:center; font-size:14px;
-    cursor:grab; transition:transform .1s;
-    box-shadow:0 1px 4px rgba(0,0,0,.1);
+    position:absolute; width:30px; height:30px;
+    border-radius:9px; background:rgba(13,27,47,0.95);
+    border:1px solid var(--card-border-strong);
+    display:grid; place-items:center; font-size:14px; color:var(--text);
+    cursor:grab; transition:transform .1s, box-shadow .15s;
+    box-shadow:0 4px 12px rgba(0,0,0,.4);
   }
-  .canvas-icon.selected{box-shadow:0 0 0 3px rgba(58,134,255,.4); transform:scale(1.1)}
-  .symbol-palette{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+  .canvas-icon:hover{box-shadow:0 6px 18px rgba(49,208,255,.4)}
+  .canvas-icon.selected{box-shadow:0 0 0 3px rgba(49,208,255,.5); transform:scale(1.1)}
+  .symbol-palette{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px}
   .sym-btn{
-    background:var(--grey-50); border:1px solid var(--grey-200);
-    padding:6px 8px; border-radius:8px; cursor:pointer; font-size:13px;
-    display:flex; align-items:center; gap:6px;
+    background:var(--card); border:1px solid var(--card-border);
+    padding:6px 10px; border-radius:999px; cursor:pointer; font-size:12px;
+    display:flex; align-items:center; gap:6px; color:var(--text);
+    transition: background .15s, border-color .15s;
   }
-  .sym-btn:hover{background:var(--blue-soft); border-color:var(--blue)}
+  .sym-btn:hover{background:var(--pill-bg); border-color:var(--brand); color:var(--pill-text)}
 
   /* ---- TASK TREE ---- */
-  .task-room{margin-bottom:12px}
+  .task-room{margin-bottom:14px}
   .task-room > .head{
-    display:flex; align-items:center; gap:10px; padding:8px 10px;
-    background:var(--navy); color:#fff; border-radius:10px; cursor:pointer;
-    font-weight:700;
+    display:flex; align-items:center; gap:10px; padding:9px 12px;
+    background:linear-gradient(135deg, rgba(49,208,255,0.18), rgba(106,255,184,0.10));
+    border:1px solid rgba(49,208,255,0.35);
+    color:var(--text); border-radius:12px; cursor:pointer;
+    font-weight:700; letter-spacing:-0.01em;
   }
   .task-circuit{
-    margin:6px 0 6px 14px; padding-left:8px;
-    border-left:3px solid var(--blue-2);
+    margin:8px 0 8px 14px; padding-left:10px;
+    border-left:2px solid rgba(49,208,255,0.5);
   }
-  .task-circuit > .head{padding:6px 8px; color:var(--blue); font-weight:600; cursor:pointer}
+  .task-circuit > .head{padding:6px 8px; color:var(--brand); font-weight:600; cursor:pointer; font-size:13px; text-transform:uppercase; letter-spacing:.5px}
   .task-item{
-    display:flex; align-items:flex-start; gap:8px;
-    background:var(--white); border:1px solid var(--grey-200);
-    border-radius:8px; padding:8px 10px; margin:5px 0;
+    display:flex; align-items:flex-start; gap:10px;
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:12px; padding:10px 12px; margin:6px 0;
+    transition: background .15s, border-color .15s;
   }
-  .task-item.done{background:var(--green-soft); border-color:#bfe5cd}
-  .task-item.issue{background:var(--red-soft); border-color:#f1c4be}
-  .task-item.progress{background:#fff7e0; border-color:#f0d99a}
+  .task-item:hover{background:var(--card-strong); border-color:var(--card-border-strong)}
+  .task-item.done{background:rgba(106,255,184,0.08); border-color:rgba(106,255,184,0.30)}
+  .task-item.issue{background:rgba(255,107,136,0.08); border-color:rgba(255,107,136,0.30)}
+  .task-item.progress{background:rgba(255,209,102,0.08); border-color:rgba(255,209,102,0.30)}
   .task-check{
-    width:22px; height:22px; border-radius:6px;
-    border:2px solid var(--grey-300); background:#fff; cursor:pointer;
-    display:grid; place-items:center; font-size:14px; color:#fff;
-    flex:0 0 22px;
+    width:24px; height:24px; border-radius:8px;
+    border:2px solid var(--card-border-strong); background:transparent; cursor:pointer;
+    display:grid; place-items:center; font-size:14px; color:#06121f;
+    flex:0 0 24px; transition: background .15s, border-color .15s;
   }
-  .task-check.done{background:var(--green); border-color:var(--green)}
-  .task-sub{margin-left:30px; margin-top:6px; display:none}
+  .task-check.done{background:linear-gradient(135deg, var(--brand-2), var(--cash)); border-color:transparent; box-shadow:0 0 12px rgba(106,255,184,.45)}
+  .task-sub{margin-left:34px; margin-top:6px; display:none}
   .task-sub.open{display:block}
   .sub-row{
     display:flex; gap:8px; align-items:center;
-    font-size:13px; padding:4px 0; color:var(--text-soft);
+    font-size:13px; padding:4px 0; color:var(--muted);
   }
-  .sub-row input[type=checkbox]{width:18px; height:18px; min-height:0}
+  .sub-row input[type=checkbox]{width:18px; height:18px; min-height:0; accent-color:var(--brand)}
 
   /* ---- AI ASSISTANT ---- */
-  .chat{display:flex; flex-direction:column; gap:8px; max-height:280px; overflow:auto; padding:8px; background:var(--grey-50); border-radius:10px}
-  .msg{padding:8px 10px; border-radius:10px; max-width:85%; font-size:14px; line-height:1.4}
-  .msg.user{align-self:flex-end; background:var(--blue-2); color:#fff}
-  .msg.bot{align-self:flex-start; background:#fff; border:1px solid var(--grey-200)}
+  .chat{display:flex; flex-direction:column; gap:10px; max-height:340px; overflow:auto; padding:12px; background:rgba(7,17,31,0.4); border:1px solid var(--card-border); border-radius:14px}
+  .msg{padding:10px 12px; border-radius:14px; max-width:85%; font-size:14px; line-height:1.5}
+  .msg.user{align-self:flex-end; background:linear-gradient(135deg, var(--brand), #1ab9eb); color:#06121f; font-weight:500; box-shadow:0 4px 14px rgba(49,208,255,.3)}
+  .msg.bot{align-self:flex-start; background:var(--card-strong); border:1px solid var(--card-border); color:var(--text)}
+  .msg.bot.thinking{opacity:.7; font-style:italic}
 
   /* ---- HELPERS ---- */
   .right{margin-left:auto}
   .center{text-align:center}
   .small{font-size:12px}
-  .tag{display:inline-block; background:var(--grey-100); color:var(--text); padding:2px 7px; border-radius:6px; font-size:11px; margin-right:4px}
-  .divider{height:1px; background:var(--grey-200); margin:14px 0}
-  .empty{padding:24px; text-align:center; color:var(--text-soft); border:1px dashed var(--grey-300); border-radius:12px; background:var(--grey-50)}
+  .tag{display:inline-block; background:var(--card); color:var(--text); padding:2px 8px; border-radius:999px; font-size:11px; margin-right:4px; border:1px solid var(--card-border)}
+  .divider{height:1px; background:var(--card-border); margin:14px 0}
+  .empty{padding:28px; text-align:center; color:var(--muted); border:1px dashed var(--card-border-strong); border-radius:16px; background:rgba(255,255,255,0.02)}
   .badge-status{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px}
+  code{background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:6px; font-size:12px; border:1px solid var(--card-border); color:var(--brand)}
 
   /* sticky page header for sub-pages with back button */
   .page-bar{
-    display:flex; align-items:center; gap:8px; margin-bottom:12px;
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
   }
   .back-btn{
-    background:var(--white); border:1px solid var(--grey-200); border-radius:10px;
-    padding:8px 10px; cursor:pointer; color:var(--blue); font-weight:600;
+    background:var(--card); border:1px solid var(--card-border); border-radius:999px;
+    padding:8px 14px; cursor:pointer; color:var(--brand); font-weight:600;
+    transition: background .15s, border-color .15s;
   }
-  .page-title{font-size:18px; font-weight:700; color:var(--navy)}
+  .back-btn:hover{background:var(--card-strong); border-color:var(--brand)}
+  .page-title{font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.02em}
+
+  /* Roadmap difficulty chips */
+  .diff{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; color:#06121f}
+  .diff.d1,.diff.d2,.diff.d3{background:linear-gradient(135deg, var(--brand-2), var(--cash))}
+  .diff.d4,.diff.d5,.diff.d6{background:linear-gradient(135deg, var(--warning), #f5b733)}
+  .diff.d7,.diff.d8,.diff.d9,.diff.d10{background:linear-gradient(135deg, var(--danger), #ff3f6c); color:#1a0a0e}
 
   /* print styles for handover */
   @media print{
     header.app-header, nav.bottom-nav, .fab, .no-print{display:none !important}
-    body{background:#fff; padding:0}
-    .card{box-shadow:none; border:1px solid #ddd; break-inside:avoid}
+    body{background:#fff; color:#000; padding:0}
+    .card{background:#fff; color:#000; border:1px solid #ddd; box-shadow:none; break-inside:avoid; backdrop-filter:none; -webkit-backdrop-filter:none}
+    .card h3, .card h2{color:#000}
+    .muted, .small{color:#444}
+    .pill{background:#eee; color:#000; border-color:#ccc}
+    table.t th{background:#f3f3f3; color:#000}
+    table.t td, table.t th{border-color:#ccc}
+    .progress{background:#eee; border-color:#ccc}
+    .progress > i{background:#888 !important; box-shadow:none}
   }
 </style>
 </head>
@@ -368,11 +473,11 @@
      ========================================================= -->
 <div id="login-screen" class="login-wrap">
   <div class="login-card">
-    <div class="brand" style="margin-bottom:12px">
+    <div class="brand" style="margin-bottom:14px">
       <div class="brand-mark">SR</div>
       <div>
-        <div class="brand-title" style="color:var(--navy); font-size:18px">Site Reviser</div>
-        <div class="brand-sub" style="color:var(--text-soft)">Electrical Site Tracking</div>
+        <div class="brand-title" style="color:var(--text); font-size:20px">Site Reviser</div>
+        <div class="brand-sub" style="color:var(--muted)">Electrical Site Tracking</div>
       </div>
     </div>
     <p class="muted">Sign in as one of your team. Roles control which screens are read-only. Auth is local-only for now — wire to real auth later.</p>
@@ -574,6 +679,15 @@
         <div class="page-title">AI Assistant <span class="pill amber" style="margin-left:6px">Preview</span></div>
       </div>
       <div id="ai-content"></div>
+    </section>
+
+    <!-- ===== ROADMAP ===== -->
+    <section class="page" id="page-roadmap">
+      <div class="page-bar">
+        <button class="back-btn" onclick="go('settings')">← Settings</button>
+        <div class="page-title">Roadmap</div>
+      </div>
+      <div id="roadmap-content"></div>
     </section>
 
     <!-- ===== SETTINGS / USERS ===== -->
@@ -866,6 +980,7 @@ function go(page, opts){
     case 'handover':   renderHandover();   break;
     case 'ai':         renderAI();         break;
     case 'settings':   renderSettings();   break;
+    case 'roadmap':    renderRoadmap();    break;
   }
   window.scrollTo({top:0, behavior:'instant'});
   location.hash = '#'+page;
@@ -2516,84 +2631,271 @@ function updateAsBuilt(val){
 </script>
 
 <script id="mod-ai">
-/* ===== AI ASSISTANT (mock) ===== */
+/* =========================================================
+   AI ASSISTANT — real Claude API if key set, smarter local
+   fallback if not. Key + model live in DB.settings.ai.
+   ========================================================= */
+function aiSettings(){
+  DB.settings.ai = DB.settings.ai || {provider:'anthropic', key:'', model:'claude-sonnet-4-5-20250929'};
+  return DB.settings.ai;
+}
+function aiEnabled(){ return !!(aiSettings().key && aiSettings().key.trim()); }
+
 function renderAI(){
   const el = document.getElementById('ai-content');
+  const enabled = aiEnabled();
   el.innerHTML = `
     <div class="card">
-      <h3>AI Assistant <span class="pill amber">Mock responses</span></h3>
-      <p class="muted small">Ask things like: "Show incomplete kitchen tasks", "How many GPOs are left?", "Create a material list", "Show all rough-in photos for Bedroom 2". <i>TODO: route through a real LLM once backend is connected.</i></p>
+      <h3>AI Assistant ${enabled
+        ? '<span class="pill green">Live · Claude</span>'
+        : '<span class="pill amber">Local mode</span>'}</h3>
+      <p class="muted small">${enabled
+        ? `Connected to <code>${escapeHtml(aiSettings().model)}</code>. Ask anything about this project — tasks, devices, photos, circuits, materials, defects, variations.`
+        : `Running in local mode (no API key). I can still answer common questions from your project data. Add a Claude API key in <a onclick="go('settings')" style="cursor:pointer">Settings</a> to enable the full LLM.`}</p>
       <div class="chat" id="chat-feed"></div>
-      <div class="row" style="margin-top:8px">
-        <input id="chat-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')chatSend()"/>
-        <button class="btn" onclick="chatSend()">Send</button>
+      <div class="row" style="margin-top:10px">
+        <input id="chat-input" placeholder="Ask anything about ${currentProject()?escapeHtml(currentProject().name):'this project'}..." onkeydown="if(event.key==='Enter')chatSend()"/>
+        <button class="btn" onclick="chatSend()" id="chat-send-btn">Send</button>
       </div>
-      <div class="btn-row" style="margin-top:8px;flex-wrap:wrap">
+      <div class="btn-row" style="margin-top:10px;flex-wrap:wrap">
         <button class="btn sm secondary" onclick="chatQuick('Show incomplete kitchen tasks')">Incomplete kitchen tasks</button>
-        <button class="btn sm secondary" onclick="chatQuick('How many GPOs are left?')">GPOs left?</button>
-        <button class="btn sm secondary" onclick="chatQuick('Create a material list')">Material list</button>
-        <button class="btn sm secondary" onclick="chatQuick('Show all rough-in photos for Bedroom 2')">Rough-in photos Bedroom 2</button>
+        <button class="btn sm secondary" onclick="chatQuick('How many GPOs are left to install?')">GPOs left?</button>
+        <button class="btn sm secondary" onclick="chatQuick('Summarise the material list')">Summarise materials</button>
+        <button class="btn sm secondary" onclick="chatQuick('Show all rough-in photos for Bedroom 1')">Rough-in photos Bedroom 1</button>
+        <button class="btn sm secondary" onclick="chatQuick('Which circuit looks closest to overloaded?')">Overload check</button>
+        <button class="btn sm secondary" onclick="chatQuick('What needs doing before fit-off?')">Pre-fit-off list</button>
       </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:4px">How the assistant uses your data</h3>
+      <p class="muted small">Each question is sent along with a compact JSON snapshot of the current project (rooms, devices, circuits, tasks, photos metadata — never the photo binaries). Nothing leaves your browser if you stay in local mode. ${enabled?'Your API key is stored only in this browser\'s localStorage.':''}</p>
     </div>`;
-  window._chat = window._chat || [{from:'bot', text:"G'day! I can search tasks, photos, materials and circuits across your active project. Ask away."}];
+  window._chat = window._chat || [{from:'bot', text: enabled
+    ? "G'day. I'm connected to Claude and can read this project's data. What do you want to know?"
+    : "G'day. Local mode here — I can answer questions about tasks, GPOs, circuits, photos, materials, defects and variations using your project data. Add a Claude API key in Settings if you want full LLM answers."}];
   renderChat();
 }
 function renderChat(){
   const f = document.getElementById('chat-feed');
-  f.innerHTML = window._chat.map(m=>`<div class="msg ${m.from}">${escapeHtml(m.text).replace(/\n/g,'<br>')}</div>`).join('');
+  if(!f) return;
+  f.innerHTML = window._chat.map(m=>`<div class="msg ${m.from}${m.thinking?' thinking':''}">${m.html?m.text:escapeHtml(m.text).replace(/\n/g,'<br>')}</div>`).join('');
   f.scrollTop = f.scrollHeight;
 }
-function chatQuick(q){ document.getElementById('chat-input').value = q; chatSend(); }
-function chatSend(){
+function chatQuick(q){
   const i = document.getElementById('chat-input');
-  const q = i.value.trim();
+  if(!i) return;
+  i.value = q; chatSend();
+}
+async function chatSend(){
+  const i = document.getElementById('chat-input');
+  const q = (i.value||'').trim();
   if(!q) return;
   window._chat.push({from:'user', text:q});
-  i.value=''; renderChat();
-  setTimeout(()=>{
-    window._chat.push({from:'bot', text: mockAIAnswer(q)});
-    renderChat();
-  }, 240);
+  i.value='';
+  const thinkIdx = window._chat.push({from:'bot', text:'Thinking…', thinking:true}) - 1;
+  renderChat();
+  let answer;
+  try{
+    if(aiEnabled()){
+      answer = await askClaude(q);
+    } else {
+      await new Promise(r=>setTimeout(r,180));
+      answer = localAIAnswer(q);
+    }
+  } catch(err){
+    answer = `⚠️ ${err.message||err}. Falling back to local mode:\n\n${localAIAnswer(q)}`;
+  }
+  window._chat[thinkIdx] = {from:'bot', text: answer};
+  renderChat();
 }
-function mockAIAnswer(q){
-  /* TODO(AI): replace with real model call. Plug in OPENAI/Claude API + tool calls
-     against the same DB structure. The mock below is keyword-driven over local data. */
+
+/* ----------------- REAL CLAUDE API CALL -----------------
+   Uses Anthropic Messages API direct from browser.
+   Requires `anthropic-dangerous-direct-browser-access: true` so CORS allows it.
+   User accepts the risk by entering their key in Settings.
+   TODO(backend): for shared keys, move this to a small server proxy.
+*/
+async function askClaude(question){
+  const s = aiSettings();
+  const project = currentProject();
+  const snapshot = projectSnapshotForAI(project);
+  const system = `You are Site Reviser's AI assistant — a helpful, plain-speaking helper for Australian electrical contractors.
+Be concise. Use bullet points only when listing 4+ things. Use the project JSON below to answer.
+If the user asks for compliance / load calcs, always remind them estimates must be verified by a licensed electrician per AS/NZS 3000.
+If data isn't in the snapshot, say so honestly — do not invent rooms, devices, or photos.`;
+  const userMsg = `PROJECT SNAPSHOT (JSON):\n\`\`\`json\n${JSON.stringify(snapshot)}\n\`\`\`\n\nQUESTION: ${question}`;
+  const body = {
+    model: s.model || 'claude-sonnet-4-5-20250929',
+    max_tokens: 1024,
+    system,
+    messages: [{role:'user', content: userMsg}]
+  };
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': s.key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    const errText = await res.text().catch(()=>String(res.status));
+    throw new Error(`Claude API ${res.status}: ${errText.slice(0,200)}`);
+  }
+  const data = await res.json();
+  const text = (data.content||[]).map(c=>c.text||'').join('').trim();
+  return text || '(empty response from Claude)';
+}
+
+/* Compact project snapshot — strips photo binaries to keep tokens low */
+function projectSnapshotForAI(p){
+  if(!p) return {note:"No project open."};
+  return {
+    name:p.name, address:p.address, builder:p.builder, jobType:p.jobType, status:p.status,
+    startDate:p.startDate, notes:p.notes,
+    rooms: p.rooms.map(r=>({id:r.id, name:r.name})),
+    circuits: p.circuits.map(c=>({id:c.id, name:c.name, type:c.type, rating:c.rating, rooms:c.rooms, notes:c.notes})),
+    devices: p.devices.map(d=>({id:d.id, type:d.type, label:d.label, roomId:d.roomId, circuitId:d.circuitId})),
+    tasks: p.tasks.map(t=>({title:t.title, roomId:t.roomId, circuitId:t.circuitId, deviceType:t.deviceType, status:t.status, priority:t.priority, dueDate:t.dueDate, assignedTo:t.assignedTo, notes:t.notes, subtasksDone: (t.subtasks||[]).filter(s=>s.done).length, subtasksTotal:(t.subtasks||[]).length})),
+    photos: p.photos.map(ph=>({stage:ph.stage, roomId:ph.roomId, circuitId:ph.circuitId, taskId:ph.taskId, ts:ph.ts, tags:ph.tags, notes:ph.notes, by:ph.by})),
+    materials: p.materials.map(m=>({category:m.category, item:m.item, qty:m.qty, unit:m.unit, price:m.price, notes:m.notes})),
+    defects: p.defects.map(d=>({title:d.title, desc:d.desc, roomId:d.roomId, priority:d.priority, status:d.status, assignedTo:d.assignedTo, notes:d.notes})),
+    variations: p.variations.map(v=>({title:v.title, desc:v.desc, roomId:v.roomId, status:v.status, labour:v.labour, items:v.items}))
+  };
+}
+
+/* ----------------- SMARTER LOCAL FALLBACK ----------------- */
+function localAIAnswer(q){
   const p = currentProject();
-  if(!p) return "Open a project first, then I can answer questions about it.";
+  if(!p) return "No project open. Pick one in Sites first.";
   const ql = q.toLowerCase();
-  // task / room queries
-  const roomMatch = p.rooms.find(r=> ql.includes(r.name.toLowerCase()));
-  if(/incomplete|outstanding|todo|left/.test(ql) && /task|kitchen|room/.test(ql) || (roomMatch && /task/.test(ql))){
-    const list = p.tasks.filter(t=> t.status!=='done' && (!roomMatch || t.roomId===roomMatch.id));
-    if(!list.length) return "All tasks are completed there. 🎉";
-    return `Found ${list.length} incomplete task${list.length===1?'':'s'}${roomMatch?' in '+roomMatch.name:''}:\n - `+list.slice(0,12).map(t=>t.title).join('\n - ');
+  const findRoom = ()=> p.rooms.find(r=> ql.includes(r.name.toLowerCase()));
+  const findStage= ()=> STAGE_LIST.find(s=> ql.includes(s.toLowerCase()))
+                       || (/rough/.test(ql)?'Rough In': /fit.?off/.test(ql)?'Fit Off': /callback/.test(ql)?'Callback': /defect/.test(ql)?'Defect': /pre.?plaster/.test(ql)?'Pre-Plaster': /hidden/.test(ql)?'Hidden Services': null);
+  const symKey   = ()=>{
+    const e = ELECTRICAL_SYMBOLS.find(s=> ql.includes(s.label.toLowerCase()) || ql.includes(s.k));
+    return e?e.k:null;
+  };
+
+  if(/overload|loaded|near.?full|over.?capacity/.test(ql)){
+    if(!p.circuits.length) return "No circuits defined yet.";
+    const scored = p.circuits.map(c=>{
+      const devs = p.devices.filter(d=>d.circuitId===c.id);
+      const watts = devs.reduce((s,d)=> s+ estimatedWatts(d), 0);
+      const ratingW = (c.rating||10)*230;
+      return {c, watts, ratingW, ratio: ratingW?watts/ratingW:0};
+    }).sort((a,b)=>b.ratio-a.ratio);
+    const top = scored.slice(0,3);
+    return "Top circuits by estimated load:\n" + top.map(s=>
+      `  • ${s.c.name} (${s.c.type}, ${s.c.rating||10}A) — ${s.watts}W of ${s.ratingW}W (${Math.round(s.ratio*100)}%)`
+    ).join('\n') + "\n\nReminder: load estimates are AI-assisted, verify with a licensed electrician.";
   }
-  if(/gpo/.test(ql)){
-    const total = p.devices.filter(d=>d.type==='gpo'||d.type==='gpo2').length;
-    const done  = p.tasks.filter(t=> (t.deviceType==='gpo'||t.deviceType==='gpo2') && t.status==='done').length;
-    return `You have ${total} GPO outlets across the site. ${done} marked complete, ${total-done} still to go.`;
+
+  if(/pre.?fit|before.?fit|ready.?for.?fit|fit.?off.?list/.test(ql)){
+    const notReady = p.tasks.filter(t=>{
+      const sub = t.subtasks||[];
+      const cableDone = sub.find(s=>s.key==='cable')?.done;
+      const boxDone   = sub.find(s=>s.key==='box')?.done;
+      const tested    = sub.find(s=>s.key==='test')?.done;
+      return !(cableDone && boxDone && tested);
+    });
+    if(!notReady.length) return "Looks like every device has cable, box and testing ticked. Ready for fit-off. 🎉";
+    return `${notReady.length} item${notReady.length===1?'':'s'} still need cable / box / testing finished before fit-off:\n - ` +
+      notReady.slice(0,15).map(t=>`${t.title} (${(p.rooms.find(r=>r.id===t.roomId)||{}).name||''})`).join('\n - ');
   }
-  if(/material|stock/.test(ql)){
-    const top = [...p.materials].sort((a,b)=> (b.qty*(b.price||0))-(a.qty*(a.price||0))).slice(0,8);
-    return `Top material lines for ${p.name}:\n`+top.map(m=>`  ${m.item} × ${m.qty} ${m.unit||'ea'} ($${(m.qty*(m.price||0)).toFixed(2)})`).join('\n');
+
+  const sk = symKey();
+  if(sk && /how many|count|left|remaining|outstanding|total/.test(ql)){
+    const matching = p.devices.filter(d=> sk==='gpo' ? (d.type==='gpo'||d.type==='gpo2') : d.type===sk);
+    const tasks = p.tasks.filter(t=> sk==='gpo' ? (t.deviceType==='gpo'||t.deviceType==='gpo2') : t.deviceType===sk);
+    const done = tasks.filter(t=>t.status==='done').length;
+    const lab = SYMBOL_BY_KEY[sk].label;
+    return `${lab}: ${matching.length} on the plan. ${done} marked complete, ${tasks.length-done} still to go.`;
   }
-  if(/photo/.test(ql)){
-    let list = p.photos;
-    const stage = STAGE_LIST.find(s=> ql.includes(s.toLowerCase())) || (ql.includes('rough')?'Rough In':null);
-    const room  = roomMatch;
+
+  const room = findRoom();
+  if(/incomplete|outstanding|todo|left|remaining|to do|to-do/.test(ql) || /list .* task|show .* task|what tasks/.test(ql) || (room && /task|do|left/.test(ql))){
+    let list = p.tasks.filter(t=>t.status!=='done');
+    if(room) list = list.filter(t=>t.roomId===room.id);
+    const sk2 = symKey();
+    if(sk2) list = list.filter(t=> sk2==='gpo' ? (t.deviceType==='gpo'||t.deviceType==='gpo2') : t.deviceType===sk2);
+    if(!list.length) return room?`All tasks in ${room.name} are complete. 🎉`:"All tasks are complete. 🎉";
+    return `${list.length} incomplete task${list.length===1?'':'s'}${room?' in '+room.name:''}:\n - ` +
+      list.slice(0,15).map(t=>{
+        const r = p.rooms.find(r=>r.id===t.roomId);
+        return `${t.title}${r?` — ${r.name}`:''}`;
+      }).join('\n - ');
+  }
+
+  if(/photo|picture|image|pic/.test(ql)){
+    let list = [...p.photos];
+    const stage = findStage();
     if(stage) list = list.filter(ph=>ph.stage===stage);
     if(room)  list = list.filter(ph=>ph.roomId===room.id);
-    if(!list.length) return "No matching photos. Try uploading some via the Photos page or relaxing the filters.";
-    return `Found ${list.length} photo${list.length===1?'':'s'}${stage?` tagged ${stage}`:''}${room?` in ${room.name}`:''}. Open the Photos page to view.`;
+    const dateMatch = ql.match(/today|yesterday|this week/);
+    if(dateMatch){
+      const now = Date.now(); const day=86400000;
+      if(dateMatch[0]==='today') list = list.filter(ph=>ph.ts > now-day);
+      if(dateMatch[0]==='yesterday') list = list.filter(ph=>ph.ts > now-2*day && ph.ts <= now-day);
+      if(dateMatch[0]==='this week') list = list.filter(ph=>ph.ts > now-7*day);
+    }
+    if(!list.length) return `No photos${stage?' tagged '+stage:''}${room?' in '+room.name:''}${dateMatch?' '+dateMatch[0]:''}. Try the Photos page filter, or upload some from the FAB.`;
+    return `Found ${list.length} photo${list.length===1?'':'s'}${stage?` tagged ${stage}`:''}${room?` in ${room.name}`:''}${dateMatch?' '+dateMatch[0]:''}. Open Photos to view them.`;
   }
-  if(/circuit/.test(ql)){
-    return `Project has ${p.circuits.length} circuits: ${p.circuits.map(c=>c.name).join(', ')}.`;
+
+  if(/material|stock|supply|order|gear|bom/.test(ql)){
+    if(/summar|overview|total/.test(ql)){
+      const total = p.materials.reduce((s,m)=> s + m.qty*(m.price||0), 0);
+      const cats = {};
+      p.materials.forEach(m=> cats[m.category] = (cats[m.category]||0) + m.qty*(m.price||0));
+      const lines = Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`  • ${k}: $${v.toFixed(2)}`);
+      return `Material summary for ${p.name}:\n${lines.join('\n')}\nTotal: $${total.toFixed(2)}`;
+    }
+    const top = [...p.materials].sort((a,b)=> (b.qty*(b.price||0))-(a.qty*(a.price||0))).slice(0,8);
+    return `Top material lines:\n` + top.map(m=>`  • ${m.item} × ${m.qty} ${m.unit||'ea'} ($${(m.qty*(m.price||0)).toFixed(2)})`).join('\n');
   }
-  if(/defect|callback/.test(ql)){
-    const open = p.defects.filter(d=>d.status!=='done').length;
-    return `There are ${open} open defects/callbacks and ${p.defects.length-open} closed.`;
+
+  if(/circuit|breaker|rcbo/.test(ql)){
+    if(!p.circuits.length) return "No circuits defined yet.";
+    return `${p.circuits.length} circuits in ${p.name}:\n` + p.circuits.map(c=>{
+      const devs = p.devices.filter(d=>d.circuitId===c.id);
+      return `  • ${c.name} — ${c.type}, ${c.rating||10}A, ${devs.length} device${devs.length===1?'':'s'}`;
+    }).join('\n');
   }
-  return "I'm a mock helper for now — ask about tasks, GPOs, materials, photos, circuits, or defects. Real AI hookups go here later.";
+
+  if(/defect|callback|issue|fault/.test(ql)){
+    const open = p.defects.filter(d=>d.status!=='done');
+    if(!p.defects.length) return "No defects logged.";
+    if(!open.length) return `All ${p.defects.length} defect${p.defects.length===1?'':'s'} are closed. 🎉`;
+    return `${open.length} open / ${p.defects.length} total. Open list:\n - ` +
+      open.slice(0,10).map(d=>{
+        const r = p.rooms.find(r=>r.id===d.roomId);
+        return `${d.title} [${d.priority}]${r?' — '+r.name:''}`;
+      }).join('\n - ');
+  }
+
+  if(/variation|vo|extra work|change.?order/.test(ql)){
+    if(!p.variations.length) return "No variations recorded.";
+    return p.variations.map(v=>{
+      const t = (v.items||[]).reduce((s,i)=>s+i.qty*i.price,0)+(v.labour||0);
+      return `  • ${v.title} (${v.status}) — $${t.toFixed(2)}`;
+    }).join('\n');
+  }
+
+  if(/summar|overview|status|how.?are.?we|progress/.test(ql)){
+    const total = p.tasks.length;
+    const done  = p.tasks.filter(t=>t.status==='done').length;
+    const openDefects = p.defects.filter(d=>d.status!=='done').length;
+    return `${p.name} — ${p.status}\n` +
+           `  Rooms: ${p.rooms.length}, Devices: ${p.devices.length}, Circuits: ${p.circuits.length}\n` +
+           `  Tasks: ${done}/${total} complete\n` +
+           `  Defects open: ${openDefects}\n` +
+           `  Photos: ${p.photos.length}`;
+  }
+
+  return "Not sure — try asking about tasks, GPOs, lights, smokes, circuits, photos, materials, defects, variations, or overall progress. Add a Claude API key in Settings for full natural-language answers.";
 }
 </script>
 
@@ -2628,6 +2930,29 @@ function renderSettings(){
     </div>
 
     <div class="card">
+      <h3>AI Assistant</h3>
+      <p class="muted small">Paste an Anthropic API key to enable real Claude answers. Without a key the assistant runs in local fallback mode using project data. Key is stored only in this browser's localStorage. <a href="https://console.anthropic.com/" target="_blank" rel="noopener" style="color:var(--brand)">Get a key →</a></p>
+      <label>Anthropic API key</label>
+      <div style="display:flex; gap:8px">
+        <input id="ai-key" type="password" placeholder="sk-ant-..." value="${escapeHtml(aiSettings().key||'')}" autocomplete="off" />
+        <button class="btn secondary" type="button" onclick="(()=>{const i=document.getElementById('ai-key'); i.type=i.type==='password'?'text':'password';})()">👁</button>
+      </div>
+      <label>Model</label>
+      <select id="ai-model">
+        <option value="claude-sonnet-4-5-20250929" ${aiSettings().model==='claude-sonnet-4-5-20250929'?'selected':''}>Claude Sonnet 4.5 (recommended)</option>
+        <option value="claude-opus-4-5" ${aiSettings().model==='claude-opus-4-5'?'selected':''}>Claude Opus 4.5 (deeper, slower)</option>
+        <option value="claude-haiku-4-5-20251001" ${aiSettings().model==='claude-haiku-4-5-20251001'?'selected':''}>Claude Haiku 4.5 (fast, cheap)</option>
+      </select>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" onclick="saveAiSettings()">Save AI settings</button>
+        <button class="btn secondary" onclick="testAi()">Test connection</button>
+        <button class="btn ghost" onclick="clearAiKey()">Remove key</button>
+      </div>
+      <div id="ai-test-result" class="small" style="margin-top:8px"></div>
+      <p class="small muted" style="margin-top:8px">⚠ The API key sits in this browser and is sent directly to Anthropic. For multi-user/team setups, wire a server proxy (see <code>TODO(backend)</code> in source).</p>
+    </div>
+
+    <div class="card">
       <h3>Data &amp; offline</h3>
       <p class="muted small">All your data is currently stored in this browser via <b>localStorage</b>. Cached projects, plans &amp; tasks are editable offline; once a backend is wired up, edits will sync when you're back online. <i>TODO: add service-worker + sync queue.</i></p>
       <div class="btn-row">
@@ -2638,8 +2963,14 @@ function renderSettings(){
     </div>
 
     <div class="card">
+      <h3>Roadmap</h3>
+      <p class="muted small">All planned features, ranked by build difficulty. Anything ranked 1-3 is "do now" territory — 4+ usually needs a chat to confirm direction.</p>
+      <button class="btn secondary" onclick="go('roadmap')">📋 Open roadmap</button>
+    </div>
+
+    <div class="card">
       <h3>About</h3>
-      <div class="small muted">Site Reviser v0.1 — branded to match Neill Data &amp; Security style. Built as a working baseline; AI/OCR/PDF export/database integration points are marked in source as <code>TODO(AI)</code>, <code>TODO(GPS)</code>, <code>TODO(backend)</code>.</div>
+      <div class="small muted">Site Reviser v0.2 — branded to match Neill Data &amp; Security. AI assistant live via Claude API; plan-vision detection, real PDF export and cloud sync are on the roadmap. Source-code integration hooks are tagged <code>TODO(AI)</code>, <code>TODO(GPS)</code>, <code>TODO(backend)</code>.</div>
     </div>
   `;
   renderUserList();
@@ -2698,6 +3029,140 @@ function wipeData(){
   localStorage.removeItem(STORAGE_KEY);
   DB = seedDB(); persist();
   refreshHeader(); go('dashboard');
+}
+function saveAiSettings(){
+  const s = aiSettings();
+  s.key = (document.getElementById('ai-key').value||'').trim();
+  s.model = document.getElementById('ai-model').value;
+  s.provider = 'anthropic';
+  persist();
+  const r = document.getElementById('ai-test-result');
+  r.innerHTML = s.key
+    ? `<span style="color:var(--brand-2)">✓ Saved. AI assistant is now in <b>live</b> mode.</span>`
+    : `<span style="color:var(--muted)">Saved. No key — assistant stays in local fallback mode.</span>`;
+}
+async function testAi(){
+  const r = document.getElementById('ai-test-result');
+  saveAiSettings();
+  if(!aiEnabled()){ r.innerHTML = `<span style="color:var(--warning)">Add a key first.</span>`; return; }
+  r.innerHTML = '<span class="muted">Testing… (sending a tiny ping to Claude)</span>';
+  try{
+    const ans = await askClaude('Reply with the single word OK so I know the connection works.');
+    r.innerHTML = `<span style="color:var(--brand-2)">✓ Connected. Reply: <i>${escapeHtml(ans.slice(0,80))}</i></span>`;
+  } catch(e){
+    r.innerHTML = `<span style="color:var(--danger)">✗ ${escapeHtml(e.message||String(e))}</span>`;
+  }
+}
+function clearAiKey(){
+  if(!confirm('Remove the saved Anthropic API key from this browser?')) return;
+  const s = aiSettings(); s.key = '';
+  persist(); renderSettings();
+}
+</script>
+
+<script id="mod-roadmap">
+/* ===== ROADMAP =====
+   Single source of truth for outstanding work + difficulty 1-10.
+*/
+const ROADMAP = [
+  {area:'Branding',  diff:1, status:'done',   title:"Rebrand to Neill Data dark theme",
+    body:"Swap to dark navy bg + cyan/mint accents + Inter font + translucent glass cards. Done in v0.2."},
+  {area:'AI',        diff:2, status:'done',   title:"Wire real Claude API in AI assistant",
+    body:"Anthropic key field in Settings → assistant routes to Claude with project JSON as context. Done in v0.2."},
+  {area:'AI',        diff:2, status:'done',   title:"Smarter local AI fallback",
+    body:"Without an API key, the assistant handles overload checks, pre-fit-off readiness, room+stage photo queries, counts by device type, defects/variations summaries. Done in v0.2."},
+  {area:'AI',        diff:2, status:'todo',   title:"Persist AI chat history per project",
+    body:"Right now the chat resets on page reload. Trivial: stash window._chat into DB.projects[].aiChat and rehydrate on render."},
+  {area:'UX',        diff:2, status:'todo',   title:"Sticky 'continue last project' shortcut on dashboard",
+    body:"One-tap card at the top of the dashboard that jumps straight to last-edited project's Tasks."},
+  {area:'Tasks',     diff:2, status:'todo',   title:"Bulk-tick subtasks from a room view",
+    body:"On the Tasks page, add a 'mark all cable runs done in Kitchen' style action — multi-select + apply."},
+  {area:'Photos',    diff:3, status:'todo',   title:"Auto-compress photos before saving",
+    body:"localStorage gets bloated quickly. Add canvas-based resize to ~1600px JPEG @ q=0.8 before storing. Cuts ~80% size."},
+  {area:'Photos',    diff:3, status:'todo',   title:"GPS coords → 'Open in Maps' link on photos",
+    body:"We already capture lat/lng. Just need to surface a Google/Apple Maps link in the photo modal."},
+  {area:'Materials', diff:3, status:'todo',   title:"Per-supplier price overrides",
+    body:"Let a user mark items 'Middys' vs 'Lawrence & Hanson' and toggle pricing source. Adds a small dropdown + alt-price column."},
+  {area:'Tasks',     diff:3, status:'todo',   title:"Default subtasks per device type",
+    body:"E.g. cameras get an extra 'Aimed & focused' subtask, smokes get 'Interlinked tested'. Just data."},
+
+  {area:'Photos',    diff:4, status:'todo',   title:"Multi-image lightbox / swipe gallery",
+    body:"Click any photo → full-screen viewer with swipe between siblings, zoom, share. Needs a small pointer-events handler."},
+  {area:'Defects',   diff:4, status:'todo',   title:"Before/after photo slots on defects",
+    body:"Currently photos are global. Add a 'pin photo here' button on the defect modal that filters from the photo library."},
+  {area:'Offline',   diff:4, status:'todo',   title:"Proper PWA + service worker",
+    body:"Add manifest.json + service-worker.js for installable home-screen icon and offline shell caching. Real offline edits already work via localStorage."},
+  {area:'Handover',  diff:5, status:'todo',   title:"Real PDF export (not just print)",
+    body:"Bring in jsPDF + html2canvas (or pdfmake) for a stable, paginated handover PDF with image embedding."},
+  {area:'Plan',      diff:5, status:'todo',   title:"Pinch-zoom + pan on the uploaded plan",
+    body:"Right now the plan is a flat img. Add panzoom controls + the ability to drop pins from the AI detection directly onto the image."},
+  {area:'AI',        diff:5, status:'todo',   title:"Plan vision detection (Claude Vision)",
+    body:"Send the uploaded plan image to Claude Vision and ask it to list visible GPOs/switches/lights with rough coords. Replace mock counts with real ones."},
+  {area:'Tasks',     diff:6, status:'todo',   title:"Drag-drop reorder + bulk edit",
+    body:"Reorder tasks within a circuit, bulk assign to a user, bulk shift due-date by N days."},
+  {area:'Materials', diff:6, status:'todo',   title:"Live Middys / L&H price sync",
+    body:"Either scrape a public-facing pricing page (fragile) or wire to a supplier API if one exists. Probably best as a CSV import for v1."},
+
+  {area:'Backend',   diff:7, status:'todo',   title:"Cloud sync via Supabase / Firebase",
+    body:"Replace persist() with a real backend so projects sync across devices. Keep localStorage as the offline cache and write a small sync queue."},
+  {area:'Auth',      diff:8, status:'todo',   title:"Real authentication + invites",
+    body:"Magic-link or SSO so the team isn't just 'pick your name from a list'. Roles get enforced server-side."},
+  {area:'Collab',    diff:8, status:'todo',   title:"Multi-user realtime collab",
+    body:"Two phones editing the same site at the same time — last-write-wins is fine for v1, real CRDT/Yjs later."},
+  {area:'Plan AI',   diff:9, status:'todo',   title:"Trained electrical-plan ML model",
+    body:"Fine-tune a small vision model on AU electrical floor plans for proper symbol detection, room outlining, and circuit inference. Months of work."},
+  {area:'Native',    diff:10, status:'todo',  title:"Native iOS/Android wrapper",
+    body:"Wrap in Capacitor/Tauri for better camera control, background uploads, push notifications, native file storage."}
+];
+
+function renderRoadmap(){
+  const el = document.getElementById('roadmap-content');
+  const buckets = {easy:[], med:[], hard:[]};
+  ROADMAP.forEach(r=>{
+    if(r.diff<=3) buckets.easy.push(r);
+    else if(r.diff<=6) buckets.med.push(r);
+    else buckets.hard.push(r);
+  });
+  const card = (title, sub, list, accent)=>`
+    <div class="card">
+      <h3>${title} <span class="pill ${accent}" style="margin-left:6px">${list.length}</span></h3>
+      <p class="muted small" style="margin-top:-4px">${sub}</p>
+      ${list.sort((a,b)=>a.diff-b.diff).map(r=>`
+        <div class="list-row" style="align-items:flex-start">
+          <div class="diff d${r.diff}">${r.diff}</div>
+          <div class="grow">
+            <div class="title">${escapeHtml(r.title)} ${r.status==='done'?'<span class="pill green" style="margin-left:4px">Done in v0.2</span>':''}</div>
+            <div class="sub">${escapeHtml(r.body)}</div>
+            <div style="margin-top:4px"><span class="pill">${escapeHtml(r.area)}</span></div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  el.innerHTML = `
+    <div class="card">
+      <h2 style="margin:0">Outstanding features &amp; build order</h2>
+      <p class="muted small">Ranked by difficulty 1 (trivial) → 10 (multi-week build). Anything 1-3 is fair game to ship without a kickoff conversation. Anything 4+ is worth a quick chat first.</p>
+      <div class="row" style="margin-top:8px">
+        <div class="card" style="margin:0; background:rgba(106,255,184,0.06); border-color:rgba(106,255,184,0.25)">
+          <div class="muted small">🟢 Easy (1-3)</div>
+          <div style="font-size:22px; font-weight:800">${buckets.easy.length} items</div>
+          <div class="small muted">Self-serve, fast wins</div>
+        </div>
+        <div class="card" style="margin:0; background:rgba(255,209,102,0.06); border-color:rgba(255,209,102,0.25)">
+          <div class="muted small">🟡 Medium (4-6)</div>
+          <div style="font-size:22px; font-weight:800">${buckets.med.length} items</div>
+          <div class="small muted">Quick chat first</div>
+        </div>
+        <div class="card" style="margin:0; background:rgba(255,107,136,0.06); border-color:rgba(255,107,136,0.25)">
+          <div class="muted small">🔴 Hard (7-10)</div>
+          <div style="font-size:22px; font-weight:800">${buckets.hard.length} items</div>
+          <div class="small muted">Needs direction</div>
+        </div>
+      </div>
+    </div>
+    ${card('🟢 Easy — 1 to 3', 'Self-serve work. I do these without asking.', buckets.easy, 'green')}
+    ${card('🟡 Medium — 4 to 6', 'Bigger changes that benefit from confirming scope first.', buckets.med, 'amber')}
+    ${card('🔴 Hard — 7 to 10', "Real architecture / ML / native work — let's talk before starting.", buckets.hard, 'red')}
+  `;
 }
 </script>
 
