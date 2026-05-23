@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Active Guard — 4-camera 4MP HD siren-light deterrent CCTV kit supplied and installed by Neill Data & Security across Melbourne and the Mornington Peninsula." />
+  <title>Active Guard 4-Camera Deterrent Kit | Neill Data & Security</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg-soft: #0d1b2f;
+      --card: rgba(255,255,255,0.08);
+      --card-border: rgba(255,255,255,0.14);
+      --text: #f6f8fb;
+      --muted: #b9c5d6;
+      --brand: #31d0ff;
+      --brand-2: #6affb8;
+      --warning: #ffd166;
+      --shadow: 0 20px 70px rgba(0,0,0,0.35);
+      --radius: 24px;
+      --max: 1160px;
+      --accent: var(--warning);
+      --accent-soft: rgba(255,209,102,0.1);
+      --accent-border: rgba(255,209,102,0.32);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,209,102,0.18), transparent 34rem),
+        radial-gradient(circle at top right, rgba(49,208,255,0.18), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+    .container { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+
+    header {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(18px);
+      background: rgba(7,17,31,0.78);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .nav { min-height: 76px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .logo { display: flex; align-items: center; gap: 12px; font-weight: 850; letter-spacing: -0.03em; font-size: 1.25rem; }
+    .logo-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d; display: grid; place-items: center; font-weight: 950;
+      box-shadow: 0 12px 32px rgba(49,208,255,0.24);
+    }
+    .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-weight: 650; }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 48px; padding: 0 20px; border-radius: 999px;
+      font-weight: 800; border: 1px solid transparent; transition: 0.2s ease; cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d; box-shadow: 0 14px 38px rgba(49,208,255,0.22);
+    }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-secondary { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .breadcrumb { padding: 26px 0 0; color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+    .breadcrumb a:hover { color: var(--text); }
+    .breadcrumb .sep { margin: 0 8px; opacity: 0.5; }
+
+    .product-hero { padding: 36px 0 60px; }
+    .product-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 42px; align-items: center; }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      padding: 8px 14px; border-radius: 999px;
+      font-weight: 800; margin-bottom: 20px;
+      font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .eyebrow .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(255,209,102,0.18);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.25); }
+    }
+
+    h1, h2, h3 { line-height: 1.1; margin: 0; letter-spacing: -0.04em; }
+    h1 { font-size: clamp(2.4rem, 5.4vw, 4rem); }
+    h2 { font-size: clamp(1.85rem, 3.5vw, 2.65rem); }
+    h3 { font-size: 1.25rem; }
+    .model-code {
+      display: block;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 14px;
+      letter-spacing: 0;
+    }
+    .model-code b { color: var(--text); font-weight: 800; }
+
+    .lede { color: var(--muted); font-size: 1.1rem; margin: 22px 0 0; max-width: 580px; }
+
+    .spec-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted); font-weight: 700; font-size: 0.9rem;
+    }
+    .chip b { color: var(--text); }
+    .chip.accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+    .chip.accent b { color: var(--accent); }
+
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+
+    /* Unified hero visual: 4-camera tile grid base */
+    .product-visual {
+      position: relative; overflow: hidden;
+      min-height: 480px; padding: 28px;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.035)),
+        radial-gradient(circle at 75% 18%, rgba(255,209,102,0.28), transparent 16rem),
+        radial-gradient(circle at 20% 80%, rgba(49,208,255,0.18), transparent 14rem),
+        var(--bg-soft);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow);
+    }
+
+    .cam-stack {
+      position: absolute;
+      inset: 40px 32px 130px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 18px;
+      z-index: 2;
+    }
+
+    .cam-tile {
+      position: relative;
+      border-radius: 22px;
+      background: linear-gradient(145deg, #eef7ff, #9eb1c7);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .cam-tile:nth-child(1) { transform: rotate(-2deg); }
+    .cam-tile:nth-child(2) { transform: rotate(3deg) translateY(4px); }
+    .cam-tile:nth-child(3) { transform: rotate(-3deg) translateY(-4px); }
+    .cam-tile:nth-child(4) { transform: rotate(2deg); }
+
+    .cam-tile .lens {
+      position: absolute;
+      width: 56%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, #08111d 0 28%, #233b55 29% 45%, #06101d 46% 100%);
+      top: 18%; left: 12%;
+      box-shadow: inset 0 0 0 6px rgba(255,255,255,0.12);
+    }
+    .cam-tile .mp-tag {
+      position: absolute; right: 12px; top: 10px;
+      color: #06101d; font-weight: 950; font-size: 1.05rem;
+      letter-spacing: -0.05em;
+    }
+
+    /* Signature: siren strobe dot on each tile */
+    .cam-tile .strobe {
+      position: absolute;
+      right: 12px; bottom: 12px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow:
+        0 0 0 4px rgba(255,209,102,0.25),
+        0 0 14px 4px rgba(255,209,102,0.55);
+      animation: flash 1.2s ease-in-out infinite;
+    }
+    .cam-tile:nth-child(2) .strobe { animation-delay: 0.3s; }
+    .cam-tile:nth-child(3) .strobe { animation-delay: 0.6s; }
+    .cam-tile:nth-child(4) .strobe { animation-delay: 0.9s; }
+    @keyframes flash {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* Signature: siren waves emanating from centre */
+    .siren-wave {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 140px; height: 140px;
+      margin-left: -70px; margin-top: -110px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,209,102,0.5);
+      transform-origin: center;
+      animation: wave 2.4s ease-out infinite;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .siren-wave.w2 { animation-delay: 0.8s; }
+    .siren-wave.w3 { animation-delay: 1.6s; }
+    @keyframes wave {
+      0% { transform: scale(0.3); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    .visual-tag {
+      position: absolute; left: 28px; bottom: 28px; right: 28px;
+      padding: 18px 22px; border-radius: 18px;
+      background: rgba(7,17,31,0.82);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(14px);
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      z-index: 3;
+    }
+    .visual-tag h4 { margin: 0; font-size: 1rem; letter-spacing: -0.02em; }
+    .visual-tag span { color: var(--muted); font-size: 0.88rem; display: block; margin-top: 2px; }
+    .visual-tag .pill {
+      background: var(--warning); color: #06101d;
+      font-weight: 900; font-size: 0.78rem;
+      padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+    }
+
+    section { padding: 64px 0; }
+    .section-head { margin-bottom: 30px; max-width: 720px; }
+    .section-head p { margin: 12px 0 0; color: var(--muted); }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .box-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .box-card { padding: 28px; }
+    .box-card .qty {
+      display: inline-block;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      padding: 4px 12px; border-radius: 999px;
+      font-weight: 900; font-size: 0.82rem; margin-bottom: 14px;
+    }
+    .box-card h3 { margin-bottom: 6px; }
+    .box-card .sub { color: var(--muted); font-size: 0.92rem; }
+    .box-card ul { padding-left: 18px; margin: 16px 0 0; color: var(--muted); }
+    .box-card ul li { margin-bottom: 6px; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feature-card {
+      padding: 26px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .feature-card.highlight {
+      background: linear-gradient(180deg, var(--accent-soft), rgba(255,255,255,0.04));
+      border-color: var(--accent-border);
+    }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: grid; place-items: center;
+      background: rgba(49,208,255,0.13);
+      border: 1px solid rgba(49,208,255,0.22);
+      font-size: 1.3rem; margin-bottom: 18px;
+    }
+    .feature-card.highlight .feature-icon {
+      background: var(--accent-soft);
+      border-color: var(--accent-border);
+    }
+    .feature-card h3 { font-size: 1.1rem; }
+    .feature-card p { color: var(--muted); margin: 10px 0 0; }
+
+    .compare { padding: 0; overflow: hidden; }
+    .compare-table { width: 100%; border-collapse: collapse; }
+    .compare-table th, .compare-table td {
+      padding: 18px 22px; text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .compare-table th {
+      font-weight: 800; letter-spacing: -0.02em; font-size: 1rem;
+      background: rgba(255,255,255,0.04);
+    }
+    .compare-table td { color: var(--muted); font-weight: 600; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; }
+    .compare-table th.this-one, .compare-table td.this-one { color: var(--accent); font-weight: 800; background: var(--accent-soft); }
+    .compare-table tr:last-child td { border-bottom: 0; }
+
+    .suits {
+      padding: 36px;
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; align-items: center;
+      background: linear-gradient(135deg, var(--accent-soft), rgba(49,208,255,0.08));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .suits ul { padding-left: 18px; color: var(--muted); margin: 0; }
+    .suits ul li { margin-bottom: 6px; }
+    .suits ul li b { color: var(--text); }
+
+    .cta {
+      padding: 38px;
+      display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center;
+      background: linear-gradient(135deg, rgba(49,208,255,0.16), var(--accent-soft));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .cta p { color: var(--muted); margin: 12px 0 0; }
+    .cta-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+
+    .other-kits { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .kit-link {
+      padding: 24px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      transition: 0.2s ease; display: block;
+    }
+    .kit-link:hover { transform: translateY(-3px); border-color: var(--accent-border); }
+    .kit-link span { color: var(--brand); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .kit-link h3 { margin: 8px 0 6px; }
+    .kit-link p { color: var(--muted); margin: 0; font-size: 0.95rem; }
+    .kit-link .model { color: var(--muted); font-size: 0.78rem; font-weight: 600; margin-top: 10px; }
+
+    footer { padding: 46px 0; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.08); }
+    .footer-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+    @media (max-width: 900px) {
+      .product-grid, .suits, .cta { grid-template-columns: 1fr; }
+      .box-grid, .feature-grid { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+      .product-visual { min-height: 380px; }
+      .cam-stack { inset: 30px 24px 110px 24px; }
+    }
+    @media (max-width: 620px) {
+      .box-grid, .feature-grid, .other-kits { grid-template-columns: 1fr; }
+      .hero-actions .btn, .cta-actions .btn { width: 100%; }
+      .visual-tag { flex-direction: column; align-items: flex-start; }
+      .compare-table th, .compare-table td { padding: 12px 14px; font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="logo" href="index.html" aria-label="Neill Data and Security home">
+        <span class="logo-mark">ND</span>
+        <span>Neill Data & Security</span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="index.html#services">Services</a>
+        <a href="index.html#packages">Camera Packages</a>
+        <a href="index.html#process">Process</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+      <a class="btn btn-primary" href="tel:0418912681">Call Now</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="container breadcrumb">
+      <a href="index.html">Home</a><span class="sep">›</span><a href="index.html#packages">Camera Packages</a><span class="sep">›</span><span>Active Guard</span>
+    </div>
+
+    <section class="product-hero">
+      <div class="container product-grid">
+        <div>
+          <div class="eyebrow"><span class="dot"></span>Mid Tier • Active Deterrent</div>
+          <h1>Active Guard — cameras that actually push back.</h1>
+          <p class="lede">A four-camera HD IP kit with built-in siren, flashing strobe and full-colour night vision. The cameras don't just record what happens, they actively warn people off before it does. A solid step up from a standard system for anyone who's had something nicked or just wants the next layer of security.</p>
+          <span class="model-code">Equipment: <b>IVSEC LX-Series LVK-119B</b></span>
+          <div class="spec-chips">
+            <span class="chip accent"><b>4</b> cameras</span>
+            <span class="chip"><b>4MP</b> HD</span>
+            <span class="chip accent"><b>Siren</b> + strobe</span>
+            <span class="chip accent"><b>Full colour</b> night vision</span>
+            <span class="chip"><b>IP66</b> weatherproof</span>
+            <span class="chip"><b>2-way</b> audio</span>
+            <span class="chip"><b>2TB</b> drive included</span>
+          </div>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="tel:0418912681">Call for a Quote</a>
+            <a class="btn btn-secondary" href="index.html#packages">Compare Kits</a>
+          </div>
+        </div>
+
+        <div class="product-visual" aria-hidden="true">
+          <div class="siren-wave"></div>
+          <div class="siren-wave w2"></div>
+          <div class="siren-wave w3"></div>
+          <div class="cam-stack">
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span><span class="strobe"></span></div>
+          </div>
+          <div class="visual-tag">
+            <div>
+              <h4>Siren + strobe deterrent built in</h4>
+              <span>Triggers on smart motion — schedulable from the app</span>
+            </div>
+            <span class="pill">Active Guard</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>What's in the box</h2>
+          <p>A complete deterrent system shipped as a kit — four siren-light cameras, the recorder and the surveillance drive already installed.</p>
+        </div>
+        <div class="box-grid">
+          <article class="panel box-card">
+            <span class="qty">4 ×</span>
+            <h3>4MP Active-Deterrent Cameras</h3>
+            <p class="sub">Bullet IP cameras with built-in spotlights, siren and two-way audio.</p>
+            <ul>
+              <li>4MP resolution with crystal-clear daytime detail</li>
+              <li>Full-colour night vision (no green-tinted shadows)</li>
+              <li>Built-in siren + flashing strobe lights</li>
+              <li>Two-way audio — talk through the camera from your phone</li>
+              <li>Smart motion, intrusion zones and line-cross detection</li>
+              <li>IP66 weatherproof metal housing</li>
+            </ul>
+          </article>
+          <article class="panel box-card">
+            <span class="qty">1 ×</span>
+            <h3>4-Channel PoE+ NVR</h3>
+            <p class="sub">Network recorder — one cable per camera for power and footage.</p>
+            <ul>
+              <li>4 × PoE+ ports built in</li>
+              <li>2TB surveillance-grade drive pre-installed</li>
+              <li>Expandable up to 10TB single HDD</li>
+              <li>AI features: face recognition, human/vehicle detect, line crossing, intrusion</li>
+              <li>Free phone app, browser and desktop access</li>
+            </ul>
+          </article>
+          <article class="panel box-card">
+            <span class="qty">Inc.</span>
+            <h3>Setup accessories</h3>
+            <p class="sub">All the bits to get up and running on day one.</p>
+            <ul>
+              <li>HDMI cable for monitor / TV</li>
+              <li>USB mouse</li>
+              <li>2TB pre-installed surveillance HDD</li>
+              <li>Free IVSEC X app (iOS &amp; Android)</li>
+              <li>Schedule-light assistant in firmware</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>Why people pick Active Guard</h2>
+          <p>Recording is fine for evidence after the fact — but most people prefer the thing not to happen in the first place. This kit is built around that idea.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card highlight">
+            <div class="feature-icon">🚨</div>
+            <h3>Siren and strobe on detection</h3>
+            <p>When the camera spots a person where it shouldn't, the spotlights flash and the siren sounds. Most opportunistic visitors don't stick around.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🌈</div>
+            <h3>Full-colour night vision</h3>
+            <p>Sensor-and-light combo gives you real colour at night instead of the usual grainy black and white — clothing, vehicle colour and faces all readable.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🎙️</div>
+            <h3>Two-way audio</h3>
+            <p>Talk through the camera from your phone — useful for couriers, gates, or telling someone they're being recorded.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">⏰</div>
+            <h3>Schedule assistant</h3>
+            <p>Set the deterrent to behave differently in the day vs overnight — e.g. silent recording during business hours, full siren response after close.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">🧠</div>
+            <h3>Value AI alerts</h3>
+            <p>The on-board AI focuses on people and vehicles, so you get useful notifications instead of one ping every time a leaf moves.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">📲</div>
+            <h3>Full IVSEC X app control</h3>
+            <p>Live view, playback, motion alerts, two-way talk and siren trigger — all from your phone, anywhere with data.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>How the kits compare</h2>
+          <p>A quick side-by-side so you can see exactly where Active Guard sits in the range.</p>
+        </div>
+        <div class="panel compare">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>&nbsp;</th>
+                <th>Essentials HD</th>
+                <th class="this-one">Active Guard</th>
+                <th>Pro 4K</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Resolution</td><td>4MP HD</td><td class="this-one">4MP HD</td><td>8MP / 4K</td></tr>
+              <tr><td>Cameras included</td><td>4</td><td class="this-one">4</td><td>4</td></tr>
+              <tr><td>Storage installed</td><td>2TB</td><td class="this-one">2TB</td><td>4TB</td></tr>
+              <tr><td>Max single HDD</td><td>10TB</td><td class="this-one">10TB</td><td>16TB</td></tr>
+              <tr><td>Weather rating</td><td>IP66</td><td class="this-one">IP66</td><td>IP67</td></tr>
+              <tr><td>Siren + strobe deterrent</td><td>—</td><td class="this-one">Yes</td><td>Yes</td></tr>
+              <tr><td>Full-colour night vision</td><td>—</td><td class="this-one">Yes</td><td>Yes</td></tr>
+              <tr><td>Two-way audio</td><td>—</td><td class="this-one">Yes</td><td>Yes</td></tr>
+              <tr><td>AI on the NVR</td><td>Yes</td><td class="this-one">Yes</td><td>Yes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="suits">
+          <div>
+            <h2>Who it suits</h2>
+            <p style="color: var(--muted); margin: 12px 0 20px;">A common upgrade when you want cameras that actually do something at the time, not just play back footage later.</p>
+            <ul>
+              <li><b>Homes that have been targeted</b> — or sit in higher-risk pockets</li>
+              <li><b>Driveways and side gates</b> — anywhere people shouldn't be after dark</li>
+              <li><b>Shopfronts and yards</b> — visible siren-light cameras read as "don't bother"</li>
+              <li><b>Building sites and rural properties</b> — deters trespass without needing monitoring</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="margin-bottom: 10px;">Bigger property?</h3>
+            <p style="color: var(--muted); margin: 0 0 18px;">These cameras pair with larger 8 and 16 channel NVRs too. Easy to scale up if 4 cameras isn't enough — just mention the property when you call.</p>
+            <a class="btn btn-secondary" href="tel:0418912681">Call to discuss</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="cta">
+          <div>
+            <h2>Get Active Guard installed</h2>
+            <p>Pop through your address and what you'd like covered. We'll talk through camera positions, deterrent settings and an installed price.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn btn-primary" href="tel:0418912681">Call 0418 912 681</a>
+            <a class="btn btn-secondary" href="https://www.instagram.com/neillelectrical" target="_blank" rel="noopener">Instagram</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>Other camera kits</h2>
+          <p>Step down for a simpler record-only setup, or step up for 4K detail.</p>
+        </div>
+        <div class="other-kits">
+          <a class="kit-link" href="essentials-hd.html">
+            <span>Entry tier</span>
+            <h3>Essentials HD</h3>
+            <p>The straightforward 4MP record-only kit — same picture quality without the siren-light add-ons.</p>
+            <div class="model">IVSEC LVK-000</div>
+          </a>
+          <a class="kit-link" href="pro-4k.html">
+            <span>Top tier</span>
+            <h3>Pro 4K</h3>
+            <p>Full 8MP / 4K version of the deterrent kit with double the storage. Best for bigger blocks.</p>
+            <div class="model">IVSEC LVK-319B-4TB</div>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>© 2026 Neill Data & Security. All rights reserved.</div>
+      <div>Melbourne • Mornington Peninsula • Surrounding areas</div>
+    </div>
+  </footer>
+</body>
+</html>

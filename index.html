@@ -230,10 +230,85 @@
     }
 
     .service-card p, .package-card p, .step-card p { color: var(--muted); margin: 12px 0 0; }
-    .package-card.featured { border-color: rgba(106,255,184,0.42); background: linear-gradient(180deg, rgba(106,255,184,0.1), rgba(255,255,255,0.06)); }
-    .badge { display: inline-block; color: #06101d; background: var(--warning); font-weight: 900; border-radius: 999px; padding: 5px 10px; margin-bottom: 14px; font-size: 0.82rem; }
 
-    .package-card ul { padding-left: 18px; color: var(--muted); margin-bottom: 0; }
+    /* Package cards as proper clickable cards */
+    .package-card {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: 0.25s ease;
+      overflow: hidden;
+    }
+    .package-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(49,208,255,0.32);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+    }
+    .package-card.featured {
+      border-color: rgba(106,255,184,0.42);
+      background: linear-gradient(180deg, rgba(106,255,184,0.1), rgba(255,255,255,0.06));
+    }
+    .package-card.featured:hover { border-color: rgba(106,255,184,0.6); }
+
+    .pkg-code {
+      display: inline-block;
+      color: var(--brand);
+      font-weight: 800;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .pkg-specs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 16px 0 14px;
+    }
+    .pkg-specs span {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--muted);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .package-card.featured .pkg-specs span {
+      background: rgba(106,255,184,0.08);
+      border-color: rgba(106,255,184,0.25);
+    }
+    .package-card ul { padding-left: 18px; color: var(--muted); margin: 0 0 22px; }
+    .pkg-cta {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--brand);
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+    .package-card.featured .pkg-cta { color: var(--brand-2); }
+    .pkg-cta .arrow { transition: transform 0.2s ease; }
+    .package-card:hover .pkg-cta .arrow { transform: translateX(4px); }
+
+    .badge {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      display: inline-block;
+      color: #06101d;
+      background: var(--warning);
+      font-weight: 900;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+    }
+
+    .service-card { transition: 0.2s ease; }
+    .service-card:hover { transform: translateY(-3px); border-color: rgba(49,208,255,0.28); }
+
     .quote-box { padding: 34px; display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center; background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09)); }
     .quote-box p { color: var(--muted); margin: 12px 0 0; }
 
@@ -324,25 +399,46 @@
       <div class="container">
         <div class="section-head">
           <h2>IVSEC camera packages</h2>
-          <p>Choose the camera level that suits the property. Bundles can be built around 2, 4, 6 or 8 cameras.</p>
+          <p>Choose the camera level that suits the property. Bundles can be built around 2, 4, 6 or 8 cameras — tap a kit for full details.</p>
         </div>
         <div class="grid-3">
-          <article class="package-card">
-            <h3>Basic 4MP Cameras</h3>
-            <p>Crisp HD quality for smaller homes, units and shops.</p>
-            <ul><li>Clear everyday coverage</li><li>Great value option</li><li>Remote viewing available</li></ul>
-          </article>
-          <article class="package-card featured">
+          <a class="package-card" href="essentials-hd.html">
+            <span class="pkg-code">Entry tier • Record &amp; review</span>
+            <h3>Essentials HD</h3>
+            <p>Crisp 4MP coverage for smaller homes, units and shops.</p>
+            <div class="pkg-specs"><span>4MP</span><span>IP66</span><span>2TB NVR</span></div>
+            <ul>
+              <li>Clear everyday coverage</li>
+              <li>Great value option</li>
+              <li>Remote viewing via app</li>
+            </ul>
+            <span class="pkg-cta">View kit details <span class="arrow">→</span></span>
+          </a>
+          <a class="package-card featured" href="active-guard.html">
             <span class="badge">Popular</span>
-            <h3>4MP Siren Light Cameras</h3>
-            <p>Active deterrent cameras with built-in siren and strobe.</p>
-            <ul><li>Smart motion detection</li><li>Siren and strobe deterrent</li><li>Ideal for higher security areas</li></ul>
-          </article>
-          <article class="package-card">
-            <h3>8MP Ultra HD Cameras</h3>
-            <p>4K clarity with wider coverage and stronger detail.</p>
-            <ul><li>Top-tier image quality</li><li>Better detail at distance</li><li>Best for larger properties</li></ul>
-          </article>
+            <span class="pkg-code">Mid tier • Active deterrent</span>
+            <h3>Active Guard</h3>
+            <p>Siren-light cameras that actively warn intruders off.</p>
+            <div class="pkg-specs"><span>4MP</span><span>Siren + strobe</span><span>Full colour night</span></div>
+            <ul>
+              <li>Smart motion detection</li>
+              <li>Siren and strobe deterrent</li>
+              <li>Ideal for higher security areas</li>
+            </ul>
+            <span class="pkg-cta">View kit details <span class="arrow">→</span></span>
+          </a>
+          <a class="package-card" href="pro-4k.html">
+            <span class="pkg-code">Top tier • Ultra HD 4K</span>
+            <h3>Pro 4K</h3>
+            <p>8MP 4K clarity with wider coverage and stronger detail.</p>
+            <div class="pkg-specs"><span>8MP / 4K</span><span>IP67</span><span>4TB NVR</span></div>
+            <ul>
+              <li>Top-tier image quality</li>
+              <li>Better detail at distance</li>
+              <li>Best for larger properties</li>
+            </ul>
+            <span class="pkg-cta">View kit details <span class="arrow">→</span></span>
+          </a>
         </div>
       </div>
     </section>

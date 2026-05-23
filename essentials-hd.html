@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Essentials HD — 4-camera 4MP HD CCTV kit supplied and installed by Neill Data & Security across Melbourne and the Mornington Peninsula." />
+  <title>Essentials HD 4-Camera Kit | Neill Data & Security</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg-soft: #0d1b2f;
+      --card: rgba(255,255,255,0.08);
+      --card-border: rgba(255,255,255,0.14);
+      --text: #f6f8fb;
+      --muted: #b9c5d6;
+      --brand: #31d0ff;
+      --brand-2: #6affb8;
+      --warning: #ffd166;
+      --shadow: 0 20px 70px rgba(0,0,0,0.35);
+      --radius: 24px;
+      --max: 1160px;
+      --accent: var(--brand);
+      --accent-soft: rgba(49,208,255,0.13);
+      --accent-border: rgba(49,208,255,0.28);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem),
+        radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+    .container { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+
+    header {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(18px);
+      background: rgba(7,17,31,0.78);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .nav { min-height: 76px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .logo { display: flex; align-items: center; gap: 12px; font-weight: 850; letter-spacing: -0.03em; font-size: 1.25rem; }
+    .logo-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d; display: grid; place-items: center; font-weight: 950;
+      box-shadow: 0 12px 32px rgba(49,208,255,0.24);
+    }
+    .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-weight: 650; }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 48px; padding: 0 20px; border-radius: 999px;
+      font-weight: 800; border: 1px solid transparent; transition: 0.2s ease; cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d; box-shadow: 0 14px 38px rgba(49,208,255,0.22);
+    }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-secondary { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .breadcrumb { padding: 26px 0 0; color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+    .breadcrumb a:hover { color: var(--text); }
+    .breadcrumb .sep { margin: 0 8px; opacity: 0.5; }
+
+    .product-hero { padding: 36px 0 60px; }
+    .product-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 42px; align-items: center; }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      padding: 8px 14px; border-radius: 999px; font-weight: 800;
+      margin-bottom: 20px; font-size: 0.85rem;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+
+    h1, h2, h3 { line-height: 1.1; margin: 0; letter-spacing: -0.04em; }
+    h1 { font-size: clamp(2.4rem, 5.4vw, 4rem); }
+    h2 { font-size: clamp(1.85rem, 3.5vw, 2.65rem); }
+    h3 { font-size: 1.25rem; }
+    .model-code {
+      display: block;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 14px;
+      letter-spacing: 0;
+    }
+    .model-code b { color: var(--text); font-weight: 800; }
+
+    .lede { color: var(--muted); font-size: 1.1rem; margin: 22px 0 0; max-width: 580px; }
+
+    .spec-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted); font-weight: 700; font-size: 0.9rem;
+    }
+    .chip b { color: var(--text); }
+    .chip.accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+    .chip.accent b { color: var(--accent); }
+
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+
+    /* Unified hero visual: 4-camera tile grid base */
+    .product-visual {
+      position: relative; overflow: hidden;
+      min-height: 480px; padding: 28px;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.035)),
+        radial-gradient(circle at 25% 12%, var(--accent-soft), transparent 18rem),
+        var(--bg-soft);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow);
+    }
+
+    .cam-stack {
+      position: absolute;
+      inset: 40px 32px 130px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 18px;
+      z-index: 2;
+    }
+
+    .cam-tile {
+      position: relative;
+      border-radius: 22px;
+      background: linear-gradient(145deg, #eef7ff, #9eb1c7);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .cam-tile:nth-child(1) { transform: rotate(-2deg); }
+    .cam-tile:nth-child(2) { transform: rotate(3deg) translateY(4px); }
+    .cam-tile:nth-child(3) { transform: rotate(-3deg) translateY(-4px); }
+    .cam-tile:nth-child(4) { transform: rotate(2deg); }
+
+    .cam-tile .lens {
+      position: absolute;
+      width: 56%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, #08111d 0 28%, #233b55 29% 45%, #06101d 46% 100%);
+      top: 18%; left: 12%;
+      box-shadow: inset 0 0 0 6px rgba(255,255,255,0.12);
+    }
+    .cam-tile .mp-tag {
+      position: absolute; right: 12px; top: 10px;
+      color: #06101d; font-weight: 950; font-size: 1.05rem;
+      letter-spacing: -0.05em;
+    }
+
+    .visual-tag {
+      position: absolute; left: 28px; bottom: 28px; right: 28px;
+      padding: 18px 22px; border-radius: 18px;
+      background: rgba(7,17,31,0.82);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(14px);
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      z-index: 3;
+    }
+    .visual-tag h4 { margin: 0; font-size: 1rem; letter-spacing: -0.02em; }
+    .visual-tag span { color: var(--muted); font-size: 0.88rem; display: block; margin-top: 2px; }
+    .visual-tag .pill {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #06101d; font-weight: 900; font-size: 0.78rem;
+      padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+    }
+
+    /* Subtle scan-line for the entry kit */
+    .scan-line {
+      position: absolute;
+      left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.7;
+      z-index: 1;
+      animation: scan 4.5s ease-in-out infinite;
+    }
+    @keyframes scan {
+      0% { top: 8%; opacity: 0; }
+      10% { opacity: 0.7; }
+      90% { opacity: 0.7; }
+      100% { top: 78%; opacity: 0; }
+    }
+
+    section { padding: 64px 0; }
+    .section-head { margin-bottom: 30px; max-width: 720px; }
+    .section-head p { margin: 12px 0 0; color: var(--muted); }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .box-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .box-card { padding: 28px; }
+    .box-card .qty {
+      display: inline-block;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      padding: 4px 12px; border-radius: 999px;
+      font-weight: 900; font-size: 0.82rem; margin-bottom: 14px;
+    }
+    .box-card h3 { margin-bottom: 6px; }
+    .box-card .sub { color: var(--muted); font-size: 0.92rem; }
+    .box-card ul { padding-left: 18px; margin: 16px 0 0; color: var(--muted); }
+    .box-card ul li { margin-bottom: 6px; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feature-card {
+      padding: 26px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .feature-card.highlight {
+      background: linear-gradient(180deg, var(--accent-soft), rgba(255,255,255,0.04));
+      border-color: var(--accent-border);
+    }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: grid; place-items: center;
+      background: rgba(49,208,255,0.13);
+      border: 1px solid rgba(49,208,255,0.22);
+      font-size: 1.3rem; margin-bottom: 18px;
+    }
+    .feature-card.highlight .feature-icon {
+      background: var(--accent-soft);
+      border-color: var(--accent-border);
+    }
+    .feature-card h3 { font-size: 1.1rem; }
+    .feature-card p { color: var(--muted); margin: 10px 0 0; }
+
+    .compare { padding: 0; overflow: hidden; }
+    .compare-table { width: 100%; border-collapse: collapse; }
+    .compare-table th, .compare-table td {
+      padding: 18px 22px; text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .compare-table th {
+      font-weight: 800; letter-spacing: -0.02em; font-size: 1rem;
+      background: rgba(255,255,255,0.04);
+    }
+    .compare-table td { color: var(--muted); font-weight: 600; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; }
+    .compare-table th.this-one, .compare-table td.this-one { color: var(--accent); font-weight: 800; background: var(--accent-soft); }
+    .compare-table tr:last-child td { border-bottom: 0; }
+
+    .suits {
+      padding: 36px;
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; align-items: center;
+      background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,0.04));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .suits ul { padding-left: 18px; color: var(--muted); margin: 0; }
+    .suits ul li { margin-bottom: 6px; }
+    .suits ul li b { color: var(--text); }
+
+    .cta {
+      padding: 38px;
+      display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center;
+      background: linear-gradient(135deg, var(--accent-soft), rgba(106,255,184,0.08));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .cta p { color: var(--muted); margin: 12px 0 0; }
+    .cta-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+
+    .other-kits { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .kit-link {
+      padding: 24px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      transition: 0.2s ease; display: block;
+    }
+    .kit-link:hover { transform: translateY(-3px); border-color: var(--accent-border); }
+    .kit-link span { color: var(--accent); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .kit-link h3 { margin: 8px 0 6px; }
+    .kit-link p { color: var(--muted); margin: 0; font-size: 0.95rem; }
+    .kit-link .model { color: var(--muted); font-size: 0.78rem; font-weight: 600; margin-top: 10px; }
+
+    footer { padding: 46px 0; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.08); }
+    .footer-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+    @media (max-width: 900px) {
+      .product-grid, .suits, .cta { grid-template-columns: 1fr; }
+      .box-grid, .feature-grid { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+      .product-visual { min-height: 380px; }
+      .cam-stack { inset: 30px 24px 110px 24px; }
+    }
+    @media (max-width: 620px) {
+      .box-grid, .feature-grid, .other-kits { grid-template-columns: 1fr; }
+      .hero-actions .btn, .cta-actions .btn { width: 100%; }
+      .visual-tag { flex-direction: column; align-items: flex-start; }
+      .compare-table th, .compare-table td { padding: 12px 14px; font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="logo" href="index.html" aria-label="Neill Data and Security home">
+        <span class="logo-mark">ND</span>
+        <span>Neill Data & Security</span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="index.html#services">Services</a>
+        <a href="index.html#packages">Camera Packages</a>
+        <a href="index.html#process">Process</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+      <a class="btn btn-primary" href="tel:0418912681">Call Now</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="container breadcrumb">
+      <a href="index.html">Home</a><span class="sep">›</span><a href="index.html#packages">Camera Packages</a><span class="sep">›</span><span>Essentials HD</span>
+    </div>
+
+    <section class="product-hero">
+      <div class="container product-grid">
+        <div>
+          <div class="eyebrow">Entry Tier • Record &amp; Review</div>
+          <h1>Essentials HD — clean 4MP coverage, set up properly.</h1>
+          <p class="lede">A solid four-camera HD IP kit. Crisp 4MP picture, a 4-channel recorder with a 2TB surveillance drive already inside, and the IVSEC X app on your phone. A great everyday system for homes, units and smaller shopfronts.</p>
+          <span class="model-code">Equipment: <b>IVSEC LX-Series LVK-000</b></span>
+          <div class="spec-chips">
+            <span class="chip accent"><b>4</b> cameras</span>
+            <span class="chip"><b>4MP</b> HD</span>
+            <span class="chip"><b>IP66</b> weatherproof</span>
+            <span class="chip"><b>2TB</b> SkyHawk drive</span>
+            <span class="chip"><b>4× PoE+</b> NVR</span>
+          </div>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="tel:0418912681">Call for a Quote</a>
+            <a class="btn btn-secondary" href="index.html#packages">Compare Kits</a>
+          </div>
+        </div>
+
+        <div class="product-visual" aria-hidden="true">
+          <div class="scan-line"></div>
+          <div class="cam-stack">
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
+          </div>
+          <div class="visual-tag">
+            <div>
+              <h4>4 HD cameras + 4-channel NVR</h4>
+              <span>2TB SkyHawk surveillance drive pre-installed</span>
+            </div>
+            <span class="pill">Essentials HD</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>What's in the box</h2>
+          <p>Everything needed to record, view and back up footage out of the gate — supplied as a complete kit and configured during install.</p>
+        </div>
+        <div class="box-grid">
+          <article class="panel box-card">
+            <span class="qty">4 ×</span>
+            <h3>4MP IP Cameras</h3>
+            <p class="sub">Compact bullet-style IP cameras with SD card slot and on-board mic.</p>
+            <ul>
+              <li>4MP high-resolution sensor</li>
+              <li>IP66 weather-rated housing</li>
+              <li>Auto day / night switching</li>
+              <li>Smart motion, line-cross and intrusion detection</li>
+              <li>Pair to the free IVSEC X app via QR code</li>
+            </ul>
+          </article>
+          <article class="panel box-card">
+            <span class="qty">1 ×</span>
+            <h3>4-Channel PoE+ NVR</h3>
+            <p class="sub">Network recorder with PoE+ ports — one cable per camera for power and data.</p>
+            <ul>
+              <li>4 × PoE+ ports built in</li>
+              <li>2TB Seagate SkyHawk drive pre-installed</li>
+              <li>Expandable up to a 10TB HDD</li>
+              <li>AI smarts: human + vehicle detection, face recognition, line crossing, intrusion</li>
+              <li>Browser, desktop CMS and phone app access</li>
+            </ul>
+          </article>
+          <article class="panel box-card">
+            <span class="qty">Inc.</span>
+            <h3>Setup accessories</h3>
+            <p class="sub">The small bits that usually get forgotten.</p>
+            <ul>
+              <li>HDMI cable for monitor / TV output</li>
+              <li>USB mouse for on-screen menus</li>
+              <li>Pre-installed 2TB surveillance HDD</li>
+              <li>Free IVSEC X app (iOS &amp; Android)</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>Why this kit works</h2>
+          <p>Essentials HD is the practical starting point — real IP cameras and a real NVR, without paying for features a smaller property doesn't need.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card highlight">
+            <div class="feature-icon">🎯</div>
+            <h3>Smart motion that ignores the breeze</h3>
+            <p>Cameras only flag people and vehicles, so you stop getting alerts every time a branch sways or a possum walks past.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">📱</div>
+            <h3>Phone access via IVSEC X</h3>
+            <p>Live view, playback and motion alerts from anywhere with internet. Setup is a QR-code scan once the system is in.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🌧️</div>
+            <h3>IP66 outdoor-rated</h3>
+            <p>Sealed against dust and rain, designed to live outside under eaves and on walls year-round in Aussie weather.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">💾</div>
+            <h3>2TB pre-installed</h3>
+            <p>A Seagate SkyHawk surveillance-grade drive is already inside — typically weeks of footage at default settings on four cameras.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">🔌</div>
+            <h3>Single-cable PoE+</h3>
+            <p>One Cat6 run does both power and video back to the NVR. Neater install, fewer points of failure.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">🧠</div>
+            <h3>AI built into the recorder</h3>
+            <p>The NVR adds face recognition, line-crossing, intrusion zones and people/vehicle counting on top of what the cameras already do.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>How the kits compare</h2>
+          <p>A quick side-by-side so you can see exactly where Essentials HD sits in the range.</p>
+        </div>
+        <div class="panel compare">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>&nbsp;</th>
+                <th class="this-one">Essentials HD</th>
+                <th>Active Guard</th>
+                <th>Pro 4K</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Resolution</td><td class="this-one">4MP HD</td><td>4MP HD</td><td>8MP / 4K</td></tr>
+              <tr><td>Cameras included</td><td class="this-one">4</td><td>4</td><td>4</td></tr>
+              <tr><td>Storage installed</td><td class="this-one">2TB</td><td>2TB</td><td>4TB</td></tr>
+              <tr><td>Max single HDD</td><td class="this-one">10TB</td><td>10TB</td><td>16TB</td></tr>
+              <tr><td>Weather rating</td><td class="this-one">IP66</td><td>IP66</td><td>IP67</td></tr>
+              <tr><td>Siren + strobe deterrent</td><td class="this-one">—</td><td>Yes</td><td>Yes</td></tr>
+              <tr><td>Full-colour night vision</td><td class="this-one">—</td><td>Yes</td><td>Yes</td></tr>
+              <tr><td>Two-way audio</td><td class="this-one">—</td><td>Yes</td><td>Yes</td></tr>
+              <tr><td>AI on the NVR</td><td class="this-one">Yes</td><td>Yes</td><td>Yes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="suits">
+          <div>
+            <h2>Who it suits</h2>
+            <p style="color: var(--muted); margin: 12px 0 20px;">A common choice when the brief is "I just want decent cameras done properly".</p>
+            <ul>
+              <li><b>Homes and units</b> — 4 cameras typically covers the front, rear and both sides</li>
+              <li><b>Small shopfronts</b> — entry door, counter and back room</li>
+              <li><b>Workshops and garages</b> — driveway, entry and stock area</li>
+              <li><b>Rentals and investment properties</b> — sensible kit at a sensible price</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style="margin-bottom: 10px;">Want a 6 or 8 camera version?</h3>
+            <p style="color: var(--muted); margin: 0 0 18px;">The same cameras can be paired with a larger NVR if you need more channels. Mention it when you call and we'll spec it up.</p>
+            <a class="btn btn-secondary" href="tel:0418912681">Call to discuss</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="cta">
+          <div>
+            <h2>Get Essentials HD installed</h2>
+            <p>Call to chat through camera positions and what's involved at your place. Quotes are free and there's no pressure either way.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn btn-primary" href="tel:0418912681">Call 0418 912 681</a>
+            <a class="btn btn-secondary" href="https://www.instagram.com/neillelectrical" target="_blank" rel="noopener">Instagram</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <h2>Other camera kits</h2>
+          <p>Step up if you want active deterrence or higher resolution.</p>
+        </div>
+        <div class="other-kits">
+          <a class="kit-link" href="active-guard.html">
+            <span>Mid tier</span>
+            <h3>Active Guard</h3>
+            <p>Same 4MP picture plus a built-in siren, flashing strobe and full-colour night vision.</p>
+            <div class="model">IVSEC LVK-119B</div>
+          </a>
+          <a class="kit-link" href="pro-4k.html">
+            <span>Top tier</span>
+            <h3>Pro 4K</h3>
+            <p>8MP / 4K cameras with a 4TB recorder — best for larger blocks and detail at distance.</p>
+            <div class="model">IVSEC LVK-319B-4TB</div>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>© 2026 Neill Data & Security. All rights reserved.</div>
+      <div>Melbourne • Mornington Peninsula • Surrounding areas</div>
+    </div>
+  </footer>
+</body>
+</html>
