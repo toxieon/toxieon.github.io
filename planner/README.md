@@ -2,7 +2,18 @@
 
 This folder contains a self-contained interactive prototype for the BuildingMap web app brief.
 
-Open `index.html` locally, or upload `Planner.html` with `app.js`, `styles.css`, `config.js`, and the `assets` folder for the hosted planner page.
+Open `index.html` locally, or upload this GitHub Pages layout for the hosted planner page:
+
+```txt
+Root/
+  Planner/
+    index.html
+  app.js
+  styles.css
+  config.js
+  assets/
+    floorplan.svg
+```
 
 - Project dashboard and mobile-style navigation
 - Colour-coded project folders for large builds such as apartments, towers, or stages
