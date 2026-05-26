@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Essentials HD — 4-camera 4MP HD CCTV kit supplied and installed by Neill Data & Security across Melbourne and the Mornington Peninsula." />
-  <title>Essentials HD 4-Camera Kit | Neill Data & Security</title>
+  <meta name="description" content="Pro 4K Guard — custom 8MP 4K kit with built-in active deterrent (siren + strobe). Supplied and installed by Neill Data & Security across Melbourne." />
+  <meta name="robots" content="noindex,follow" />
+  <title>Pro 4K Guard — 4K + Active Deterrent | Neill Data & Security</title>
   <style>
     :root {
       --bg: #07111f;
@@ -19,9 +20,9 @@
       --shadow: 0 20px 70px rgba(0,0,0,0.35);
       --radius: 24px;
       --max: 1160px;
-      --accent: var(--brand);
-      --accent-soft: rgba(49,208,255,0.13);
-      --accent-border: rgba(49,208,255,0.28);
+      --accent: var(--brand-2);
+      --accent-soft: rgba(106,255,184,0.13);
+      --accent-border: rgba(106,255,184,0.32);
     }
 
     * { box-sizing: border-box; }
@@ -30,8 +31,8 @@
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(49,208,255,0.22), transparent 34rem),
-        radial-gradient(circle at top right, rgba(106,255,184,0.12), transparent 32rem),
+        radial-gradient(circle at top left, rgba(106,255,184,0.2), transparent 34rem),
+        radial-gradient(circle at top right, rgba(255,209,102,0.18), transparent 32rem),
         var(--bg);
       color: var(--text);
       line-height: 1.6;
@@ -83,14 +84,14 @@
       color: var(--accent);
       background: var(--accent-soft);
       border: 1px solid var(--accent-border);
-      padding: 8px 14px; border-radius: 999px; font-weight: 800;
-      margin-bottom: 20px; font-size: 0.85rem;
-      letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 8px 14px; border-radius: 999px;
+      font-weight: 800; margin-bottom: 20px;
+      font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase;
     }
     .eyebrow .dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--accent);
-      box-shadow: 0 0 0 4px rgba(49,208,255,0.18);
+      box-shadow: 0 0 0 4px rgba(106,255,184,0.18);
       animation: pulse 1.6s ease-in-out infinite;
       flex-shrink: 0;
     }
@@ -126,20 +127,53 @@
     .chip b { color: var(--text); }
     .chip.accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
     .chip.accent b { color: var(--accent); }
+    .chip.siren {
+      background: rgba(255,209,102,0.13);
+      border-color: rgba(255,209,102,0.38);
+      color: var(--warning);
+    }
+    .chip.siren b { color: var(--warning); }
 
     .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
 
-    /* Unified hero visual: 4-camera tile grid base */
+    /* Unified hero visual */
     .product-visual {
       position: relative; overflow: hidden;
       min-height: 480px; padding: 28px;
       border-radius: var(--radius);
       background:
         linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.035)),
-        radial-gradient(circle at 25% 12%, var(--accent-soft), transparent 18rem),
+        radial-gradient(circle at 22% 18%, rgba(106,255,184,0.22), transparent 16rem),
+        radial-gradient(circle at 88% 22%, rgba(255,209,102,0.25), transparent 14rem),
         var(--bg-soft);
       border: 1px solid var(--card-border);
       box-shadow: var(--shadow);
+    }
+
+    /* Pixel matrix shimmer (Pro 4K signature) */
+    .pixel-matrix {
+      position: absolute;
+      inset: 16px 16px 110px 16px;
+      display: grid;
+      grid-template-columns: repeat(14, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+      gap: 4px;
+      opacity: 0.45;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .pixel-matrix span {
+      background: rgba(106,255,184,0.32);
+      border-radius: 2px;
+      animation: shimmer 4.5s ease-in-out infinite;
+    }
+    .pixel-matrix span:nth-child(3n) { background: rgba(49,208,255,0.4); animation-delay: 0.3s; }
+    .pixel-matrix span:nth-child(5n) { background: rgba(255,255,255,0.18); animation-delay: 0.6s; }
+    .pixel-matrix span:nth-child(7n) { animation-delay: 0.9s; }
+    .pixel-matrix span:nth-child(11n) { background: rgba(106,255,184,0.5); animation-delay: 1.2s; }
+    @keyframes shimmer {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 1; }
     }
 
     .cam-stack {
@@ -155,8 +189,8 @@
     .cam-tile {
       position: relative;
       border-radius: 22px;
-      background: linear-gradient(145deg, #eef7ff, #9eb1c7);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      background: linear-gradient(145deg, #ffffff, #b8c5d6);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
       overflow: hidden;
     }
     .cam-tile:nth-child(1) { transform: rotate(-2deg); }
@@ -169,14 +203,79 @@
       width: 56%;
       aspect-ratio: 1;
       border-radius: 50%;
-      background: radial-gradient(circle, #08111d 0 28%, #233b55 29% 45%, #06101d 46% 100%);
+      background: radial-gradient(circle, #08111d 0 22%, #1b3147 23% 38%, #06101d 39% 100%);
       top: 18%; left: 12%;
-      box-shadow: inset 0 0 0 6px rgba(255,255,255,0.12);
+      box-shadow:
+        inset 0 0 0 6px rgba(255,255,255,0.12),
+        inset 0 0 0 10px rgba(106,255,184,0.28);
     }
     .cam-tile .mp-tag {
       position: absolute; right: 12px; top: 10px;
       color: #06101d; font-weight: 950; font-size: 1.05rem;
       letter-spacing: -0.05em;
+    }
+    .cam-tile .mp-tag small {
+      display: block;
+      font-size: 0.6rem; letter-spacing: 0.08em;
+      font-weight: 800; color: #1f3247;
+      margin-top: -3px;
+    }
+    /* Strobe dot on each camera (siren signature) */
+    .cam-tile .strobe {
+      position: absolute;
+      right: 12px; bottom: 12px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow:
+        0 0 0 4px rgba(255,209,102,0.22),
+        0 0 12px 3px rgba(255,209,102,0.55);
+      animation: strobe-flash 1.2s ease-in-out infinite;
+    }
+    .cam-tile:nth-child(2) .strobe { animation-delay: 0.3s; }
+    .cam-tile:nth-child(3) .strobe { animation-delay: 0.6s; }
+    .cam-tile:nth-child(4) .strobe { animation-delay: 0.9s; }
+    @keyframes strobe-flash {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.78); }
+    }
+
+    /* Siren corner — top-right emanating waves */
+    .siren-corner {
+      position: absolute;
+      top: 36px; right: 36px;
+      width: 64px; height: 64px;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .siren-corner .core {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 18px; height: 18px;
+      margin: -9px 0 0 -9px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow:
+        0 0 0 4px rgba(255,209,102,0.2),
+        0 0 18px 4px rgba(255,209,102,0.7);
+      animation: core-flash 1.2s ease-in-out infinite;
+    }
+    .siren-corner .wave {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(255,209,102,0.55);
+      animation: corner-wave 2.1s ease-out infinite;
+    }
+    .siren-corner .wave.w2 { animation-delay: 0.7s; }
+    .siren-corner .wave.w3 { animation-delay: 1.4s; }
+    @keyframes corner-wave {
+      0% { transform: scale(0.35); opacity: 0.95; }
+      100% { transform: scale(2.6); opacity: 0; }
+    }
+    @keyframes core-flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
     .visual-tag {
@@ -191,25 +290,9 @@
     .visual-tag h4 { margin: 0; font-size: 1rem; letter-spacing: -0.02em; }
     .visual-tag span { color: var(--muted); font-size: 0.88rem; display: block; margin-top: 2px; }
     .visual-tag .pill {
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      background: linear-gradient(135deg, var(--warning), var(--brand-2));
       color: #06101d; font-weight: 900; font-size: 0.78rem;
       padding: 6px 12px; border-radius: 999px; white-space: nowrap;
-    }
-
-    /* Subtle scan-line for the entry kit */
-    .scan-line {
-      position: absolute;
-      left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0.7;
-      z-index: 1;
-      animation: scan 4.5s ease-in-out infinite;
-    }
-    @keyframes scan {
-      0% { top: 8%; opacity: 0; }
-      10% { opacity: 0.7; }
-      90% { opacity: 0.7; }
-      100% { top: 78%; opacity: 0; }
     }
 
     section { padding: 64px 0; }
@@ -233,6 +316,11 @@
       padding: 4px 12px; border-radius: 999px;
       font-weight: 900; font-size: 0.82rem; margin-bottom: 14px;
     }
+    .box-card.siren-card .qty {
+      background: rgba(255,209,102,0.14);
+      border-color: rgba(255,209,102,0.4);
+      color: var(--warning);
+    }
     .box-card h3 { margin-bottom: 6px; }
     .box-card .sub { color: var(--muted); font-size: 0.92rem; }
     .box-card ul { padding-left: 18px; margin: 16px 0 0; color: var(--muted); }
@@ -250,6 +338,10 @@
       background: linear-gradient(180deg, var(--accent-soft), rgba(255,255,255,0.04));
       border-color: var(--accent-border);
     }
+    .feature-card.siren-feature {
+      background: linear-gradient(180deg, rgba(255,209,102,0.13), rgba(255,255,255,0.04));
+      border-color: rgba(255,209,102,0.35);
+    }
     .feature-icon {
       width: 48px; height: 48px; border-radius: 14px;
       display: grid; place-items: center;
@@ -260,6 +352,10 @@
     .feature-card.highlight .feature-icon {
       background: var(--accent-soft);
       border-color: var(--accent-border);
+    }
+    .feature-card.siren-feature .feature-icon {
+      background: rgba(255,209,102,0.16);
+      border-color: rgba(255,209,102,0.4);
     }
     .feature-card h3 { font-size: 1.1rem; }
     .feature-card p { color: var(--muted); margin: 10px 0 0; }
@@ -276,13 +372,16 @@
     }
     .compare-table td { color: var(--muted); font-weight: 600; }
     .compare-table td:first-child { color: var(--text); font-weight: 700; }
-    .compare-table th.this-one, .compare-table td.this-one { color: var(--accent); font-weight: 800; background: var(--accent-soft); }
+    .compare-table th.this-one, .compare-table td.this-one {
+      color: var(--warning); font-weight: 800;
+      background: linear-gradient(135deg, rgba(255,209,102,0.13), rgba(106,255,184,0.1));
+    }
     .compare-table tr:last-child td { border-bottom: 0; }
 
     .suits {
       padding: 36px;
       display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 32px; align-items: center;
-      background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,0.04));
+      background: linear-gradient(135deg, rgba(106,255,184,0.13), rgba(255,209,102,0.08));
       border: 1px solid var(--card-border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
@@ -349,10 +448,34 @@
     .upsize-cta .arrow { transition: transform 0.2s ease; }
     .upsize-cta:hover .arrow { transform: translateX(3px); }
 
+    .hidden-callout {
+      position: relative;
+      padding: 32px;
+      background:
+        linear-gradient(135deg, rgba(255,209,102,0.1), rgba(106,255,184,0.06));
+      border: 1px dashed rgba(255,209,102,0.4);
+      border-radius: var(--radius);
+      margin-top: 24px;
+    }
+    .hidden-callout h3 { margin: 0 0 10px; color: var(--warning); font-size: 1.2rem; }
+    .hidden-callout p { color: var(--muted); margin: 0; }
+    .hidden-callout .tag {
+      display: inline-block;
+      background: var(--warning);
+      color: #06101d;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
     .cta {
       padding: 38px;
       display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center;
-      background: linear-gradient(135deg, var(--accent-soft), rgba(106,255,184,0.08));
+      background: linear-gradient(135deg, var(--accent-soft), rgba(255,209,102,0.13));
       border: 1px solid var(--card-border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
@@ -369,7 +492,7 @@
       transition: 0.2s ease; display: block;
     }
     .kit-link:hover { transform: translateY(-3px); border-color: var(--accent-border); }
-    .kit-link span { color: var(--accent); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .kit-link span { color: var(--brand); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
     .kit-link h3 { margin: 8px 0 6px; }
     .kit-link p { color: var(--muted); margin: 0; font-size: 0.95rem; }
     .kit-link .model { color: var(--muted); font-size: 0.78rem; font-weight: 600; margin-top: 10px; }
@@ -383,12 +506,13 @@
       .nav-links { display: none; }
       .product-visual { min-height: 380px; }
       .cam-stack { inset: 30px 24px 110px 24px; }
+      .pixel-matrix { inset: 12px 12px 90px 12px; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(8, 1fr); }
     }
     @media (max-width: 620px) {
       .box-grid, .feature-grid, .other-kits { grid-template-columns: 1fr; }
       .hero-actions .btn, .cta-actions .btn { width: 100%; }
       .visual-tag { flex-direction: column; align-items: flex-start; }
-      .compare-table th, .compare-table td { padding: 12px 14px; font-size: 0.9rem; }
+      .compare-table th, .compare-table td { padding: 12px 14px; font-size: 0.85rem; }
     }
   </style>
 </head>
@@ -411,43 +535,63 @@
 
   <main>
     <div class="container breadcrumb">
-      <a href="index.html">Home</a><span class="sep">›</span><a href="index.html#packages">Camera Packages</a><span class="sep">›</span><span>Essentials HD</span>
+      <a href="index.html">Home</a><span class="sep">›</span><a href="index.html#packages">Camera Packages</a><span class="sep">›</span><a href="pro-4k.html">Pro 4K</a><span class="sep">›</span><span>Pro 4K Guard</span>
     </div>
 
     <section class="product-hero">
       <div class="container product-grid">
         <div>
-          <div class="eyebrow"><span class="dot"></span>Record &amp; Review</div>
-          <h1>Essentials HD — clean 4MP coverage, set up properly.</h1>
-          <p class="lede">A solid four-camera HD IP kit. Crisp 4MP picture, a 4-channel recorder with a 2TB surveillance drive already inside, and the IVSEC X app on your phone. A great everyday system for homes, units and smaller shopfronts.</p>
-          <span class="model-code">Equipment: <b>IVSEC LX-Series LVK-000</b></span>
+          <div class="eyebrow"><span class="dot"></span>Hidden Upgrade • 4K + Active Siren</div>
+          <h1>Pro 4K Guard — 4K detail, sirens included.</h1>
+          <p class="lede">A custom build that swaps the standard 4K cameras for 8MP active-deterrent variants. Same flagship 4K image, IP67 housing and 4TB recorder — plus the built-in siren, flashing strobes and full-colour night vision from the Active Guard line. The complete top-tier setup, off the standard menu.</p>
+          <span class="model-code">Equipment: <b>IVSEC LX-Series — custom 8MP active-deterrent build</b></span>
           <div class="spec-chips">
             <span class="chip accent"><b>4</b> cameras</span>
-            <span class="chip"><b>4MP</b> HD</span>
-            <span class="chip"><b>IP66</b> weatherproof</span>
-            <span class="chip"><b>2TB</b> SkyHawk drive</span>
-            <span class="chip"><b>4× PoE+</b> NVR</span>
+            <span class="chip accent"><b>8MP</b> / 4K</span>
+            <span class="chip accent"><b>4TB</b> pre-installed</span>
+            <span class="chip"><b>IP67</b> weatherproof</span>
+            <span class="chip siren"><b>Siren</b> + strobe</span>
+            <span class="chip siren"><b>Full colour</b> night vision</span>
+            <span class="chip"><b>2-way</b> audio</span>
+            <span class="chip"><b>Up to 16TB</b> capacity</span>
           </div>
           <div class="hero-actions">
             <a class="btn btn-primary" href="tel:0418912681">Call for a Quote</a>
-            <a class="btn btn-secondary" href="index.html#packages">Compare Kits</a>
+            <a class="btn btn-secondary" href="pro-4k.html">Back to Pro 4K</a>
           </div>
         </div>
 
         <div class="product-visual" aria-hidden="true">
-          <div class="scan-line"></div>
+          <div class="pixel-matrix">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
           <div class="cam-stack">
-            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
-            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
-            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
-            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4MP</span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4K<small>8MP</small></span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4K<small>8MP</small></span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4K<small>8MP</small></span><span class="strobe"></span></div>
+            <div class="cam-tile"><div class="lens"></div><span class="mp-tag">4K<small>8MP</small></span><span class="strobe"></span></div>
+          </div>
+          <div class="siren-corner">
+            <div class="wave"></div>
+            <div class="wave w2"></div>
+            <div class="wave w3"></div>
+            <div class="core"></div>
           </div>
           <div class="visual-tag">
             <div>
-              <h4>4 HD cameras + 4-channel NVR</h4>
-              <span>2TB SkyHawk surveillance drive pre-installed</span>
+              <h4>4K detail + active siren on every camera</h4>
+              <span>Custom 8MP active-deterrent build • 4TB drive included</span>
             </div>
-            <span class="pill">Essentials HD</span>
+            <span class="pill">Pro 4K Guard</span>
           </div>
         </div>
       </div>
@@ -457,42 +601,44 @@
       <div class="container">
         <div class="section-head">
           <h2>What's in the box</h2>
-          <p>Everything needed to record, view and back up footage out of the gate — supplied as a complete kit and configured during install.</p>
+          <p>The Pro 4K kit re-spec'd with 8MP active-deterrent cameras. Same recorder and storage — cameras that record AND warn intruders off.</p>
         </div>
         <div class="box-grid">
-          <article class="panel box-card">
+          <article class="panel box-card siren-card">
             <span class="qty">4 ×</span>
-            <h3>4MP IP Cameras</h3>
-            <p class="sub">Compact bullet-style IP cameras with SD card slot and on-board mic.</p>
+            <h3>8MP / 4K Active-Deterrent Cameras</h3>
+            <p class="sub">4K resolution bullet cameras with built-in siren, strobe and full-colour night vision.</p>
             <ul>
-              <li>4MP high-resolution sensor</li>
-              <li>IP66 weather-rated housing</li>
-              <li>Auto day / night switching</li>
-              <li>Smart motion, line-cross and intrusion detection</li>
-              <li>Pair to the free IVSEC X app via QR code</li>
+              <li>8 megapixel / 4K image — read plates and faces at distance</li>
+              <li>IP67 weather rating (a step above standard IP66)</li>
+              <li><b>Built-in siren and flashing strobe lights</b></li>
+              <li>Full-colour night vision with motion-triggered spotlight</li>
+              <li>Two-way audio — talk through the camera from your phone</li>
+              <li>Smart motion, intrusion, line-cross and sound detection</li>
             </ul>
           </article>
           <article class="panel box-card">
             <span class="qty">1 ×</span>
-            <h3>4-Channel PoE+ NVR</h3>
-            <p class="sub">Network recorder with PoE+ ports — one cable per camera for power and data.</p>
+            <h3>4-Channel PoE+ NVR (4TB)</h3>
+            <p class="sub">Same flagship recorder as the standard Pro 4K kit — double the storage of the entry kits.</p>
             <ul>
               <li>4 × PoE+ ports built in</li>
-              <li>2TB Seagate SkyHawk drive pre-installed</li>
-              <li>Expandable up to a 10TB HDD</li>
-              <li>AI smarts: human + vehicle detection, face recognition, line crossing, intrusion</li>
-              <li>Browser, desktop CMS and phone app access</li>
+              <li><b>4TB surveillance drive pre-installed</b></li>
+              <li>Single bay expandable up to 16TB</li>
+              <li>AI: face recognition, plate detection, human/vehicle, intrusion zones</li>
+              <li>App, browser and desktop CMS access</li>
             </ul>
           </article>
           <article class="panel box-card">
             <span class="qty">Inc.</span>
             <h3>Setup accessories</h3>
-            <p class="sub">The small bits that usually get forgotten.</p>
+            <p class="sub">Plus everything you need to get a picture on a screen on day one.</p>
             <ul>
-              <li>HDMI cable for monitor / TV output</li>
-              <li>USB mouse for on-screen menus</li>
-              <li>Pre-installed 2TB surveillance HDD</li>
+              <li>HDMI cable for monitor / TV</li>
+              <li>USB mouse</li>
               <li>Free IVSEC X app (iOS &amp; Android)</li>
+              <li>Schedule-light assistant</li>
+              <li>Video management software (Surveillance Client)</li>
             </ul>
           </article>
         </div>
@@ -502,39 +648,39 @@
     <section>
       <div class="container">
         <div class="section-head">
-          <h2>Why this kit works</h2>
-          <p>Essentials HD is the practical starting point — real IP cameras and a real NVR, without paying for features a smaller property doesn't need.</p>
+          <h2>Why pick Pro 4K Guard</h2>
+          <p>The full Pro 4K kit with the active deterrent from the Active Guard line baked into the cameras. Best of both worlds — no trade-offs.</p>
         </div>
         <div class="feature-grid">
+          <article class="feature-card siren-feature">
+            <div class="feature-icon">🚨</div>
+            <h3>Siren + strobe on detection</h3>
+            <p>Each camera fires its built-in siren and flashes its strobes when smart motion picks up a person. Most opportunistic visitors don't stick around — even less so with four cameras going at once.</p>
+          </article>
           <article class="feature-card highlight">
             <div class="feature-icon">🎯</div>
-            <h3>Smart motion that ignores the breeze</h3>
-            <p>Cameras only flag people and vehicles, so you stop getting alerts every time a branch sways or a possum walks past.</p>
+            <h3>4K detail at distance</h3>
+            <p>8MP cameras pull faces, vehicle colour and number plates out of the frame where a 4MP camera would just show a blur — a real difference on larger blocks and longer driveways.</p>
+          </article>
+          <article class="feature-card siren-feature">
+            <div class="feature-icon">🌈</div>
+            <h3>Full-colour night vision</h3>
+            <p>Spotlight + sensor combo keeps colour info after dark — clothing, vehicles and faces stay identifiable in dark areas where a standard IR camera shows only shapes.</p>
           </article>
           <article class="feature-card highlight">
-            <div class="feature-icon">📱</div>
-            <h3>Phone access via IVSEC X</h3>
-            <p>Live view, playback and motion alerts from anywhere with internet. Setup is a QR-code scan once the system is in.</p>
-          </article>
-          <article class="feature-card highlight">
-            <div class="feature-icon">🌧️</div>
-            <h3>IP66 outdoor-rated</h3>
-            <p>Sealed against dust and rain, designed to live outside under eaves and on walls year-round in Aussie weather.</p>
-          </article>
-          <article class="feature-card">
             <div class="feature-icon">💾</div>
-            <h3>2TB pre-installed</h3>
-            <p>A Seagate SkyHawk surveillance-grade drive is already inside — typically weeks of footage at default settings on four cameras.</p>
+            <h3>4TB pre-installed</h3>
+            <p>Double the storage of the standard kits. At 4 channels of 4K that typically means weeks of continuous footage with motion clips kept much longer.</p>
           </article>
-          <article class="feature-card">
-            <div class="feature-icon">🔌</div>
-            <h3>Single-cable PoE+</h3>
-            <p>One Cat6 run does both power and video back to the NVR. Neater install, fewer points of failure.</p>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🛡️</div>
+            <h3>IP67 housing</h3>
+            <p>Fully sealed against dust and capable of brief immersion. Built for unsheltered spots, exposed walls and harsher weather.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon">🧠</div>
-            <h3>AI built into the recorder</h3>
-            <p>The NVR adds face recognition, line-crossing, intrusion zones and people/vehicle counting on top of what the cameras already do.</p>
+            <h3>Heavy on the AI</h3>
+            <p>Face recognition, plate detection, line-crossing, intrusion zones, queue length and crowd-density — all running on the recorder, not a cloud subscription.</p>
           </article>
         </div>
       </div>
@@ -544,30 +690,36 @@
       <div class="container">
         <div class="section-head">
           <h2>How the kits compare</h2>
-          <p>A quick side-by-side so you can see exactly where Essentials HD sits in the range.</p>
+          <p>Pro 4K Guard sits at the very top — every feature from the range, in one kit.</p>
         </div>
         <div class="panel compare">
           <table class="compare-table">
             <thead>
               <tr>
                 <th>&nbsp;</th>
-                <th class="this-one">Essentials HD</th>
+                <th>Essentials HD</th>
                 <th>Active Guard</th>
                 <th>Pro 4K</th>
+                <th class="this-one">Pro 4K Guard</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td>Resolution</td><td class="this-one">4MP HD</td><td>4MP HD</td><td>8MP / 4K</td></tr>
-              <tr><td>Cameras included</td><td class="this-one">4</td><td>4</td><td>4</td></tr>
-              <tr><td>Storage installed</td><td class="this-one">2TB</td><td>2TB</td><td>4TB</td></tr>
-              <tr><td>Max single HDD</td><td class="this-one">10TB</td><td>10TB</td><td>16TB</td></tr>
-              <tr><td>Weather rating</td><td class="this-one">IP66</td><td>IP66</td><td>IP67</td></tr>
-              <tr><td>Siren + strobe deterrent</td><td class="this-one">—</td><td>Yes</td><td>—</td></tr>
-              <tr><td>Full-colour night vision</td><td class="this-one">—</td><td>Yes</td><td>Yes</td></tr>
-              <tr><td>Two-way audio</td><td class="this-one">—</td><td>Yes</td><td>Yes</td></tr>
-              <tr><td>Smart detection</td><td class="this-one">Yes</td><td>Yes</td><td>Yes</td></tr>
+              <tr><td>Resolution</td><td>4MP HD</td><td>4MP HD</td><td>8MP / 4K</td><td class="this-one">8MP / 4K</td></tr>
+              <tr><td>Cameras included</td><td>4</td><td>4</td><td>4</td><td class="this-one">4</td></tr>
+              <tr><td>Storage installed</td><td>2TB</td><td>2TB</td><td>4TB</td><td class="this-one">4TB</td></tr>
+              <tr><td>Max single HDD</td><td>10TB</td><td>10TB</td><td>16TB</td><td class="this-one">16TB</td></tr>
+              <tr><td>Weather rating</td><td>IP66</td><td>IP66</td><td>IP67</td><td class="this-one">IP67</td></tr>
+              <tr><td>Siren + strobe deterrent</td><td>—</td><td>Yes</td><td>—</td><td class="this-one">Yes</td></tr>
+              <tr><td>Full-colour night vision</td><td>—</td><td>Yes</td><td>Yes</td><td class="this-one">Yes</td></tr>
+              <tr><td>Two-way audio</td><td>—</td><td>Yes</td><td>Yes</td><td class="this-one">Yes</td></tr>
+              <tr><td>Smart detection</td><td>Yes</td><td>Yes</td><td>Yes</td><td class="this-one">Yes</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="hidden-callout">
+          <span class="tag">Off the menu</span>
+          <h3>This is a custom spec — not in the standard kit listings</h3>
+          <p>The standard Pro 4K kit ships with non-siren cameras. The Guard build swaps them for an 8MP active-deterrent variant from the IVSEC LX-Series. Pricing reflects the upgraded cameras. Worth a quick call to confirm current stock and lock in the spec for your install.</p>
         </div>
       </div>
     </section>
@@ -577,12 +729,12 @@
         <div class="suits">
           <div>
             <h2>Who it suits</h2>
-            <p style="color: var(--muted); margin: 12px 0 20px;">A common choice when the brief is "I just want decent cameras done properly".</p>
+            <p style="color: var(--muted); margin: 12px 0 20px;">The pick for properties where both 4K detail AND an active deterrent matter — usually the bigger or higher-risk jobs.</p>
             <ul>
-              <li><b>Homes and units</b> — 4 cameras typically covers the front, rear and both sides</li>
-              <li><b>Small shopfronts</b> — entry door, counter and back room</li>
-              <li><b>Workshops and garages</b> — driveway, entry and stock area</li>
-              <li><b>Rentals and investment properties</b> — sensible kit at a sensible price</li>
+              <li><b>Larger family homes in high-risk pockets</b> — 4K evidence with a deterrent that fires the moment something moves</li>
+              <li><b>Yards, warehouses and rural sheds</b> — long ranges + a siren that hears trouble from across the block</li>
+              <li><b>Businesses after-hours</b> — clear ID footage during the day, active deterrent overnight</li>
+              <li><b>Anyone who'd otherwise have to pick</b> between 4K (Pro 4K) and sirens (Active Guard) — this is both</li>
             </ul>
           </div>
           <aside class="upsize">
@@ -594,7 +746,7 @@
               <span class="cnt active">8+</span>
             </div>
             <h3>Need more than 4 cameras?</h3>
-            <p>The same cameras pair with 8 and 16 channel NVRs — easy to scale up the kit for a bigger property without changing what you've already chosen.</p>
+            <p>The 8MP active-deterrent cameras work with 8 and 16 channel NVRs too. Easy to scale up across a bigger property — just mention it when you call.</p>
             <a class="btn btn-primary upsize-cta" href="tel:0418912681">Call to scale up <span class="arrow">→</span></a>
           </aside>
         </div>
@@ -605,8 +757,8 @@
       <div class="container">
         <div class="cta">
           <div>
-            <h2>Get Essentials HD installed</h2>
-            <p>Call to chat through camera positions and what's involved at your place. Quotes are free and there's no pressure either way.</p>
+            <h2>Get Pro 4K Guard installed</h2>
+            <p>This is a custom spec so quotes are confirmed over a quick chat. Call to lock in cameras and walk through what you'd like covered.</p>
           </div>
           <div class="cta-actions">
             <a class="btn btn-primary" href="tel:0418912681">Call 0418 912 681</a>
@@ -620,20 +772,20 @@
       <div class="container">
         <div class="section-head">
           <h2>Other camera kits</h2>
-          <p>Step up if you want active deterrence or higher resolution.</p>
+          <p>Standard kits from the range if Pro 4K Guard is more than the property needs.</p>
         </div>
         <div class="other-kits">
+          <a class="kit-link" href="pro-4k.html">
+            <span>Standard top tier</span>
+            <h3>Pro 4K</h3>
+            <p>The standard flagship — 8MP / 4K cameras with the 4TB recorder. No siren, lower price.</p>
+            <div class="model">IVSEC LVK-319B-4TB</div>
+          </a>
           <a class="kit-link" href="active-guard.html">
             <span>Active deterrent</span>
             <h3>Active Guard</h3>
-            <p>Same 4MP picture plus a built-in siren, flashing strobe and full-colour night vision.</p>
+            <p>4MP version of the deterrent kit — siren, strobe and full-colour night vision in the cameras themselves.</p>
             <div class="model">IVSEC LVK-119B</div>
-          </a>
-          <a class="kit-link" href="pro-4k.html">
-            <span>Top tier</span>
-            <h3>Pro 4K</h3>
-            <p>8MP / 4K cameras with a 4TB recorder — best for larger blocks and detail at distance.</p>
-            <div class="model">IVSEC LVK-319B-4TB</div>
           </a>
         </div>
       </div>
