@@ -996,8 +996,8 @@ function renderSettingsView() {
           <span class="sync-chip"><span class="sync-dot"></span>${hasGoogleApiKey && hasGoogleClientId ? "Configured" : "Config needed"}</span>
         </div>
         <div class="integration-list">
-          <div class="integration-row"><span><strong>Browser API Key</strong><span>${hasGoogleApiKey ? "Loaded from config.js" : "Add googleApiKey to config.js"}</span></span>${statusPill(hasGoogleApiKey ? "Complete" : "Not Started")}</div>
-          <div class="integration-row"><span><strong>OAuth Client ID</strong><span>${hasGoogleClientId ? "Loaded from config.js" : "Add googleClientId to config.js"}</span></span>${statusPill(hasGoogleClientId ? "Complete" : "Not Started")}</div>
+          <div class="integration-row"><span><strong>Browser API Key</strong><span>${hasGoogleApiKey ? "Loaded from index.html (inline config)" : "Add googleApiKey to the inline config in index.html"}</span></span>${statusPill(hasGoogleApiKey ? "Complete" : "Not Started")}</div>
+          <div class="integration-row"><span><strong>OAuth Client ID</strong><span>${hasGoogleClientId ? "Loaded from index.html (inline config)" : "Add googleClientId to the inline config in index.html"}</span></span>${statusPill(hasGoogleClientId ? "Complete" : "Not Started")}</div>
           <div class="integration-row"><span><strong>OAuth Scopes</strong><span>${escapeHtml((googleConfig.scopes || ["https://www.googleapis.com/auth/drive.file"]).join(" "))}</span></span>${statusPill("In Progress")}</div>
           <div class="integration-row"><span><strong>Drive Root</strong><span>/${DRIVE_ROOT_NAME}/</span></span>${statusPill("In Progress")}</div>
           <div class="integration-row"><span><strong>Project Photos</strong><span>${escapeHtml(drivePathForProject())}</span></span>${statusPill("In Progress")}</div>
