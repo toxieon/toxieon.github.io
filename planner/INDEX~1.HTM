@@ -18,10 +18,16 @@
         googleClientId: "418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com",
         driveRootFolderName: "NeillPlanner",
         scopes: [
-          "https://www.googleapis.com/auth/drive.file"
+          "https://www.googleapis.com/auth/drive.file",
+          "https://www.googleapis.com/auth/spreadsheets",
+          "openid",
+          "email",
+          "profile"
         ]
       };
     </script>
+    <script src="https://apis.google.com/js/api.js" defer></script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
   </head>
   <body>
     <div id="app"></div>

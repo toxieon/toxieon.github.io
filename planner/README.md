@@ -1,6 +1,6 @@
-# NeillPlanner (Planner folder)
+# NeillPlanner (Planner folder) — v0.2
 
-Drop this `Planner/` folder into the root of your GitHub repo. Once GitHub Pages is enabled, the live URL will be:
+Drop this `Planner/` folder into the root of your GitHub repo. Live URL once Pages is enabled:
 
 ```
 neilldata.com/Planner/
@@ -11,56 +11,42 @@ neilldata.com/Planner/
 ```
 Root/
   Planner/
-    index.html       <- entry point (Google API key + OAuth Client ID are baked in here)
+    index.html       <- entry point (Google API key + OAuth Client ID baked in here)
     app.js
     styles.css
     assets/
-      floorplan.svg
+      floorplan.svg  (decorative texture only)
 ```
 
-Everything is co-located inside `Planner/` — no parent-folder references, no separate `config.js`. You can upload the folder as-is.
+Everything is co-located inside `Planner/` — no parent-folder references, no separate `config.js`. Upload the folder as-is.
 
-## What changed in this build
+## What's in v0.2
 
-- Google API key and OAuth Client ID are now inlined directly inside `index.html` (in a `<script>` tag above `app.js`). No more external `config.js`.
-- All assets live inside `Planner/` — the previous `<base href="../">` trick is gone.
-- The static `Planner.html` and the lowercase `planner/` route have been removed.
+The big rewrite. No defaults, no examples — just a blank app wired into Google Drive + Sheets.
 
-## Security notes (important)
+- **Empty on first run.** No seed projects, no example folders, no example nodes. Click "Create your first project" to start.
+- **Google sign-in** via Google Identity Services (token model). One button in the top bar and in Settings.
+- **Drive bootstrap on sign-in.** The app creates (or finds) `NeillPlanner/`, `NeillPlanner/Admin Files/`, `NeillPlanner/Projects/`, `NeillPlanner/Unfiled Projects/`, and an audit spreadsheet inside Admin Files.
+- **Per-project Drive folders** created automatically when you create a project. Sub-structure: `Projects/<colour folder>/<project name>/<node title>/photo.jpg`. Projects without a colour folder go under `Unfiled Projects/<project name>/`.
+- **Photo upload** straight to the right node folder via the Drive multipart upload endpoint. Uses only the narrow `drive.file` scope (the app can only see files it created).
+- **Sheets-backed audit log.** Every action (project created, node created, status changed, photo uploaded, comment added, folder renamed, etc.) appends a row to `NeillPlanner-Audit` in Admin Files. Sheet columns: Timestamp, User, Action, Project ID, Project Name, Folder, Node ID, Node Title, Category, Status, Details, Device.
+- **On-demand audit fetch.** The audit log does NOT load on every page view. Open the Audit tab and click "Load from Sheet" to pull rows.
+- **Filterable audit view.** Filters: date from, date to, user, action, project, node title contains, details contains, free-text anywhere. Plus a "Download CSV" button that exports the currently filtered rows.
+- **Per-project floor plans** stored locally as data URLs (kept in browser storage for now — Drive sync for plans is a follow-up).
+- **No Firebase.** All FCM / push notifications code is gone.
 
-- The browser API key is **HTTP-referrer restricted** in Google Cloud — make sure the allowed referrers include `https://neilldata.com/*`, `https://www.neilldata.com/*`, and your local preview origins (`http://127.0.0.1:4173/*`, `http://localhost:4173/*`).
-- The OAuth **Client ID** is a public identifier by design. It is safe to include in client-side code.
-- The OAuth **Client SECRET** must **never** be placed in this folder. If you ever need server-side OAuth flows, that work happens in a real Next.js backend, not on GitHub Pages.
-- GitHub Pages is **public** — anyone who guesses the URL can load the page. The `noindex,nofollow` meta tag helps with search engines but is not access control. Do not upload real client photos or sensitive project data until proper auth is wired in (Cloudflare Access, Vercel auth, Firebase Hosting + Google Auth, etc.).
+## Google Cloud requirements
 
-## Google Drive folder structure (create these manually for now)
+The OAuth client and API key are already baked into `index.html`. In Google Cloud, make sure:
 
-```
-NeillPlanner/
-  Admin Files/
-  Projects/
-    HQ Fit-out/
-    Apartment Builds/
-    Service & Maintenance/
-    Unfiled Projects/
-```
+1. **APIs enabled**: Google Drive API, Google Sheets API.
+2. **OAuth consent screen** lists these scopes: `openid`, `profile`, `email`, `https://www.googleapis.com/auth/drive.file`, `https://www.googleapis.com/auth/spreadsheets`.
+3. **OAuth client ID — Authorized JavaScript origins** includes `https://neilldata.com`, `https://www.neilldata.com`, and your local dev origins (`http://127.0.0.1:4173`, `http://localhost:4173`).
+4. **API key — HTTP referrer restrictions** include `https://neilldata.com/*`, `https://www.neilldata.com/*`, `http://127.0.0.1:4173/*`, `http://localhost:4173/*`.
+5. **API key — API restrictions** (if used) allow Drive API and Sheets API.
+6. **If OAuth app is in "Testing" mode**, add your email (`toxieon.minecraft@gmail.com`) to the Test Users list. Otherwise sign-in returns `access_denied`.
 
-When the real backend is wired, the app will create per-project / per-floor / per-node subfolders automatically using `files.create` with `mimeType: application/vnd.google-apps.folder`.
+## How the data flows
 
-## What this prototype includes
-
-- Project dashboard with colour-coded project folders (for large builds like apartment blocks).
-- Interactive floor plan with zoom, pan, filtering, and tappable status nodes.
-- Node create / edit modal and node detail drawer with notes, images, comments, status updates, audit trail, sharing, and QR action.
-- Progress dashboard and audit table.
-- Google Drive / Sheets / OAuth integration surfaces (UI ready — backend wiring still required).
-- Settings screen shows whether `googleApiKey` and `googleClientId` are loaded.
-
-The prototype stores edits in browser local storage. No Firebase or Next.js credentials are required to run it.
-
-## Next step (the actual Drive wiring)
-
-1. Add Google Identity Services sign-in (token model) using the inlined `googleClientId` + `drive.file` scope.
-2. On first sign-in, look up or create the `NeillPlanner` root folder, then `Admin Files/`, `Projects/`, and `Unfiled Projects/` under it.
-3. When the user uploads a photo to a node, create (or reuse) `Projects/<Project>/<Floor Plan>/<Node Title>/` and `POST` the file via the Drive `multipart` upload endpoint.
-4. Save the returned `driveFileId`, `webViewLink`, and `thumbnailLink` against the node in local state (and later, Firestore).
+**On sign-in (one time):**
+- App requests an access token with the d
