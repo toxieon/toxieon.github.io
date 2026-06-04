@@ -604,7 +604,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
     <!-- QUOTE -->
     <section class="panel active" data-panel="quote">
       <h2 class="panel-title">New quote</h2>
-      <p class="panel-sub">Pick items, set quantities, generate PDF.</p>
+      <p class="panel-sub">Pick items, set quantities, generate PDF or image.</p>
 
       <!-- Today/Tomorrow brief -->
       <div class="card brief-card" id="upcoming-brief" style="display:none;">
@@ -802,6 +802,8 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
       <div class="btn-row">
         <button class="btn btn-primary hide-from-staff" id="save-pdf">Save &amp; download PDF</button>
         <button class="btn btn-cash hide-from-staff" id="save-cash-pdf" style="display:none;">Save &amp; download Cash PDF</button>
+        <button class="btn btn-secondary hide-from-staff" id="save-image">Save &amp; download Image</button>
+        <button class="btn btn-secondary hide-from-staff" id="save-cash-image" style="display:none;">Save &amp; download Cash Image</button>
         <button class="btn btn-secondary" id="save-only">Save quote</button>
         <button class="btn btn-ghost hide-from-staff" id="clear-quote">Clear</button>
       </div>
@@ -2018,6 +2020,7 @@ document.getElementById('cash-toggle').addEventListener('change', e => {
   currentQuote.cashMode = e.target.checked;
   if (e.target.checked) { currentQuote.gst = false; document.getElementById('gst-toggle').checked = false; }
   document.getElementById('save-cash-pdf').style.display = e.target.checked ? '' : 'none';
+  document.getElementById('save-cash-image').style.display = e.target.checked ? '' : 'none';
   renderTotals(); scheduleDraftSave();
 });
 document.getElementById('notes').addEventListener('input', e => { currentQuote.notes = e.target.value; scheduleDraftSave(); });
@@ -2073,6 +2076,7 @@ function resetQuoteUI() {
   document.getElementById('gst-toggle').checked = settings.gstDefault;
   document.getElementById('cash-toggle').checked = false;
   document.getElementById('save-cash-pdf').style.display = 'none';
+  document.getElementById('save-cash-image').style.display = 'none';
   document.getElementById('route-box').style.display = 'none';
   document.getElementById('route-warn').style.display = 'none';
   if (!Array.isArray(currentQuote.photos)) currentQuote.photos = [];
@@ -2403,6 +2407,7 @@ function renderHistory() {
     const actions = [];
     actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="open">Open</button>`);
     if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="pdf">PDF</button>`);
+    if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="image">Image</button>`);
     if (jsKey === 'quote' && !isStaff()) {
       actions.push(`<button class="btn btn-progress" data-id="${q.id}" data-act="to_in_progress" title="Release this quote — staff can now see materials and address">▶ In Progress</button>`);
     }
@@ -2435,6 +2440,11 @@ function renderHistory() {
       const snap = JSON.parse(JSON.stringify(currentQuote));
       currentQuote = JSON.parse(JSON.stringify(q));
       generatePDF(q.cashMode ? 'cash' : 'regular');
+      currentQuote = snap;
+    } else if (act === 'image') {
+      const snap = JSON.parse(JSON.stringify(currentQuote));
+      currentQuote = JSON.parse(JSON.stringify(q));
+      generateQuoteImage(q.cashMode ? 'cash' : 'regular');
       currentQuote = snap;
     } else if (act === 'del') {
       if (confirm('Delete this quote? This cannot be undone.')) {
@@ -2487,6 +2497,7 @@ function hydrateQuoteUI() {
   document.getElementById('gst-toggle').checked  = !!currentQuote.gst;
   document.getElementById('cash-toggle').checked = !!currentQuote.cashMode;
   document.getElementById('save-cash-pdf').style.display = currentQuote.cashMode ? '' : 'none';
+  document.getElementById('save-cash-image').style.display = currentQuote.cashMode ? '' : 'none';
   if (!Array.isArray(currentQuote.photos)) currentQuote.photos = [];
   if (!Array.isArray(currentQuote.extraMaterials)) currentQuote.extraMaterials = [];
   renderPhotos();
@@ -2519,12 +2530,20 @@ function hydrateQuoteUI() {
 }
 document.getElementById('save-only').onclick = () => { saveCurrentQuote('regular'); alert('Quote saved.'); };
 document.getElementById('save-pdf').onclick  = () => { saveCurrentQuote('regular'); generatePDF('regular'); };
+document.getElementById('save-image').onclick = () => { saveCurrentQuote('regular'); generateQuoteImage('regular'); };
 document.getElementById('save-cash-pdf').onclick = () => {
   currentQuote.cashMode = true; document.getElementById('cash-toggle').checked = true;
   currentQuote.gst = false; document.getElementById('gst-toggle').checked = false;
   renderTotals();
   saveCurrentQuote('cash');
   generatePDF('cash');
+};
+document.getElementById('save-cash-image').onclick = () => {
+  currentQuote.cashMode = true; document.getElementById('cash-toggle').checked = true;
+  currentQuote.gst = false; document.getElementById('gst-toggle').checked = false;
+  renderTotals();
+  saveCurrentQuote('cash');
+  generateQuoteImage('cash');
 };
 function saveCurrentQuote(style) {
   const c = calcQuote();
@@ -3298,7 +3317,7 @@ async function sharePDF(blob, filename) {
   try {
     const file = new File([blob], filename, { type: 'application/pdf' });
     if (navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Quote', text: 'Your quote from ' + getBizName() });
+      await navigator.share({ files: [file] });
       return true;
     }
   } catch (e) { /* user cancelled or share unsupported */ }
@@ -3306,6 +3325,380 @@ async function sharePDF(blob, filename) {
 }
 
 
+
+function customerDocRows(c, isCash) {
+  const rows = [];
+  const rowOut = (label, qty, unit, total, original) => {
+    rows.push({
+      label: label || '',
+      qty: qty == null ? '' : String(qty),
+      unit: unit == null ? '' : fmt(unit),
+      total: fmt(total),
+      original: (!isCash && original != null && Math.abs(original - total) > 0.001) ? fmt(original) : ''
+    });
+  };
+
+  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
+  sectionOrder.forEach(sec => {
+    let raw = 0, net = 0, anyCapped = false, totalQty = 0;
+    Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
+      const [section] = key.split(':');
+      if (section !== sec) return;
+      const item = findItem(key); if (!item || !qty) return;
+      const r = (Number(item.price) || 0) * Number(qty);
+      const cap = effectiveCap(sec, item);
+      const eff = Math.min(c.d, cap);
+      raw += r; net += r * (1 - eff / 100);
+      totalQty += Number(qty);
+      if (cap < c.d && c.d > 0) anyCapped = true;
+    });
+    if (raw > 0) {
+      const label = sec.charAt(0).toUpperCase() + sec.slice(1);
+      rowOut(label, totalQty || null, null, net, anyCapped ? null : raw);
+    }
+  });
+
+  currentQuote.customLines.forEach(line => {
+    const ml = migrateCustomLine(line);
+    const total = customLineTotal(ml); if (!total) return;
+    const net = total * (1 - c.d / 100);
+    rowOut(ml.label || 'Custom', ml.qty || null, customLineFinal(ml), net, null);
+  });
+
+  const labourRaw = (Number(currentQuote.hours) || 0) * (Number(settings.hourlyRate) || 0)
+                  + (Number(currentQuote.days)  || 0) * (Number(settings.dayRate)    || 0);
+  if (labourRaw > 0) {
+    const labourNet = labourRaw * (1 - c.d / 100);
+    rowOut('Labour', null, null, labourNet, c.d > 0 ? labourRaw : null);
+  }
+
+  if (c.travelRaw) {
+    rowOut(isCash ? 'Travel' : `Travel${currentQuote.distanceKm ? ' (' + currentQuote.distanceKm.toFixed(1) + ' km)' : ''}`, null, null, c.travelNet, c.travelRaw);
+  }
+
+  return rows;
+}
+
+function buildQuoteImageData(style) {
+  const c = calcQuote();
+  const isCash = style === 'cash';
+  const isInvoice = !isCash && !!currentQuote.completed;
+  const today = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+  const metaLines = ['Date: ' + today];
+
+  if (!isCash) {
+    if (isInvoice) {
+      const completedAt = currentQuote.completedAt ? new Date(currentQuote.completedAt).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }) : '';
+      if (completedAt) metaLines.push('Completed: ' + completedAt);
+      if (currentQuote.id) metaLines.push('Invoice ref: ' + currentQuote.id);
+    } else {
+      const exp = new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+      metaLines.push('Valid until: ' + exp);
+      if (currentQuote.id) metaLines.push('Ref: ' + currentQuote.id);
+    }
+  }
+
+  if (currentQuote.proposedDate) {
+    const hasTime = currentQuote.proposedDate.includes('T');
+    const pdDate = new Date(hasTime ? currentQuote.proposedDate : currentQuote.proposedDate + 'T00:00');
+    const pd = pdDate.toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }) +
+      (hasTime ? ', ' + pdDate.toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit' }) : '');
+    metaLines.push('Proposed start: ' + pd);
+  }
+
+  const slug = (currentQuote.client.name || 'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+  const docTag = isCash ? '-cash' : '';
+  const docKind = isCash ? 'quote' : (isInvoice ? 'invoice' : 'quote');
+  const totalRows = [
+    { label: 'Subtotal', value: fmt(c.subtotal), strong: false }
+  ];
+  if (!isCash && currentQuote.gst) totalRows.push({ label: `GST (${settings.gstPct}%)`, value: fmt(c.gstAmt), strong: false });
+  totalRows.push({ label: 'Total', value: fmt(c.grand), strong: true });
+
+  const visiblePhotos = (currentQuote.includePhotosInPdf === false || !Array.isArray(currentQuote.photos)) ? [] :
+    currentQuote.photos.map(migratePhoto).filter(p => p.customerVisible !== false && p.url).map((p, i) => ({
+      url: p.url,
+      label: 'Photo ' + (i + 1)
+    }));
+
+  return {
+    isCash,
+    title: isCash ? '' : (isInvoice ? 'Invoice' : 'Quote'),
+    headerTitle: isCash ? 'Estimate' : getBizName(),
+    headerLine: [getBizPhone(), getBizEmail(), getBizAbn() ? 'ABN ' + getBizAbn() : ''].filter(Boolean).join('  |  '),
+    preparedLabel: isCash ? 'For' : 'Prepared for',
+    clientName: currentQuote.client.name || '',
+    clientAddress: currentQuote.client.address || '',
+    metaLines,
+    rows: customerDocRows(c, isCash),
+    totalRows,
+    footerText: !isCash ? (isInvoice
+      ? 'Tax invoice. Payment due upon receipt. Thank you for your business.'
+      : 'Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.') : '',
+    photos: visiblePhotos,
+    filename: `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.jpg`
+  };
+}
+
+function setCanvasFont(ctx, weight, size) {
+  ctx.font = weight + ' ' + size + 'px Inter, Arial, sans-serif';
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines = [];
+  let line = '';
+  words.forEach(word => {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width <= maxWidth || !line) {
+      line = test;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawWrappedCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  const lines = wrapCanvasText(ctx, text, maxWidth);
+  lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  return y + lines.length * lineHeight;
+}
+
+function measureQuoteImageHeight(data, width, margin) {
+  const ctx = document.createElement('canvas').getContext('2d');
+  let y = 230;
+  if (data.title) y += 62;
+  setCanvasFont(ctx, '400', 23);
+  y += data.metaLines.length * 30 + 26;
+  setCanvasFont(ctx, '400', 24);
+  y += 36;
+  if (data.clientName) y += 30;
+  if (data.clientAddress) y += wrapCanvasText(ctx, data.clientAddress, width - margin * 2).length * 30;
+  y += 34;
+  y += 48;
+  data.rows.forEach(row => {
+    y += Math.max(48, wrapCanvasText(ctx, row.label, 520).length * 30) + 8;
+  });
+  y += 34 + data.totalRows.length * 34 + 58;
+  if (data.footerText) y += wrapCanvasText(ctx, data.footerText, width - margin * 2).length * 24 + 36;
+  if (data.photos.length) {
+    const gap = 24;
+    const cellH = 320;
+    y += 58 + Math.ceil(data.photos.length / 2) * (cellH + gap) + 18;
+  }
+  return Math.max(1754, Math.ceil(y + margin));
+}
+
+function loadQuoteCanvasImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function drawContainedImage(ctx, img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width || 1;
+  const ih = img.naturalHeight || img.height || 1;
+  const s = Math.min(w / iw, h / ih);
+  const dw = iw * s;
+  const dh = ih * s;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+async function renderQuoteImageCanvas(data) {
+  const width = 1200;
+  const margin = 96;
+  const height = measureQuoteImageHeight(data, width, margin);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = data.isCash ? '#166534' : '#07111f';
+  ctx.fillRect(0, 0, width, 170);
+  if (!data.isCash) {
+    ctx.fillStyle = '#31d0ff';
+    ctx.fillRect(0, 166, width, 4);
+  }
+  setCanvasFont(ctx, '700', data.isCash ? 48 : 44);
+  ctx.fillStyle = data.isCash ? '#ffffff' : '#31d0ff';
+  ctx.fillText(data.headerTitle, margin, data.isCash ? 100 : 76);
+  if (!data.isCash && data.headerLine) {
+    setCanvasFont(ctx, '400', 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(data.headerLine, margin, 118);
+  }
+
+  let y = 230;
+  ctx.fillStyle = '#111827';
+  if (data.title) {
+    setCanvasFont(ctx, '700', 48);
+    ctx.fillText(data.title, margin, y);
+    y += 62;
+  }
+
+  setCanvasFont(ctx, '400', 23);
+  data.metaLines.forEach(line => {
+    ctx.fillStyle = '#374151';
+    ctx.fillText(line, margin, y);
+    y += 30;
+  });
+  y += 26;
+
+  setCanvasFont(ctx, '700', 24);
+  ctx.fillStyle = '#111827';
+  ctx.fillText(data.preparedLabel, margin, y);
+  y += 34;
+  setCanvasFont(ctx, '400', 24);
+  if (data.clientName) {
+    ctx.fillText(data.clientName, margin, y);
+    y += 30;
+  }
+  if (data.clientAddress) y = drawWrappedCanvasText(ctx, data.clientAddress, margin, y, width - margin * 2, 30);
+  y += 34;
+
+  const tableX = margin - 16;
+  const tableW = width - margin * 2 + 32;
+  ctx.fillStyle = data.isCash ? '#dcfce7' : '#e1f7ff';
+  ctx.fillRect(tableX, y - 32, tableW, 46);
+  const col = { item: margin, qty: margin + 575, unit: margin + 730, total: width - margin };
+  setCanvasFont(ctx, '700', 23);
+  ctx.fillStyle = '#111827';
+  ctx.textAlign = 'left';
+  ctx.fillText('Item', col.item, y);
+  ctx.fillText('Qty', col.qty, y);
+  ctx.fillText('Unit', col.unit, y);
+  ctx.textAlign = 'right';
+  ctx.fillText('Total', col.total, y);
+  ctx.textAlign = 'left';
+  y += 42;
+
+  setCanvasFont(ctx, '400', 24);
+  data.rows.forEach(row => {
+    const rowTop = y - 24;
+    const labelLines = wrapCanvasText(ctx, row.label, 520);
+    const rowH = Math.max(48, labelLines.length * 30) + 8;
+    ctx.fillStyle = '#111827';
+    labelLines.forEach((line, i) => ctx.fillText(line, col.item, y + i * 30));
+    ctx.fillText(row.qty, col.qty, y);
+    ctx.fillText(row.unit, col.unit, y);
+    ctx.textAlign = 'right';
+    if (row.original) {
+      setCanvasFont(ctx, '400', 19);
+      ctx.fillStyle = '#9ca3af';
+      const oldX = col.total - 96;
+      ctx.fillText(row.original, oldX, y);
+      const oldW = ctx.measureText(row.original).width;
+      ctx.strokeStyle = '#9ca3af';
+      ctx.beginPath();
+      ctx.moveTo(oldX - oldW, y - 7);
+      ctx.lineTo(oldX, y - 7);
+      ctx.stroke();
+      setCanvasFont(ctx, '400', 24);
+    }
+    ctx.fillStyle = '#111827';
+    ctx.fillText(row.total, col.total, y);
+    ctx.textAlign = 'left';
+    y = rowTop + rowH + 24;
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.beginPath();
+    ctx.moveTo(margin, y - 18);
+    ctx.lineTo(width - margin, y - 18);
+    ctx.stroke();
+  });
+
+  y += 20;
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.beginPath();
+  ctx.moveTo(margin, y);
+  ctx.lineTo(width - margin, y);
+  ctx.stroke();
+  y += 34;
+  data.totalRows.forEach(row => {
+    setCanvasFont(ctx, row.strong ? '700' : '400', row.strong ? 30 : 23);
+    ctx.fillStyle = row.strong && !data.isCash ? '#0891b2' : '#111827';
+    ctx.textAlign = 'right';
+    ctx.fillText(row.label, width - margin - 180, y);
+    ctx.fillText(row.value, width - margin, y);
+    y += row.strong ? 42 : 34;
+  });
+  ctx.textAlign = 'left';
+  y += 24;
+
+  if (data.footerText) {
+    ctx.fillStyle = '#31d0ff';
+    ctx.fillRect(0, y, width, 4);
+    y += 32;
+    setCanvasFont(ctx, '400', 20);
+    ctx.fillStyle = '#6b7280';
+    y = drawWrappedCanvasText(ctx, data.footerText, margin, y, width - margin * 2, 24) + 20;
+  }
+
+  if (data.photos.length) {
+    y += 22;
+    setCanvasFont(ctx, '700', 30);
+    ctx.fillStyle = '#111827';
+    ctx.fillText('Site photos', margin, y);
+    y += 36;
+    const gap = 24;
+    const cols = 2;
+    const cellW = (width - margin * 2 - gap) / cols;
+    const cellH = 320;
+    for (let i = 0; i < data.photos.length; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      const x = margin + c * (cellW + gap);
+      const py = y + r * (cellH + gap);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(x, py, cellW, cellH);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.strokeRect(x, py, cellW, cellH);
+      try {
+        const img = await loadQuoteCanvasImage(data.photos[i].url);
+        drawContainedImage(ctx, img, x + 10, py + 10, cellW - 20, cellH - 46);
+      } catch (e) {
+        setCanvasFont(ctx, '400', 20);
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Photo unavailable', x + 20, py + 60);
+      }
+      setCanvasFont(ctx, '400', 18);
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText(data.photos[i].label, x + 14, py + cellH - 14);
+    }
+  }
+
+  return canvas;
+}
+
+function downloadCanvasAsJpg(canvas, filename) {
+  const fallback = () => {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/jpeg', 0.92);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+  if (!canvas.toBlob) { fallback(); return; }
+  canvas.toBlob(blob => {
+    if (blob) downloadBlob(blob, filename);
+    else fallback();
+  }, 'image/jpeg', 0.92);
+}
+
+async function generateQuoteImage(style) {
+  const data = buildQuoteImageData(style);
+  const canvas = await renderQuoteImageCanvas(data);
+  downloadCanvasAsJpg(canvas, data.filename);
+}
 
 /* =====================================================
    v10: MULTI-DAY, IN-APP CAMERA + WATERMARK,
