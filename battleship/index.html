@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>DEAD RECKONING — Battleship Roguelike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ord:#ff5a3c;--son:#34c6ff;--man:#3ee08a;--dec:#ffc23c;--fla:#a98bff;--rep:#8f7dff;
+    --gold:#ffcf45;--hit:#ff4646;--good:#5fe0b0;--bad:#ff7a78;
+    --com:#9fc2dd;--rare:#5fb8ff;--forge:#3ee08a;--contra:#ff7a3c;--omega:#e05fff;
+    --ink:#eaf4ff;--ink2:#9fc2dd;--ink3:#5d86a6;
+    --card:#15324c;--cardlip:#0c2236;--line:#2a557c;--bg:#081826;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{font-size:clamp(13px,3.4vw,17px)}
+  html,body{margin:0;height:100%;overflow-x:hidden}
+  body{font-family:'Pixelify Sans',ui-rounded,system-ui,sans-serif;color:var(--ink);min-height:100%;position:relative;
+    background:radial-gradient(1300px 700px at 50% -8%,#15506b,#0a2740 42%,#061726 100%);-webkit-font-smoothing:none;
+    padding-bottom:env(safe-area-inset-bottom)}
+  #water{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.9}
+  #vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 120% at 50% 40%,transparent 55%,rgba(2,8,15,.55) 100%)}
+  .frame{position:relative;z-index:2;width:100%;max-width:1120px;margin:0 auto;padding:12px;padding-top:max(12px,env(safe-area-inset-top))}
+  .shake{animation:shake .32s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes shake{10%,90%{transform:translate(-1px,0)}20%,80%{transform:translate(3px,-1px)}30%,50%,70%{transform:translate(-5px,1px)}40%,60%{transform:translate(5px,-2px)}}
+  .hidden{display:none!important}
+  button{font-family:inherit}
+  .cell,.card,button,[role=button]{cursor:pointer}
+  .cell:active,.card:active{transform:scale(.94);transition:transform .08s}
+  button:active{opacity:.8}
+
+  /* topbar */
+  .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;
+    padding-bottom:7px;border-bottom:2px solid rgba(52,198,255,.2)}
+  .brand h1{margin:0;font-family:'Press Start 2P',monospace;font-size:.85rem;letter-spacing:1px;color:#eaf4ff;text-shadow:0 2px 0 #0a2236,0 0 16px rgba(52,198,255,.5)}
+  .brand .sub{font-size:.72rem;color:var(--son);margin-top:3px}
+  .stats{display:flex;gap:5px;flex-wrap:wrap}
+  .stat{background:rgba(8,26,42,.7);border:2px solid var(--line);border-radius:9px;padding:4px 9px;text-align:center;min-width:48px;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+  .stat .k{font-size:.5rem;letter-spacing:1px;color:var(--ink3);text-transform:uppercase}
+  .stat .v{font-size:.95rem;font-weight:700;line-height:1.1}
+  .stat .v.g{color:var(--gold)}
+  .snd{display:flex;gap:4px}
+  .snd span{background:rgba(8,26,42,.7);border:2px solid var(--line);border-radius:8px;padding:2px 7px;font-size:.8rem;cursor:pointer}
+  .relics{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;min-height:30px}
+  .relic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:rgba(8,26,42,.8);border:2px solid var(--gold);cursor:help;position:relative;box-shadow:0 2px 0 rgba(0,0,0,.4)}
+  .relic .tip{display:none;position:absolute;bottom:36px;left:50%;transform:translateX(-50%);width:150px;background:#0a2030;border:2px solid var(--line);border-radius:8px;padding:7px 9px;font-size:.7rem;color:var(--ink2);z-index:50;text-align:center;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  .relic .tip b{color:var(--gold)}
+  .relic:hover .tip{display:block}
+  .relics .empty{font-size:.72rem;color:var(--ink3)}
+
+  .btn{cursor:pointer;border-radius:11px;font-size:.92rem;font-weight:700;letter-spacing:.5px;border:none;padding:9px 18px;transition:transform .08s,filter .1s;text-transform:uppercase;touch-action:manipulation}
+  .btn:active{transform:translateY(3px)}
+  .btn-end{background:#1d4a6b;color:#cfeaff;box-shadow:0 4px 0 #0e2c43}.btn-end:hover{filter:brightness(1.15)}
+  .btn-fire{background:linear-gradient(180deg,#ff6b52,#e23a28);color:#fff;box-shadow:0 4px 0 #8d1d12}.btn-fire:hover{filter:brightness(1.1)}
+  .btn-go{background:linear-gradient(180deg,#46e39a,#1fae6e);color:#06301f;box-shadow:0 4px 0 #0c6b41;font-size:1rem;padding:11px 24px;min-height:48px}.btn-go:hover{filter:brightness(1.08)}
+  .btn-gold{background:linear-gradient(180deg,#ffe27a,#e0a319);color:#4a2c00;box-shadow:0 4px 0 #8a5e00}
+  .btn-sm{font-size:.75rem;padding:7px 12px}
+  .btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
+
+  /* TITLE */
+  #title{text-align:center;padding:8px 0 24px}
+  #title .big{font-family:'Press Start 2P',monospace;font-size:clamp(20px,6vw,30px);letter-spacing:2px;text-shadow:0 4px 0 #0a2236,0 0 26px rgba(52,198,255,.6);margin:14px 0 6px;line-height:1.5}
+  #title .tag{color:var(--son);font-size:.95rem;margin-bottom:8px}
+  #title .pick{font-size:.85rem;color:var(--ink2);margin:16px 0 10px;letter-spacing:1px}
+  .admirals{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .adm{width:min(215px,90vw);background:linear-gradient(180deg,rgba(16,44,66,.85),rgba(7,24,38,.92));border:2px solid var(--line);border-radius:16px;padding:15px;cursor:pointer;text-align:left;transition:transform .1s,border-color .1s,box-shadow .1s;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+  .adm:hover{transform:translateY(-6px);border-color:var(--son);box-shadow:0 14px 26px rgba(0,0,0,.5)}
+  .adm.locked{opacity:.5;cursor:not-allowed}
+  .adm .face{font-size:2.4rem;text-align:center;margin-bottom:4px}
+  .adm .an{font-family:'Press Start 2P',monospace;font-size:.7rem;color:#fff;margin-bottom:5px;line-height:1.4}
+  .adm .arch{font-size:.78rem;color:var(--gold);margin-bottom:7px}
+  .adm .ap{font-size:.78rem;color:var(--ink2);line-height:1.45}
+  .adm .lk{font-size:.7rem;color:var(--son);margin-top:7px}
+
+  /* MAP */
+  #map{display:flex;flex-direction:column;align-items:center;background:linear-gradient(180deg,rgba(10,38,58,.5),rgba(5,22,36,.7));border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;width:100%;max-width:100vw;overflow:hidden}
+  #map .mt{font-family:'Press Start 2P',monospace;font-size:.8rem;color:var(--son);margin-bottom:4px;text-align:center}
+  #map .ms{font-size:.78rem;color:var(--ink2);margin-bottom:10px;text-align:center}
+  #mapcanvas{position:relative;width:100%;max-width:560px;overflow-x:hidden;overflow-y:auto}
+  .mnode{position:absolute;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:rgba(8,26,42,.9);border:2px solid var(--line);transform:translate(-50%,-50%);transition:transform .1s,box-shadow .12s;z-index:2}
+  .mnode.done{opacity:.4;border-color:#2a3a4a}
+  .mnode.reach{cursor:pointer;border-color:var(--gold);box-shadow:0 0 16px rgba(255,207,69,.6);animation:pulse 1.6s infinite}
+  @keyframes pulse{50%{transform:translate(-50%,-50%) scale(1.12)}}
+  .mnode.cur{border-color:var(--son);box-shadow:0 0 18px rgba(52,198,255,.7)}
+  .mnode .lbl{position:absolute;top:46px;font-size:.5rem;color:var(--ink3);white-space:nowrap;letter-spacing:.5px}
+
+  /* COMBAT */
+  .grids{display:flex;flex-direction:column;gap:12px;margin-bottom:10px;width:100%}
+  @media(min-width:760px){.grids{flex-direction:row}}
+  .panel{flex:1;min-width:0;background:linear-gradient(180deg,rgba(10,38,58,.55),rgba(5,22,36,.7));border:2px solid var(--line);border-radius:16px;padding:10px;position:relative;overflow:hidden;box-shadow:0 6px 0 rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)}
+  .panel-label{font-size:.72rem;letter-spacing:1px;color:var(--ink2);text-transform:uppercase;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .panel-label .tag{color:var(--son);font-size:.72rem;text-align:right}
+  .board{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:2px;width:100%;position:relative;z-index:2}
+  .board.expand{animation:expand .6s cubic-bezier(.2,1,.4,1)}
+  @keyframes expand{0%{transform:scale(.82);opacity:.3}100%{transform:scale(1);opacity:1}}
+  .cell{aspect-ratio:1;min-width:0;width:100%;border-radius:4px;border:1.5px solid rgba(52,198,255,.18);background:rgba(7,26,42,.45);display:flex;align-items:center;justify-content:center;transition:transform .1s,background .12s,box-shadow .12s;position:relative;overflow:visible;touch-action:manipulation}
+  .cell::after{content:'';position:absolute;inset:-3px}
+  .enemy .cell{cursor:crosshair}
+  .enemy .cell:hover{background:rgba(52,198,255,.22);box-shadow:inset 0 0 0 2px var(--son),0 0 10px rgba(52,198,255,.5);z-index:3}
+  .cell.fog{background:rgba(6,20,33,.66)}
+  .cell.miss{background:rgba(10,30,46,.7)}
+  .cell.miss::before{content:'';width:24%;height:24%;border-radius:50%;background:#2f5878;box-shadow:0 0 5px #1a3148}
+  .cell.dmg{background:radial-gradient(circle at 50% 45%,#ff8a5c,#e23a28);border-color:#8d1d12;box-shadow:0 0 12px rgba(255,90,60,.7)}
+  .cell.dmg::before{content:'';width:34%;height:34%;border-radius:50%;background:#2a0606;box-shadow:0 0 4px #000 inset}
+  .cell.sunkx{background:linear-gradient(180deg,#7a1f1f,#4a0f0f);border-color:#2a0808}
+  .cell.ship{background:linear-gradient(180deg,#3f78ac,#235d8f);border-color:#7fc0ee;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+  .cell.shiphit{background:radial-gradient(circle at 50% 45%,#ff8a5c,#c5301f);border-color:#8d1d12}
+  .cell.sonar{background:rgba(62,224,138,.16);border-color:rgba(62,224,138,.55)}
+  .cell.sonarship{background:rgba(62,224,138,.4);border-color:#7dffc2;box-shadow:0 0 10px rgba(62,224,138,.6);animation:sonarPing .5s ease-out}
+  @keyframes sonarPing{0%{transform:scale(.6);opacity:.2}100%{transform:scale(1);opacity:1}}
+  .cell.deflect{background:rgba(255,194,60,.3);border-color:var(--dec)}
+  .cell.ghost{background:rgba(160,140,255,.18);border-color:rgba(160,140,255,.6);box-shadow:0 0 8px rgba(160,140,255,.4)}
+  .cell.ghost::before{content:'👻';font-size:.7em;opacity:.7}
+  .cell.aimprev{box-shadow:inset 0 0 0 2px var(--dec)}
+  .hull{position:absolute;inset:14%;background:linear-gradient(180deg,#6a7b88,#33424f);box-shadow:inset 0 1px 0 rgba(255,255,255,.3);z-index:1}
+  .cell.shiphit .hull{filter:brightness(.8) saturate(.6)}
+  .cap-l{border-top-left-radius:50%;border-bottom-left-radius:50%}.cap-r{border-top-right-radius:50%;border-bottom-right-radius:50%}
+  .cap-t{border-top-left-radius:50%;border-top-right-radius:50%}.cap-b{border-bottom-left-radius:50%;border-bottom-right-radius:50%}
+  .turret{position:absolute;width:26%;height:26%;max-width:6px;max-height:6px;border-radius:50%;background:#0c1a26;z-index:2}
+  .fire{position:absolute;left:50%;top:34%;width:34%;height:42%;max-width:11px;max-height:15px;transform:translate(-50%,-50%);background:radial-gradient(circle at 50% 70%,#fff2a8,#ff7a2a 45%,#e23a28 75%,transparent);border-radius:50% 50% 45% 45%;z-index:4;animation:flick .5s ease-in-out infinite alternate;pointer-events:none}
+  @keyframes flick{0%{transform:translate(-50%,-50%) scale(.85) rotate(-4deg);opacity:.85}100%{transform:translate(-55%,-60%) scale(1.15) rotate(4deg);opacity:1}}
+  .cell.pop{animation:cellpop .3s ease-out}
+  @keyframes cellpop{0%{transform:scale(.4)}55%{transform:scale(1.3)}100%{transform:scale(1)}}
+  .cell.reveal{animation:reveal .5s ease-out}
+  @keyframes reveal{0%{transform:scale(.5);filter:brightness(2)}100%{transform:scale(1);filter:brightness(1)}}
+
+  /* enemy roster (fog ???) */
+  .roster{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;position:relative;z-index:2}
+  .rchip{font-size:.62rem;padding:2px 7px;border-radius:9px;background:#0a2030;border:1px solid var(--line);color:var(--ink3);letter-spacing:.5px}
+  .rchip.sunk{background:#4a0f0f;border-color:#8d1d12;color:#f08a88}
+  .fleet{display:flex;flex-direction:column;gap:5px;margin-top:8px;position:relative;z-index:2}
+  .fitem{font-size:.72rem;color:var(--ink2);display:flex;align-items:center;gap:6px}
+  .fbar{flex:1;height:6px;border-radius:4px;background:#08202f;overflow:hidden}
+  .ffill{height:100%;background:linear-gradient(90deg,#34c6ff,#8fe6ff);transition:width .3s}
+  .badge{font-size:.5rem;padding:2px 6px;border-radius:9px;letter-spacing:.5px;font-weight:700}
+  .b-ok{background:#0e3a2e;color:#5fe0b0}.b-dmg{background:#4a3306;color:#f2c46a}.b-sunk{background:#4a0f0f;color:#f08a88}.b-ghost{background:#2a2350;color:#b9aef5}
+
+  /* placement */
+  .place-wrap{display:flex;flex-direction:column;align-items:center;gap:11px;background:linear-gradient(180deg,rgba(10,38,58,.5),rgba(5,22,36,.7));border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;position:relative;overflow:hidden}
+  .place-title{font-family:'Press Start 2P',monospace;font-size:.72rem;color:var(--son);text-align:center;line-height:1.5}
+  .place-sub{font-size:.78rem;color:var(--ink2);text-align:center;margin-top:-2px}
+  #place-grid{position:relative;touch-action:none;user-select:none}
+  #place-grid.expand{animation:expand .6s cubic-bezier(.2,1,.4,1)}
+  .pg-cell{position:absolute;border-radius:4px;border:1.5px solid rgba(52,198,255,.18);background:rgba(7,26,42,.4)}
+  .pship{position:absolute;border-radius:8px;cursor:grab;z-index:5;background:linear-gradient(180deg,#3f78ac,#235d8f);border:2px solid #7fc0ee;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 4px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#cfeeff;font-size:.66rem;touch-action:none;overflow:hidden}
+  .pship:hover{filter:brightness(1.12)}
+  .pship.dragging{cursor:grabbing;z-index:9;filter:brightness(1.2)}
+  .pship.bad{background:linear-gradient(180deg,#c5483f,#8d1d12);border-color:#ffb3ad}
+  .pship.dmgd{background:linear-gradient(180deg,#7a5a30,#5a3d18);border-color:#e8b86a}
+  .pship .rot{position:absolute;top:1px;right:3px;font-size:.6rem;opacity:.7}
+  .place-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+  /* hand */
+  .handwrap{margin-bottom:8px}
+  .handlbl{font-size:.72rem;letter-spacing:1px;color:var(--ink2);text-transform:uppercase;margin-bottom:5px;text-align:center}
+  .selbanner{display:none;text-align:center;font-size:.78rem;color:var(--dec);background:rgba(255,194,60,.12);border:1px solid var(--dec);border-radius:8px;padding:5px;margin-bottom:6px}
+  .selbanner.show{display:block}
+  .hand{display:flex;gap:9px;justify-content:flex-start;overflow-x:auto;overflow-y:visible;padding:10px 8px 14px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .hand::-webkit-scrollbar{display:none}
+  @media(min-width:760px){.hand{justify-content:center;flex-wrap:wrap;overflow-x:visible}}
+  .card{flex-shrink:0;width:min(118px,32vw);min-width:104px;height:160px;border-radius:13px;position:relative;background:linear-gradient(180deg,var(--card),var(--cardlip));border:2px solid var(--line);padding:8px;box-shadow:0 7px 0 rgba(0,0,0,.35),inset 0 2px 0 rgba(255,255,255,.08);scroll-snap-align:start;animation:bob 3.2s ease-in-out infinite;will-change:transform}
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-6px) rotate(1deg)}}
+  .card:hover{animation:none;transform:translateY(-12px) scale(1.07);z-index:20;box-shadow:0 16px 24px rgba(0,0,0,.5)}
+  .card.armed{border-color:var(--dec);box-shadow:0 7px 0 rgba(0,0,0,.35),0 0 0 3px var(--dec),0 0 20px rgba(255,194,60,.5);animation:none;transform:translateY(-8px) scale(1.04)}
+  .card.cant{filter:grayscale(.6) brightness(.7)}
+  .card.deal{animation:dealIn .42s cubic-bezier(.2,1.2,.4,1) both}
+  @keyframes dealIn{0%{transform:translateY(56px) rotate(-12deg) scale(.7);opacity:0}100%{transform:translateY(0) rotate(-1deg) scale(1);opacity:1}}
+  .card.spent{animation:spend .32s ease-in forwards}
+  @keyframes spend{0%{transform:translateY(0) scale(1)}100%{transform:translateY(-80px) scale(.5) rotate(14deg);opacity:0}}
+  .card .cat{font-size:.55rem;letter-spacing:1px;font-weight:700;text-transform:uppercase}
+  .card .art{height:42px;margin:4px 0;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;background:rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.08)}
+  .card .nm{font-size:.82rem;font-weight:700;color:#fff;line-height:1.05;margin-bottom:3px}
+  .card .ds{font-size:.6rem;color:var(--ink2);line-height:1.22}
+  .card .cost{position:absolute;top:-9px;left:-9px;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe27a,#e0a319);border:2px solid #fff3c4;color:#4a2c00;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 6px rgba(0,0,0,.4);z-index:5}
+  .card .rar{position:absolute;bottom:4px;right:6px;font-size:.46rem;letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+  .cat-ORDNANCE{color:var(--ord)}.cat-SONAR{color:var(--son)}.cat-MANEUVER{color:var(--man)}.cat-DECOY{color:var(--dec)}.cat-FLAGSHIP{color:var(--fla)}.cat-REPAIR{color:var(--rep)}
+  .r-common{color:var(--com)}.r-rare{color:var(--rare)}.r-forge{color:var(--forge)}.r-contra{color:var(--contra)}.r-omega{color:var(--omega)}
+
+  /* action bar (two-zone HUD) */
+  .actionbar{position:sticky;bottom:0;z-index:15;display:flex;gap:7px;flex-wrap:wrap;align-items:center;justify-content:center;
+    background:rgba(5,18,30,.94);border:2px solid var(--line);border-radius:13px;padding:8px;margin-bottom:8px;
+    box-shadow:0 -4px 16px rgba(0,0,0,.4);padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .chip{background:rgba(8,26,42,.7);border:2px solid var(--line);border-radius:9px;padding:5px 9px;font-size:.72rem;color:var(--ink2);display:flex;align-items:center;gap:5px}
+  .chip b{color:var(--ink);font-size:.9rem}
+  .score-hud{background:linear-gradient(180deg,#13344c,#0a2236);border:2px solid var(--gold);border-radius:10px;padding:5px 11px;display:flex;align-items:center;gap:6px;font-size:.78rem}
+  .score-hud .chips{color:var(--son);font-weight:700;font-size:1rem}.score-hud .x{color:var(--ink3)}.score-hud .mult{color:var(--ord);font-weight:700;font-size:1rem}
+  .score-hud.bump{animation:bump .25s ease}@keyframes bump{50%{transform:scale(1.13)}}
+  .edots{display:flex;gap:3px}
+  .dot{width:12px;height:12px;border-radius:50%;background:#0c2236;border:2px solid #234;transition:.2s}
+  .dot.on{background:radial-gradient(circle at 35% 30%,#bff0ff,#2aa8e6);border-color:#bff0ff;box-shadow:0 0 8px #34c6ff}
+  .end-turn-btn{min-height:46px;padding:0 20px;font-size:.95rem;font-weight:700;border-radius:10px;background:#1d4a6b;color:#cfeaff;border:none;box-shadow:0 4px 0 #0e2c43;position:relative;overflow:hidden;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+  .end-turn-btn:active{transform:translateY(3px)}
+  .end-turn-btn.auto::after{content:'';position:absolute;bottom:0;left:0;height:4px;width:100%;background:var(--dec);opacity:.7;animation:drain 1.2s linear forwards;transform-origin:left}
+  @keyframes drain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+  .log{background:rgba(4,16,26,.7);border:2px solid var(--line);border-radius:11px;padding:8px 11px;font-size:.72rem;color:var(--ink2);height:74px;overflow-y:auto;line-height:1.6;margin-bottom:8px}
+  .log .ln{opacity:.5}.log .ln:last-child{opacity:1;color:var(--ink)}
+  .log .gd{color:var(--good)}.log .bd{color:var(--bad)}.log .am{color:var(--dec)}
+  .help{font-size:.72rem;color:var(--ink3);text-align:center;margin-top:6px;position:relative;z-index:2}
+  .kbd{font-size:.64rem;color:var(--ink3);text-align:center;margin-top:4px}
+
+  /* fx */
+  #fx{position:fixed;inset:0;z-index:40;pointer-events:none;overflow:hidden}
+  .pop{position:absolute;font-family:'Press Start 2P',monospace;font-size:.78rem;font-weight:700;transform:translate(-50%,-50%);animation:floatUp 1s ease-out forwards;text-shadow:0 2px 0 rgba(0,0,0,.6)}
+  @keyframes floatUp{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}20%{opacity:1;transform:translate(-50%,-60%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-150%) scale(1)}}
+  .spark{position:absolute;width:7px;height:7px;border-radius:50%;pointer-events:none}
+
+  /* screens */
+  .sheet{background:linear-gradient(180deg,rgba(12,42,62,.7),rgba(6,22,36,.85));border:2px solid var(--line);border-radius:16px;padding:18px;margin-bottom:12px;text-align:center;position:relative}
+  .sheet h2{font-family:'Press Start 2P',monospace;font-size:.95rem;margin:0 0 6px}
+  .sheet .desc{font-size:.82rem;color:var(--ink2);line-height:1.55;max-width:560px;margin:6px auto 12px}
+  .shop-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:12px 0}
+  .buy{display:flex;flex-direction:column;align-items:center;gap:5px}.buy .price{font-size:.78rem;color:var(--gold);font-weight:700}.buy.sold{opacity:.4;pointer-events:none}
+  .relic-card{width:148px;background:linear-gradient(180deg,#173a55,#0c2236);border:2px solid var(--gold);border-radius:12px;padding:11px;text-align:center}
+  .relic-card .ri{font-size:1.7rem}.relic-card .rn{font-size:.78rem;font-weight:700;color:var(--gold);margin:4px 0}.relic-card .rd{font-size:.66rem;color:var(--ink2);line-height:1.3}
+  .choices{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+  .choice{background:rgba(8,26,42,.8);border:2px solid var(--line);border-radius:12px;padding:12px 15px;cursor:pointer;max-width:240px;transition:.1s}
+  .choice:hover{border-color:var(--son);transform:translateY(-4px)}
+  .choice .ct{font-size:.85rem;font-weight:700;color:#fff;margin-bottom:4px}.choice .cd{font-size:.74rem;color:var(--ink2);line-height:1.4}
+  .rewards{display:flex;gap:11px;justify-content:center;margin:14px 0;flex-wrap:wrap}
+
+  /* overlay */
+  .ovl{position:fixed;inset:0;background:rgba(4,12,20,.82);display:none;align-items:center;justify-content:center;z-index:60;backdrop-filter:blur(4px);padding:14px}
+  .ovl.show{display:flex;animation:fade .25s ease}@keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{background:linear-gradient(180deg,#123349,#081826);border:2px solid var(--line);border-radius:18px;padding:24px 28px;text-align:center;max-width:540px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.6);animation:popIn .35s cubic-bezier(.2,1.3,.4,1);max-height:92vh;overflow-y:auto}
+  @keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal h2{margin:0 0 8px;font-family:'Press Start 2P',monospace;font-size:1.05rem}
+  .modal .win{color:var(--good);text-shadow:0 0 22px rgba(95,224,176,.5)}.modal .lose{color:var(--bad);text-shadow:0 0 22px rgba(255,122,120,.5)}
+  .modal p{color:var(--ink2);font-size:.85rem;line-height:1.55;margin:8px 0 14px}
+  .tally{font-family:'Press Start 2P',monospace;margin:12px 0}
+  .tally .row{display:flex;justify-content:space-between;gap:18px;font-size:.72rem;color:var(--ink2);margin:5px 0}
+  .tally .big{font-size:1.4rem;color:var(--gold);margin-top:8px}.tally .cc{color:var(--son)}.tally .mm{color:var(--ord)}
+  /* cutscene */
+  #cut{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:#020608}
+  #cut.show{display:flex}
+  .cutart{text-align:center;max-width:620px;padding:24px}
+  .cutart .scene{font-size:4rem;margin-bottom:12px;filter:drop-shadow(0 0 30px rgba(255,180,60,.5))}
+  .cutart .cn{font-family:'Press Start 2P',monospace;font-size:1.4rem;color:#ffcf45;letter-spacing:2px;text-shadow:0 0 24px rgba(255,207,69,.6);margin-bottom:12px}
+  .cutart .cd{font-size:1rem;color:#cfe3f2;font-style:italic;line-height:1.6}
+  /* admiral portraits */
+  .cmdrs{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px}
+  .portrait{width:52px;height:70px;border-radius:9px;background:linear-gradient(180deg,var(--coat,#26456b),#0a1a29);border:2px solid var(--line);position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;box-shadow:0 3px 0 rgba(0,0,0,.4)}
+  .portrait .face{width:100%;height:calc(100% - 12px);display:flex;align-items:flex-end;justify-content:center;padding:3px 4px 0;font-size:1.7rem;line-height:1;transition:transform .15s}
+  .portrait .face svg{width:100%;height:100%}
+  .portrait .cn{font-size:.46rem;color:#dfeefb;background:rgba(0,0,0,.4);width:100%;text-align:center;padding:1px 2px;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .portrait.idle .face{animation:breathe 3s ease-in-out infinite}
+  @keyframes breathe{50%{transform:translateY(-2px) scale(1.05)}}
+  .portrait.hit{animation:pflinch .45s}
+  @keyframes pflinch{0%{filter:none}25%{filter:brightness(1.8) sepia(1) hue-rotate(-35deg) saturate(4);transform:translateX(-3px)}60%{transform:translateX(3px)}100%{filter:none}}
+  .portrait.triumph .face{animation:ptri .55s}
+  @keyframes ptri{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-8px) scale(1.2)}}
+  .portrait.grimace{filter:grayscale(.55) brightness(.82)}.portrait.grimace .face{transform:rotate(-8deg)}
+  .portrait.victory{box-shadow:0 0 18px var(--gold);border-color:var(--gold)}.portrait.victory .face{animation:ptri .55s infinite}
+  .cmdrs .vs{font-family:'Press Start 2P',monospace;font-size:.66rem;color:var(--ink3)}
+  /* pirate RTS */
+  .pirate-wrap{background:linear-gradient(180deg,rgba(44,32,15,.7),rgba(22,15,7,.85));border:2px solid #6a4a1c;border-radius:16px;padding:12px;margin-bottom:12px}
+  .pmaphdr{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:#f0d9a8;margin-bottom:8px;flex-wrap:wrap;gap:6px}
+  .pmaphdr b{color:#fff}
+  .ocean{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:2px;background:repeating-linear-gradient(45deg,#0b2438,#0b2438 9px,#0e2c44 9px,#0e2c44 18px);padding:3px;border-radius:9px;max-width:460px;margin:0 auto}
+  .ocell{aspect-ratio:1;border:1px solid rgba(120,180,220,.12);border-radius:3px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;min-width:0}
+  .ocell .tok{font-size:1.05rem;line-height:1}
+  .ocell .hdg{position:absolute;top:0;right:2px;font-size:.6rem;color:#bfe6ff}
+  .ocell .hp,.ocell .cw{position:absolute;left:8%;width:84%;height:3px;border-radius:2px;background:rgba(0,0,0,.55);overflow:hidden}
+  .ocell .hp{bottom:4px}.ocell .cw{bottom:0}
+  .ocell .hp i{display:block;height:100%;background:#5fe0b0}.ocell .cw i{display:block;height:100%;background:#ffcf45}
+  .ocell.pship2{background:rgba(55,138,221,.2)}.ocell.eship2{background:rgba(226,75,74,.2)}
+  .ocell.selp{box-shadow:inset 0 0 0 2px var(--son),0 0 10px var(--son)}
+  .ocell.boarding{box-shadow:inset 0 0 0 2px var(--dec)}
+  .pctrl{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;flex-wrap:wrap}
+  .dpad{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .dpad>div{display:flex;gap:3px}
+  .dpad button{width:40px;height:36px;font-size:1rem;background:#143049;color:#cfeaff;border:2px solid var(--line);border-radius:8px;cursor:pointer;touch-action:manipulation}
+  .dpad button:active{transform:translateY(2px)}
+  .pacts{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+  .phint{font-size:.72rem;color:#d9c08a;margin-top:8px;text-align:center;line-height:1.5}
+  #map.sea{background:linear-gradient(180deg,rgba(60,46,22,.78),rgba(30,22,10,.88));border-color:#8a6a2c}
+  #map.sea .mt{color:#f0d9a8}#map.sea .ms{color:#d9c08a}
+  /* meta / ascension / records */
+  .metabar{font-size:.74rem;color:var(--ink2);margin-bottom:8px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .mbtn{background:rgba(8,26,42,.7);border:2px solid var(--line);color:var(--son);border-radius:8px;padding:4px 10px;font-family:inherit;font-size:.72rem;cursor:pointer}
+  .ascbar{font-size:.74rem;color:var(--ink2);margin-bottom:10px}
+  .ascb{background:rgba(8,26,42,.7);border:2px solid var(--line);color:var(--ink2);border-radius:7px;padding:3px 9px;margin:0 2px;font-family:inherit;font-size:.72rem;cursor:pointer}
+  .ascb.on{border-color:var(--ord);color:#fff;background:rgba(255,90,60,.18)}
+  .checklist{text-align:left;font-size:.82rem;color:var(--ink2);line-height:1.8;margin:10px auto;max-width:340px}
+  .checklist .u{color:var(--good)}.checklist .l{color:var(--ink3)}
+  /* broadside mini-grid */
+  .bsgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;max-width:330px;margin:12px auto}
+  .bscell{aspect-ratio:1;border-radius:5px;border:2px solid var(--line);background:#0c2236;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem}
+  .bscell:hover{border-color:var(--son)}
+  .bscell.hit{background:#7a1f1f;border-color:#e24b4a}.bscell.miss{background:#0a1a28;opacity:.55}.bscell.cc{background:#4a3306;border-color:#ffc23c}
+  .bsbars{display:flex;gap:14px;justify-content:center;margin:6px 0;flex-wrap:wrap}
+  .bsbar{min-width:120px}.bsbar .lab{font-size:.7rem;color:var(--ink2)}.bsbar .t{height:7px;border-radius:4px;background:#08202f;overflow:hidden;margin-top:2px}.bsbar .t i{display:block;height:100%}
+  #cut .scene{letter-spacing:8px;animation:cscene 1.2s ease-out}
+  @keyframes cscene{0%{transform:scale(.6);opacity:0;filter:blur(8px)}100%{transform:scale(1);opacity:1;filter:blur(0)}}
+  #cut.flash{background:#02060899}#cut.flash .cutart{animation:cflash 1s ease-out}
+  @keyframes cflash{0%{transform:scale(1.2);opacity:0}25%{opacity:1}100%{transform:scale(1);opacity:.92}}
+  #cut .cn{animation:cglow 1.5s ease-in-out infinite alternate}
+  @keyframes cglow{to{text-shadow:0 0 34px rgba(255,207,69,.95)}}
+</style>
+</head>
+<body>
+<canvas id="water"></canvas>
+<div id="vignette"></div>
+<div id="fx"></div>
+<div id="cut"><div class="cutart" id="cutart"></div></div>
+
+<div class="frame" id="frame">
+  <div class="top">
+    <div class="brand"><h1>DEAD&nbsp;RECKONING</h1><div class="sub" id="adm-sub">a battleship roguelike</div></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Act</div><div class="v" id="s-act">—</div></div>
+      <div class="stat"><div class="k">Gold</div><div class="v g" id="s-gold">0</div></div>
+      <div class="stat"><div class="k">Score</div><div class="v" id="s-score">0</div></div>
+      <div class="snd"><span id="mute" onclick="game.toggleMute()">🔊</span><span id="music" onclick="game.toggleMusic()">🎵</span></div>
+    </div>
+  </div>
+  <div class="relics" id="relics"></div>
+  <div class="cmdrs hidden" id="cmdrs">
+    <div class="portrait idle" id="p-portrait"><span class="face">🎖️</span><span class="cn">Voss</span></div>
+    <div class="vs">VS</div>
+    <div class="portrait foe idle" id="e-portrait"><span class="face">☠️</span><span class="cn">Enemy</span></div>
+  </div>
+
+  <div id="title"></div>
+  <div id="map" class="hidden"></div>
+
+  <div class="place-wrap hidden" id="place">
+    <div class="place-title" id="place-head">DEPLOY YOUR FLEET</div>
+    <div class="place-sub" id="place-sub">Drag to move · tap a ship to rotate</div>
+    <div id="place-grid"></div>
+    <div class="place-btns">
+      <button class="btn btn-end btn-go" onclick="game.randomizeFleet()" style="min-height:48px">⚄ Randomize</button>
+      <button class="btn btn-go" onclick="game.setSail()">⚓ Set Sail</button>
+    </div>
+  </div>
+
+  <div id="combat" class="hidden">
+    <div class="selbanner" id="selbanner"></div>
+    <div class="grids">
+      <div class="panel enemy">
+        <div class="panel-label">Enemy Waters <span class="tag" id="foe-name">—</span></div>
+        <div class="board" id="enemy-grid"></div>
+        <div class="roster" id="roster"></div>
+        <div class="help" id="aim-help">Tap a cell to fire.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-label">Your Fleet <span class="tag" id="adm-tag">—</span></div>
+        <div class="board" id="player-grid"></div>
+        <div class="fleet" id="fleet"></div>
+      </div>
+    </div>
+    <div class="handwrap"><div class="handlbl">⟡ Hand ⟡</div><div class="hand" id="hand"></div></div>
+    <div class="actionbar">
+      <div class="chip">⚡<span class="edots" id="energy"></span></div>
+      <div class="chip">🎯<b id="s-shots">1</b></div>
+      <div class="chip">☠<b id="s-enemyships">2</b></div>
+      <div class="score-hud" id="scorehud"><span class="chips" id="h-chips">0</span><span class="x">×</span><span class="mult" id="h-mult">1.0</span></div>
+      <button class="end-turn-btn" id="btn-end" onclick="game.endTurn()">End Turn ▸</button>
+    </div>
+    <div class="log" id="log"></div>
+    <div class="kbd" id="kbd">keys: 1–9 play card · F / Space end turn · R randomize (deploy)</div>
+  </div>
+
+  <div id="sheet" class="sheet hidden"></div>
+  <div id="pirate" class="hidden"></div>
+</div>
+
+<div class="ovl" id="ovl"><div class="modal" id="modal"></div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   DEAD RECKONING — Phase 2 build (variable grid, fog, scarcity, repair)
+   ========================================================================= */
+const COLS='ABCDEFGHIJKLMN'.split('');
+const SHIP_DEFS={Carrier:5,Battleship:4,Cruiser:3,Submarine:3,Destroyer:2};
+const TOUCH=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
+
+const ADMIRALS=[
+  {id:'voss',face:'🎖️',name:'Adm. Voss',arch:'The Tactician',ap:'First salvo each turn costs 0 energy. +2 gold per node.',lk:'Starter',locked:false},
+  {id:'kael',face:'🔥',name:'Cmdr. Kael',arch:'The Blitz',ap:'When any ship sinks, draw 1 card.',lk:'Unlock: 3 runs',locked:true},
+  {id:'silas',face:'👻',name:'Capt. Silas',arch:'The Ghost',ap:'Your decoys are invisible to enemy sonar; decoys cost 0.',lk:'Unlock: beat Act 1 boss',locked:true},
+  {id:'yara',face:'💥',name:'Cmdr. Yara',arch:'The Devastator',ap:'Hits splash to an adjacent tile (35%).',lk:'Unlock: win a run',locked:true},
+  {id:'blacktide',face:'🏴‍☠️',name:'Capt. Blacktide',arch:'The Pirate',ap:'Crew-depleted enemies join your fleet. (RTS mode — Sprint 6)',lk:'Unlock: win with no Sonar',locked:true},
+];
+// for the prototype all admirals are selectable (meta-unlocks are Sprint 5)
+ADMIRALS.forEach(a=>a.playable=(a.id!=='blacktide'));
+
+const FACTIONS=[
+  {name:'Corsair Skiffs',ai:'scatter',tint:'Erratic fire'},
+  {name:'Ghost Tide',ai:'decoy',tint:'Probes first'},
+  {name:'Reef Swarm',ai:'swarm',tint:'Rapid shots'},
+  {name:'Iron Armada',ai:'hunter',tint:'Checkerboard hunter'},
+  {name:'Deepwatch Snipers',ai:'sniper',tint:'Hunts big hulls'},
+  {name:'Carrion Fleet',ai:'adaptive',tint:'Learns & escalates'},
+];
+const BOSSES=['Iron Armada','Deepwatch Snipers','Carrion Fleet'];
+
+const ART={salvo:'💥',spread:'🎯',barrage:'🔱',pinpoint:'📍',depthcharge:'🧨',chainshot:'⛓️',torpedo:'🚀',overkill:'☄️',
+  ping:'📡',heat:'🌡️',widescan:'📶',recon:'🛰️',activesonar:'🔊',
+  hull:'🛡️',evade:'🌀',flank:'⚡',battlestations:'🎺',smoke:'💨',
+  buoy:'🛟',mirror:'🪞',chaff:'✨',eye:'👁️',allhands:'⚓',doctrine:'📜',nuke:'☢️',
+  damagecontrol:'🔧',bulkhead:'🚪',tow:'🪢',drydock:'🛠️',scuttle:'💀',salvage:'♻️',crewtransfer:'🔀',blacktide:'🌊',
+  sig_voss:'🎖️',sig_kael:'🔥',sig_silas:'👻',sig_yara:'💥',sig_blacktide:'🌊'};
+const LIB=[
+  {id:'salvo',cat:'ORDNANCE',name:'Double Salvo',cost:1,rar:'common',kind:'instant',ds:'+1 shot this turn.'},
+  {id:'spread',cat:'ORDNANCE',name:'Spread Shot',cost:1,rar:'common',kind:'arm',ds:'Next shot hits a 1×3 row.'},
+  {id:'torpedo',cat:'ORDNANCE',name:'Torpedo Run',cost:1,rar:'rare',kind:'arm',ds:'Next shot hits a 3×1 column.'},
+  {id:'depthcharge',cat:'ORDNANCE',name:'Depth Charge',cost:2,rar:'rare',kind:'arm',ds:'Next shot hits a 2×2 block.'},
+  {id:'barrage',cat:'ORDNANCE',name:'Barrage',cost:2,rar:'rare',kind:'instant',ds:'+2 shots this turn.'},
+  {id:'pinpoint',cat:'ORDNANCE',name:'Pinpoint',cost:1,rar:'forge',kind:'arm',ds:'Next shot auto-finds a hull in that row.'},
+  {id:'chainshot',cat:'ORDNANCE',name:'Chain Shot',cost:1,rar:'forge',kind:'instant',ds:'If your next shot hits, +1 shot.'},
+  {id:'overkill',cat:'ORDNANCE',name:'Overkill',cost:1,rar:'contra',kind:'instant',ds:'This turn, hits on damaged hulls score double.'},
+  {id:'ping',cat:'SONAR',name:'Sonar Ping',cost:1,rar:'common',kind:'target',ds:'Scan a 3×3 area for hulls.'},
+  {id:'widescan',cat:'SONAR',name:'Wide Scan',cost:1,rar:'common',kind:'target',ds:'Reveal hulls in a row.'},
+  {id:'recon',cat:'SONAR',name:'Recon Drone',cost:1,rar:'forge',kind:'instant',ds:'Reveal 2 random hull cells.'},
+  {id:'heat',cat:'SONAR',name:'Heat Map',cost:2,rar:'rare',kind:'instant',ds:'Reveal the hottest column.'},
+  {id:'activesonar',cat:'SONAR',name:'Active Sonar',cost:2,rar:'rare',kind:'instant',ds:'Reveal the densest 3×3.'},
+  {id:'hull',cat:'MANEUVER',name:'Iron Hull',cost:1,rar:'common',kind:'instant',ds:'Block the next 2 hits.'},
+  {id:'evade',cat:'MANEUVER',name:'Evasive',cost:1,rar:'common',kind:'instant',ds:'50% dodge each shot next turn.'},
+  {id:'flank',cat:'MANEUVER',name:'Flank Speed',cost:0,rar:'common',kind:'instant',ds:'+1 energy now.'},
+  {id:'battlestations',cat:'MANEUVER',name:'Battle Stations',cost:1,rar:'rare',kind:'instant',ds:'Draw 2 cards.'},
+  {id:'smoke',cat:'MANEUVER',name:'Smoke Screen',cost:2,rar:'contra',kind:'instant',ds:'Enemy entirely misses next turn.'},
+  {id:'buoy',cat:'DECOY',name:'Ghost Buoy',cost:1,rar:'common',kind:'instant',ds:'Enemy wastes its next shot.'},
+  {id:'chaff',cat:'DECOY',name:'Chaff Cloud',cost:1,rar:'forge',kind:'instant',ds:'Reset enemy hunt targeting.'},
+  {id:'mirror',cat:'DECOY',name:'Mirror Fleet',cost:2,rar:'rare',kind:'instant',ds:'Enemy wastes its next 2 shots.'},
+  {id:'eye',cat:'FLAGSHIP',name:"Admiral's Eye",cost:2,rar:'rare',kind:'instant',ds:'Reveal one whole enemy hull.'},
+  {id:'allhands',cat:'FLAGSHIP',name:'All Hands',cost:2,rar:'forge',kind:'instant',ds:'+1 energy, +1 shot, draw 1.'},
+  {id:'doctrine',cat:'FLAGSHIP',name:'Salvo Doctrine',cost:3,rar:'contra',kind:'instant',ds:'+3 shots this turn.'},
+  {id:'nuke',cat:'FLAGSHIP',name:'Saturation Strike',cost:3,rar:'omega',kind:'arm',ds:'Next shot hits a 3×3 block.'},
+  // ---- REPAIR class (Sprint 3) ----
+  {id:'damagecontrol',cat:'REPAIR',name:'Damage Control',cost:1,rar:'common',kind:'instant',ds:'Restore 1 tile on a damaged ship.'},
+  {id:'bulkhead',cat:'REPAIR',name:'Bulkhead Seal',cost:1,rar:'common',kind:'instant',ds:'Next 2 hits deal no damage. Once/battle.'},
+  {id:'tow',cat:'REPAIR',name:'Emergency Tow',cost:1,rar:'rare',kind:'instant',ds:'Reposition a ship. Enemy loses its track.'},
+  {id:'drydock',cat:'REPAIR',name:'Dry Dock',cost:2,rar:'rare',kind:'instant',ds:'Fully repair a ship. Skip your shot.'},
+  {id:'scuttle',cat:'REPAIR',name:'Scuttle Protocol',cost:1,rar:'rare',kind:'instant',ds:'Sink your smallest ship: draw 3, +1 shot.'},
+  {id:'salvage',cat:'REPAIR',name:'Salvage Op',cost:1,rar:'forge',kind:'instant',ds:'Raise a 1-tile ghost hull (absorbs 1 hit).'},
+  {id:'crewtransfer',cat:'REPAIR',name:'Crew Transfer',cost:1,rar:'forge',kind:'instant',ds:'Reposition your two largest ships.'},
+  {id:'blacktide',cat:'REPAIR',name:'Black Tide Salvage',cost:2,rar:'omega',kind:'instant',ds:'All sunk ships rise as ghosts for 3 turns. Once/run.'},
+];
+const cardById=id=>LIB.find(c=>c.id===id);
+/* Signature cards (Omega) — one per admiral, drop only from elite/boss; trigger a cutscene */
+const SIGS={
+  voss:{id:'sig_voss',adm:'voss',cat:'FLAGSHIP',name:'Full Broadside',cost:3,rar:'omega',kind:'instant',ds:"Fire every tile on the enemy's back row.",scene:'🌩️ ⛴️ 🔭',sceneText:'Voss at the helm in the storm, the whole fleet arrayed behind him, telescope raised. Deliberate. Inevitable.'},
+  kael:{id:'sig_kael',adm:'kael',cat:'FLAGSHIP',name:'Into the Fire',cost:2,rar:'omega',kind:'instant',ds:'+2 shots this turn. Your smallest ship takes 1 hit.',scene:'🔥 🚢 😈',sceneText:'Kael on the bow of a burning enemy ship, coat alight, laughing into the gale.'},
+  silas:{id:'sig_silas',adm:'silas',cat:'FLAGSHIP',name:"Dead Man's Course",cost:2,rar:'omega',kind:'instant',ds:'Your fleet is invisible for 3 enemy turns.',scene:'🌫️ 👻 🚢',sceneText:'Silas alone on a fogbound deck, the ship dissolving into mist around him. Absolute silence.'},
+  yara:{id:'sig_yara',adm:'yara',cat:'FLAGSHIP',name:'Nuclear Option',cost:3,rar:'omega',kind:'instant',ds:'Reveal then obliterate a 4×4 zone.',scene:'💥 🌊 🔱',sceneText:'Yara silhouetted against a wall of fire, arms wide, laughing. The sea itself turns orange.'},
+  blacktide:{id:'sig_blacktide',adm:'blacktide',cat:'FLAGSHIP',name:'The Black Tide Rises',cost:3,rar:'omega',kind:'instant',ds:'Sunken ships rise under your flag for 3 turns.',scene:'🌊 🏴‍☠️ ⚡',sceneText:'Blacktide at the prow of a vast black galleon, a dozen ghost ships rising around him. Lightning splits the sky.'},
+};
+const RAR_LABEL={common:'common',rare:'rare',forge:'forged',contra:'contraband',omega:'omega'};
+/* card upgrade ("+") descriptions + special costs (Idea #17) */
+const UP={salvo:'+2 shots this turn.',spread:'Next shot hits a 1×5 row.',torpedo:'Next shot hits a 5×1 column.',depthcharge:'Next shot hits a 3×3 block.',barrage:'+3 shots this turn.',pinpoint:'Auto-finds up to 2 hulls in that row.',chainshot:'If your next shot hits, +2 shots.',overkill:'Hits on damaged hulls score TRIPLE.',ping:'Scan a 3×3 — costs 0 energy.',widescan:'Reveal a row — costs 0 energy.',recon:'Reveal 3 random hull cells.',heat:'Reveal the 2 hottest columns.',activesonar:'Reveal the densest 4×4.',hull:'Block the next 3 hits.',evade:'70% dodge each shot next turn.',flank:'+2 energy now.',battlestations:'Draw 3 cards.',smoke:'Enemy misses the next 2 turns.',buoy:'Enemy wastes its next 2 shots.',chaff:'Reset targeting & brace 1 hit.',mirror:'Enemy wastes its next 3 shots.',eye:'Reveal two whole enemy hulls.',allhands:'+2 energy, +2 shots, draw 2.',doctrine:'+4 shots this turn.',nuke:'3×3 block — costs 2.',damagecontrol:'Restore 2 tiles.',bulkhead:'Next 3 hits deal no damage.',tow:'Reposition a ship & brace 1 hit.',drydock:'Fully repair a ship (keep your shot).',scuttle:'Sink smallest: draw 4, +2 shots.',salvage:'Raise two ghost hulls.',crewtransfer:'Reposition ALL your ships.',blacktide:'Sunken ships rise for 4 turns.'};
+const UPCOST={ping:0,widescan:0,nuke:2};
+function upgradeCard(card){if(card.up||!UP[card.id])return false;card.up=true;card.name=card.name.replace(/ \+$/,'')+' +';card.ds=UP[card.id];if(UPCOST[card.id]!=null)card.cost=UPCOST[card.id];return true;}
+/* boss intro cutscenes + signature mechanic per act boss (Idea #18) */
+const BOSS_SCENE={
+  'Iron Armada':{id:'boss_iron',scene:'🛡️ ⚙️ ⚓',name:'THE IRON ARMADA',sceneText:'A wall of riveted steel slides from the fog. Its hull drinks your shells and seals its own wounds.',mech:'regen'},
+  'Deepwatch Snipers':{id:'boss_deep',scene:'🎯 🌫️ 👁️',name:'THE DEEPWATCH',sceneText:'Unseen guns track your largest hull. The sea itself seems to close over their positions.',mech:'refog'},
+  'Carrion Fleet':{id:'boss_carrion',scene:'☠️ 🌊 🦅',name:'THE CARRION FLEET',sceneText:'A tide of scavenger hulls, ever-growing. Sink one and two more crawl up from the deep.',mech:'spawn'},
+};
+/* weather / sea-state (Idea #24) */
+const WEATHERS=[
+  {id:'swell',name:'Heavy Swell',ic:'🌊',ds:'Open seas — no effect.'},
+  {id:'storm',name:'Storm',ic:'🌩️',ds:'30% of every shot scatters to a neighbouring cell.'},
+  {id:'fog',name:'Fog Bank',ic:'🌫️',ds:'Sonar reveals one fewer cell; enemy hunting falters.'},
+  {id:'calm',name:'Dead Calm',ic:'☀️',ds:'Clear shooting — your hits score +25% chips.'},
+];
+/* enemy special ships / officers (Idea #21) */
+const SPECIALS={sub:{ic:'🟢',name:'Cloaked Sub',ds:'Invisible to sonar.'},tender:{ic:'🟩',name:'Repair Tender',ds:'Heals adjacent enemy hulls.'},artillery:{ic:'🟥',name:'Artillery Cruiser',ds:'Hitting it gives the enemy +1 shot next turn.'}};
+
+const RELICS=[
+  {id:'spyglass',ic:'🔭',name:'Brass Spyglass',ds:'+1 max hand size.'},
+  {id:'powder',ic:'🛢️',name:'Powder Monkey',ds:'+1 max energy.'},
+  {id:'targeting',ic:'🎯',name:'Targeting Computer',ds:'Hits score +50% chips.'},
+  {id:'marque',ic:'📜',name:'Letters of Marque',ds:'+5 gold per sink.'},
+  {id:'reactor',ic:'⚛️',name:'Overcharged Reactor',ds:'+0.3 Mult per card played each turn.'},
+  {id:'kraken',ic:'🐙',name:"Kraken's Eye",ds:'Reveal a random enemy hull cell each turn.'},
+  {id:'keel',ic:'⚓',name:'Iron Keel',ds:'Block the first hit of every battle.'},
+  {id:'charm',ic:'🍀',name:'Lucky Charm',ds:'+40 chips per unused shot at battle end.'},
+  {id:'salvage',ic:'🪝',name:'Salvage Rights',ds:'+3 gold per hit.'},
+  {id:'combo',ic:'🔗',name:'Combo Engine',ds:'Hit streak builds Mult 50% faster.'},
+  {id:'predator',ic:'🦈',name:"Predator's Instinct",ds:'+1 Mult each time you sink a hull.'},
+  {id:'anchor',ic:'🏅',name:'Golden Anchor',ds:'+25% gold from all sources.'},
+  {id:'fog',ic:'🌫️',name:'Fog Machine',ds:'25% of enemy shots auto-miss.'},
+  {id:'drum',ic:'🥁',name:'War Drum',ds:'+1 shot on the first turn of each battle.'},
+  {id:'chest',ic:'💰',name:'War Chest',ds:'Start each battle with +1 energy.'},
+  {id:'shipwright',ic:'🔨',name:"Shipwright's Kit",ds:'Repair 1 hull damage after each battle.'},
+];
+const relicById=id=>RELICS.find(r=>r.id===id);
+
+/* ---- deterministic RNG for Daily runs (seed = the date; no server needed) ---- */
+const _origRandom=Math.random.bind(Math);
+let _seeded=null;
+Math.random=function(){return _seeded?_seeded():_origRandom();};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hashStr(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function todaySeed(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+/* META-PROGRESSION (persists across runs; Sprint 5) */
+const Meta={devAll:false,data:{runs:0,wins:0,act1boss:false,sonarless:false,best:0,asc:0,sigsSeen:{}},
+  load(){try{const j=localStorage.getItem('dr_meta');if(j)this.data=Object.assign(this.data,JSON.parse(j));}catch(e){}},
+  save(){try{localStorage.setItem('dr_meta',JSON.stringify(this.data));}catch(e){}},
+  unlocked(id){const d=this.data;if(this.devAll)return true;
+    return id==='voss'||(id==='kael'&&d.runs>=3)||(id==='silas'&&d.act1boss)||(id==='yara'&&d.wins>=1)||(id==='blacktide'&&d.sonarless);},
+};
+
+/* AUDIO */
+const Sound={ctx:null,muted:false,
+  init(){if(!this.ctx){try{this.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}},
+  blip(f,d,t,v){if(this.muted||!this.ctx)return;const c=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=t||'square';o.frequency.setValueAtTime(f,c);g.gain.setValueAtTime(v||.08,c);g.gain.exponentialRampToValueAtTime(.0001,c+d);o.connect(g);g.connect(this.ctx.destination);o.start(c);o.stop(c+d);},
+  fire(){this.blip(180,.12,'sawtooth',.05);},miss(){this.blip(120,.16,'sine',.05);},
+  hit(){this.blip(95,.18,'square',.09);setTimeout(()=>this.blip(72,.14,'square',.07),55);},
+  sink(){[300,240,180,120].forEach((f,i)=>setTimeout(()=>this.blip(f,.18,'square',.09),i*70));},
+  card(){this.blip(520,.07,'triangle',.05);},draw(){this.blip(420,.05,'triangle',.04);},
+  coin(){this.blip(880,.06,'square',.05);setTimeout(()=>this.blip(1180,.08,'square',.05),50);},
+  win(){[400,520,660,880].forEach((f,i)=>setTimeout(()=>this.blip(f,.2,'triangle',.08),i*110));},
+  lose(){[300,240,180,120,90].forEach((f,i)=>setTimeout(()=>this.blip(f,.25,'sawtooth',.08),i*120));},
+  expand(){[200,300,440].forEach((f,i)=>setTimeout(()=>this.blip(f,.3,'sine',.05),i*90));},
+};
+const Music={on:true,timer:null,i:0,scale:[174.6,196,233.1,261.6,293.7,349.2,392,233.1],
+  start(){if(this.timer)return;this.timer=setInterval(()=>this.step(),760);},
+  step(){if(!this.on||Sound.muted||!Sound.ctx)return;const n=this.scale[this.i%this.scale.length];this.low(n,1.1,.02);if(this.i%4===0)this.low(n/2,1.4,.028);this.i++;},
+  low(f,d,v){const c=Sound.ctx.currentTime,o=Sound.ctx.createOscillator(),g=Sound.ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(f,c);g.gain.setValueAtTime(0,c);g.gain.linearRampToValueAtTime(v,c+.1);g.gain.exponentialRampToValueAtTime(.0001,c+d);o.connect(g);g.connect(Sound.ctx.destination);o.start(c);o.stop(c+d);},
+};
+
+/* FX */
+const FX={
+  popup(x,y,t,c){const e=document.createElement('div');e.className='pop';e.textContent=t;e.style.left=x+'px';e.style.top=y+'px';e.style.color=c||'#fff';document.getElementById('fx').appendChild(e);setTimeout(()=>e.remove(),1000);},
+  burst(x,y,c,n){const fx=document.getElementById('fx');for(let i=0;i<(n||10);i++){const s=document.createElement('div');s.className='spark';s.style.left=x+'px';s.style.top=y+'px';s.style.background=c;s.style.boxShadow='0 0 6px '+c;const a=_origRandom()*6.28,d=18+_origRandom()*42,du=400+_origRandom()*320,dx=Math.cos(a)*d,dy=Math.sin(a)*d-12;s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(${dx-50}%,${dy}px) scale(0)`,opacity:0}],{duration:du,easing:'cubic-bezier(.2,.8,.3,1)'});fx.appendChild(s);setTimeout(()=>s.remove(),du);}},
+  shake(){const f=document.getElementById('frame');f.classList.remove('shake');void f.offsetWidth;f.classList.add('shake');},
+  atCell(g,r,c){const el=document.querySelector(`#${g} .cell[data-r="${r}"][data-c="${c}"]`);if(!el)return null;const b=el.getBoundingClientRect();return {x:b.left+b.width/2,y:b.top+b.height/2,el};},
+};
+
+/* WATER */
+function initWater(){const cv=document.getElementById('water'),ctx=cv.getContext('2d');let W,H,dpr;
+  function rs(){dpr=Math.min(devicePixelRatio||1,2);W=cv.width=innerWidth*dpr;H=cv.height=innerHeight*dpr;}rs();addEventListener('resize',rs);
+  let t=0;(function frame(){t+=.012;ctx.clearRect(0,0,W,H);const bands=9;
+    for(let i=0;i<bands;i++){const y0=H*(i/bands),amp=18*dpr+i*2*dpr,k=.006/dpr,hue=200+i*4;ctx.beginPath();ctx.moveTo(0,y0);
+      for(let x=0;x<=W;x+=14*dpr){const y=y0+Math.sin(x*k+t*(1+i*.12)+i)*amp+Math.sin(x*k*2.3-t*.7)*amp*.4;ctx.lineTo(x,y);}
+      ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=`hsla(${hue},70%,${22+i*2}%,${.05+.018*i})`;ctx.fill();}
+    requestAnimationFrame(frame);})();}
+
+/* ========================================================================= */
+const game={
+  boot(){Sound.init();Meta.load();this.ascension=0;this.dailyActive=false;this.renderTitle();this.show('title');},
+  renderTitle(){
+    const t=document.getElementById('title');const d=Meta.data;if(this.ascension==null)this.ascension=0;
+    const ascCap=Meta.devAll?5:d.asc;if(this.ascension>ascCap)this.ascension=ascCap;
+    let dbest=0;try{dbest=(JSON.parse(localStorage.getItem('dr_daily')||'{}'))[todaySeed()]||0;}catch(e){}
+    const ascSel=ascCap>0?`<div class="ascbar">⚔ Ascension: ${Array.from({length:ascCap+1},(_,i)=>`<button class="ascb${this.ascension===i?' on':''}" onclick="game.setAsc(${i})">${i===0?'Off':'A'+i}</button>`).join('')}</div>`:'';
+    t.innerHTML=`<div class="big">DEAD RECKONING</div><div class="tag">a battleship roguelike · chase the high score</div>
+      <div class="metabar">⚓ Runs ${d.runs} · 🏆 Wins ${d.wins} · ⭐ Best ${d.best.toLocaleString()}
+        <button class="mbtn" onclick="game.records()">🏅 Records</button>
+        <button class="mbtn" onclick="game.devUnlock()">🧪 Unlock all</button></div>
+      <div class="metabar"><button class="mbtn" style="border-color:var(--gold);color:var(--gold)" onclick="game.startDaily()">📅 Daily Run</button> seed <b>${todaySeed()}</b>${dbest?` · your best ${dbest.toLocaleString()}`:''} · same run for everyone today</div>
+      ${ascSel}
+      <div class="pick">CHOOSE YOUR ADMIRAL · CHOOSE YOUR THEATRE</div><div class="admirals" id="adm-list"></div>`;
+    const list=t.querySelector('#adm-list');
+    ADMIRALS.forEach(a=>{const pl=Meta.unlocked(a.id);const el=document.createElement('div');el.className='adm'+(pl?'':' locked');
+      el.innerHTML=`<div class="face">${a.face}</div><div class="an">${a.name}</div><div class="arch">${a.arch}</div><div class="ap">${a.ap}</div><div class="lk">${pl?'✓ Available':'🔒 '+a.lk}</div>`;
+      el.onclick=pl?(()=>this.chooseTheatre(a)):(()=>this.toast('🔒 '+a.lk));list.appendChild(el);});
+  },
+  setAsc(n){this.ascension=n;this.renderTitle();},
+  startDaily(){_seeded=mulberry32(hashStr(todaySeed()));this.dailyActive=true;this.dailySeed=todaySeed();
+    this.ascension=0;this.admiral=ADMIRALS[0];this.orientation=(_seeded()<0.5)?'portrait':'landscape';
+    this.startRun();const sub=document.getElementById('adm-sub');if(sub)sub.textContent='Adm. Voss · 📅 Daily '+this.dailySeed;},
+  recordDaily(){if(!this.dailyActive)return;try{const o=JSON.parse(localStorage.getItem('dr_daily')||'{}');if(this.runScore>(o[this.dailySeed]||0)){o[this.dailySeed]=this.runScore;localStorage.setItem('dr_daily',JSON.stringify(o));}}catch(e){}},
+  devUnlock(){Meta.devAll=true;Meta.data.asc=5;Meta.save();this.toast('🧪 Everything unlocked (testing)');this.renderTitle();},
+  records(){const d=Meta.data;const m=document.getElementById('modal');
+    const row=(id,label,done)=>`<div>${done?'<span class="u">✓</span>':'<span class="l">🔒</span>'} ${label}</div>`;
+    m.innerHTML=`<h2 style="font-size:.95rem;color:var(--gold)">🏅 RECORDS</h2>
+      <div class="tally" style="margin:8px 0"><div class="row"><span>Runs played</span><span>${d.runs}</span></div>
+      <div class="row"><span>Runs won</span><span>${d.wins}</span></div>
+      <div class="row"><span>Best score</span><span class="cc">${d.best.toLocaleString()}</span></div>
+      <div class="row"><span>Ascension reached</span><span class="mm">A${d.asc}</span></div></div>
+      <div style="font-size:.78rem;color:#9fc2dd;margin-top:6px">ADMIRAL UNLOCKS</div>
+      <div class="checklist">
+        ${row('voss','Adm. Voss — starter',true)}
+        ${row('kael','Cmdr. Kael — complete 3 runs ('+Math.min(d.runs,3)+'/3)',Meta.unlocked('kael'))}
+        ${row('silas','Capt. Silas — beat the Act 1 boss',Meta.unlocked('silas'))}
+        ${row('yara','Cmdr. Yara — win a full run',Meta.unlocked('yara'))}
+        ${row('blacktide','Capt. Blacktide — win using zero Sonar cards',Meta.unlocked('blacktide'))}
+      </div>
+      <button class="btn btn-go" onclick="game.closeModal()">Back ▸</button>`;
+    document.getElementById('ovl').classList.add('show');},
+  chooseTheatre(adm){
+    this.admiral=adm;
+    const t=document.getElementById('title');
+    t.innerHTML=`<div class="big" style="font-size:clamp(16px,5vw,24px)">CHOOSE YOUR THEATRE OF WAR</div>
+      <div class="tag">${adm.name} — ${adm.arch}</div>
+      <div class="ms" style="font-size:.85rem;color:var(--ink2);margin:14px 0">Orientation shapes only your opening battles. The ocean opens up from there.</div>
+      <div class="admirals">
+        <div class="adm" style="text-align:center" onclick="game.pickOrient('portrait')"><div class="face">📱</div><div class="an">PORTRAIT</div><div class="ap" style="text-align:center">3 wide × 5 tall.<br>Tall & narrow waters.</div></div>
+        <div class="adm" style="text-align:center" onclick="game.pickOrient('landscape')"><div class="face">🖥️</div><div class="an">LANDSCAPE</div><div class="ap" style="text-align:center">5 wide × 3 tall.<br>Broad open channel.</div></div>
+        <div class="adm" style="text-align:center" onclick="game.pickOrient('random')"><div class="face" id="coin">🪙</div><div class="an">RANDOM</div><div class="ap" style="text-align:center">Coin-flip decides<br>your theatre.</div></div>
+      </div>`;
+  },
+  pickOrient(o){
+    Sound.init();_seeded=null;this.dailyActive=false;
+    if(o==='random'){const coin=document.getElementById('coin');let n=0;const iv=setInterval(()=>{coin.textContent=['🪙','🔵','🟠'][n%3];n++;Sound.draw();},90);
+      setTimeout(()=>{clearInterval(iv);this.orientation=Math.random()<.5?'portrait':'landscape';coin.textContent=this.orientation==='portrait'?'📱':'🖥️';setTimeout(()=>this.startRun(),500);},900);return;}
+    this.orientation=o;this.startRun();
+  },
+  startRun(){
+    Sound.init();Music.start();
+    const adm=this.admiral;
+    this.act=1;this.gold=0;this.runScore=0;this.battlesWon=0;this.actBattle=0;this.permShot=0;
+    this.stats={hits:0,sinks:0,cardsPlayed:0,bestMult:1,nodes:0,bestBattle:0};
+    this.seenNudge=false;this.usedBlackTide=false;this.usedSonar=false;this._recorded=false;
+    // fleet scarcity: start with Destroyer + Cruiser only
+    this.fleet=[{name:'Destroyer',len:2,hits:0,sunk:false},{name:'Cruiser',len:3,hits:0,sunk:false}];
+    // reduced starting deck
+    this.deck=['salvo','spread','ping','hull','buoy','flank','damagecontrol','widescan'].map(id=>({...cardById(id)}));
+    this.relics=[];
+    if(adm.id==='voss')this.addRelic('spyglass');
+    if(adm.id==='kael')this.addRelic('predator');
+    if(adm.id==='yara')this.addRelic('targeting');
+    if(adm.id==='silas')this.deck.push({...cardById('buoy')},{...cardById('chaff')});
+    document.getElementById('adm-sub').textContent=adm.name+' · '+adm.arch;
+    document.getElementById('adm-tag').textContent=adm.name;
+    document.getElementById('kbd').style.display=TOUCH?'none':'block';
+    if(TOUCH)document.getElementById('place-sub').textContent='Drag to move · tap a ship to rotate · use Randomize if fiddly';
+    this.newMap();
+  },
+  tryPirateUnlock(){const bt=ADMIRALS.find(a=>a.id==='blacktide');
+    if(bt.playable){this.chooseTheatre(bt);return;}
+    if(Sound.muted&&!Music.on){this.pclicks=(this.pclicks||0)+1;
+      if(this.pclicks>=3){bt.playable=true;Sound.coin();this.toast('🏴‍☠️ PIRATE MODE UNLOCKED');this.renderTitle();}
+      else this.toast('Arr… '+this.pclicks+'/3');}
+    else this.toast('Mute 🔇 + music 🎵 off first, then tap me 3×');},
+  addRelic(id){if(!this.relics.find(r=>r.id===id)){this.relics.push(relicById(id));this.renderRelics();}},
+  hasRelic(id){return!!this.relics.find(r=>r.id===id);},
+
+  /* ---------- MAP ---------- */
+  newMap(){this.map=genMap();this.reach=[[0,0]];this.map.cur=null;this.renderTop();this.showMap();},
+  showMap(){const m=document.getElementById('map');const sea=this.admiral&&this.admiral.id==='blacktide';m.classList.toggle('sea',sea);
+    m.innerHTML=`<div class="mt">${sea?'🧭 CHART':'ACT'} ${this.act} — THE ${['SHALLOWS','NARROWS','MAELSTROM'][this.act-1]||'DEEP'}</div>
+      <div class="ms">${sea?'🧭 Plot a course through the coves. Every hull is a prize — sink it or take it.':'Choose your route. 🛶 Scout (safe) · ⚔️ Standard · ☠️ Elite · ❓ Ambush (hidden) · 🪙 shop · 🛠 repair · 💎 cache'}</div>
+      <div id="mapcanvas"></div>`;this.renderMap();this.show('map');},
+  renderMap(){const cvs=document.getElementById('mapcanvas');if(!cvs)return;const F=this.map.floors.length;
+    const H=Math.max(340,F*72),W=cvs.clientWidth||520;cvs.style.height=H+'px';
+    const xOf=(f,i)=>{const row=this.map.floors[f];return (W*(i+1))/(row.length+1);};
+    const yOf=f=>H-26-(f*(H-52)/(F-1));
+    let svg=`<svg width="100%" height="${H}" style="position:absolute;inset:0;z-index:1">`;
+    for(let f=0;f<F-1;f++)this.map.floors[f].forEach((node,i)=>node.links.forEach(j=>{
+      const rch=this.reach.some(([rf,ri])=>rf===f&&ri===i);
+      svg+=`<line x1="${xOf(f,i)}" y1="${yOf(f)}" x2="${xOf(f+1,j)}" y2="${yOf(f+1)}" stroke="${node.done?'#2a3a4a':(rch?'#ffcf45':'#244563')}" stroke-width="${node.done?2:3}" stroke-dasharray="${node.done?'0':'5 5'}"/>`;}));
+    svg+='</svg>';
+    const ICON={scout:'🛶',standard:'⚔️',elite:'☠️',ambush:'❓',shop:'🪙',event:'📜',rest:'🛠',treasure:'💎',boss:'🐙'};
+    const LBL={scout:'Scout',standard:'Battle',elite:'Elite',ambush:'Ambush',shop:'Shop',event:'Event',rest:'Repair',treasure:'Cache',boss:'BOSS'};
+    const sea=this.admiral&&this.admiral.id==='blacktide';const COVE=['Black Cove','Salt Reach','Gallows Bay','Maroon Key','Tortuga','Dead Man Shoal','Wreckers Row','Storm Inlet','Bone Atoll','Siren Rocks'];
+    const lf=(node,f,i)=>sea?(node.type==='boss'?'Skull Throne':COVE[(f*3+i)%COVE.length]):LBL[node.type];
+    let nodes='';
+    for(let f=0;f<F;f++)this.map.floors[f].forEach((node,i)=>{
+      const rch=this.reach.some(([rf,ri])=>rf===f&&ri===i);const cur=this.map.cur&&this.map.cur[0]===f&&this.map.cur[1]===i;
+      nodes+=`<div class="mnode ${node.done?'done':''} ${rch?'reach':''} ${cur?'cur':''}" style="left:${xOf(f,i)}px;top:${yOf(f)}px" ${rch?`onclick="game.enterNode(${f},${i})"`:''}>${ICON[node.type]}<span class="lbl">${lf(node,f,i)}</span></div>`;});
+    cvs.innerHTML=svg+nodes;},
+  enterNode(f,i){const node=this.map.floors[f][i];this.map.cur=[f,i];this.curNode=node;this.stats.nodes++;
+    if(this.admiral.id==='voss')this.gold+=2;this.renderTop();Sound.card();
+    let type=node.type;
+    if(type==='ambush'){const roll=Math.random();type=roll<.25?'scout':roll<.7?'standard':roll<.92?'elite':'boss';this.toast('Ambush! → '+type.toUpperCase());node.resolved=type;}
+    if(['scout','standard','elite','boss'].includes(type))this.startBattle(type);
+    else if(type==='shop')this.openShop();
+    else if(type==='event')this.openEvent();
+    else if(type==='rest')this.openRest();
+    else if(type==='treasure')this.openTreasure();},
+  finishNode(){const [f,i]=this.map.cur;const node=this.map.floors[f][i];node.done=true;
+    if(node.type==='boss'){if(this.act===1&&!Meta.data.act1boss){Meta.data.act1boss=true;Meta.save();}this.battlesWon++;this.act++;this.actBattle=0;if(this.act>3)return this.runComplete();this.newMap();return;}
+    this.reach=node.links.map(j=>[f+1,j]);this.showMap();},
+
+  /* ---------- GRID SIZING (Sprint 1) ---------- */
+  gridSize(boss){
+    if(this.act===1){
+      if(boss)return {r:7,c:6};
+      if(this.actBattle<=1)return this.orientation==='portrait'?{r:5,c:3}:{r:3,c:5};
+      return {r:5,c:5};
+    }
+    if(this.act===2){if(boss)return {r:10,c:10};return this.actBattle===0?{r:8,c:8}:{r:10,c:10};}
+    if(boss)return {r:14,c:14};return {r:12,c:12};
+  },
+
+  /* ---------- BATTLE SETUP ---------- */
+  startBattle(kind){
+    if(this.admiral.id==='blacktide'){this.battleKind=kind;Pirate.start(kind);return;}
+    this.battleKind=kind;const boss=kind==='boss';
+    if(boss)this.faction=FACTIONS.find(x=>x.name===BOSSES[this.act-1]);
+    else{const pool=FACTIONS.filter(x=>x.ai!=='adaptive');this.faction=pool[Math.floor(Math.random()*pool.length)];}
+    const dims=this.gridSize(boss);this.rows=dims.r;this.cols=dims.c;
+    const variant=boss?'boss':kind;const A=this.ascension||0;
+    const enemyDefs=enemyFleetFor(this.rows,this.cols,variant);
+    if(A>=2&&Math.max(this.rows,this.cols)>=2)enemyDefs.push({name:'Destroyer',len:2}); // A2: denser enemy fleets
+    this.enemy=bakeBoard(placeFleet(enemyDefs,this.rows,this.cols),this.rows,this.cols);
+    this.enemyShots=(boss?2:kind==='elite'?2:1)+(this.act-1>=2?1:0)+(A>=1?1:0)+((A>=4&&(boss||kind==='elite'))?1:0)+(A>=5?1:0);
+    this.enemyAbilities=(kind==='elite'||boss);
+    this.hardMode=(A>=3); this.ascEscalate=(A>=5); // A3: your board fogs · A5: every faction escalates
+    this.adaptiveBoost=0;this.refog=(boss&&this.rows>=14);
+    // deploy: place persistent (surviving) fleet on this grid
+    this.deploy=this.fleet.filter(s=>!s.sunk).map(s=>({name:s.name,len:s.len,hits:s.hits,sunk:false,src:s}));
+    placeDeploy(this.deploy,this.rows,this.cols);
+    this.phase='placement';
+    document.getElementById('place-head').textContent=(boss?'⚠ BOSS — ':kind==='elite'?'☠ ELITE — ':kind==='scout'?'🛶 SCOUT — ':'')+`${this.faction.name} · ${this.cols}×${this.rows}`;
+    this.renderPlacement(true);this.show('place');this.renderTop();
+  },
+  randomizeFleet(){Sound.card();placeDeploy(this.deploy,this.rows,this.cols);this.renderPlacement(false);},
+  renderPlacement(expand){
+    const wrap=document.getElementById('place-grid');
+    const maxW=Math.min(440,window.innerWidth-44);const cell=Math.max(26,Math.min(60,maxW/this.cols));
+    wrap.style.width=(this.cols*cell)+'px';wrap.style.height=(this.rows*cell)+'px';
+    let html='';
+    for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++)html+=`<div class="pg-cell" style="left:${c*cell}px;top:${r*cell}px;width:${cell-3}px;height:${cell-3}px"></div>`;
+    this.deploy.forEach((s,i)=>{const w=(s.horiz?s.len:1)*cell-4,h=(s.horiz?1:s.len)*cell-4;
+      html+=`<div class="pship ${s.hits>0?'dmgd':''}" data-i="${i}" style="left:${s.c*cell+2}px;top:${s.r*cell+2}px;width:${w}px;height:${h}px"><span class="rot">↻</span>${s.name[0]}${s.len}${s.hits>0?' ('+(s.len-s.hits)+')':''}</div>`;});
+    wrap.innerHTML=html;wrap._cell=cell;
+    if(expand){wrap.classList.remove('expand');void wrap.offsetWidth;wrap.classList.add('expand');Sound.expand();}
+    wrap.querySelectorAll('.pship').forEach(el=>el.addEventListener('pointerdown',e=>this.dragStart(e)));
+  },
+  dragStart(e){e.preventDefault();const wrap=document.getElementById('place-grid'),cell=wrap._cell;const i=+e.currentTarget.dataset.i,ship=this.deploy[i];
+    const rect=wrap.getBoundingClientRect();const offC=Math.floor((e.clientX-rect.left)/cell)-ship.c,offR=Math.floor((e.clientY-rect.top)/cell)-ship.r;
+    const prev={r:ship.r,c:ship.c,horiz:ship.horiz};const el=e.currentTarget;el.classList.add('dragging');let moved=false;
+    const move=ev=>{const nc=Math.floor((ev.clientX-rect.left)/cell)-offC,nr=Math.floor((ev.clientY-rect.top)/cell)-offR;
+      if(nc!==prev.c||nr!==prev.r)moved=true;ship.c=clamp(nc,0,this.cols-(ship.horiz?ship.len:1));ship.r=clamp(nr,0,this.rows-(ship.horiz?1:ship.len));
+      el.style.left=(ship.c*cell+2)+'px';el.style.top=(ship.r*cell+2)+'px';el.classList.toggle('bad',!this.valid(i));};
+    const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);el.classList.remove('dragging');
+      if(!moved){const nh=!ship.horiz;if(this.fits(ship,ship.r,ship.c,nh)){ship.horiz=nh;ship.c=clamp(ship.c,0,this.cols-(ship.horiz?ship.len:1));ship.r=clamp(ship.r,0,this.rows-(ship.horiz?1:ship.len));if(!this.valid(i)){ship.r=prev.r;ship.c=prev.c;ship.horiz=prev.horiz;}else Sound.card();}}
+      else if(!this.valid(i)){ship.r=prev.r;ship.c=prev.c;ship.horiz=prev.horiz;}else Sound.draw();this.renderPlacement(false);};
+    document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);},
+  fits(s,r,c,h){const len=s.len;if(h)return c+len<=this.cols&&r<this.rows;return r+len<=this.rows&&c<this.cols;},
+  valid(idx){const s=this.deploy[idx];const cells=cellsOf(s);for(const[r,c]of cells)if(r<0||c<0||r>=this.rows||c>=this.cols)return false;
+    const occ=new Set();this.deploy.forEach((o,j)=>{if(j!==idx)cellsOf(o).forEach(([r,c])=>occ.add(r+','+c));});return cells.every(([r,c])=>!occ.has(r+','+c));},
+
+  setSail(){
+    Sound.win();
+    this.player=bakeFromDeploy(this.deploy,this.rows,this.cols);
+    this.turn=1;for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++)this.player.grid[r][c].seen=1;
+    this.ghosts=[];this.phase='combat';
+    this.drawPile=shuffle(this.deck.slice());this.discard=[];this.hand=[];this.ai={targets:[]};
+    this.maxEnergy=2;this.handSize=5;
+    if(this.hasRelic('powder'))this.maxEnergy++;
+    if(this.hasRelic('spyglass'))this.handSize++;
+    const alive=this.player.ships;
+    if(alive.find(s=>s.name==='Carrier'))this.handSize++;
+    if(alive.find(s=>s.name==='Cruiser'))this.maxEnergy++;
+    this.chips=0;this.mult=1;this.streak=0;
+    if(alive.find(s=>s.name==='Destroyer'))this.mult+=0.5;
+    this.ironHull=0;this.evade=false;this.decoyWaste=0;this.smoke=false;this.overkill=false;this.chain=false;this.invis=0;
+    this.armed=null;this.targeting=null;this.bulkheadUsed=false;this.firstSalvoFree=(this.admiral.id==='voss');
+    this.cardsThisTurn=0;
+    if(this.hasRelic('keel'))this.ironHull+=1;
+    document.getElementById('foe-name').textContent=this.faction.name+(this.battleKind==='boss'?' (BOSS)':this.battleKind==='elite'?' (ELITE)':this.battleKind==='scout'?' (scout)':'');
+    document.getElementById('enemy-grid').style.setProperty('--cols',this.cols);
+    document.getElementById('player-grid').style.setProperty('--cols',this.cols);
+    this.show('combat');this.clearLog();
+    this.log(`Engaging <b>${this.faction.name}</b> on a ${this.cols}×${this.rows} grid. ${this.faction.tint}.`);
+    this.log('<span class="am">Fog of war:</span> hits show ● only — hull shapes hidden until fully sunk.');
+    this.startTurn(true);
+    ['enemy-grid','player-grid'].forEach(id=>{const b=document.getElementById(id);b.classList.remove('expand');void b.offsetWidth;b.classList.add('expand');});
+    setupPortraits();
+    this.render();
+  },
+
+  /* ---------- TURNS ---------- */
+  startTurn(first){
+    this.clearAuto();
+    this.energy=this.maxEnergy;this.shots=1+this.permShot;this.armed=null;this.targeting=null;this.overkill=false;this.chain=false;this.reactorMult=0;this.cardsThisTurn=0;this.fired=false;
+    if(this.hasRelic('chest'))this.energy+=1;
+    if(first&&this.hasRelic('drum'))this.shots+=1;
+    if(this.player.ships.find(s=>s.name==='Submarine'&&!s.sunk))this.scout(1,'Submarine sonar');
+    if(this.hasRelic('kraken'))this.scout(1,"Kraken's Eye");
+    if(this.refog)this.doRefog();
+    // expire ghosts
+    if(this.ghosts){this.ghosts.forEach(g=>{if(g.turns>0)g.turns--;});this.ghosts=this.ghosts.filter(g=>g.turns!==0);}
+    while(this.hand.length<this.handSize){if(this.drawPile.length===0){if(this.discard.length===0)break;this.drawPile=shuffle(this.discard);this.discard=[];}this.hand.push(this.drawPile.pop());}
+    this.dealAnim=true;if(!first)this.log('— New turn. Energy & shots restored.');setTimeout(()=>Sound.draw(),60);
+  },
+  scout(n,src){let done=0;const cells=[];this.enemy.ships.forEach(s=>s.cells.forEach(([r,c])=>{const t=this.enemy.grid[r][c];if(!t.shot&&t.sonar!=='ship')cells.push([r,c]);}));
+    shuffle(cells);for(const[r,c]of cells){if(done>=n)break;this.enemy.grid[r][c].sonar='ship';this.enemy.grid[r][c].seen=this.turn||0;done++;}
+    if(done)this.log(`<span class="gd">${src}</span> reveals a hull contact.`);},
+  doRefog(){let n=0;for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.enemy.grid[r][c];
+    if(t.shot&&!t.hit&&(this.turn-(t.seen||0))>=4){t.shot=false;n++;}if(t.sonar&&!t.hit&&(this.turn-(t.seen||0))>=4)t.sonar=null;}
+    if(n)this.log('<span class="am">🌫️ The fog rolls back in</span> — unwatched waters return to unknown.');},
+
+  /* ---------- CARDS ---------- */
+  playCard(idx,el){
+    this.clearAuto();
+    const c=this.hand[idx];if(!c)return;let cost=c.cost;
+    if(this.fired){this.flash('Turn over — you already fired this turn.','am');Sound.miss();return;}
+    if(this.admiral.id==='silas'&&c.cat==='DECOY')cost=0;
+    if(cost>this.energy){this.flash(`Not enough energy for ${c.name}.`,'bd');Sound.miss();return;}
+    if(c.cat==='SONAR')this.usedSonar=true;
+    if(c.kind==='target'){this.targeting={idx,card:c,cost};this.setHelp(c.id==='widescan'?'WIDE SCAN — tap a row to reveal it.':'SONAR PING — tap to scan a 3×3.');this.banner(c.name+' — tap the enemy grid');Sound.card();this.render();return;}
+    this.cardsThisTurn++;this.stats.cardsPlayed++;
+    if(this.hasRelic('reactor'))this.mult+=0.3;
+    if(c.kind==='arm'){this.armed={idx,card:c};this.energy-=cost;Sound.card();if(el)el.classList.add('spent');this.banner(c.name+' loaded — tap to fire');setTimeout(()=>{this.removeHand(idx);this.render();},200);this.setHelp(`${c.name} loaded — now fire!`);this.log(`Loaded <b>${c.name}</b>.`);this.bump();return;}
+    this.energy-=cost;Sound.card();
+    if(c.id&&c.id.indexOf('sig_')===0){this.log(`Unleashing <b>${c.name}</b>…`);this.playSignature(c);if(el)el.classList.add('spent');setTimeout(()=>{this.removeHand(idx);this.render();},200);this.bump();return;}
+    this.resolveInstant(c);if(this.admiral.id==='silas'&&c.cat==='DECOY')this.ironHull+=1;
+    if(el)el.classList.add('spent');setTimeout(()=>{this.removeHand(idx);this.render();this.checkAuto();},200);this.bump();
+  },
+  playSignature(c){showCutscene(c,()=>{this.sigEffect(c);this.render();if(this.enemy.alive>0)this.checkAuto();});},
+  sigEffect(c){switch(c.id){
+    case 'sig_voss':{this.log('<span class="am">⚓ FULL BROADSIDE!</span>');for(let cc=0;cc<this.cols;cc++)if(!this.enemy.grid[0][cc].shot)this.fireOne(0,cc);if(this.enemy.alive<=0)return this.victory();break;}
+    case 'sig_kael':{this.shots+=2;const sm=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>a.len-b.len)[0];
+      if(sm){const cell=sm.cells.find(([r,cc])=>!this.player.grid[r][cc].hit);if(cell){const[r,cc]=cell;this.player.grid[r][cc].hit=true;this.player.grid[r][cc].shot=true;sm.hits++;if(sm.hits>=sm.len){sm.sunk=true;sm.cells.forEach(([rr,c2])=>this.player.grid[rr][c2].sunkx=true);this.player.alive--;}if(this.player.sync)this.player.sync();}}
+      this.log('<span class="am">🔥 INTO THE FIRE — +2 shots; your smallest hull takes a hit.</span>');break;}
+    case 'sig_silas':{this.invis=3;this.log('<span class="gd">👻 DEAD MAN’S COURSE — your fleet is invisible for 3 enemy turns.</span>');break;}
+    case 'sig_yara':{this.nuclear();break;}
+  }},
+  nuclear(){const R=Math.min(4,this.rows),C=Math.min(4,this.cols);let best=-1,br=0,bc=0;
+    for(let r=0;r<=this.rows-R;r++)for(let c=0;c<=this.cols-C;c++){let n=0;for(let dr=0;dr<R;dr++)for(let dc=0;dc<C;dc++){const t=this.enemy.grid[r+dr][c+dc];if(t.ship&&!t.shot)n++;}if(n>best){best=n;br=r;bc=c;}}
+    this.log('<span class="am">💥 NUCLEAR OPTION — the sea turns orange.</span>');
+    for(let dr=0;dr<R;dr++)for(let dc=0;dc<C;dc++){const rr=br+dr,cc=bc+dc;if(rr<this.rows&&cc<this.cols&&!this.enemy.grid[rr][cc].shot)this.fireOne(rr,cc);}
+    if(this.enemy.alive<=0)this.victory();},
+  resolveInstant(c){const u=c.up;switch(c.id){
+    case 'salvo':this.shots+=u?2:1;this.log(`<span class="am">+${u?2:1} shot${u?'s':''}.</span>`);break;
+    case 'barrage':this.shots+=u?3:2;this.log(`<span class="am">+${u?3:2} shots — barrage!</span>`);break;
+    case 'doctrine':this.shots+=u?4:3;this.log(`<span class="am">+${u?4:3} shots!</span>`);break;
+    case 'flank':this.energy+=u?2:1;this.log(`Flank speed: +${u?2:1} energy.`);break;
+    case 'allhands':this.energy+=u?2:1;this.shots+=u?2:1;this.drawCards(u?2:1);this.log('All hands on deck!');break;
+    case 'battlestations':this.drawCards(u?3:2);this.log(`Battle stations: drew ${u?3:2}.`);break;
+    case 'hull':this.ironHull+=u?3:2;this.log(`Iron Hull: next ${u?3:2} hits blocked.`);break;
+    case 'evade':this.evade=true;this.evadeChance=u?0.7:0.5;this.log('Evasive course plotted.');break;
+    case 'smoke':this.smoke+=u?2:1;this.log('Smoke screen up.');break;
+    case 'buoy':this.decoyWaste+=u?2:1;this.log('Ghost buoy deployed.');break;
+    case 'mirror':this.decoyWaste+=u?3:2;this.log('Mirror fleet deployed.');break;
+    case 'chaff':this.ai.targets=[];if(u)this.ironHull+=1;this.log('Chaff — enemy targeting reset.');break;
+    case 'overkill':this.overkill=true;this.overkillMult=u?3:2;this.log('<span class="am">Overkill armed.</span>');break;
+    case 'chainshot':this.chain=true;this.chainAmt=u?2:1;this.log('Chain shot ready.');break;
+    case 'heat':this.heatMap(u);break;
+    case 'recon':this.scout(u?3:2,'Recon drone');break;
+    case 'activesonar':this.activeSonar(u);break;
+    case 'eye':this.admiralsEye(u);break;
+    case 'damagecontrol':this.repairTiles(u?2:1);break;
+    case 'bulkhead':if(this.bulkheadUsed){this.log('Bulkhead already used this battle.');this.energy+=c.cost;}else{this.bulkheadUsed=true;this.ironHull+=u?3:2;this.log(`Bulkhead sealed — next ${u?3:2} hits negated.`);}break;
+    case 'tow':this.towShip();if(u)this.ironHull+=1;break;
+    case 'drydock':this.dryDock(u);break;
+    case 'scuttle':this.scuttle(u);break;
+    case 'salvage':this.salvageGhost();if(u)this.salvageGhost();break;
+    case 'crewtransfer':this.crewTransfer(u);break;
+    case 'blacktide':this.blackTide(u);break;
+  }},
+  drawCards(n){for(let k=0;k<n;k++){if(this.hand.length>=this.handSize+3)break;if(this.drawPile.length===0){if(this.discard.length===0)break;this.drawPile=shuffle(this.discard);this.discard=[];}this.hand.push(this.drawPile.pop());}this.dealAnim=true;},
+  repairTiles(n){const dmg=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits);if(!dmg.length){this.log('No damaged ships to repair.');return;}
+    let left=n;for(const s of dmg){while(left>0&&s.hits>0){const cell=s.cells.find(([r,c])=>this.player.grid[r][c].hit);if(!cell)break;const[r,c]=cell;this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;s.hits--;left--;}if(left<=0)break;}
+    this.log(`<span class="gd">Damage control</span> — patched ${n-left} tile(s).`);Sound.draw();},
+  dryDock(){const dmg=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits)[0];if(!dmg){this.log('No damaged ship to dry-dock.');return;}
+    dmg.cells.forEach(([r,c])=>{this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;});dmg.hits=0;this.shots=0;this.log(`<span class="gd">Dry Dock</span> — ${dmg.name} fully repaired. Shot skipped.`);Sound.draw();},
+  scuttle(){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>a.len-b.len);if(live.length<=1){this.log('Cannot scuttle your last ship.');return;}
+    const s=live[0];s.sunk=true;s.hits=s.len;s.cells.forEach(([r,c])=>{this.player.grid[r][c].hit=true;this.player.grid[r][c].shot=true;this.player.grid[r][c].sunkx=true;});this.player.alive--;
+    this.drawCards(3);this.shots+=1;this.log(`<span class="bd">Scuttled the ${s.name}</span> — drew 3, +1 shot.`);Sound.sink();if(this.player.sync)this.player.sync();},
+  towShip(){const live=this.player.ships.filter(s=>!s.sunk);if(!live.length)return;
+    const target=live.find(s=>s.cells.some(([r,c])=>this.player.grid[r][c].hit))||live[Math.floor(Math.random()*live.length)];
+    if(relocateShip(this.player,target,this.rows,this.cols)){this.ai.targets=[];this.log(`<span class="gd">Emergency Tow</span> — ${target.name} slipped away. Enemy lost its track.`);Sound.draw();}
+    else this.log('No room to tow.');},
+  crewTransfer(){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>b.len-a.len);if(live.length<2){this.log('Need 2 ships to transfer.');return;}
+    relocateShip(this.player,live[0],this.rows,this.cols);relocateShip(this.player,live[1],this.rows,this.cols);this.ai.targets=[];this.log('<span class="gd">Crew Transfer</span> — two hulls repositioned.');Sound.draw();},
+  salvageGhost(){const cell=randomEmptyCell(this.player,this.ghosts,this.rows,this.cols);if(!cell){this.log('No open water for a ghost hull.');return;}this.ghosts.push({r:cell[0],c:cell[1],turns:-1});this.log('<span class="gd">Salvage Op</span> — a ghost hull rises (absorbs 1 hit).');Sound.draw();},
+  blackTide(){if(this.usedBlackTide){this.log('Black Tide already called this run.');this.energy+=2;return;}this.usedBlackTide=true;
+    let n=0;this.player.ships.filter(s=>s.sunk).forEach(s=>{const c=s.cells[0];this.ghosts.push({r:c[0],c:c[1],turns:3});n++;});
+    if(!n){const cell=randomEmptyCell(this.player,this.ghosts,this.rows,this.cols);if(cell){this.ghosts.push({r:cell[0],c:cell[1],turns:3});n=1;}}
+    this.log(`<span class="am">🌊 THE BLACK TIDE RISES</span> — ${n} ghost hull(s) for 3 turns.`);Sound.sink();},
+  heatMap(){let best=-1,bc=0;for(let c=0;c<this.cols;c++){let n=0;for(let r=0;r<this.rows;r++){const t=this.enemy.grid[r][c];if(t.ship&&!t.shot)n++;}if(n>best){best=n;bc=c;}}
+    for(let r=0;r<this.rows;r++){const t=this.enemy.grid[r][bc];if(!t.shot){t.sonar=t.ship?'ship':'empty';t.seen=this.turn;}}this.log(`<span class="gd">Heat Map:</span> column <b>${COLS[bc]}</b> hottest.`);Sound.draw();},
+  activeSonar(){let best=-1,br=0,bcc=0;for(let r=0;r<=this.rows-3;r++)for(let c=0;c<=this.cols-3;c++){let n=0;for(let dr=0;dr<3;dr++)for(let dc=0;dc<3;dc++){const t=this.enemy.grid[r+dr][c+dc];if(t.ship&&!t.shot)n++;}if(n>best){best=n;br=r;bcc=c;}}
+    for(let dr=0;dr<3;dr++)for(let dc=0;dc<3;dc++){const t=this.enemy.grid[br+dr]&&this.enemy.grid[br+dr][bcc+dc];if(t&&!t.shot){t.sonar=t.ship?'ship':'empty';t.seen=this.turn;}}this.log('<span class="gd">Active sonar</span> lights a cluster.');Sound.draw();},
+  admiralsEye(){const live=this.enemy.ships.filter(s=>!s.sunk&&s.cells.some(([r,c])=>!this.enemy.grid[r][c].shot));if(!live.length){this.log('Nothing to reveal.');return;}
+    const s=live[Math.floor(Math.random()*live.length)];s.cells.forEach(([r,c])=>{if(!this.enemy.grid[r][c].shot){this.enemy.grid[r][c].sonar='ship';this.enemy.grid[r][c].seen=this.turn;}});this.log(`<span class="gd">Admiral's Eye</span> — a ${s.name} glints.`);Sound.draw();},
+
+  /* ---------- FIRING ---------- */
+  boardClick(r,c){
+    this.clearAuto();
+    if(this.targeting){const card=this.targeting.card;this.energy-=this.targeting.cost;this.cardsThisTurn++;this.stats.cardsPlayed++;this.removeHand(this.targeting.idx);
+      if(card.id==='ping')this.ping(r,c);else if(card.id==='widescan')this.wideScan(r);this.targeting=null;this.setHelp('Tap a cell to fire.');this.banner('');this.render();this.checkAuto();return;}
+    if(this.shots<=0){this.flash('No shots left — End Turn.','am');Sound.miss();return;}
+    // cards-first nudge (once per run)
+    if(!this.seenNudge&&this.cardsThisTurn===0&&!this.armed&&this.hand.some(k=>this.canAfford(k))){this.seenNudge=true;this.nudge(r,c);return;}
+    this.doFire(r,c);
+  },
+  canAfford(k){let cost=k.cost;if(this.admiral.id==='silas'&&k.cat==='DECOY')cost=0;return cost<=this.energy;},
+  nudge(r,c){const m=document.getElementById('modal');m.innerHTML=`<h2 style="font-size:.9rem">UNPLAYED CARDS</h2><p>You still have cards you could play this turn. Fire anyway, or play cards first?</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn btn-end" onclick="game.closeModal()">Play cards first</button><button class="btn btn-fire" onclick="game.closeModal();game.doFire(${r},${c})">Fire anyway</button></div>`;
+    document.getElementById('ovl').classList.add('show');},
+  doFire(r,c){
+    this.fired=true;
+    let shape='single';if(this.armed){shape=this.armed.card.id;this.armed=null;this.setHelp('Tap a cell to fire.');this.banner('');}
+    let cost=1;if(this.firstSalvoFree){cost=0;this.firstSalvoFree=false;this.log('<span class="am">Voss:</span> first salvo free.');}
+    this.fireShape(shape,r,c);this.shots-=cost;this.render();
+    if(this.enemy.alive<=0)return this.victory();
+    this.checkAuto();
+  },
+  fireShape(shape,r,c){let cells=[[r,c]];
+    if(shape==='spread')cells=[[r,c-1],[r,c],[r,c+1]];
+    else if(shape==='torpedo')cells=[[r-1,c],[r,c],[r+1,c]];
+    else if(shape==='depthcharge')cells=[[r,c],[r,c+1],[r+1,c],[r+1,c+1]];
+    else if(shape==='nuke')cells=[[r-1,c-1],[r-1,c],[r-1,c+1],[r,c-1],[r,c],[r,c+1],[r+1,c-1],[r+1,c],[r+1,c+1]];
+    else if(shape==='pinpoint'){const f=[];for(let cc=0;cc<this.cols;cc++){const t=this.enemy.grid[r][cc];if(t.ship&&!t.shot)f.push([r,cc]);}cells=f.length?[f[0]]:[[r,c]];this.log('<span class="am">Pinpoint</span> on row '+(r+1)+'.');}
+    if(shape!=='single'&&shape!=='pinpoint')this.log(`<span class="am">${cardById(shape).name}!</span>`);
+    let any=false;cells.forEach(([rr,cc])=>{if(rr<0||cc<0||rr>=this.rows||cc>=this.cols)return;if(!this.enemy.grid[rr][cc].shot){this.fireOne(rr,cc);any=true;}});
+    if(!any)this.flash('Those cells were already fired.','am');},
+  fireOne(r,c){const t=this.enemy.grid[r][c];if(t.shot)return;t.shot=true;t.sonar=null;t.seen=this.turn;
+    if(t.ship){t.hit=true;const s=t.shipRef;const wasDmg=s.hits>0;s.hits++;this.stats.hits++;
+      let add=10;if(this.player.ships.find(x=>x.name==='Battleship'&&!x.sunk))add+=5;
+      if(this.hasRelic('targeting'))add*=1.5;if(this.overkill&&wasDmg)add*=2;
+      this.chips+=Math.round(add);const inc=(this.hasRelic('combo')?0.3:0.2)+0.05*this.streak;this.mult+=inc;this.streak++;
+      if(this.mult>this.stats.bestMult)this.stats.bestMult=this.mult;if(this.hasRelic('salvage'))this.addGold(3);
+      this.render();const p=FX.atCell('enemy-grid',r,c);if(p){FX.popup(p.x,p.y,'+'+Math.round(add),'#ffd34d');FX.burst(p.x,p.y,'#ff7a2a',12);if(p.el)p.el.classList.add('pop');}Sound.hit();FX.shake();this.bump();
+      if(this.admiral.id==='yara'&&Math.random()<0.35){const ns=neighbors(r,c,this.rows,this.cols).filter(([rr,cc])=>!this.enemy.grid[rr][cc].shot);if(ns.length){const[nr,nc]=ns[Math.floor(Math.random()*ns.length)];this.log('<span class="am">Splash!</span>');this.fireOne(nr,nc);}}
+      if(this.chain){this.chain=false;this.shots+=1;this.log('<span class="am">Chain shot — +1 shot!</span>');}
+      if(s.hits>=s.len&&!s.sunk){s.sunk=true;s.cells.forEach(([rr,cc])=>this.enemy.grid[rr][cc].sunkx=true);this.enemy.alive--;this.stats.sinks++;
+        this.chips+=100;this.addGold(8+(this.hasRelic('marque')?5:0));if(this.hasRelic('predator'))this.mult+=1;
+        if(this.admiral.id==='kael')this.drawCards(1);
+        this.log(`<span class="gd">${s.name} revealed & SUNK!</span> +100 chips`);portrait('triumph');foePortrait('hit');
+        this.render();const q=FX.atCell('enemy-grid',r,c);if(q){FX.popup(q.x,q.y-24,s.name+' SUNK','#ff5a3c');FX.burst(q.x,q.y,'#ffd34d',24);}
+        s.cells.forEach(([rr,cc])=>{const e=FX.atCell('enemy-grid',rr,cc);if(e&&e.el)e.el.classList.add('reveal');});Sound.sink();this.bump();}
+      else this.log('<span class="gd">HIT</span> '+COLS[c]+(r+1)+' — but what did you hit?');
+    } else {this.streak=0;this.log('Splash — miss '+COLS[c]+(r+1)+'.');this.render();const p=FX.atCell('enemy-grid',r,c);if(p){FX.burst(p.x,p.y,'#4f9fd0',6);if(p.el)p.el.classList.add('pop');}Sound.miss();}},
+  ping(r,c){let f=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=this.rows||cc>=this.cols)continue;const t=this.enemy.grid[rr][cc];if(t.shot)continue;if(t.ship){t.sonar='ship';f++;}else t.sonar='empty';t.seen=this.turn;}this.log(`<span class="gd">Ping</span> ${COLS[c]}${r+1}: ${f?('<b>'+f+'</b> contact'+(f>1?'s':'')):'clear'}.`);Sound.draw();},
+  wideScan(r){let f=0;for(let c=0;c<this.cols;c++){const t=this.enemy.grid[r][c];if(t.shot)continue;if(t.ship){t.sonar='ship';f++;}else t.sonar='empty';t.seen=this.turn;}this.log(`<span class="gd">Wide scan</span> row ${r+1}: <b>${f}</b> hull cells.`);Sound.draw();},
+
+  /* ---------- TURN-FLOW AUTO ADVANCE ---------- */
+  checkAuto(){if(this.phase!=='combat')return;const noShots=this.shots<=0;const noCards=this.fired||this.hand.every(k=>!this.canAfford(k));
+    if(noShots&&noCards&&!this.targeting){this.startAuto();}},
+  startAuto(){this.clearAuto();const b=document.getElementById('btn-end');b.classList.add('auto');b.textContent='Ending turn…';
+    this.autoT=setTimeout(()=>{this.autoT=null;if(this.phase==='combat'&&this.shots<=0&&(this.fired||this.hand.every(k=>!this.canAfford(k)))&&!this.targeting)this.endTurn();else this.clearAuto();},1250);},
+  clearAuto(){if(this.autoT){clearTimeout(this.autoT);this.autoT=null;}const b=document.getElementById('btn-end');if(b){b.classList.remove('auto');b.textContent='End Turn ▸';}},
+
+  /* ---------- ENEMY ---------- */
+  endTurn(){if(this.phase!=='combat')return;this.clearAuto();if(this.targeting){this.targeting=null;this.setHelp('Tap a cell to fire.');this.banner('');}this.armed=null;
+    this.discard.push(...this.hand);this.hand=[];this.log('<span class="ln">You end the turn.</span>');this.enemyTurn();},
+  enemyTurn(){
+    this.turn=(this.turn||1);
+    if(this.invis>0){this.invis--;this.log(`<span class="gd">Dead Man's Course</span> — the enemy fires blind into the fog. (${this.invis} turns left)`);return this.afterEnemy();}
+    if(this.smoke){this.smoke=false;this.log('<span class="gd">Smoke screen</span> — enemy fires blind, misses entirely.');return this.afterEnemy();}
+    let shots=this.enemyShots;if(this.faction.ai==='adaptive'){this.adaptiveBoost++;shots+=Math.floor(this.adaptiveBoost/2);}
+    if(this.ascEscalate){this.adaptiveBoost++;shots+=Math.floor(this.adaptiveBoost/3);}
+    let waste=this.decoyWaste;this.decoyWaste=0;
+    for(let i=0;i<shots;i++){if(this.player.alive<=0)break;
+      if(waste>0){waste--;this.log('<span class="am">Enemy hits a decoy</span> — wasted.');Sound.miss();continue;}
+      if(this.hasRelic('fog')&&Math.random()<0.25){this.log('<span class="gd">Fog</span> — enemy shot lost.');continue;}
+      const cell=this.aiPick();if(!cell)break;const[r,c]=cell;
+      // ghost decoy
+      const gi=this.ghosts.findIndex(g=>g.r===r&&g.c===c);
+      if(gi>=0){this.ghosts.splice(gi,1);this.log('<span class="am">Enemy fires on a ghost hull</span> — it absorbs the hit and fades.');this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'GHOST','#b9aef5');Sound.miss();continue;}
+      const t=this.player.grid[r][c];t.shot=true;t.seen=this.turn;neighbors(r,c,this.rows,this.cols).forEach(([rr,cc])=>this.player.grid[rr][cc].seen=this.turn);
+      if(t.ship){
+        if(this.evade&&Math.random()<0.5){this.log(`<span class="gd">Evaded</span> ${COLS[c]}${r+1}.`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'DODGE','#3ee08a');Sound.draw();continue;}
+        if(this.ironHull>0){this.ironHull--;t.deflect=true;this.log(`<span class="gd">Blocked</span> ${COLS[c]}${r+1}. (${this.ironHull} left)`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'BLOCK','#ffc23c');Sound.draw();continue;}
+        t.hit=true;const s=t.shipRef;s.hits++;this.ai.targets.push(...neighbors(r,c,this.rows,this.cols).filter(([rr,cc])=>!this.player.grid[rr][cc].shot));
+        this.render();const p=FX.atCell('player-grid',r,c);if(p){FX.burst(p.x,p.y,'#ff5a3c',12);if(p.el)p.el.classList.add('pop');}Sound.hit();FX.shake();
+        if(s.hits>=s.len&&!s.sunk){s.sunk=true;s.cells.forEach(([rr,cc])=>this.player.grid[rr][cc].sunkx=true);this.player.alive--;this.ai.targets=[];this.log(`<span class="bd">Your ${s.name} was SUNK!</span>`);if(p)FX.popup(p.x,p.y-24,'LOST','#ff7a78');portrait('grimace');foePortrait('triumph');Sound.sink();}
+        else {this.log(`<span class="bd">Enemy HIT</span> ${COLS[c]}${r+1}.`);portrait('hit');}
+      } else {this.log(`Enemy misses ${COLS[c]}${r+1}.`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.burst(p.x,p.y,'#4f9fd0',5);Sound.miss();}
+    }
+    this.afterEnemy();
+  },
+  afterEnemy(){this.evade=false;if(this.player.sync)this.player.sync();if(this.player.alive<=0){this.render();return this.defeat();}this.turn++;this.startTurn(false);this.render();},
+  aiPick(){
+    while(this.ai.targets.length){const[r,c]=this.ai.targets.pop();if(!this.player.grid[r][c].shot)return[r,c];}
+    if(this.faction.ai==='sniper'){const big=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>b.len-a.len)[0];
+      if(big){const cand=[];big.cells.forEach(([r,c])=>{if(!this.player.grid[r][c].shot)cand.push([r,c]);neighbors(r,c,this.rows,this.cols).forEach(([rr,cc])=>{if(!this.player.grid[rr][cc].shot)cand.push([rr,cc]);});});if(cand.length&&Math.random()<0.6)return cand[Math.floor(Math.random()*cand.length)];}}
+    const opts=[];for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.player.grid[r][c];if(t.shot)continue;if(this.faction.ai==='hunter'&&(r+c)%2!==0)continue;opts.push([r,c]);}
+    const pool=opts.length?opts:allUnshot(this.player);if(!pool.length)return null;return pool[Math.floor(Math.random()*pool.length)];},
+
+  /* ---------- SCORING ---------- */
+  addGold(n){let g=n;if(this.hasRelic('anchor'))g=Math.round(g*1.25);this.gold+=g;this.renderTop();Sound.coin();},
+  bump(){const el=document.getElementById('scorehud');el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');this.renderScore();},
+  renderScore(){document.getElementById('h-chips').textContent=Math.round(this.chips);document.getElementById('h-mult').textContent=this.mult.toFixed(1);},
+
+  /* ---------- VICTORY ---------- */
+  victory(){this.clearAuto();this._sigShown=false;if(this.player.sync)this.player.sync();
+    if(this.hasRelic('shipwright'))this.fleet.forEach(s=>{if(s.hits>0)s.hits--;});
+    let bonus=0;const lines=[];const base=Math.round(this.chips*this.mult);
+    if(this.hasRelic('charm')){const lc=Math.max(0,this.shots)*40;bonus+=lc;if(lc)lines.push(['Lucky Charm','+'+lc]);}
+    const intact=this.player.ships.filter(s=>!s.sunk&&s.hits===0).length;const ib=intact*60;bonus+=ib;if(ib)lines.push([intact+' pristine hulls','+'+ib]);
+    const kb={boss:500,elite:200,scout:0,standard:80}[this.battleKind]||0;bonus+=kb;if(kb)lines.push([this.battleKind.toUpperCase(),'+'+kb]);
+    const total=base+bonus;this.runScore+=total;if(total>this.stats.bestBattle)this.stats.bestBattle=total;
+    this.addGold(({boss:55,elite:35,scout:8,standard:15})[this.battleKind]||15);
+    this.battlesWon++;this.actBattle++;this.renderTop();Sound.win();portrait('victory');foePortrait('grimace');
+    this.showTally(base,bonus,total);},
+  showTally(base,bonus,total){const m=document.getElementById('modal');
+    const extra=[];if(bonus){extra.push(`<div class="row"><span>Bonuses</span><span>+${bonus}</span></div>`);}
+    m.innerHTML=`<h2 class="win">${this.battleKind==='boss'?'BOSS DOWN':'NODE CLEARED'}</h2>
+      <div class="tally"><div class="row"><span>Chips</span><span class="cc">${Math.round(this.chips)}</span></div>
+      <div class="row"><span>Mult</span><span class="mm">×${this.mult.toFixed(1)}</span></div>
+      <div class="row"><span>Base</span><span>${base}</span></div>${extra.join('')}
+      <div class="big" id="tt">+0</div></div>
+      <p>Run score <b>${this.runScore.toLocaleString()}</b> · Gold <b>${this.gold}</b></p><div id="rz"></div>`;
+    document.getElementById('ovl').classList.add('show');
+    let cur=0;const step=Math.max(1,Math.round(total/30));const tEl=m.querySelector('#tt');
+    const iv=setInterval(()=>{cur=Math.min(total,cur+step);tEl.textContent='+'+cur.toLocaleString();Sound.draw();if(cur>=total){clearInterval(iv);this.showReward();}},26);},
+  showReward(){
+    const z=document.getElementById('rz');const give=(this.battleKind==='elite'||this.battleKind==='boss');
+    const sig=SIGS[this.admiral.id];
+    if(give&&sig&&this.admiral.id!=='blacktide'&&!this.deck.some(k=>k.id===sig.id)&&!this._sigShown){this._sigShown=true;
+      z.innerHTML=`<div style="font-size:.78rem;color:var(--omega);margin:6px 0">⭐ SIGNATURE CARD — claim your flagship move</div><div class="rewards" id="rzz"></div><button class="btn btn-end btn-sm" onclick="game.showReward()">Decline ▸</button>`;
+      const rz=z.querySelector('#rzz');const el=document.createElement('div');el.className='card';el.style.animation='none';el.innerHTML=cardInner(sig);el.onclick=()=>{this.deck.push({...sig});Sound.card();this.afterReward();};rz.appendChild(el);return;}
+    // fleet unlock milestones
+    let fleetReward=null;
+    if(this.battleKind==='boss'&&this.act===1&&!this.fleet.find(s=>s.name==='Battleship'))fleetReward='Battleship';
+    else if(this.battleKind==='boss'&&this.act===2&&!this.fleet.find(s=>s.name==='Carrier'))fleetReward='Carrier';
+    else if(this.battlesWon===2&&!this.fleet.find(s=>s.name==='Submarine'))fleetReward='choice';
+    if(fleetReward==='choice'){
+      z.innerHTML=`<div style="font-size:.78rem;color:#9fc2dd;margin:6px 0">FLEET MILESTONE — CHOOSE ONE</div><div class="choices">
+        <div class="choice" onclick="game.grantShip('Submarine')"><div class="ct">🚢 +1 Submarine (3t)</div><div class="cd">A third hull — more board presence & a turn-start scout.</div></div>
+        <div class="choice" onclick="game.grantPermShot()"><div class="ct">🎯 +1 Shot / turn (permanent)</div><div class="cd">Pure aggression. Every turn, forever.</div></div></div>`;
+      return;}
+    if(fleetReward){z.innerHTML=`<div style="font-size:.78rem;color:#9fc2dd;margin:6px 0">NEW FLEET SLOT</div>
+      <div class="choices"><div class="choice" onclick="game.grantShip('${fleetReward}')"><div class="ct">⚓ +1 ${fleetReward} (${SHIP_DEFS[fleetReward]}t)</div><div class="cd">Your fleet grows. It will deploy next battle.</div></div></div>`;return;}
+    if(give){const owned=this.relics.map(r=>r.id);const picks=shuffle(RELICS.filter(r=>!owned.includes(r.id))).slice(0,3);
+      z.innerHTML=`<div style="font-size:.78rem;color:#9fc2dd;margin:6px 0">CLAIM A RELIC</div><div class="rewards" id="rzz"></div><button class="btn btn-end btn-sm" onclick="game.afterReward()">Skip ▸</button>`;
+      const rz=z.querySelector('#rzz');picks.forEach(r=>{const el=document.createElement('div');el.className='relic-card';el.style.cursor='pointer';el.innerHTML=`<div class="ri">${r.ic}</div><div class="rn">${r.name}</div><div class="rd">${r.ds}</div>`;el.onclick=()=>{this.addRelic(r.id);Sound.coin();this.afterReward();};rz.appendChild(el);});
+    } else {const picks=shuffle(weightedCards()).slice(0,3);
+      z.innerHTML=`<div style="font-size:.78rem;color:#9fc2dd;margin:6px 0">DRAFT A CARD</div><div class="rewards" id="rzz"></div><button class="btn btn-end btn-sm" onclick="game.afterReward()">Skip ▸</button>`;
+      const rz=z.querySelector('#rzz');picks.forEach(c=>{const el=document.createElement('div');el.className='card';el.style.animation='none';el.innerHTML=cardInner(c);el.onclick=()=>{this.deck.push({...c});Sound.card();this.afterReward();};rz.appendChild(el);});}
+  },
+  grantShip(name){this.fleet.push({name,len:SHIP_DEFS[name],hits:0,sunk:false});this.toast('+1 '+name+' joins your fleet');Sound.coin();this.afterReward();},
+  grantPermShot(){this.permShot+=1;this.toast('+1 permanent shot/turn');Sound.coin();this.afterReward();},
+  afterReward(){this.closeModal();this.finishNode();},
+  recordRun(win){if(this._recorded)return;this._recorded=true;const d=Meta.data;d.runs++;if(win){d.wins++;if(!this.usedSonar)d.sonarless=true;d.asc=Math.max(d.asc,Math.min(5,(this.ascension||0)+1));}if(this.runScore>d.best)d.best=this.runScore;this.recordDaily();Meta.save();},
+  runComplete(){this.recordRun(true);const m=document.getElementById('modal');m.innerHTML=`<h2 class="win">VICTORY — ALL SEAS CLEARED</h2><p>You broke all three acts and their bosses. A legendary run.</p>${this.summary()}<button class="btn btn-go" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');Sound.win();},
+  defeat(){this.recordRun(false);Sound.lose();this.clearAuto();const m=document.getElementById('modal');m.innerHTML=`<h2 class="lose">FLEET LOST</h2><p>Sunk in Act ${this.act} by the ${this.faction?this.faction.name:'sea'}.</p>${this.summary()}<button class="btn btn-fire" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');this.phase='dead';},
+  summary(){return `<div class="tally"><div class="big" style="font-size:1.8rem">${this.runScore.toLocaleString()}</div>
+    <div class="row"><span>Admiral</span><span>${this.admiral.name}</span></div>
+    <div class="row"><span>Best battle</span><span>${this.stats.bestBattle.toLocaleString()}</span></div>
+    <div class="row"><span>Peak Mult</span><span class="mm">×${this.stats.bestMult.toFixed(1)}</span></div>
+    <div class="row"><span>Hulls sunk</span><span>${this.stats.sinks}</span></div>
+    <div class="row"><span>Relics</span><span>${this.relics.map(r=>r.ic).join(' ')||'—'}</span></div></div>`;},
+  restart(){if(Pirate.loop){clearInterval(Pirate.loop);Pirate.loop=null;}_seeded=null;this.dailyActive=false;this.closeModal();this.renderTitle();this.show('title');document.getElementById('relics').innerHTML='';['s-act','s-gold','s-score'].forEach(id=>document.getElementById(id).textContent=id==='s-act'?'—':'0');},
+
+  /* ---------- SHOP / EVENT / REST / TREASURE ---------- */
+  openShop(){const cards=shuffle(weightedCards()).slice(0,3);const owned=this.relics.map(r=>r.id);const relic=shuffle(RELICS.filter(r=>!owned.includes(r.id)))[0];this.shopState={cards,relic,bought:[]};this.renderShop();this.show('sheet');},
+  renderShop(){const s=document.getElementById('sheet');const st=this.shopState;
+    const cardHtml=st.cards.map((c,i)=>{const price=cardPrice(c);const sold=st.bought.includes('c'+i);return `<div class="buy ${sold?'sold':''}"><div onclick="game.buyCard(${i})">${cardEl(c)}</div><div class="price">${sold?'SOLD':'🪙 '+price}</div></div>`;}).join('');
+    const relicHtml=st.relic?`<div class="buy ${st.bought.includes('r')?'sold':''}"><div class="relic-card" onclick="game.buyRelic()"><div class="ri">${st.relic.ic}</div><div class="rn">${st.relic.name}</div><div class="rd">${st.relic.ds}</div></div><div class="price">${st.bought.includes('r')?'SOLD':'🪙 '+relicPrice()}</div></div>`:'';
+    s.innerHTML=`<h2 style="color:var(--gold)">🪙 SMUGGLER'S WHARF</h2><div class="desc">Spend gold. Thinning your deck is power — remove a card for 🪙 30.</div>
+      <div class="shop-row">${cardHtml}</div><div class="shop-row">${relicHtml}</div>
+      <div class="choices"><div class="choice" onclick="game.removeMenu()"><div class="ct">🗑️ Remove a card — 🪙 30</div><div class="cd">Trim a weak card.</div></div></div>
+      <button class="btn btn-go" style="margin-top:14px" onclick="game.finishNode()">Leave Wharf ▸</button>`;},
+  buyCard(i){const st=this.shopState;if(st.bought.includes('c'+i))return;const p=cardPrice(st.cards[i]);if(this.gold<p){this.toast('Not enough gold');return;}this.gold-=p;this.deck.push({...st.cards[i]});st.bought.push('c'+i);Sound.coin();this.renderTop();this.renderShop();},
+  buyRelic(){const st=this.shopState;if(st.bought.includes('r'))return;const p=relicPrice();if(this.gold<p){this.toast('Not enough gold');return;}this.gold-=p;this.addRelic(st.relic.id);st.bought.push('r');Sound.coin();this.renderTop();this.renderShop();},
+  removeMenu(){if(this.gold<30){this.toast('Need 🪙 30');return;}const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--gold)">🗑️ REMOVE A CARD</h2><div class="desc">Scrap one (🪙 30).</div><div class="rewards" id="rm"></div><button class="btn btn-end" onclick="game.renderShop()">Cancel</button>`;
+    const z=s.querySelector('#rm');this.deck.forEach((c,i)=>{const el=document.createElement('div');el.className='card';el.style.animation='none';el.innerHTML=cardInner(c);el.onclick=()=>{this.gold-=30;this.deck.splice(i,1);Sound.coin();this.renderTop();this.renderShop();};z.appendChild(el);});},
+  openEvent(){const events=[
+      {t:'DERELICT FREIGHTER',d:'A ghost ship drifts in the fog.',ch:[{ct:'Salvage the hold',cd:'+45 gold',fn:()=>this.addGold(45)},{ct:'Strip its guns',cd:'Random Ordnance card',fn:()=>this.grantCard('ORDNANCE')},{ct:'Scuttle for parts',cd:'Repair 2 hull damage',fn:()=>this.repairFleet(2)}]},
+      {t:'MUTINOUS CREW',d:'Half want plunder, half want safe passage.',ch:[{ct:'Promise plunder',cd:'+60 gold, take 1 damage',fn:()=>{this.addGold(60);this.damageFleet(1);}},{ct:'Keep discipline',cd:'Random Repair card',fn:()=>this.grantCard('REPAIR')}]},
+      {t:'BLACK MARKET BUOY',d:'A cache blinks with contraband.',ch:[{ct:'Crack it open',cd:'Random relic',fn:()=>this.grantRelic()},{ct:'Sell the coords',cd:'+35 gold',fn:()=>this.addGold(35)}]},
+      {t:'STORM FRONT',d:'A squall — cover, or a battering.',ch:[{ct:'Sail through',cd:'Sonar card, risk 1 damage',fn:()=>{this.grantCard('SONAR');if(Math.random()<.5)this.damageFleet(1);}},{ct:'Wait it out',cd:'Repair all damage',fn:()=>this.repairFleet(99)}]},
+    ];this.eventState=events[Math.floor(Math.random()*events.length)];const ev=this.eventState;const s=document.getElementById('sheet');
+    s.innerHTML=`<h2 style="color:var(--son)">📜 ${ev.t}</h2><div class="desc">${ev.d}</div><div class="choices" id="ev"></div>`;
+    const z=s.querySelector('#ev');ev.ch.forEach(c=>{const el=document.createElement('div');el.className='choice';el.innerHTML=`<div class="ct">${c.ct}</div><div class="cd">${c.cd}</div>`;el.onclick=()=>{c.fn();this.eventDone(c);};z.appendChild(el);});this.show('sheet');},
+  eventDone(c){const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--son)">📜 ${this.eventState.t}</h2><div class="desc">You chose: <b>${c.ct}</b>. ${c.cd}.</div><button class="btn btn-go" onclick="game.finishNode()">Continue ▸</button>`;},
+  grantCard(cat){const c=shuffle(LIB.filter(x=>x.cat===cat))[0];this.deck.push({...c});this.toast('Gained '+c.name);},
+  grantRelic(){const owned=this.relics.map(r=>r.id);const r=shuffle(RELICS.filter(x=>!owned.includes(x.id)))[0];if(r)this.addRelic(r.id);},
+  repairFleet(n){let left=n;this.fleet.forEach(s=>{while(left>0&&s.hits>0){s.hits--;left--;}if(s.sunk&&s.hits<s.len)s.sunk=false;});this.toast('Hull repaired');},
+  damageFleet(n){const live=this.fleet.filter(s=>!s.sunk);for(let k=0;k<n&&live.length;k++){const s=live[Math.floor(Math.random()*live.length)];s.hits=Math.min(s.len,s.hits+1);if(s.hits>=s.len)s.sunk=true;}if(this.fleet.every(s=>s.sunk))this.defeat();},
+  openRest(){const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--man)">🛠 DRY DOCK</h2><div class="desc">A quiet harbor. Patch hulls or refit.</div>
+    <div class="choices"><div class="choice" onclick="game.restRepair()"><div class="ct">🔧 Full Repair</div><div class="cd">Remove all hull damage.</div></div>
+    <div class="choice" onclick="game.restCard()"><div class="ct">⚒️ Salvage Yard</div><div class="cd">Gain a free random card.</div></div>
+    <div class="choice" onclick="game.addGold(40);game.finishNode()"><div class="ct">💰 Trade Run</div><div class="cd">+40 gold.</div></div></div>`;this.show('sheet');},
+  restRepair(){this.repairFleet(99);this.toast('Fleet fully repaired');this.finishNode();},
+  restCard(){const c=shuffle(weightedCards())[0];this.deck.push({...c});this.toast('Gained '+c.name);this.finishNode();},
+  openTreasure(){const s=document.getElementById('sheet');const owned=this.relics.map(r=>r.id);const picks=shuffle(RELICS.filter(r=>!owned.includes(r.id))).slice(0,2);
+    s.innerHTML=`<h2 style="color:var(--gold)">💎 SUNKEN CACHE</h2><div class="desc">Take one prize, and 🪙 30.</div><div class="rewards" id="tz"></div>`;this.addGold(30);
+    const z=s.querySelector('#tz');picks.forEach(r=>{const el=document.createElement('div');el.className='relic-card';el.style.cursor='pointer';el.innerHTML=`<div class="ri">${r.ic}</div><div class="rn">${r.name}</div><div class="rd">${r.ds}</div>`;el.onclick=()=>{this.addRelic(r.id);Sound.coin();this.finishNode();};z.appendChild(el);});
+    if(!picks.length)s.innerHTML+=`<button class="btn btn-go" onclick="game.finishNode()">Take the gold ▸</button>`;this.show('sheet');},
+
+  /* ---------- RENDER ---------- */
+  show(which){['title','map','place','combat','sheet','pirate'].forEach(id=>document.getElementById(id).classList.toggle('hidden',id!==which));document.getElementById('relics').classList.toggle('hidden',which==='title');document.getElementById('cmdrs').classList.toggle('hidden',!(which==='combat'||which==='pirate'));if(which!=='pirate'&&Pirate.loop){clearInterval(Pirate.loop);Pirate.loop=null;}},
+  renderTop(){document.getElementById('s-act').textContent=this.act?this.act+'/3':'—';document.getElementById('s-gold').textContent=this.gold;document.getElementById('s-score').textContent=this.runScore.toLocaleString();this.renderRelics();},
+  renderRelics(){const el=document.getElementById('relics');if(!this.relics||!this.relics.length){el.innerHTML='<span class="empty">No relics yet — clear elites & bosses to earn them.</span>';return;}el.innerHTML=this.relics.map(r=>`<div class="relic">${r.ic}<div class="tip"><b>${r.name}</b><br>${r.ds}</div></div>`).join('');},
+  banner(t){const b=document.getElementById('selbanner');b.textContent=t;b.classList.toggle('show',!!t);},
+  render(){this.renderTop();if(this.phase!=='combat')return;
+    document.getElementById('s-shots').textContent=this.shots;document.getElementById('s-enemyships').textContent=this.enemy.alive;
+    const ed=document.getElementById('energy');ed.innerHTML='';for(let i=0;i<this.maxEnergy;i++){const d=document.createElement('span');d.className='dot'+(i<this.energy?' on':'');ed.appendChild(d);}
+    this.renderScore();this.renderGrid('enemy-grid',this.enemy,true);this.renderGrid('player-grid',this.player,false);this.renderRoster();this.renderFleet();this.renderHand();},
+  renderGrid(id,board,isEnemy){const g=document.getElementById(id);let html='';
+    for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=board.grid[r][c];let cls='cell',inner='';
+      if(isEnemy){
+        if(t.sunkx){cls+=' sunkx';inner=hullGlyph(t,r,c);}        // shape revealed only when sunk (fog)
+        else if(t.hit){cls+=' dmg';}                              // hit = ● marker only
+        else if(t.shot)cls+=' miss';
+        else if(t.sonar==='ship')cls+=' sonarship';
+        else if(t.sonar==='empty')cls+=' sonar';
+        else cls+=' fog';
+        const ev=`onclick="game.boardClick(${r},${c})"`;html+=`<div class="${cls}" data-r="${r}" data-c="${c}" ${ev}>${inner}</div>`;
+      } else {
+        const ghost=this.ghosts&&this.ghosts.some(gg=>gg.r===r&&gg.c===c);
+        const foggy=this.hardMode&&!t.hit&&!t.sunkx&&((this.turn-(t.seen||0))>=4);
+        if(foggy){cls+=' fog';}
+        else if(t.sunkx){cls+=' sunkx';inner=hullGlyph(t,r,c);}
+        else if(t.hit){cls+=' shiphit';inner=hullGlyph(t,r,c)+'<div class="fire"></div>';}
+        else if(t.ship){cls+=' ship';inner=hullGlyph(t,r,c);}
+        else if(ghost)cls+=' ghost';
+        if(!foggy&&t.shot&&!t.hit&&!t.ship)cls+=' miss';
+        if(t.deflect)cls+=' deflect';
+        html+=`<div class="${cls}" data-r="${r}" data-c="${c}">${inner}</div>`;
+      }}
+    g.style.setProperty('--cols',this.cols);g.innerHTML=html;},
+  renderRoster(){const el=document.getElementById('roster');el.innerHTML=this.enemy.ships.map(s=>s.sunk?`<span class="rchip sunk">${s.name} (${s.len}) ✓</span>`:`<span class="rchip">??? </span>`).join('');},
+  renderFleet(){const el=document.getElementById('fleet');el.innerHTML='';
+    this.player.ships.forEach(s=>{const pct=Math.max(0,100*(s.len-s.hits)/s.len);let b='b-ok',txt='Intact';if(s.sunk){b='b-sunk';txt='Sunk';}else if(s.hits>0){b='b-dmg';txt=`Hit ${s.hits}/${s.len}`;}
+      const d=document.createElement('div');d.className='fitem';d.innerHTML=`<span style="min-width:70px">${s.name} (${s.len})</span><span class="fbar"><span class="ffill" style="width:${pct}%"></span></span><span class="badge ${b}">${txt}</span>`;el.appendChild(d);});
+    if(this.ghosts&&this.ghosts.length){const d=document.createElement('div');d.className='fitem';d.innerHTML=`<span style="min-width:70px">👻 Ghosts</span><span class="fbar"></span><span class="badge b-ghost">${this.ghosts.length} active</span>`;el.appendChild(d);}},
+  renderHand(){const h=document.getElementById('hand');h.innerHTML='';
+    this.hand.forEach((c,i)=>{let cost=c.cost;if(this.admiral.id==='silas'&&c.cat==='DECOY')cost=0;const can=!this.fired&&cost<=this.energy;
+      const armed=(this.armed&&this.armed.idx===i)||(this.targeting&&this.targeting.idx===i);
+      const el=document.createElement('div');el.className='card'+(can?'':' cant')+(armed?' armed':'')+(this.dealAnim?' deal':'');el.style.animationDelay=this.dealAnim?(i*0.05)+'s':'';
+      el.innerHTML=cardInner(c,cost);el.onclick=()=>this.playCard(i,el);h.appendChild(el);});
+    this.dealAnim=false;document.getElementById('btn-end').disabled=false;},
+
+  /* ---------- misc ---------- */
+  toast(msg){const t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;left:50%;top:16%;transform:translateX(-50%);background:#0a2030;border:2px solid var(--gold);color:#ffe27a;padding:8px 16px;border-radius:10px;z-index:80;font-size:.82rem';document.body.appendChild(t);setTimeout(()=>t.remove(),1300);},
+  removeHand(i){this.hand.splice(i,1);},
+  setHelp(t){const e=document.getElementById('aim-help');if(e)e.textContent=t;},
+  toggleMute(){Sound.muted=!Sound.muted;document.getElementById('mute').textContent=Sound.muted?'🔇':'🔊';},
+  toggleMusic(){Music.on=!Music.on;document.getElementById('music').style.opacity=Music.on?'1':'.4';},
+  clearLog(){document.getElementById('log').innerHTML='';},
+  log(h){const l=document.getElementById('log');const d=document.createElement('div');d.className='ln';d.innerHTML=h;l.appendChild(d);l.scrollTop=l.scrollHeight;},
+  flash(h,cls){this.log(`<span class="${cls||''}">${h}</span>`);},
+  closeModal(){document.getElementById('ovl').classList.remove('show');},
+};
+
+/* ---- card render ---- */
+function cardInner(c,cost){const cc=(cost===0||cost)?cost:c.cost;return `<div class="cost">${cc}</div><div class="cat cat-${c.cat}" style="padding-top:3px">${c.cat}</div><div class="art">${ART[c.id]||'⚓'}</div><div class="nm">${c.name}</div><div class="ds">${c.ds}</div><div class="rar r-${c.rar}">${RAR_LABEL[c.rar]}</div>`;}
+function cardEl(c){return `<div class="card" style="animation:none">${cardInner(c)}</div>`;}
+function cardPrice(c){return ({common:35,rare:55,forge:65,contra:80,omega:110})[c.rar]||40;}
+function relicPrice(){return 90;}
+function weightedCards(){const w={common:5,rare:3,forge:2,contra:1,omega:1};const out=[];LIB.forEach(c=>{for(let i=0;i<w[c.rar];i++)out.push(c);});return out;}
+function hullGlyph(t,r,c){const s=t.shipRef;if(!s||s.cells.length===1)return '<div class="hull"></div>';
+  const horiz=s.cells[0][0]===s.cells[1][0];const idx=s.cells.findIndex(([rr,cc])=>rr===r&&cc===c);
+  let caps='';if(horiz){if(idx===0)caps=' cap-l';else if(idx===s.cells.length-1)caps=' cap-r';}else{if(idx===0)caps=' cap-t';else if(idx===s.cells.length-1)caps=' cap-b';}
+  const turret=(idx===Math.floor(s.cells.length/2))?'<div class="turret"></div>':'';return `<div class="hull${caps}"></div>${turret}`;}
+
+/* ---- board / fleet (variable grid) ---- */
+function emptyGrid(rows,cols){return Array.from({length:rows},()=>Array.from({length:cols},()=>({ship:false,shipRef:null,shot:false,hit:false,sonar:null,sunkx:false,deflect:false,seen:0})));}
+function cellsOf(s){const o=[];for(let i=0;i<s.len;i++)o.push(s.horiz?[s.r,s.c+i]:[s.r+i,s.c]);return o;}
+function placeFleet(defs,rows,cols){const fleet=[],occ=new Set();
+  for(const def of defs){let placed=false,g=0;while(!placed&&g++<900){const horiz=Math.random()<.5;
+    const maxR=horiz?rows:rows-def.len+1,maxC=horiz?cols-def.len+1:cols;if(maxR<=0||maxC<=0){
+      // ship too big for this orientation; force the other
+      const h2=!horiz;const mR=h2?rows:rows-def.len+1,mC=h2?cols-def.len+1:cols;if(mR<=0||mC<=0)break;
+      const r=Math.floor(Math.random()*mR),c=Math.floor(Math.random()*mC);const s={name:def.name,len:def.len,horiz:h2,r,c,hits:0,sunk:false};
+      if(cellsOf(s).some(([rr,cc])=>occ.has(rr+','+cc)))continue;cellsOf(s).forEach(([rr,cc])=>occ.add(rr+','+cc));fleet.push(s);placed=true;continue;}
+    const r=Math.floor(Math.random()*maxR),c=Math.floor(Math.random()*maxC);const s={name:def.name,len:def.len,horiz,r,c,hits:0,sunk:false};
+    if(cellsOf(s).some(([rr,cc])=>occ.has(rr+','+cc)))continue;cellsOf(s).forEach(([rr,cc])=>occ.add(rr+','+cc));fleet.push(s);placed=true;}}
+  return fleet;}
+function placeDeploy(deploy,rows,cols){const occ=new Set();
+  deploy.forEach(s=>{let placed=false,g=0;while(!placed&&g++<900){const horiz=Math.random()<.5;
+    const maxR=horiz?rows:rows-s.len+1,maxC=horiz?cols-s.len+1:cols;let hh=horiz,mR=maxR,mC=maxC;
+    if(mR<=0||mC<=0){hh=!horiz;mR=hh?rows:rows-s.len+1;mC=hh?cols-s.len+1:cols;}if(mR<=0||mC<=0)break;
+    const r=Math.floor(Math.random()*mR),c=Math.floor(Math.random()*mC);s.r=r;s.c=c;s.horiz=hh;
+    if(cellsOf(s).some(([rr,cc])=>occ.has(rr+','+cc)))continue;cellsOf(s).forEach(([rr,cc])=>occ.add(rr+','+cc));placed=true;}});}
+function bakeBoard(fleet,rows,cols){const grid=emptyGrid(rows,cols),ships=[];
+  fleet.forEach(f=>{const cells=cellsOf(f);const s={name:f.name,len:f.len,hits:0,sunk:false,cells};cells.forEach(([r,c])=>{grid[r][c].ship=true;grid[r][c].shipRef=s;});ships.push(s);});
+  return {grid,ships,alive:ships.length,rows,cols};}
+function bakeFromDeploy(deploy,rows,cols){const grid=emptyGrid(rows,cols),ships=[];let alive=0;
+  deploy.forEach(f=>{const cells=cellsOf(f);const s={name:f.name,len:f.len,hits:f.hits||0,sunk:false,cells,src:f.src};
+    cells.forEach(([r,c],i)=>{grid[r][c].ship=true;grid[r][c].shipRef=s;if(i<s.hits){grid[r][c].hit=true;grid[r][c].shot=true;}});ships.push(s);alive++;});
+  const board={grid,ships,alive,rows,cols};
+  board.sync=()=>{ships.forEach(s=>{if(s.src){s.src.hits=s.hits;s.src.sunk=s.sunk;}});};return board;}
+function relocateShip(board,ship,rows,cols){const occ=new Set();board.ships.forEach(o=>{if(o!==ship&&!o.sunk)o.cells.forEach(([r,c])=>occ.add(r+','+c));});
+  for(let g=0;g<400;g++){const horiz=Math.random()<.5;const maxR=horiz?rows:rows-ship.len+1,maxC=horiz?cols-ship.len+1:cols;if(maxR<=0||maxC<=0)continue;
+    const r=Math.floor(Math.random()*maxR),c=Math.floor(Math.random()*maxC);const cells=[];let ok=true;
+    for(let i=0;i<ship.len;i++){const rr=horiz?r:r+i,cc=horiz?c+i:c;if(occ.has(rr+','+cc)){ok=false;break;}cells.push([rr,cc]);}
+    if(!ok)continue;
+    ship.cells.forEach(([r0,c0])=>{const t=board.grid[r0][c0];t.ship=false;t.shipRef=null;t.hit=false;t.shot=false;t.sunkx=false;});
+    ship.cells=cells;ship.hits=0;cells.forEach(([rr,cc])=>{board.grid[rr][cc].ship=true;board.grid[rr][cc].shipRef=ship;});return true;}
+  return false;}
+function randomEmptyCell(board,ghosts,rows,cols){const taken=new Set();for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const t=board.grid[r][c];if(t.ship||t.shot)taken.add(r+','+c);}(ghosts||[]).forEach(g=>taken.add(g.r+','+g.c));
+  const free=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(!taken.has(r+','+c))free.push([r,c]);return free.length?free[Math.floor(Math.random()*free.length)]:null;}
+function neighbors(r,c,rows,cols){return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([rr,cc])=>rr>=0&&cc>=0&&rr<rows&&cc<cols);}
+function allUnshot(b){const o=[];for(let r=0;r<b.rows;r++)for(let c=0;c<b.cols;c++)if(!b.grid[r][c].shot)o.push([r,c]);return o;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+/* ---- enemy fleet sizing by grid + variant ---- */
+function enemyFleetFor(rows,cols,variant){
+  const cells=rows*cols,maxLen=Math.max(rows,cols);
+  const density=variant==='scout'?0.16:variant==='elite'?0.34:variant==='boss'?0.42:0.26;
+  let budget=Math.max(4,Math.round(cells*density));
+  const pool=[['Carrier',5],['Battleship',4],['Cruiser',3],['Submarine',3],['Destroyer',2]].filter(s=>s[1]<=maxLen);
+  const names=[];let used=0,guard=0;const cap=variant==='boss'?8:variant==='scout'?2:6;
+  while(used<budget&&guard++<30&&names.length<cap){const remaining=budget-used;const choices=pool.filter(s=>s[1]<=remaining+1);if(!choices.length)break;const pick=choices[Math.floor(Math.random()*choices.length)];names.push(pick[0]);used+=pick[1];}
+  while(names.length<2&&pool.length)names.push(pool[pool.length-1][0]);
+  if(!names.length)names.push('Destroyer');return names.map(n=>({name:n,len:SHIP_DEFS[n]}));}
+
+/* ---- map gen with node variance (Sprint 2) ---- */
+function pickNodeType(){const r=Math.random();
+  if(r<0.30)return 'standard';if(r<0.45)return 'scout';if(r<0.58)return 'elite';if(r<0.70)return 'ambush';
+  if(r<0.82)return 'event';if(r<0.91)return 'shop';if(r<0.97)return 'rest';return 'treasure';}
+function genMap(){const FLOORS=7,floors=[];
+  for(let f=0;f<FLOORS;f++){let nodes;
+    if(f===0)nodes=[{type:'scout'}];
+    else if(f===FLOORS-1)nodes=[{type:'boss'}];
+    else{const count=2+(Math.random()<0.5?1:0);nodes=[];for(let i=0;i<count;i++)nodes.push({type:pickNodeType()});}
+    floors.push(nodes.map((n,i)=>({type:n.type,f,i,links:[],done:false})));}
+  for(let f=0;f<FLOORS-1;f++){const cur=floors[f],nxt=floors[f+1];
+    cur.forEach((node,i)=>{const center=nxt.length===1?0:Math.round((i/Math.max(1,cur.length-1))*(nxt.length-1));
+      const set=new Set([center]);if(nxt.length>1&&Math.random()<0.6)set.add(clamp(center+(Math.random()<.5?-1:1),0,nxt.length-1));node.links=[...set];});
+    nxt.forEach((nn,j)=>{if(!cur.some(node=>node.links.includes(j))){let best=0,bd=99;cur.forEach((node,i)=>{const center=Math.round((i/Math.max(1,cur.length-1))*(nxt.length-1));const d=Math.abs(center-j);if(d<bd){bd=d;best=i;}});cur[best].links.push(j);}});}
+  return {floors,cur:null};}
+
+/* ============ ADMIRAL PORTRAITS (Sprint 4) ============ */
+const ADM_COAT={voss:'#26456b',kael:'#7a1f1f',silas:'#3a4a44',yara:'#5a2f5a',blacktide:'#3a2a12'};
+const FACE_FACTION={'Corsair Skiffs':'🏴‍☠️','Ghost Tide':'👻','Reef Swarm':'🦑','Iron Armada':'🛡️','Deepwatch Snipers':'🎯','Carrion Fleet':'☠️'};
+/* hand-built pixel-art portrait busts (SVG) */
+const PCFG={
+  voss:{skin:'#e3b48f',sk:'#bf8a5f',coat:'#26456b',cd:'#16304a',hair:'#5b4a32',hat:'tricorn',hatC:'#1b2f4a',acc:'#d9a82a',buttons:1,scope:1},
+  kael:{skin:'#dca87e',sk:'#b07a50',coat:'#7a1f1f',cd:'#4e1212',hair:'#1c1813',hat:'wild',hatC:'',acc:'#c9c2b8',scar:1},
+  silas:{skin:'#cabfa6',sk:'#9a8c6e',coat:'#2f3a36',cd:'#1c2420',hair:'',hat:'hood',hatC:'#3c4a44',acc:'#7a8a80',pale:1},
+  yara:{skin:'#caa07a',sk:'#9c734f',coat:'#5a2f5a',cd:'#3a1f3a',hair:'#1a1410',hat:'tie',hatC:'#7a2f4a',acc:'#d9a82a',epaul:1,grin:1},
+  blacktide:{skin:'#c79a72',sk:'#946843',coat:'#191515',cd:'#000000',hair:'#15110d',hat:'pirate',hatC:'#1a1414',acc:'#d9a82a',feather:1,scar:1,gold:1},
+  foe:{skin:'#b9c2c0',sk:'#8b9492',coat:'#3a1c1c',cd:'#240f0f',hair:'#0d0d0d',hat:'cap',hatC:'#222222',acc:'#7a3030',skull:1},
+};
+function pixelBust(id){const P=4,W=12,H=14,c=PCFG[id]||PCFG.foe,r=[];
+  const px=(x,y,w,h,col)=>r.push(`<rect x="${x*P}" y="${y*P}" width="${w*P}" height="${h*P}" fill="${col}"/>`);
+  px(1,11,10,3,c.coat);px(0,12,12,2,c.coat);px(1,11,10,1,c.cd);px(5,11,2,3,c.cd);
+  if(c.buttons){px(5,12,1,1,c.acc);px(6,13,1,1,c.acc);}
+  if(c.epaul){px(0,11,2,1,c.acc);px(10,11,2,1,c.acc);}
+  px(5,10,2,1,c.sk);
+  px(3,4,6,6,c.skin);px(8,4,1,6,c.sk);px(3,9,6,1,c.sk);
+  px(4,6,1,1,c.pale?'#1c3a44':'#10161c');px(7,6,1,1,c.pale?'#1c3a44':'#10161c');
+  if(c.grin)px(5,8,3,1,'#f1e6d6');else px(5,8,2,1,c.sk);
+  if(c.gold)px(5,8,1,1,c.acc);
+  if(c.scar)px(7,4,1,3,'#aa3333');
+  if(c.hat==='wild'){px(2,2,8,2,c.hair);px(2,3,1,4,c.hair);px(9,3,1,4,c.hair);px(3,3,6,1,c.hair);px(2,1,3,1,c.hair);px(7,1,3,1,c.hair);}
+  if(c.hat==='tricorn'){px(0,3,12,1,c.cd);px(1,3,10,1,c.hatC);px(3,1,6,2,c.hatC);px(4,0,4,1,c.hatC);px(5,1,2,1,c.acc);}
+  if(c.hat==='hood'){px(2,1,8,2,c.hatC);px(1,2,2,8,c.hatC);px(9,2,2,8,c.hatC);px(3,3,6,1,c.hatC);}
+  if(c.hat==='tie'){px(3,2,6,2,c.hair);px(2,3,1,3,c.hair);px(9,3,1,3,c.hair);px(8,2,3,1,c.acc);}
+  if(c.hat==='pirate'){px(0,3,12,1,c.hatC);px(1,2,10,1,c.hatC);px(3,1,6,1,c.hatC);px(2,2,2,1,c.acc);if(c.feather){px(9,0,1,3,'#cc4433');px(10,1,1,2,'#cc4433');}}
+  if(c.hat==='cap'){px(2,2,8,2,c.hatC);px(1,3,10,1,c.cd);if(c.skull){px(4,4,1,1,'#1a1a1a');px(7,4,1,1,'#1a1a1a');}}
+  if(c.scope){px(9,6,3,1,c.acc);px(11,5,1,3,'#cfe3f2');}
+  return `<svg viewBox="0 0 ${W*P} ${H*P}" width="100%" height="100%" shape-rendering="crispEdges" style="image-rendering:pixelated;display:block">${r.join('')}</svg>`;}
+function setupPortraits(){const adm=game.admiral;const p=document.getElementById('p-portrait'),e=document.getElementById('e-portrait');
+  if(p&&adm){p.style.setProperty('--coat',ADM_COAT[adm.id]||'#26456b');p.querySelector('.face').innerHTML=pixelBust(adm.id);p.querySelector('.cn').textContent=adm.name.replace(/^(Adm\.|Cmdr\.|Capt\.) /,'');p.className='portrait idle';}
+  if(e&&game.faction){e.style.setProperty('--coat','#3a1c1c');e.querySelector('.face').innerHTML=pixelBust('foe');e.querySelector('.cn').textContent=game.faction.name;e.className='portrait foe idle';}}
+function portrait(state){const el=document.getElementById('p-portrait');if(!el)return;el.className='portrait '+state;clearTimeout(portrait._t);if(state!=='victory'&&state!=='grimace')portrait._t=setTimeout(()=>{el.className='portrait idle';},1100);}
+function foePortrait(state){const el=document.getElementById('e-portrait');if(!el)return;el.className='portrait foe '+state;clearTimeout(foePortrait._t);foePortrait._t=setTimeout(()=>{el.className='portrait foe idle';},1100);}
+
+/* ============ SIGNATURE CUTSCENE (Sprint 4) ============ */
+function showCutscene(c,cb){
+  const seen=Meta.data.sigsSeen&&Meta.data.sigsSeen[c.id];
+  const cut=document.getElementById('cut'),art=document.getElementById('cutart');
+  art.innerHTML=`<div class="scene">${c.scene}</div><div class="cn">${c.name}</div>${seen?'':`<div class="cd">${c.sceneText}</div>`}`;
+  cut.classList.remove('flash');if(seen)cut.classList.add('flash');
+  cut.classList.add('show');Sound.win();FX.shake();
+  if(!seen){if(!Meta.data.sigsSeen)Meta.data.sigsSeen={};Meta.data.sigsSeen[c.id]=true;Meta.save();}
+  clearTimeout(showCutscene._t);
+  showCutscene._t=setTimeout(()=>{cut.classList.remove('show');cut.classList.remove('flash');if(cb)cb();},seen?1100:2900);
+}
+
+/* ============ PIRATE RTS BOARDING MODE ============ */
+const Pirate={
+  start(kind){
+    if(this.loop){clearInterval(this.loop);this.loop=null;}
+    this.kind=kind;this.rows=8;this.cols=8;this.tickN=0;this.maxEnergy=6;this.energy=4;this.paused=false;this.sel=null;this.over=false;
+    this.wind=this.rdir();this.windT=3;this.ships=[];this.bs=null;this.sunk=[];this.btUsed=false;this.smokeT=0;
+    game.faction={name:kind==='boss'?(BOSSES[game.act-1]||'Carrion Fleet'):['Corsair Skiffs','Reef Swarm','Ghost Tide'][Math.floor(Math.random()*3)],ai:'pirate'};
+    game.fleet.filter(s=>!s.sunk).forEach(s=>this.add(s.name,s.len,'p'));
+    const ec=kind==='scout'?2:kind==='boss'?5:kind==='elite'?4:3;
+    const types=[['Destroyer',2],['Cruiser',3],['Battleship',4],['Submarine',3],['Carrier',5]];
+    for(let i=0;i<ec;i++){const t=types[i%types.length];this.add(t[0],t[1],'e');}
+    this.place();this.buildUI();game.show('pirate');setupPortraits();
+    this.render();this.loop=setInterval(()=>this.tick(),2000);
+  },
+  rdir(){return ['N','S','E','W'][Math.floor(Math.random()*4)];},
+  add(name,len,owner){this.ships.push({name,owner,len,r:0,c:0,dir:null,hull:len,maxHull:len,crew:len,maxCrew:len,grapT:0,grapBy:null,boarding:false,captured:false,_dead:false});},
+  place(){const occ=new Set();this.ships.forEach(s=>{for(let g=0;g<300;g++){const r=s.owner==='p'?this.rows-1-(g%2):(g%2);const c=Math.floor(Math.random()*this.cols);if(occ.has(r+','+c))continue;occ.add(r+','+c);s.r=r;s.c=c;return;}});},
+  inb(r,c){return r>=0&&c>=0&&r<this.rows&&c<this.cols;},
+  occ(r,c,ex){return this.ships.find(s=>s!==ex&&s.hull>0&&s.r===r&&s.c===c);},
+  delta(d){return d==='N'?[-1,0]:d==='S'?[1,0]:d==='E'?[0,1]:d==='W'?[0,-1]:[0,0];},
+  opp(d){return {N:'S',S:'N',E:'W',W:'E'}[d];},
+  toward(a,b){if(Math.abs(b.r-a.r)>=Math.abs(b.c-a.c))return b.r<a.r?'N':b.r>a.r?'S':(b.c<a.c?'W':'E');return b.c<a.c?'W':'E';},
+  nearest(s,owner){let best=null,bd=1e9;this.ships.forEach(o=>{if(o.owner===owner&&o.hull>0){const d=Math.abs(o.r-s.r)+Math.abs(o.c-s.c);if(d<bd){bd=d;best=o;}}});return best;},
+  tick(){if(this.paused||this.over)return;this.tickN++;
+    if(this.energy<this.maxEnergy)this.energy++;
+    if(--this.windT<=0){this.wind=this.rdir();this.windT=3;this.log('🌬 Wind shifts '+this.wind+'.');}
+    this.ships.forEach(s=>{if(s.ttl!=null&&--s.ttl<=0){s.hull=0;this.log('A ghost ship fades back into the deep.');}});
+    // enemy AI heads to nearest ally
+    if(this.smokeT>0){this.smokeT--;this.log('💨 The enemy gropes blindly through the smoke.');}
+    else this.ships.filter(s=>s.owner==='e'&&s.hull>0).forEach(s=>{const t=this.nearest(s,'p');if(t)s.dir=this.toward(s,t);});
+    // grappled pull
+    this.ships.forEach(s=>{if(s.grapT>0&&s.grapBy&&s.grapBy.hull>0){const[dr,dc]=this.delta(this.toward(s,s.grapBy));const nr=s.r+dr,nc=s.c+dc;if(this.inb(nr,nc)&&!this.occ(nr,nc,s)){s.r=nr;s.c=nc;}s.grapT--;s.dir=null;}});
+    // movement
+    this.ships.filter(s=>s.hull>0&&s.dir&&s.grapT<=0).forEach(s=>{const[dr,dc]=this.delta(s.dir);const nr=s.r+dr,nc=s.c+dc;
+      if(!this.inb(nr,nc)){s.dir=null;return;}if(this.occ(nr,nc,s))return;
+      if(s.owner==='p'&&this.opp(this.wind)===s.dir){if(this.energy<=0)return;this.energy--;}
+      s.r=nr;s.c=nc;});
+    this.broadsides();this.resolve();this.render();},
+  broadsides(){if(this.bs)return;const adj=(a,b)=>Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1;
+    for(const p of this.ships.filter(s=>s.owner==='p'&&s.hull>0)){const e=this.ships.find(s=>s.owner==='e'&&s.hull>0&&adj(p,s));if(e){this.openBroadside(p,e);return;}}},
+  openBroadside(p,e){this.paused=true;this.bs={p,e};const n=18;const idx=shuffle([...Array(n).keys()]);const sec=Array(n).fill('');let k=0;
+    for(let i=0;i<e.hull&&k<n;i++)sec[idx[k++]]='H';for(let i=0;i<e.crew&&k<n;i++)sec[idx[k++]]='C';
+    this.bs.sec=sec;this.bs.shown=Array(n).fill(false);Sound.card();this.renderBroadside();},
+  renderBroadside(){const {p,e}=this.bs;const m=document.getElementById('modal');
+    let cells='';this.bs.sec.forEach((s,i)=>{const sh=this.bs.shown[i];let cls='bscell',t='';
+      if(sh){if(s==='H'){cls+=' hit';t='💥';}else if(s==='C'){cls+=' cc';t='⚑';}else{cls+=' miss';t='·';}}
+      cells+=`<div class="${cls}" onclick="Pirate.bsFire(${i})">${t}</div>`;});
+    m.innerHTML=`<h2 style="font-size:.85rem;color:var(--ord)">⚔ BROADSIDE</h2>
+      <p style="margin:4px 0">Your <b>${p.name}</b> grinds alongside the <b>${e.name}</b>. Tap sections — 💥 hull sinks her, ⚑ crew captures her. She fires back with every volley.</p>
+      <div class="bsbars"><div class="bsbar"><div class="lab">Your hull ${Math.max(0,p.hull)}/${p.maxHull}</div><div class="t"><i style="width:${100*Math.max(0,p.hull)/p.maxHull}%;background:#5fe0b0"></i></div></div>
+      <div class="bsbar"><div class="lab">${e.name}: hull ${Math.max(0,e.hull)} · crew ${Math.max(0,e.crew)}</div><div class="t"><i style="width:${100*Math.max(0,e.hull)/e.maxHull}%;background:#ff7a78"></i></div></div></div>
+      <div class="bsgrid">${cells}</div>
+      <button class="btn btn-end" onclick="Pirate.bsRetreat()">⚐ Disengage</button>`;
+    document.getElementById('ovl').classList.add('show');},
+  bsFire(i){if(!this.bs||this.bs.shown[i])return;this.bs.shown[i]=true;const {p,e}=this.bs;const s=this.bs.sec[i];
+    if(s==='H'){e.hull--;Sound.hit();}else if(s==='C'){e.crew--;Sound.hit();}else Sound.miss();
+    if(e.hull>0&&e.crew>0)p.hull--;this.bsCheck();},
+  bsCheck(){const {p,e}=this.bs;
+    if(e.crew<=0&&e.hull>0&&!e.captured){e.captured=true;e.owner='p';e.hull=1;e.crew=e.maxCrew;e.dir=null;e.boarding=false;game.fleet.push({name:e.name,len:e.len,hits:e.len-1,sunk:false});this.log('⚓ <b>Captured the '+e.name+'!</b> She flies your colours now.');portrait('triumph');foePortrait('grimace');Sound.sink();return this.closeBroadside();}
+    if(e.hull<=0){e._dead=true;e.hull=0;if(e.ttl==null)this.sunk.push({name:e.name,len:e.len,r:e.r,c:e.c});this.log('The '+e.name+' is blown apart at point-blank!');portrait('triumph');Sound.sink();return this.closeBroadside();}
+    if(p.hull<=0){p._dead=true;p.hull=0;if(p.ttl==null)this.sunk.push({name:p.name,len:p.len,r:p.r,c:p.c});this.log('Your '+p.name+' is lost in the exchange!');portrait('grimace');Sound.sink();return this.closeBroadside();}
+    this.renderBroadside();},
+  bsRetreat(){const {p,e}=this.bs;const away=this.opp(this.toward(p,e));const[dr,dc]=this.delta(away);const nr=p.r+dr,nc=p.c+dc;if(this.inb(nr,nc)&&!this.occ(nr,nc,p)){p.r=nr;p.c=nc;}this.log('Disengaged from the '+e.name+'.');this.closeBroadside();},
+  closeBroadside(){document.getElementById('ovl').classList.remove('show');this.bs=null;this.ships=this.ships.filter(s=>s.hull>0);if(this.sel&&this.sel.hull<=0)this.sel=null;this.paused=false;this.render();
+    const en=this.ships.filter(s=>s.owner==='e'&&s.hull>0).length,al=this.ships.filter(s=>s.owner==='p'&&s.hull>0).length;
+    if(en===0)this.win();else if(al===0)this.lose();},
+  resolve(){
+    this.ships.forEach(s=>{if(s.owner==='e'&&s.crew<=0&&s.hull>0&&!s.captured){s.captured=true;s.owner='p';s.hull=1;s.crew=Math.max(1,s.maxCrew);s.dir=null;s.boarding=false;this.log('⚓ <b>Captured the '+s.name+'!</b> It joins your fleet.');game.fleet.push({name:s.name,len:s.len,hits:s.len-1,sunk:false});portrait('triumph');foePortrait('grimace');Sound.sink();}});
+    this.ships.filter(s=>s.hull<=0&&!s._dead).forEach(s=>{s._dead=true;if(s.ttl==null)this.sunk.push({name:s.name,len:s.len,r:s.r,c:s.c});this.log((s.owner==='p'?'Your ':'Enemy ')+s.name+' sinks!');if(s.owner==='p'){portrait('grimace');}else{portrait('triumph');foePortrait('hit');}Sound.sink();});
+    this.ships=this.ships.filter(s=>s.hull>0);if(this.sel&&this.sel.hull<=0)this.sel=null;
+    const en=this.ships.filter(s=>s.owner==='e'&&s.hull>0).length,al=this.ships.filter(s=>s.owner==='p'&&s.hull>0).length;
+    if(en===0)this.win();else if(al===0)this.lose();},
+  buildUI(){document.getElementById('pirate').innerHTML=`<div class="pirate-wrap">
+    <div class="pmaphdr"><span>🏴‍☠️ BOARDING — ${game.faction.name}${this.kind==='boss'?' (BOSS)':''}</span><span id="p-wind">🌬 ${this.wind}</span><span>⚡<b id="p-energy">${this.energy}</b></span></div>
+    <div class="ocean" id="ocean"></div>
+    <div class="pctrl">
+      <div class="dpad"><button onclick="Pirate.setDir('N')">▲</button><div><button onclick="Pirate.setDir('W')">◀</button><button onclick="Pirate.setDir('stop')">■</button><button onclick="Pirate.setDir('E')">▶</button></div><button onclick="Pirate.setDir('S')">▼</button></div>
+      <div class="pacts">
+        <button class="btn btn-end btn-sm" onclick="Pirate.grapple()">🪝 Grapple ⚡2</button>
+        <button class="btn btn-end btn-sm" onclick="Pirate.windSurge()">🌬 Wind Surge ⚡1</button>
+        <button class="btn btn-end btn-sm" onclick="Pirate.chainVolley()">💥 Chain Volley ⚡2</button>
+        <button class="btn btn-end btn-sm" onclick="Pirate.patch()">🛠 Patch ⚡2</button>
+        <button class="btn btn-end btn-sm" onclick="Pirate.smokeBurst()">💨 Smoke ⚡2</button>
+        <button class="btn btn-end btn-sm" onclick="Pirate.toggleBoard()">🧗 Board/Broadside</button>
+        <button class="btn btn-gold btn-sm" onclick="Pirate.blackTideSig()">🌊 Black Tide ⚡3</button>
+        <button class="btn btn-end btn-sm" id="p-pause" onclick="Pirate.togglePause()">⏸ Pause</button>
+        <button class="btn btn-fire btn-sm" onclick="Pirate.flee()">⚐ Forfeit</button>
+      </div>
+    </div>
+    <div class="phint">Tap your ship (⛵) to select, steer with the pad (wind ⚡ costs against you). Drift alongside an enemy to broadside; toggle 🧗 to take crew & capture instead. Grapple drags a ship in for boarding.</div>
+    <div class="log" id="p-log" style="margin-top:8px"></div></div>`;},
+  render(){const e=document.getElementById('p-energy');if(e)e.textContent=this.energy;const w=document.getElementById('p-wind');if(w)w.textContent='🌬 '+this.wind;
+    const o=document.getElementById('ocean');if(!o)return;o.style.setProperty('--cols',this.cols);let html='';
+    for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const s=this.ships.find(x=>x.r===r&&x.c===c&&x.hull>0);let cls='ocell',inner='';
+      if(s){cls+=s.owner==='p'?' pship2':' eship2';if(s===this.sel)cls+=' selp';if(s.boarding)cls+=' boarding';
+        const a={N:'↑',S:'↓',E:'→',W:'←'}[s.dir]||'';
+        inner=`<span class="tok">${s.ttl!=null?'👻':s.captured?'🏴':s.owner==='p'?'⛵':'🚢'}</span><span class="hdg">${a}</span><span class="hp"><i style="width:${100*s.hull/s.maxHull}%"></i></span><span class="cw"><i style="width:${100*Math.max(0,s.crew)/s.maxCrew}%"></i></span>`;}
+      html+=`<div class="${cls}" onclick="Pirate.cellClick(${r},${c})">${inner}</div>`;}
+    o.innerHTML=html;},
+  cellClick(r,c){const s=this.ships.find(x=>x.r===r&&x.c===c&&x.hull>0);if(s&&s.owner==='p'){this.sel=s;this.render();return;}if(this.sel)this.setDir(this.toward(this.sel,{r,c}));},
+  setDir(d){if(!this.sel){game.toast('Select your ship first');return;}this.sel.dir=(d==='stop')?null:d;this.render();},
+  grapple(){if(!this.sel){game.toast('Select your ship');return;}const e=this.nearest(this.sel,'e');if(!e){game.toast('No enemy left');return;}if(Math.abs(e.r-this.sel.r)+Math.abs(e.c-this.sel.c)>3){game.toast('No enemy in grapple range (3)');return;}if(this.energy<2){game.toast('Need ⚡2');return;}this.energy-=2;e.grapT=3;e.grapBy=this.sel;this.log('🪝 Grappled the '+e.name+' — hauling it in!');Sound.card();this.render();},
+  toggleBoard(){if(!this.sel){game.toast('Select your ship');return;}this.sel.boarding=!this.sel.boarding;game.toast(this.sel.name+(this.sel.boarding?': BOARD (drains crew → capture)':': BROADSIDE (drains hull → sink)'));this.render();},
+  togglePause(){this.paused=!this.paused;const b=document.getElementById('p-pause');if(b)b.textContent=this.paused?'▶ Resume':'⏸ Pause';},
+  flee(){if(this.over)return;this.over=true;if(this.loop){clearInterval(this.loop);this.loop=null;}game.defeat();},
+  log(h){const l=document.getElementById('p-log');if(!l)return;const d=document.createElement('div');d.className='ln';d.innerHTML=h;l.appendChild(d);l.scrollTop=l.scrollHeight;},
+  chainVolley(){if(!this.sel){game.toast('Select a ship');return;}if(this.energy<2){game.toast('Need ⚡2');return;}const adj=this.ships.filter(s=>s.owner==='e'&&s.hull>0&&Math.abs(s.r-this.sel.r)+Math.abs(s.c-this.sel.c)===1);if(!adj.length){game.toast('No adjacent enemy');return;}this.energy-=2;adj.forEach(e=>e.hull--);this.log('💥 Chain volley rakes '+adj.length+' hull(s)!');Sound.hit();this.resolve();this.render();},
+  patch(){if(!this.sel){game.toast('Select a ship');return;}if(this.sel.hull>=this.sel.maxHull){game.toast('Hull already full');return;}if(this.energy<2){game.toast('Need ⚡2');return;}this.energy-=2;this.sel.hull++;game.toast('🛠 Patched +1 hull');this.render();},
+  smokeBurst(){if(this.energy<2){game.toast('Need ⚡2');return;}this.energy-=2;this.smokeT=2;this.log('💨 Smoke deployed — enemy loses your bearing for 2 ticks.');this.render();},
+  windSurge(){if(!this.sel){game.toast('Select a ship');return;}if(!this.sel.dir){game.toast('Set a heading first');return;}if(this.energy<1){game.toast('Need ⚡1');return;}
+    const[dr,dc]=this.delta(this.sel.dir);const nr=this.sel.r+dr,nc=this.sel.c+dc;if(this.inb(nr,nc)&&!this.occ(nr,nc,this.sel)){this.energy--;this.sel.r=nr;this.sel.c=nc;game.toast('🌬 Wind surge — free move!');this.broadsides();this.render();}else game.toast('Blocked');},
+  deltaAll(r,c){return [[r,c],[r-1,c],[r+1,c],[r,c-1],[r,c+1],[r-1,c-1],[r+1,c+1],[r-1,c+1],[r+1,c-1]];},
+  freeNear(r,c){for(const[rr,cc]of this.deltaAll(r,c)){if(this.inb(rr,cc)&&!this.occ(rr,cc,null))return[rr,cc];}return null;},
+  blackTideSig(){if(this.btUsed){game.toast('Black Tide already called this battle');return;}if(this.energy<3){game.toast('Need ⚡3');return;}
+    this.btUsed=true;this.energy-=3;this.paused=true;
+    showCutscene(SIGS.blacktide,()=>{let n=0;this.sunk.slice(-4).forEach(s=>{const cell=this.freeNear(s.r,s.c);if(cell){this.ships.push({name:s.name+' ghost',owner:'p',len:s.len,r:cell[0],c:cell[1],dir:null,hull:1,maxHull:1,crew:1,maxCrew:1,grapT:0,grapBy:null,boarding:false,captured:false,_dead:false,ttl:3});n++;}});
+      this.log('🌊 <b>THE BLACK TIDE RISES</b> — '+n+' ghost ship'+(n===1?'':'s')+' under your flag for 3 turns!');this.paused=false;this.render();});},
+  win(){if(this.over)return;this.over=true;if(this.loop){clearInterval(this.loop);this.loop=null;}portrait('victory');
+    const captures=this.ships.filter(s=>s.captured).length;const total=500+captures*120+(this.kind==='boss'?800:this.kind==='elite'?300:0);
+    game.runScore+=total;game.battlesWon++;game.actBattle++;game.addGold(({boss:55,elite:35,scout:8,standard:15})[this.kind]||15);game.renderTop();Sound.win();
+    const m=document.getElementById('modal');m.innerHTML=`<h2 class="win">${this.kind==='boss'?'BOSS BOARDED':'WATERS TAKEN'}</h2><p>Boarding action won${captures?` — ${captures} ship(s) captured`:''}. +${total} score.</p>${game.summary()}<button class="btn btn-go" onclick="game.closeModal();game.finishNode()">Continue ▸</button>`;document.getElementById('ovl').classList.add('show');},
+  lose(){if(this.over)return;this.over=true;if(this.loop){clearInterval(this.loop);this.loop=null;}portrait('grimace');game.defeat();},
+};
+
+/* ---- boot ---- */
+initWater();
+addEventListener('resize',()=>{if(game.phase==='placement')game.renderPlacement(false);if(game.map&&!document.getElementById('map').classList.contains('hidden'))game.renderMap();});
+addEventListener('keydown',e=>{
+  if(game.phase==='combat'){if(e.key>='1'&&e.key<='9'){const el=document.querySelectorAll('#hand .card')[+e.key-1];if(el)el.click();}if(e.key==='f'||e.key==='F'||e.key===' '){e.preventDefault();game.endTurn();}}
+  if(game.phase==='placement'&&(e.key==='r'||e.key==='R'))game.randomizeFleet();
+  if(game.phase==='placement'&&(e.key===' '||e.key==='Enter')){e.preventDefault();game.setSail();}
+});
+game.boot();
+</script>
+</body>
+</html>
