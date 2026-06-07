@@ -299,6 +299,19 @@
   @keyframes cflash{0%{transform:scale(1.2);opacity:0}25%{opacity:1}100%{transform:scale(1);opacity:.92}}
   #cut .cn{animation:cglow 1.5s ease-in-out infinite alternate}
   @keyframes cglow{to{text-shadow:0 0 34px rgba(255,207,69,.95)}}
+  .card.up{border-color:var(--gold);box-shadow:0 7px 0 rgba(0,0,0,.35),0 0 14px rgba(255,207,69,.4)}
+  .card.up .nm{color:var(--gold)}
+  .wchip{background:rgba(8,26,42,.7);border:2px solid var(--line);border-radius:9px;padding:5px 9px;font-size:.72rem;color:var(--ink2)}
+  .rchip.officer{border-color:var(--bad);color:#ffd0cf}
+  .homewrap{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+  .homecard{width:min(260px,90vw);background:linear-gradient(180deg,rgba(16,44,66,.9),rgba(7,24,38,.95));border:2px solid var(--line);border-radius:16px;padding:22px 18px;cursor:pointer;transition:transform .1s,border-color .1s,box-shadow .1s;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+  .homecard:hover{transform:translateY(-7px);border-color:var(--son);box-shadow:0 16px 28px rgba(0,0,0,.5)}
+  .homecard.mp:hover{border-color:var(--ord)}
+  .hicon{font-size:3rem;margin-bottom:6px}
+  .htitle{font-family:'Press Start 2P',monospace;font-size:.9rem;color:#fff;margin-bottom:8px;letter-spacing:1px}
+  .hsub{font-size:.78rem;color:var(--ink2);line-height:1.4}
+  .bm-status{font-family:'Press Start 2P',monospace;font-size:.7rem;color:var(--ink);margin:6px 0 10px;letter-spacing:.5px}
+  #bm .cant{filter:grayscale(.6) brightness(.7);cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -358,6 +371,7 @@
       <div class="chip">🎯<b id="s-shots">1</b></div>
       <div class="chip">☠<b id="s-enemyships">2</b></div>
       <div class="score-hud" id="scorehud"><span class="chips" id="h-chips">0</span><span class="x">×</span><span class="mult" id="h-mult">1.0</span></div>
+      <div class="wchip" id="s-weather" title="Sea state">🌊</div>
       <button class="end-turn-btn" id="btn-end" onclick="game.endTurn()">End Turn ▸</button>
     </div>
     <div class="log" id="log"></div>
@@ -366,6 +380,7 @@
 
   <div id="sheet" class="sheet hidden"></div>
   <div id="pirate" class="hidden"></div>
+  <div id="bm" class="hidden"></div>
 </div>
 
 <div class="ovl" id="ovl"><div class="modal" id="modal"></div></div>
@@ -396,8 +411,11 @@ const FACTIONS=[
   {name:'Iron Armada',ai:'hunter',tint:'Checkerboard hunter'},
   {name:'Deepwatch Snipers',ai:'sniper',tint:'Hunts big hulls'},
   {name:'Carrion Fleet',ai:'adaptive',tint:'Learns & escalates'},
+  {name:'The Kraken',ai:'hunter',tint:'Tentacles drag the deep back over your sonar'},
+  {name:'Megalodon',ai:'sniper',tint:'A roaming leviathan that never holds still'},
 ];
 const BOSSES=['Iron Armada','Deepwatch Snipers','Carrion Fleet'];
+const ACT_BOSSES={1:['Iron Armada'],2:['Deepwatch Snipers','The Kraken'],3:['Carrion Fleet','Megalodon']};
 
 const ART={salvo:'💥',spread:'🎯',barrage:'🔱',pinpoint:'📍',depthcharge:'🧨',chainshot:'⛓️',torpedo:'🚀',overkill:'☄️',
   ping:'📡',heat:'🌡️',widescan:'📶',recon:'🛰️',activesonar:'🔊',
@@ -460,6 +478,8 @@ const BOSS_SCENE={
   'Iron Armada':{id:'boss_iron',scene:'🛡️ ⚙️ ⚓',name:'THE IRON ARMADA',sceneText:'A wall of riveted steel slides from the fog. Its hull drinks your shells and seals its own wounds.',mech:'regen'},
   'Deepwatch Snipers':{id:'boss_deep',scene:'🎯 🌫️ 👁️',name:'THE DEEPWATCH',sceneText:'Unseen guns track your largest hull. The sea itself seems to close over their positions.',mech:'refog'},
   'Carrion Fleet':{id:'boss_carrion',scene:'☠️ 🌊 🦅',name:'THE CARRION FLEET',sceneText:'A tide of scavenger hulls, ever-growing. Sink one and two more crawl up from the deep.',mech:'spawn'},
+  'The Kraken':{id:'boss_kraken',scene:'🦑 🌊 🌑',name:'THE KRAKEN',sceneText:'Vast tentacles rise from the black water, dragging your sonar contacts back into the deep and lashing your decks.',mech:'kraken'},
+  'Megalodon':{id:'boss_mega',scene:'🦈 🌊 🩸',name:'MEGALODON',sceneText:'A shadow the size of a frigate circles below. The moment you fix its position, it is already gone.',mech:'mega'},
 };
 /* weather / sea-state (Idea #24) */
 const WEATHERS=[
@@ -490,6 +510,44 @@ const RELICS=[
   {id:'shipwright',ic:'🔨',name:"Shipwright's Kit",ds:'Repair 1 hull damage after each battle.'},
 ];
 const relicById=id=>RELICS.find(r=>r.id===id);
+/* Doctrines — run-modifier jokers, chosen at run start (Idea #20) */
+const DOCTRINES=[
+  {id:'overcharge',ic:'⚡',name:'Overcharged Doctrine',ds:'+1 max energy every battle.'},
+  {id:'arsenal',ic:'🎯',name:'Arsenal Doctrine',ds:'+1 shot at the start of every turn.'},
+  {id:'fortune',ic:'🪙',name:"Privateer's Charter",ds:'+50% gold from all sources.'},
+  {id:'gambler',ic:'🎲',name:"Gambler's Gambit",ds:'+1.0 starting Mult each battle, but draw 1 fewer card.'},
+  {id:'ironfleet',ic:'🛡️',name:'Iron Doctrine',ds:'Start every battle with the next 2 hits blocked.'},
+  {id:'berserk',ic:'💢',name:'Berserker Doctrine',ds:'Your hit-streak builds Mult twice as fast.'},
+];
+const doctrineById=id=>DOCTRINES.find(d=>d.id===id);
+/* Achievements + cosmetics (Idea #23) */
+const ACH=[
+  {id:'maiden',ic:'⚓',name:'Maiden Voyage',ds:'Complete your first run.',chk:d=>d.runs>=1},
+  {id:'firstwin',ic:'🏆',name:'First Blood',ds:'Win a run.',chk:d=>d.wins>=1},
+  {id:'oldsalt',ic:'🎖️',name:'Old Salt',ds:'Play 10 runs.',chk:d=>d.runs>=10},
+  {id:'silent',ic:'👻',name:'Silent Hunter',ds:'Win using no Sonar cards.',chk:d=>d.sonarless},
+  {id:'breaker',ic:'🗡️',name:'Breaker of Fleets',ds:'Beat the Act 1 boss.',chk:d=>d.act1boss},
+  {id:'ascend',ic:'🔥',name:'Ascendant',ds:'Win at Ascension 1 or higher.',chk:d=>d.asc>=2},
+  {id:'master',ic:'☠️',name:'Master & Commander',ds:'Reach Ascension 5.',chk:d=>d.asc>=5},
+  {id:'butcher',ic:'🦈',name:'Butcher of the Deep',ds:'Sink 100 hulls (lifetime).',chk:d=>(d.totalSinks||0)>=100},
+  {id:'highroller',ic:'⭐',name:'High Roller',ds:'Score 10,000 in a run.',chk:d=>(d.best||0)>=10000},
+  {id:'duelist',ic:'⚔️',name:'Duelist',ds:'Win a multiplayer match.',chk:d=>(d.mpWins||0)>=1},
+];
+const COSMETICS=[
+  {id:'default',name:'Steel Sea',req:null,filter:'none'},
+  {id:'crimson',name:'Crimson Tide',req:'firstwin',filter:'hue-rotate(-55deg) saturate(1.2)'},
+  {id:'emerald',name:'Emerald Deep',req:'breaker',filter:'hue-rotate(115deg)'},
+  {id:'amethyst',name:'Amethyst Abyss',req:'ascend',filter:'hue-rotate(60deg) saturate(1.3)'},
+  {id:'void',name:'The Black Void',req:'master',filter:'saturate(.25) brightness(.65)'},
+];
+const TUT_STEPS=[
+  {t:'⚓ Deploy',x:'Drag your ships onto the grid (or hit Randomize), then Set Sail. Ships carry damage between battles — repair at 🛠 dry docks.'},
+  {t:'🃏 Cards & Energy',x:'Each turn you draw a hand and spend energy on cards: extra shots, sonar, defenses, repairs. Play cards FIRST — once you fire, your turn ends.'},
+  {t:'🎯 Fire',x:'Tap the enemy grid to fire. Hits show a ● only — hull shapes stay hidden (fog of war) until a ship is fully sunk. Use Sonar to scout.'},
+  {t:'🌊 Sea State',x:'Each battle has weather: ☀️ Calm boosts your chips, 🌩️ Storm scatters shots, 🌫️ Fog shrinks sonar. It shifts every few turns.'},
+  {t:'💎 Relics & Doctrines',x:'Elites and bosses drop relics (permanent passives). At run start you pick a Doctrine — a run-defining modifier. Stack them for big builds.'},
+  {t:'🗺️ The Run',x:'Choose your route across 3 acts — battles, elites, shops, events, repairs. Clear the act boss to advance. Score is king. Good hunting, Admiral.'},
+];
 
 /* ---- deterministic RNG for Daily runs (seed = the date; no server needed) ---- */
 const _origRandom=Math.random.bind(Math);
@@ -500,11 +558,34 @@ function hashStr(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCo
 function todaySeed(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 /* META-PROGRESSION (persists across runs; Sprint 5) */
-const Meta={devAll:false,data:{runs:0,wins:0,act1boss:false,sonarless:false,best:0,asc:0,sigsSeen:{}},
+const Meta={devAll:false,data:{runs:0,wins:0,act1boss:false,sonarless:false,best:0,asc:0,sigsSeen:{},ach:{},totalSinks:0,mpWins:0,cosmetic:'default'},
   load(){try{const j=localStorage.getItem('dr_meta');if(j)this.data=Object.assign(this.data,JSON.parse(j));}catch(e){}},
   save(){try{localStorage.setItem('dr_meta',JSON.stringify(this.data));}catch(e){}},
   unlocked(id){const d=this.data;if(this.devAll)return true;
     return id==='voss'||(id==='kael'&&d.runs>=3)||(id==='silas'&&d.act1boss)||(id==='yara'&&d.wins>=1)||(id==='blacktide'&&d.sonarless);},
+};
+
+/* ONLINE LEADERBOARD (Cloudflare Worker; local fallback) */
+const LB_URL='https://dead-reckoning-lb.toxieon.workers.dev'; // your deployed leaderboard Worker
+const LB={
+  local(){try{return JSON.parse(localStorage.getItem('dr_lb')||'[]');}catch(e){return [];}},
+  save(a){try{localStorage.setItem('dr_lb',JSON.stringify(a.slice(-300)));}catch(e){}},
+  submit(e){const a=this.local();a.push(e);this.save(a);if(LB_URL){try{fetch(LB_URL+'/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(e)}).catch(()=>{});}catch(_){}}},
+  localTop(seed){let a=this.local();if(seed)a=a.filter(x=>x.seed===seed);return a.sort((x,y)=>(y.score||0)-(x.score||0)).slice(0,20);},
+  top(seed,cb){if(LB_URL){fetch(LB_URL+'/top'+(seed?('?seed='+encodeURIComponent(seed)):'')).then(r=>r.json()).then(j=>cb(j||[],true)).catch(()=>cb(this.localTop(seed),false));return;}cb(this.localTop(seed),false);},
+};
+
+/* MULTIPLAYER netcode (Cloudflare Durable Object Worker; see dead_reckoning_mp_worker.js) */
+const MP_URL='wss://dead-reckoning-mp.toxieon.workers.dev'; // your realtime multiplayer Worker
+const Net={ws:null,side:null,
+  open(path,onMsg,onOpen,onClose){if(!MP_URL){game.mpSay('⚠ MP_URL not set — deploy the Worker and set it to go live.');return false;}
+    this.close();try{this.ws=new WebSocket(MP_URL+path);}catch(e){game.mpSay('Could not connect.');return false;}
+    this.ws.onopen=()=>{if(onOpen)onOpen();};
+    this.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch(_){return;}onMsg(m);};
+    this.ws.onclose=()=>{if(onClose)onClose();};
+    this.ws.onerror=()=>{game.mpSay('Connection error — is the Worker URL right?');};return true;},
+  send(o){if(this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(o));},
+  close(){if(this.ws){try{this.ws.onclose=null;this.ws.close();}catch(_){}this.ws=null;}},
 };
 
 /* AUDIO */
@@ -545,15 +626,57 @@ function initWater(){const cv=document.getElementById('water'),ctx=cv.getContext
 
 /* ========================================================================= */
 const game={
-  boot(){Sound.init();Meta.load();this.ascension=0;this.dailyActive=false;this.renderTitle();this.show('title');},
+  boot(){Sound.init();Meta.load();this.applyCosmetic();this.ascension=0;this.dailyActive=false;this.renderHome();this.show('title');},
+  renderHome(){Net.close&&Net.close();const t=document.getElementById('title');const d=Meta.data;
+    t.innerHTML=`<div class="big">DEAD RECKONING</div><div class="tag">a battleship roguelike</div>
+      <div class="homewrap">
+        <div class="homecard sp" onclick="game.singlePlayer()"><div class="hicon">🚢</div><div class="htitle">SINGLE PLAYER</div><div class="hsub">Roguelike campaign · daily run · chase the high score</div></div>
+        <div class="homecard mp" onclick="game.multiplayer()"><div class="hicon">⚔️</div><div class="htitle">MULTIPLAYER</div><div class="hsub">Duel another captain — room codes & quick-match</div></div>
+      </div>
+      ${this.hasSave()?'<div class="metabar"><button class="mbtn" style="border-color:var(--good);color:var(--good)" onclick="game.loadRun()">▶ Continue Run</button></div>':''}
+      <div class="metabar"><button class="mbtn" onclick="game.tutorial(0)">📖 How to Play</button><button class="mbtn" onclick="game.codex()">📚 Codex</button><button class="mbtn" onclick="game.achievements()">🎖️ Achievements</button></div>
+      <div class="metabar"><button class="mbtn" onclick="game.records()">🏅 Records</button><button class="mbtn" onclick="game.showLeaderboard()">🏆 Leaderboard</button></div>`;},
+  singlePlayer(){this.renderTitle();},
+  multiplayer(){this.renderMPLobby();},
+  setMpMode(m){this.mpMode=m;this.renderMPLobby();},
+  renderMPLobby(){const t=document.getElementById('title');const online=!!MP_URL;const mode=this.mpMode=this.mpMode||'battle';
+    t.innerHTML=`<div class="big" style="font-size:clamp(18px,5vw,26px)">MULTIPLAYER</div><div class="tag">${mode==='classic'?'🗺 Classic — rival replaces each act boss':'⚔️ Battle — best-of-3 duel with shop'}</div>
+      <div class="metabar">Mode <span style="color:var(--ink3)">(host's choice applies)</span>: <button class="mbtn" style="${mode==='battle'?'border-color:var(--ord);color:#fff':''}" onclick="game.setMpMode('battle')">⚔ Battle</button><button class="mbtn" style="${mode==='classic'?'border-color:var(--ord);color:#fff':''}" onclick="game.setMpMode('classic')">🗺 Classic</button></div>
+      ${online?'':'<div class="note" style="max-width:470px;margin:10px auto">Realtime play needs the Worker deployed — set <b>MP_URL</b> in this file to your <code>wss://…workers.dev</code> URL (steps in <b>dead_reckoning_mp_worker.js</b>). Until then this lobby is a preview.</div>'}
+      <div class="homewrap">
+        <div class="homecard" onclick="game.mpCreate()"><div class="hicon">🆕</div><div class="htitle">CREATE ROOM</div><div class="hsub">Get a code to share with a friend</div></div>
+        <div class="homecard mp" onclick="game.mpQuick()"><div class="hicon">🎲</div><div class="htitle">QUICK MATCH</div><div class="hsub">Pair with anyone waiting</div></div>
+      </div>
+      <div style="margin:14px 0"><input id="mpcode" maxlength="6" placeholder="CODE" style="text-transform:uppercase;font-family:'Press Start 2P',monospace;font-size:.9rem;padding:9px 12px;border-radius:9px;border:2px solid var(--line);background:#0a2030;color:#fff;width:150px;text-align:center"> <button class="btn btn-go" onclick="game.mpJoin()">Join ▸</button></div>
+      <div id="mpstatus" style="font-size:.82rem;color:var(--ink2);min-height:24px;margin-bottom:8px"></div>
+      <button class="btn btn-end btn-sm" onclick="Net.close();game.renderHome();">← Back</button>`;},
+  mpSay(s){const e=document.getElementById('mpstatus');if(e)e.innerHTML=s;},
+  genCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=a[Math.floor(Math.random()*a.length)];return s;},
+  mpConnect(path){return Net.open(path,m=>this.mpMsg(m),null,()=>this.mpSay('Disconnected from server.'));},
+  mpCreate(){const code=this._roomCode=this.genCode();if(this.mpConnect('/room/'+code))this.mpSay(`Room <b style="color:var(--gold);font-size:1.1rem">${code}</b> created — share it. Waiting for an opponent…`);},
+  mpJoin(){const code=((document.getElementById('mpcode')||{}).value||'').toUpperCase().trim();if(code.length<3){this.mpSay('Enter a valid room code.');return;}this._roomCode=code;if(this.mpConnect('/room/'+code))this.mpSay('Joining '+code+'…');},
+  mpQuick(){if(this.mpConnect('/quick'))this.mpSay('🎲 Searching for an opponent…');},
+  mpMsg(m){switch(m.type){
+    case 'waiting':this.mpSay('Connected — waiting for an opponent to join…');break;
+    case 'full':this.mpSay('That room is already full. Try another code.');break;
+    case 'start':Net.side=m.side;this.mpSide=m.side;this.mpSay('✓ Opponent found! (you are '+(m.side==='a'?'Captain A':'Captain B')+')');this.startBattleMode(m);break;
+    case 'mode':if(this.mpSide==='b')this.launchMode(m.mode,m.seed);break;
+    case 'left':this.mpSay('Opponent disconnected.');break;
+    default:if(this._mpHandler)this._mpHandler(m);}},
+  startBattleMode(m){Sound.win();this.mpSide=m.side;Net.side=m.side;
+    if(m.side==='a'){const mode=this.mpMode||'battle';const seed=this._roomCode||this.genCode();this.launchMode(mode,seed);Net.send({t:'mode',mode,seed});}
+    else this.mpSay('Opponent found — waiting for host to choose a mode…');},
+  launchMode(mode,seed){if(mode==='classic'){game._classicSeed=seed;Classic.start(this.mpSide,seed);}else{BM.send=o=>Net.send(o);BM.start(this.mpSide);}},
+  classicNextAct(){if(this.map&&this.map.cur){const[f,i]=this.map.cur;const node=this.map.floors[f]&&this.map.floors[f][i];if(node)node.done=true;}this.battlesWon++;this.act++;this.actBattle=0;_seeded=mulberry32(hashStr('classic:'+(this._classicSeed||'x')+':act'+this.act));this.newMap();},
   renderTitle(){
     const t=document.getElementById('title');const d=Meta.data;if(this.ascension==null)this.ascension=0;
     const ascCap=Meta.devAll?5:d.asc;if(this.ascension>ascCap)this.ascension=ascCap;
     let dbest=0;try{dbest=(JSON.parse(localStorage.getItem('dr_daily')||'{}'))[todaySeed()]||0;}catch(e){}
     const ascSel=ascCap>0?`<div class="ascbar">⚔ Ascension: ${Array.from({length:ascCap+1},(_,i)=>`<button class="ascb${this.ascension===i?' on':''}" onclick="game.setAsc(${i})">${i===0?'Off':'A'+i}</button>`).join('')}</div>`:'';
     t.innerHTML=`<div class="big">DEAD RECKONING</div><div class="tag">a battleship roguelike · chase the high score</div>
-      <div class="metabar">⚓ Runs ${d.runs} · 🏆 Wins ${d.wins} · ⭐ Best ${d.best.toLocaleString()}
+      <div class="metabar"><button class="mbtn" onclick="game.renderHome()">← Home</button> ⚓ Runs ${d.runs} · 🏆 Wins ${d.wins} · ⭐ Best ${d.best.toLocaleString()}
         <button class="mbtn" onclick="game.records()">🏅 Records</button>
+        <button class="mbtn" onclick="game.showLeaderboard()">🏆 Leaderboard</button>
         <button class="mbtn" onclick="game.devUnlock()">🧪 Unlock all</button></div>
       <div class="metabar"><button class="mbtn" style="border-color:var(--gold);color:var(--gold)" onclick="game.startDaily()">📅 Daily Run</button> seed <b>${todaySeed()}</b>${dbest?` · your best ${dbest.toLocaleString()}`:''} · same run for everyone today</div>
       ${ascSel}
@@ -564,11 +687,60 @@ const game={
       el.onclick=pl?(()=>this.chooseTheatre(a)):(()=>this.toast('🔒 '+a.lk));list.appendChild(el);});
   },
   setAsc(n){this.ascension=n;this.renderTitle();},
-  startDaily(){_seeded=mulberry32(hashStr(todaySeed()));this.dailyActive=true;this.dailySeed=todaySeed();
+  startDaily(){_seeded=mulberry32(hashStr(todaySeed()));this.dailyActive=true;this.dailySeed=todaySeed();this.doctrine=null;this.classicMode=false;
     this.ascension=0;this.admiral=ADMIRALS[0];this.orientation=(_seeded()<0.5)?'portrait':'landscape';
     this.startRun();const sub=document.getElementById('adm-sub');if(sub)sub.textContent='Adm. Voss · 📅 Daily '+this.dailySeed;},
   recordDaily(){if(!this.dailyActive)return;try{const o=JSON.parse(localStorage.getItem('dr_daily')||'{}');if(this.runScore>(o[this.dailySeed]||0)){o[this.dailySeed]=this.runScore;localStorage.setItem('dr_daily',JSON.stringify(o));}}catch(e){}},
   devUnlock(){Meta.devAll=true;Meta.data.asc=5;Meta.save();this.toast('🧪 Everything unlocked (testing)');this.renderTitle();},
+  tutorial(step){step=step||0;const s=TUT_STEPS[step];if(!s){this.closeModal();return;}const m=document.getElementById('modal');
+    m.innerHTML=`<h2 style="font-size:.92rem;color:var(--son)">${s.t}</h2><p style="min-height:96px">${s.x}</p>
+      <div style="font-size:.7rem;color:var(--ink3);margin-bottom:8px">Step ${step+1} of ${TUT_STEPS.length}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${step>0?`<button class="btn btn-end btn-sm" onclick="game.tutorial(${step-1})">‹ Back</button>`:''}<button class="btn btn-go" onclick="game.tutorial(${step+1})">${step<TUT_STEPS.length-1?'Next ›':'Got it! ⚓'}</button><button class="btn btn-end btn-sm" onclick="game.closeModal()">Close</button></div>`;
+    document.getElementById('ovl').classList.add('show');},
+  codex(){const sheet=document.getElementById('sheet');this.show('sheet');
+    const grid=h=>`<div class="grid" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">${h}</div>`;
+    const cards=LIB.map(c=>cardEl(c)).join('');const sigs=Object.values(SIGS).map(c=>`<div class="card" style="animation:none;border-color:var(--omega)">${cardInner(c)}</div>`).join('');
+    const relics=RELICS.map(r=>`<div class="relic-card"><div class="ri">${r.ic}</div><div class="rn">${r.name}</div><div class="rd">${r.ds}</div></div>`).join('');
+    const docs=DOCTRINES.map(d=>`<div class="relic-card" style="border-color:var(--son)"><div class="ri">${d.ic}</div><div class="rn" style="color:var(--son)">${d.name}</div><div class="rd">${d.ds}</div></div>`).join('');
+    const adms=ADMIRALS.map(a=>`<div class="relic-card" style="border-color:${ADM_COAT[a.id]||'#26456b'}"><div class="ri">${a.face}</div><div class="rn">${a.name}</div><div class="rd">${a.arch} — ${a.ap}</div></div>`).join('');
+    const facs=FACTIONS.map(f=>`<span class="rchip">${f.name} — ${f.tint}</span>`).join(' ');
+    sheet.innerHTML=`<h2 style="color:var(--son)">📚 CODEX</h2><div class="desc">Every card, relic, doctrine, admiral & faction.</div>
+      <div class="lbl" style="font-size:.72rem;color:var(--ink3);margin:8px 0 4px">CARDS (${LIB.length})</div>${grid(cards)}
+      <div class="lbl" style="font-size:.72rem;color:var(--omega);margin:10px 0 4px">SIGNATURE CARDS</div>${grid(sigs)}
+      <div class="lbl" style="font-size:.72rem;color:var(--gold);margin:10px 0 4px">RELICS (${RELICS.length})</div>${grid(relics)}
+      <div class="lbl" style="font-size:.72rem;color:var(--son);margin:10px 0 4px">DOCTRINES</div>${grid(docs)}
+      <div class="lbl" style="font-size:.72rem;color:var(--ink3);margin:10px 0 4px">ADMIRALS</div>${grid(adms)}
+      <div class="lbl" style="font-size:.72rem;color:var(--ink3);margin:10px 0 4px">FACTIONS & BOSSES</div><div style="font-size:.72rem;color:var(--ink2);line-height:2;max-width:560px;margin:0 auto">${facs}</div>
+      <button class="btn btn-go" style="margin-top:14px" onclick="game.renderHome()">← Home</button>`;},
+  offerDoctrine(){const picks=shuffle(DOCTRINES.slice()).slice(0,2);const t=document.getElementById('title');
+    t.innerHTML=`<div class="big" style="font-size:clamp(16px,5vw,24px)">CHOOSE A DOCTRINE</div><div class="tag">${this.admiral.name} — a run-defining modifier</div>
+      <div class="homewrap" id="docpick"></div><div style="margin-top:4px"><button class="btn btn-end btn-sm" onclick="game.chooseDoctrine(null)">Skip — no doctrine</button></div>`;
+    const dp=t.querySelector('#docpick');picks.forEach(d=>{const el=document.createElement('div');el.className='homecard';el.style.width='min(240px,90vw)';el.innerHTML=`<div class="hicon">${d.ic}</div><div class="htitle" style="font-size:.74rem">${d.name}</div><div class="hsub">${d.ds}</div>`;el.onclick=()=>this.chooseDoctrine(d.id);dp.appendChild(el);});},
+  chooseDoctrine(id){this.doctrine=id;this.classicMode=false;this.startRun();},
+  achievements(){const d=Meta.data;const sheet=document.getElementById('sheet');this.show('sheet');
+    const rows=ACH.map(a=>{const got=d.ach&&d.ach[a.id];return `<div style="display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line2);opacity:${got?1:.5}"><div style="font-size:1.4rem">${got?a.ic:'🔒'}</div><div style="text-align:left"><div style="font-size:.82rem;color:${got?'var(--gold)':'var(--ink2)'};font-weight:700">${a.name}</div><div style="font-size:.68rem;color:var(--ink3)">${a.ds}</div></div></div>`;}).join('');
+    const got=ACH.filter(a=>d.ach&&d.ach[a.id]).length;
+    sheet.innerHTML=`<h2 style="color:var(--gold)">🎖️ ACHIEVEMENTS <span style="font-size:.55em;color:var(--ink3)">${got}/${ACH.length}</span></h2>
+      <div style="max-width:430px;margin:0 auto">${rows}</div>
+      <div class="lbl" style="margin-top:12px;color:var(--son)">🎨 SEA THEMES — unlocked by achievements</div><div class="choices" id="cosrow"></div>
+      <button class="btn btn-go" style="margin-top:12px" onclick="game.renderHome()">← Home</button>`;
+    const cr=sheet.querySelector('#cosrow');COSMETICS.forEach(c=>{const un=!c.req||(d.ach&&d.ach[c.req]);const sel=(d.cosmetic||'default')===c.id;const el=document.createElement('div');el.className='choice';el.style.cssText='max-width:130px'+(sel?';border-color:var(--gold)':'')+(un?'':';opacity:.45');el.innerHTML=`<div class="ct">${c.name}</div><div class="cd">${un?(sel?'✓ equipped':'tap to equip'):'🔒 '+((ACH.find(a=>a.id===c.req)||{}).name||'')}</div>`;if(un)el.onclick=()=>this.equipCosmetic(c.id);cr.appendChild(el);});},
+  equipCosmetic(id){Meta.data.cosmetic=id;Meta.save();this.applyCosmetic();this.achievements();},
+  applyCosmetic(){const c=COSMETICS.find(x=>x.id===(Meta.data.cosmetic||'default'))||COSMETICS[0];const w=document.getElementById('water');if(w)w.style.filter=c.filter;},
+  evalAchievements(){const d=Meta.data;if(!d.ach)d.ach={};const newly=[];ACH.forEach(a=>{if(!d.ach[a.id]&&a.chk(d)){d.ach[a.id]=true;newly.push(a);}});if(newly.length){Meta.save();newly.forEach((a,i)=>setTimeout(()=>this.toast('🎖️ '+a.name+' unlocked!'),500+i*900));}},
+  saveRun(){if(this.dailyActive||this.classicMode||(this.admiral&&this.admiral.id==='blacktide')||this.phase==='dead')return;try{const s={admiral:this.admiral.id,act:this.act,actBattle:this.actBattle,gold:this.gold,runScore:this.runScore,permShot:this.permShot,ascension:this.ascension,doctrine:this.doctrine||null,battlesWon:this.battlesWon,orientation:this.orientation,usedSonar:this.usedSonar,usedBlackTide:this.usedBlackTide,seenNudge:this.seenNudge,stats:this.stats,cardCounts:this.cardCounts,deck:this.deck.map(c=>({id:c.id,up:!!c.up})),relics:this.relics.map(r=>r.id),fleet:this.fleet.map(f=>({name:f.name,len:f.len,hits:f.hits,sunk:f.sunk})),map:this.map,reach:this.reach,cur:this.map?this.map.cur:null};localStorage.setItem('dr_save',JSON.stringify(s));}catch(e){}},
+  hasSave(){try{return !!localStorage.getItem('dr_save');}catch(e){return false;}},
+  clearSave(){try{localStorage.removeItem('dr_save');}catch(e){}},
+  loadRun(){let s;try{s=JSON.parse(localStorage.getItem('dr_save'));}catch(e){}if(!s)return;
+    Sound.init();Music.start();_seeded=null;this.dailyActive=false;this.classicMode=false;
+    this.admiral=ADMIRALS.find(a=>a.id===s.admiral)||ADMIRALS[0];this.act=s.act;this.actBattle=s.actBattle||0;this.gold=s.gold;this.runScore=s.runScore;this.permShot=s.permShot||0;this.ascension=s.ascension||0;this.doctrine=s.doctrine||null;this.battlesWon=s.battlesWon||0;this.orientation=s.orientation||'portrait';this.usedSonar=s.usedSonar;this.usedBlackTide=s.usedBlackTide;this.seenNudge=s.seenNudge;this._recorded=false;this.runSeed='free';
+    this.stats=s.stats||{hits:0,sinks:0,cardsPlayed:0,bestMult:1,nodes:0,bestBattle:0};this.cardCounts=s.cardCounts||{};
+    this.deck=(s.deck||[]).map(o=>{const c={...cardTpl(o.id)};if(o.up)upgradeCard(c);return c;}).filter(c=>c&&c.id);
+    this.relics=(s.relics||[]).map(id=>relicById(id)).filter(Boolean);
+    this.fleet=(s.fleet||[]).map(f=>({name:f.name,len:f.len,hits:f.hits,sunk:f.sunk}));
+    this.map=s.map;this.reach=s.reach;if(this.map)this.map.cur=s.cur;
+    document.getElementById('adm-sub').textContent=this.admiral.name+' · '+this.admiral.arch;document.getElementById('adm-tag').textContent=this.admiral.name;document.getElementById('kbd').style.display=TOUCH?'none':'block';
+    this.renderTop();this.showMap();},
   records(){const d=Meta.data;const m=document.getElementById('modal');
     const row=(id,label,done)=>`<div>${done?'<span class="u">✓</span>':'<span class="l">🔒</span>'} ${label}</div>`;
     m.innerHTML=`<h2 style="font-size:.95rem;color:var(--gold)">🏅 RECORDS</h2>
@@ -601,14 +773,15 @@ const game={
   pickOrient(o){
     Sound.init();_seeded=null;this.dailyActive=false;
     if(o==='random'){const coin=document.getElementById('coin');let n=0;const iv=setInterval(()=>{coin.textContent=['🪙','🔵','🟠'][n%3];n++;Sound.draw();},90);
-      setTimeout(()=>{clearInterval(iv);this.orientation=Math.random()<.5?'portrait':'landscape';coin.textContent=this.orientation==='portrait'?'📱':'🖥️';setTimeout(()=>this.startRun(),500);},900);return;}
-    this.orientation=o;this.startRun();
+      setTimeout(()=>{clearInterval(iv);this.orientation=Math.random()<.5?'portrait':'landscape';coin.textContent=this.orientation==='portrait'?'📱':'🖥️';setTimeout(()=>this.offerDoctrine(),500);},900);return;}
+    this.orientation=o;this.offerDoctrine();
   },
   startRun(){
-    Sound.init();Music.start();
+    Sound.init();Music.start();this.clearSave();
     const adm=this.admiral;
     this.act=1;this.gold=0;this.runScore=0;this.battlesWon=0;this.actBattle=0;this.permShot=0;
-    this.stats={hits:0,sinks:0,cardsPlayed:0,bestMult:1,nodes:0,bestBattle:0};
+    this.stats={hits:0,sinks:0,cardsPlayed:0,bestMult:1,nodes:0,bestBattle:0};this.cardCounts={};
+    this.runSeed=this.dailyActive?('daily '+this.dailySeed):'free';
     this.seenNudge=false;this.usedBlackTide=false;this.usedSonar=false;this._recorded=false;
     // fleet scarcity: start with Destroyer + Cruiser only
     this.fleet=[{name:'Destroyer',len:2,hits:0,sunk:false},{name:'Cruiser',len:3,hits:0,sunk:false}];
@@ -639,7 +812,7 @@ const game={
   showMap(){const m=document.getElementById('map');const sea=this.admiral&&this.admiral.id==='blacktide';m.classList.toggle('sea',sea);
     m.innerHTML=`<div class="mt">${sea?'🧭 CHART':'ACT'} ${this.act} — THE ${['SHALLOWS','NARROWS','MAELSTROM'][this.act-1]||'DEEP'}</div>
       <div class="ms">${sea?'🧭 Plot a course through the coves. Every hull is a prize — sink it or take it.':'Choose your route. 🛶 Scout (safe) · ⚔️ Standard · ☠️ Elite · ❓ Ambush (hidden) · 🪙 shop · 🛠 repair · 💎 cache'}</div>
-      <div id="mapcanvas"></div>`;this.renderMap();this.show('map');},
+      <div id="mapcanvas"></div>`;this.renderMap();this.show('map');this.saveRun();},
   renderMap(){const cvs=document.getElementById('mapcanvas');if(!cvs)return;const F=this.map.floors.length;
     const H=Math.max(340,F*72),W=cvs.clientWidth||520;cvs.style.height=H+'px';
     const xOf=(f,i)=>{const row=this.map.floors[f];return (W*(i+1))/(row.length+1);};
@@ -668,7 +841,7 @@ const game={
     else if(type==='rest')this.openRest();
     else if(type==='treasure')this.openTreasure();},
   finishNode(){const [f,i]=this.map.cur;const node=this.map.floors[f][i];node.done=true;
-    if(node.type==='boss'){if(this.act===1&&!Meta.data.act1boss){Meta.data.act1boss=true;Meta.save();}this.battlesWon++;this.act++;this.actBattle=0;if(this.act>3)return this.runComplete();this.newMap();return;}
+    if(node.type==='boss'){if(this.act===1&&!Meta.data.act1boss){Meta.data.act1boss=true;Meta.save();this.evalAchievements();}this.battlesWon++;this.act++;this.actBattle=0;if(this.act>3)return this.runComplete();this.newMap();return;}
     this.reach=node.links.map(j=>[f+1,j]);this.showMap();},
 
   /* ---------- GRID SIZING (Sprint 1) ---------- */
@@ -684,9 +857,10 @@ const game={
 
   /* ---------- BATTLE SETUP ---------- */
   startBattle(kind){
+    if(this.classicMode&&kind==='boss'){Classic.bossDuel(this.act);return;}
     if(this.admiral.id==='blacktide'){this.battleKind=kind;Pirate.start(kind);return;}
     this.battleKind=kind;const boss=kind==='boss';
-    if(boss)this.faction=FACTIONS.find(x=>x.name===BOSSES[this.act-1]);
+    if(boss){const pool=ACT_BOSSES[this.act]||['Carrion Fleet'];const pick=pool[Math.floor(Math.random()*pool.length)];this.faction=FACTIONS.find(x=>x.name===pick)||FACTIONS.find(x=>x.name==='Carrion Fleet');}
     else{const pool=FACTIONS.filter(x=>x.ai!=='adaptive');this.faction=pool[Math.floor(Math.random()*pool.length)];}
     const dims=this.gridSize(boss);this.rows=dims.r;this.cols=dims.c;
     const variant=boss?'boss':kind;const A=this.ascension||0;
@@ -697,12 +871,15 @@ const game={
     this.enemyAbilities=(kind==='elite'||boss);
     this.hardMode=(A>=3); this.ascEscalate=(A>=5); // A3: your board fogs · A5: every faction escalates
     this.adaptiveBoost=0;this.refog=(boss&&this.rows>=14);
+    this.bossMech=boss?((BOSS_SCENE[this.faction.name]||{}).mech||null):null;if(this.bossMech==='refog')this.refog=true;this.bossTick=0;
+    this.specialsList=assignSpecials(this.enemy,kind,this.act);
     // deploy: place persistent (surviving) fleet on this grid
     this.deploy=this.fleet.filter(s=>!s.sunk).map(s=>({name:s.name,len:s.len,hits:s.hits,sunk:false,src:s}));
     placeDeploy(this.deploy,this.rows,this.cols);
     this.phase='placement';
     document.getElementById('place-head').textContent=(boss?'⚠ BOSS — ':kind==='elite'?'☠ ELITE — ':kind==='scout'?'🛶 SCOUT — ':'')+`${this.faction.name} · ${this.cols}×${this.rows}`;
-    this.renderPlacement(true);this.show('place');this.renderTop();
+    this.renderPlacement(true);this.renderTop();
+    if(boss&&BOSS_SCENE[this.faction.name])showCutscene(BOSS_SCENE[this.faction.name],()=>this.show('place'));else this.show('place');
   },
   randomizeFleet(){Sound.card();placeDeploy(this.deploy,this.rows,this.cols);this.renderPlacement(false);},
   renderPlacement(expand){
@@ -745,16 +922,22 @@ const game={
     if(alive.find(s=>s.name==='Cruiser'))this.maxEnergy++;
     this.chips=0;this.mult=1;this.streak=0;
     if(alive.find(s=>s.name==='Destroyer'))this.mult+=0.5;
-    this.ironHull=0;this.evade=false;this.decoyWaste=0;this.smoke=false;this.overkill=false;this.chain=false;this.invis=0;
+    if(this.doctrine==='overcharge')this.maxEnergy++;
+    if(this.doctrine==='gambler'){this.mult+=1;this.handSize=Math.max(2,this.handSize-1);}
+    this.ironHull=0;this.evade=false;this.evadeChance=0.5;this.decoyWaste=0;this.smoke=0;this.overkill=false;this.overkillMult=2;this.chain=false;this.chainAmt=1;this.invis=0;this.enemyBonusShot=0;
+    this.weather=WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
     this.armed=null;this.targeting=null;this.bulkheadUsed=false;this.firstSalvoFree=(this.admiral.id==='voss');
     this.cardsThisTurn=0;
     if(this.hasRelic('keel'))this.ironHull+=1;
+    if(this.doctrine==='ironfleet')this.ironHull+=2;
     document.getElementById('foe-name').textContent=this.faction.name+(this.battleKind==='boss'?' (BOSS)':this.battleKind==='elite'?' (ELITE)':this.battleKind==='scout'?' (scout)':'');
     document.getElementById('enemy-grid').style.setProperty('--cols',this.cols);
     document.getElementById('player-grid').style.setProperty('--cols',this.cols);
     this.show('combat');this.clearLog();
     this.log(`Engaging <b>${this.faction.name}</b> on a ${this.cols}×${this.rows} grid. ${this.faction.tint}.`);
     this.log('<span class="am">Fog of war:</span> hits show ● only — hull shapes hidden until fully sunk.');
+    this.log('Sea state: '+this.weather.ic+' <b>'+this.weather.name+'</b> — '+this.weather.ds);
+    if(this.specialsList&&this.specialsList.length)this.log('<span class="bd">⚠ Officer ships in this fleet:</span> '+this.specialsList.map(k=>SPECIALS[k].ic+' '+SPECIALS[k].name).join(', '));
     this.startTurn(true);
     ['enemy-grid','player-grid'].forEach(id=>{const b=document.getElementById(id);b.classList.remove('expand');void b.offsetWidth;b.classList.add('expand');});
     setupPortraits();
@@ -764,7 +947,8 @@ const game={
   /* ---------- TURNS ---------- */
   startTurn(first){
     this.clearAuto();
-    this.energy=this.maxEnergy;this.shots=1+this.permShot;this.armed=null;this.targeting=null;this.overkill=false;this.chain=false;this.reactorMult=0;this.cardsThisTurn=0;this.fired=false;
+    if(!first&&this.turn>1&&this.turn%4===1){this.weather=WEATHERS[Math.floor(Math.random()*WEATHERS.length)];this.log('The sea shifts: '+this.weather.ic+' <b>'+this.weather.name+'</b>.');}
+    this.energy=this.maxEnergy;this.shots=1+this.permShot+(this.doctrine==='arsenal'?1:0);this.armed=null;this.targeting=null;this.overkill=false;this.chain=false;this.reactorMult=0;this.cardsThisTurn=0;this.fired=false;
     if(this.hasRelic('chest'))this.energy+=1;
     if(first&&this.hasRelic('drum'))this.shots+=1;
     if(this.player.ships.find(s=>s.name==='Submarine'&&!s.sunk))this.scout(1,'Submarine sonar');
@@ -775,7 +959,8 @@ const game={
     while(this.hand.length<this.handSize){if(this.drawPile.length===0){if(this.discard.length===0)break;this.drawPile=shuffle(this.discard);this.discard=[];}this.hand.push(this.drawPile.pop());}
     this.dealAnim=true;if(!first)this.log('— New turn. Energy & shots restored.');setTimeout(()=>Sound.draw(),60);
   },
-  scout(n,src){let done=0;const cells=[];this.enemy.ships.forEach(s=>s.cells.forEach(([r,c])=>{const t=this.enemy.grid[r][c];if(!t.shot&&t.sonar!=='ship')cells.push([r,c]);}));
+  revealAt(r,c){const t=this.enemy.grid[r]&&this.enemy.grid[r][c];if(!t||t.shot)return false;const hull=!!(t.ship&&!(t.shipRef&&t.shipRef.kind==='sub'));t.sonar=hull?'ship':'empty';t.seen=this.turn;return hull;},
+  scout(n,src){let done=0;const cells=[];this.enemy.ships.forEach(s=>{if(s.kind==='sub')return;s.cells.forEach(([r,c])=>{const t=this.enemy.grid[r][c];if(!t.shot&&t.sonar!=='ship')cells.push([r,c]);});});
     shuffle(cells);for(const[r,c]of cells){if(done>=n)break;this.enemy.grid[r][c].sonar='ship';this.enemy.grid[r][c].seen=this.turn||0;done++;}
     if(done)this.log(`<span class="gd">${src}</span> reveals a hull contact.`);},
   doRefog(){let n=0;for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.enemy.grid[r][c];
@@ -790,6 +975,7 @@ const game={
     if(this.admiral.id==='silas'&&c.cat==='DECOY')cost=0;
     if(cost>this.energy){this.flash(`Not enough energy for ${c.name}.`,'bd');Sound.miss();return;}
     if(c.cat==='SONAR')this.usedSonar=true;
+    this.cardCounts[c.id]=(this.cardCounts[c.id]||0)+1;
     if(c.kind==='target'){this.targeting={idx,card:c,cost};this.setHelp(c.id==='widescan'?'WIDE SCAN — tap a row to reveal it.':'SONAR PING — tap to scan a 3×3.');this.banner(c.name+' — tap the enemy grid');Sound.card();this.render();return;}
     this.cardsThisTurn++;this.stats.cardsPlayed++;
     if(this.hasRelic('reactor'))this.mult+=0.3;
@@ -842,31 +1028,31 @@ const game={
     case 'blacktide':this.blackTide(u);break;
   }},
   drawCards(n){for(let k=0;k<n;k++){if(this.hand.length>=this.handSize+3)break;if(this.drawPile.length===0){if(this.discard.length===0)break;this.drawPile=shuffle(this.discard);this.discard=[];}this.hand.push(this.drawPile.pop());}this.dealAnim=true;},
-  repairTiles(n){const dmg=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits);if(!dmg.length){this.log('No damaged ships to repair.');return;}
-    let left=n;for(const s of dmg){while(left>0&&s.hits>0){const cell=s.cells.find(([r,c])=>this.player.grid[r][c].hit);if(!cell)break;const[r,c]=cell;this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;s.hits--;left--;}if(left<=0)break;}
-    this.log(`<span class="gd">Damage control</span> — patched ${n-left} tile(s).`);Sound.draw();},
-  dryDock(){const dmg=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits)[0];if(!dmg){this.log('No damaged ship to dry-dock.');return;}
-    dmg.cells.forEach(([r,c])=>{this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;});dmg.hits=0;this.shots=0;this.log(`<span class="gd">Dry Dock</span> — ${dmg.name} fully repaired. Shot skipped.`);Sound.draw();},
-  scuttle(){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>a.len-b.len);if(live.length<=1){this.log('Cannot scuttle your last ship.');return;}
+  repairTiles(n){let healed=0,failed=0;for(let k=0;k<n;k++){const ship=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits)[0];if(!ship)break;if(Math.random()<0.15){failed++;continue;}const cell=ship.cells.find(([r,c])=>this.player.grid[r][c].hit);if(!cell)break;const[r,c]=cell;this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;ship.hits--;healed++;}
+    if(!healed&&!failed){this.log('No damaged ships to repair.');return;}this.log(`<span class="gd">Damage control</span> — patched ${healed} tile(s)${failed?` <span class="bd">(${failed} patch failed!)</span>`:''}.`);Sound.draw();},
+  dryDock(up){const dmg=this.player.ships.filter(s=>!s.sunk&&s.hits>0).sort((a,b)=>b.hits-a.hits)[0];if(!dmg){this.log('No damaged ship to dry-dock.');return;}
+    dmg.cells.forEach(([r,c])=>{this.player.grid[r][c].hit=false;this.player.grid[r][c].shot=false;});dmg.hits=0;
+    let partial=false;if(Math.random()<0.15){const[r,c]=dmg.cells[0];this.player.grid[r][c].hit=true;this.player.grid[r][c].shot=true;dmg.hits=1;partial=true;}
+    if(!up)this.shots=0;this.log(`<span class="gd">Dry Dock</span> — ${dmg.name} repaired${partial?' <span class="bd">(a breach reopened!)</span>':''}.${up?'':' Shot skipped.'}`);Sound.draw();},
+  scuttle(up){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>a.len-b.len);if(live.length<=1){this.log('Cannot scuttle your last ship.');return;}
     const s=live[0];s.sunk=true;s.hits=s.len;s.cells.forEach(([r,c])=>{this.player.grid[r][c].hit=true;this.player.grid[r][c].shot=true;this.player.grid[r][c].sunkx=true;});this.player.alive--;
-    this.drawCards(3);this.shots+=1;this.log(`<span class="bd">Scuttled the ${s.name}</span> — drew 3, +1 shot.`);Sound.sink();if(this.player.sync)this.player.sync();},
+    const d=up?4:3,sh=up?2:1;this.drawCards(d);this.shots+=sh;this.log(`<span class="bd">Scuttled the ${s.name}</span> — drew ${d}, +${sh} shot${sh>1?'s':''}.`);Sound.sink();if(this.player.sync)this.player.sync();},
   towShip(){const live=this.player.ships.filter(s=>!s.sunk);if(!live.length)return;
     const target=live.find(s=>s.cells.some(([r,c])=>this.player.grid[r][c].hit))||live[Math.floor(Math.random()*live.length)];
     if(relocateShip(this.player,target,this.rows,this.cols)){this.ai.targets=[];this.log(`<span class="gd">Emergency Tow</span> — ${target.name} slipped away. Enemy lost its track.`);Sound.draw();}
     else this.log('No room to tow.');},
-  crewTransfer(){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>b.len-a.len);if(live.length<2){this.log('Need 2 ships to transfer.');return;}
-    relocateShip(this.player,live[0],this.rows,this.cols);relocateShip(this.player,live[1],this.rows,this.cols);this.ai.targets=[];this.log('<span class="gd">Crew Transfer</span> — two hulls repositioned.');Sound.draw();},
+  crewTransfer(up){const live=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>b.len-a.len);if(live.length<2){this.log('Need 2 ships to transfer.');return;}
+    (up?live:live.slice(0,2)).forEach(s=>relocateShip(this.player,s,this.rows,this.cols));this.ai.targets=[];this.log(`<span class="gd">Crew Transfer</span> — ${up?'all hulls':'two hulls'} repositioned.`);Sound.draw();},
   salvageGhost(){const cell=randomEmptyCell(this.player,this.ghosts,this.rows,this.cols);if(!cell){this.log('No open water for a ghost hull.');return;}this.ghosts.push({r:cell[0],c:cell[1],turns:-1});this.log('<span class="gd">Salvage Op</span> — a ghost hull rises (absorbs 1 hit).');Sound.draw();},
-  blackTide(){if(this.usedBlackTide){this.log('Black Tide already called this run.');this.energy+=2;return;}this.usedBlackTide=true;
-    let n=0;this.player.ships.filter(s=>s.sunk).forEach(s=>{const c=s.cells[0];this.ghosts.push({r:c[0],c:c[1],turns:3});n++;});
-    if(!n){const cell=randomEmptyCell(this.player,this.ghosts,this.rows,this.cols);if(cell){this.ghosts.push({r:cell[0],c:cell[1],turns:3});n=1;}}
-    this.log(`<span class="am">🌊 THE BLACK TIDE RISES</span> — ${n} ghost hull(s) for 3 turns.`);Sound.sink();},
-  heatMap(){let best=-1,bc=0;for(let c=0;c<this.cols;c++){let n=0;for(let r=0;r<this.rows;r++){const t=this.enemy.grid[r][c];if(t.ship&&!t.shot)n++;}if(n>best){best=n;bc=c;}}
-    for(let r=0;r<this.rows;r++){const t=this.enemy.grid[r][bc];if(!t.shot){t.sonar=t.ship?'ship':'empty';t.seen=this.turn;}}this.log(`<span class="gd">Heat Map:</span> column <b>${COLS[bc]}</b> hottest.`);Sound.draw();},
-  activeSonar(){let best=-1,br=0,bcc=0;for(let r=0;r<=this.rows-3;r++)for(let c=0;c<=this.cols-3;c++){let n=0;for(let dr=0;dr<3;dr++)for(let dc=0;dc<3;dc++){const t=this.enemy.grid[r+dr][c+dc];if(t.ship&&!t.shot)n++;}if(n>best){best=n;br=r;bcc=c;}}
-    for(let dr=0;dr<3;dr++)for(let dc=0;dc<3;dc++){const t=this.enemy.grid[br+dr]&&this.enemy.grid[br+dr][bcc+dc];if(t&&!t.shot){t.sonar=t.ship?'ship':'empty';t.seen=this.turn;}}this.log('<span class="gd">Active sonar</span> lights a cluster.');Sound.draw();},
-  admiralsEye(){const live=this.enemy.ships.filter(s=>!s.sunk&&s.cells.some(([r,c])=>!this.enemy.grid[r][c].shot));if(!live.length){this.log('Nothing to reveal.');return;}
-    const s=live[Math.floor(Math.random()*live.length)];s.cells.forEach(([r,c])=>{if(!this.enemy.grid[r][c].shot){this.enemy.grid[r][c].sonar='ship';this.enemy.grid[r][c].seen=this.turn;}});this.log(`<span class="gd">Admiral's Eye</span> — a ${s.name} glints.`);Sound.draw();},
+  blackTide(up){if(this.usedBlackTide){this.log('Black Tide already called this run.');this.energy+=2;return;}this.usedBlackTide=true;const T=up?4:3;
+    let n=0;this.player.ships.filter(s=>s.sunk).forEach(s=>{const c=s.cells[0];this.ghosts.push({r:c[0],c:c[1],turns:T});n++;});
+    if(!n){const cell=randomEmptyCell(this.player,this.ghosts,this.rows,this.cols);if(cell){this.ghosts.push({r:cell[0],c:cell[1],turns:T});n=1;}}
+    this.log(`<span class="am">🌊 THE BLACK TIDE RISES</span> — ${n} ghost hull(s) for ${T} turns.`);Sound.sink();},
+  heatMap(up){const cols=[];for(let c=0;c<this.cols;c++){let n=0;for(let r=0;r<this.rows;r++){const t=this.enemy.grid[r][c];if(t.ship&&!t.shot&&!(t.shipRef&&t.shipRef.kind==='sub'))n++;}cols.push([n,c]);}cols.sort((a,b)=>b[0]-a[0]);const k=up?2:1;const pick=cols.slice(0,k).map(x=>x[1]);pick.forEach(c=>{for(let r=0;r<this.rows;r++)this.revealAt(r,c);});this.log(`<span class="gd">Heat Map:</span> column${k>1?'s':''} <b>${pick.map(c=>COLS[c]).join(', ')}</b> hottest.`);Sound.draw();},
+  activeSonar(up){const Z=Math.min(up?4:3,this.rows,this.cols);let best=-1,br=0,bcc=0;for(let r=0;r<=this.rows-Z;r++)for(let c=0;c<=this.cols-Z;c++){let n=0;for(let dr=0;dr<Z;dr++)for(let dc=0;dc<Z;dc++){const t=this.enemy.grid[r+dr][c+dc];if(t.ship&&!t.shot&&!(t.shipRef&&t.shipRef.kind==='sub'))n++;}if(n>best){best=n;br=r;bcc=c;}}
+    for(let dr=0;dr<Z;dr++)for(let dc=0;dc<Z;dc++)this.revealAt(br+dr,bcc+dc);this.log('<span class="gd">Active sonar</span> lights a cluster.');Sound.draw();},
+  admiralsEye(up){const live=this.enemy.ships.filter(s=>!s.sunk&&s.kind!=='sub'&&s.cells.some(([r,c])=>!this.enemy.grid[r][c].shot));if(!live.length){this.log('Nothing to reveal.');return;}
+    shuffle(live);(up?live.slice(0,2):live.slice(0,1)).forEach(s=>{s.cells.forEach(([r,c])=>this.revealAt(r,c));this.log(`<span class="gd">Admiral's Eye</span> — a ${s.name} glints.`);});Sound.draw();},
 
   /* ---------- FIRING ---------- */
   boardClick(r,c){
@@ -884,30 +1070,32 @@ const game={
     document.getElementById('ovl').classList.add('show');},
   doFire(r,c){
     this.fired=true;
-    let shape='single';if(this.armed){shape=this.armed.card.id;this.armed=null;this.setHelp('Tap a cell to fire.');this.banner('');}
+    let shape='single';this.armUp=false;if(this.armed){shape=this.armed.card.id;this.armUp=!!this.armed.card.up;this.armed=null;this.setHelp('Tap a cell to fire.');this.banner('');}
+    if(this.weather&&this.weather.id==='storm'&&shape==='single'&&Math.random()<0.3){const ns=neighbors(r,c,this.rows,this.cols).filter(([rr,cc])=>!this.enemy.grid[rr][cc].shot);if(ns.length){const[nr,nc]=ns[Math.floor(Math.random()*ns.length)];this.log('<span class="am">🌩️ The storm throws your shot off-target!</span>');r=nr;c=nc;}}
     let cost=1;if(this.firstSalvoFree){cost=0;this.firstSalvoFree=false;this.log('<span class="am">Voss:</span> first salvo free.');}
     this.fireShape(shape,r,c);this.shots-=cost;this.render();
     if(this.enemy.alive<=0)return this.victory();
     this.checkAuto();
   },
-  fireShape(shape,r,c){let cells=[[r,c]];
-    if(shape==='spread')cells=[[r,c-1],[r,c],[r,c+1]];
-    else if(shape==='torpedo')cells=[[r-1,c],[r,c],[r+1,c]];
-    else if(shape==='depthcharge')cells=[[r,c],[r,c+1],[r+1,c],[r+1,c+1]];
+  fireShape(shape,r,c){const u=this.armUp;let cells=[[r,c]];
+    if(shape==='spread')cells=u?[[r,c-2],[r,c-1],[r,c],[r,c+1],[r,c+2]]:[[r,c-1],[r,c],[r,c+1]];
+    else if(shape==='torpedo')cells=u?[[r-2,c],[r-1,c],[r,c],[r+1,c],[r+2,c]]:[[r-1,c],[r,c],[r+1,c]];
+    else if(shape==='depthcharge')cells=u?[[r-1,c-1],[r-1,c],[r-1,c+1],[r,c-1],[r,c],[r,c+1],[r+1,c-1],[r+1,c],[r+1,c+1]]:[[r,c],[r,c+1],[r+1,c],[r+1,c+1]];
     else if(shape==='nuke')cells=[[r-1,c-1],[r-1,c],[r-1,c+1],[r,c-1],[r,c],[r,c+1],[r+1,c-1],[r+1,c],[r+1,c+1]];
-    else if(shape==='pinpoint'){const f=[];for(let cc=0;cc<this.cols;cc++){const t=this.enemy.grid[r][cc];if(t.ship&&!t.shot)f.push([r,cc]);}cells=f.length?[f[0]]:[[r,c]];this.log('<span class="am">Pinpoint</span> on row '+(r+1)+'.');}
-    if(shape!=='single'&&shape!=='pinpoint')this.log(`<span class="am">${cardById(shape).name}!</span>`);
+    else if(shape==='pinpoint'){const f=[];for(let cc=0;cc<this.cols;cc++){const t=this.enemy.grid[r][cc];if(t.ship&&!t.shot)f.push([r,cc]);}cells=f.length?(u?f.slice(0,2):[f[0]]):[[r,c]];this.log('<span class="am">Pinpoint</span> on row '+(r+1)+'.');}
+    if(shape!=='single'&&shape!=='pinpoint')this.log(`<span class="am">${cardById(shape).name}${u?' +':''}!</span>`);
     let any=false;cells.forEach(([rr,cc])=>{if(rr<0||cc<0||rr>=this.rows||cc>=this.cols)return;if(!this.enemy.grid[rr][cc].shot){this.fireOne(rr,cc);any=true;}});
     if(!any)this.flash('Those cells were already fired.','am');},
   fireOne(r,c){const t=this.enemy.grid[r][c];if(t.shot)return;t.shot=true;t.sonar=null;t.seen=this.turn;
     if(t.ship){t.hit=true;const s=t.shipRef;const wasDmg=s.hits>0;s.hits++;this.stats.hits++;
+      if(s.kind==='artillery'){this.enemyBonusShot=(this.enemyBonusShot||0)+1;this.log('<span class="bd">⚠ Artillery cruiser struck — enemy gains +1 shot next turn!</span>');}
       let add=10;if(this.player.ships.find(x=>x.name==='Battleship'&&!x.sunk))add+=5;
-      if(this.hasRelic('targeting'))add*=1.5;if(this.overkill&&wasDmg)add*=2;
-      this.chips+=Math.round(add);const inc=(this.hasRelic('combo')?0.3:0.2)+0.05*this.streak;this.mult+=inc;this.streak++;
+      if(this.hasRelic('targeting'))add*=1.5;if(this.overkill&&wasDmg)add*=(this.overkillMult||2);if(this.weather&&this.weather.id==='calm')add*=1.25;
+      this.chips+=Math.round(add);const inc=((this.hasRelic('combo')?0.3:0.2)+0.05*this.streak)*(this.doctrine==='berserk'?2:1);this.mult+=inc;this.streak++;
       if(this.mult>this.stats.bestMult)this.stats.bestMult=this.mult;if(this.hasRelic('salvage'))this.addGold(3);
       this.render();const p=FX.atCell('enemy-grid',r,c);if(p){FX.popup(p.x,p.y,'+'+Math.round(add),'#ffd34d');FX.burst(p.x,p.y,'#ff7a2a',12);if(p.el)p.el.classList.add('pop');}Sound.hit();FX.shake();this.bump();
       if(this.admiral.id==='yara'&&Math.random()<0.35){const ns=neighbors(r,c,this.rows,this.cols).filter(([rr,cc])=>!this.enemy.grid[rr][cc].shot);if(ns.length){const[nr,nc]=ns[Math.floor(Math.random()*ns.length)];this.log('<span class="am">Splash!</span>');this.fireOne(nr,nc);}}
-      if(this.chain){this.chain=false;this.shots+=1;this.log('<span class="am">Chain shot — +1 shot!</span>');}
+      if(this.chain){this.chain=false;const ca=this.chainAmt||1;this.shots+=ca;this.log('<span class="am">Chain shot — +'+ca+' shot'+(ca>1?'s':'')+'!</span>');}
       if(s.hits>=s.len&&!s.sunk){s.sunk=true;s.cells.forEach(([rr,cc])=>this.enemy.grid[rr][cc].sunkx=true);this.enemy.alive--;this.stats.sinks++;
         this.chips+=100;this.addGold(8+(this.hasRelic('marque')?5:0));if(this.hasRelic('predator'))this.mult+=1;
         if(this.admiral.id==='kael')this.drawCards(1);
@@ -916,8 +1104,8 @@ const game={
         s.cells.forEach(([rr,cc])=>{const e=FX.atCell('enemy-grid',rr,cc);if(e&&e.el)e.el.classList.add('reveal');});Sound.sink();this.bump();}
       else this.log('<span class="gd">HIT</span> '+COLS[c]+(r+1)+' — but what did you hit?');
     } else {this.streak=0;this.log('Splash — miss '+COLS[c]+(r+1)+'.');this.render();const p=FX.atCell('enemy-grid',r,c);if(p){FX.burst(p.x,p.y,'#4f9fd0',6);if(p.el)p.el.classList.add('pop');}Sound.miss();}},
-  ping(r,c){let f=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=this.rows||cc>=this.cols)continue;const t=this.enemy.grid[rr][cc];if(t.shot)continue;if(t.ship){t.sonar='ship';f++;}else t.sonar='empty';t.seen=this.turn;}this.log(`<span class="gd">Ping</span> ${COLS[c]}${r+1}: ${f?('<b>'+f+'</b> contact'+(f>1?'s':'')):'clear'}.`);Sound.draw();},
-  wideScan(r){let f=0;for(let c=0;c<this.cols;c++){const t=this.enemy.grid[r][c];if(t.shot)continue;if(t.ship){t.sonar='ship';f++;}else t.sonar='empty';t.seen=this.turn;}this.log(`<span class="gd">Wide scan</span> row ${r+1}: <b>${f}</b> hull cells.`);Sound.draw();},
+  ping(r,c){let f=0;const fog=this.weather&&this.weather.id==='fog';for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(fog&&Math.abs(dr)+Math.abs(dc)===2)continue;if(this.revealAt(r+dr,c+dc))f++;}this.log(`<span class="gd">Ping</span> ${COLS[c]}${r+1}: ${f?('<b>'+f+'</b> contact'+(f>1?'s':'')):'clear'}${fog?' (fog)':''}.`);Sound.draw();},
+  wideScan(r){let f=0;for(let c=0;c<this.cols;c++){if(this.revealAt(r,c))f++;}this.log(`<span class="gd">Wide scan</span> row ${r+1}: <b>${f}</b> hull cells.`);Sound.draw();},
 
   /* ---------- TURN-FLOW AUTO ADVANCE ---------- */
   checkAuto(){if(this.phase!=='combat')return;const noShots=this.shots<=0;const noCards=this.fired||this.hand.every(k=>!this.canAfford(k));
@@ -932,20 +1120,22 @@ const game={
   enemyTurn(){
     this.turn=(this.turn||1);
     if(this.invis>0){this.invis--;this.log(`<span class="gd">Dead Man's Course</span> — the enemy fires blind into the fog. (${this.invis} turns left)`);return this.afterEnemy();}
-    if(this.smoke){this.smoke=false;this.log('<span class="gd">Smoke screen</span> — enemy fires blind, misses entirely.');return this.afterEnemy();}
+    if(this.smoke>0){this.smoke--;this.log('<span class="gd">Smoke screen</span> — enemy fires blind, misses entirely.');return this.afterEnemy();}
     let shots=this.enemyShots;if(this.faction.ai==='adaptive'){this.adaptiveBoost++;shots+=Math.floor(this.adaptiveBoost/2);}
     if(this.ascEscalate){this.adaptiveBoost++;shots+=Math.floor(this.adaptiveBoost/3);}
+    shots+=(this.enemyBonusShot||0);this.enemyBonusShot=0;
     let waste=this.decoyWaste;this.decoyWaste=0;
     for(let i=0;i<shots;i++){if(this.player.alive<=0)break;
       if(waste>0){waste--;this.log('<span class="am">Enemy hits a decoy</span> — wasted.');Sound.miss();continue;}
       if(this.hasRelic('fog')&&Math.random()<0.25){this.log('<span class="gd">Fog</span> — enemy shot lost.');continue;}
-      const cell=this.aiPick();if(!cell)break;const[r,c]=cell;
+      const cell=this.aiPick();if(!cell)break;let[r,c]=cell;
+      if(this.weather&&this.weather.id==='storm'&&Math.random()<0.3){const ns=neighbors(r,c,this.rows,this.cols);if(ns.length)[r,c]=ns[Math.floor(Math.random()*ns.length)];}
       // ghost decoy
       const gi=this.ghosts.findIndex(g=>g.r===r&&g.c===c);
       if(gi>=0){this.ghosts.splice(gi,1);this.log('<span class="am">Enemy fires on a ghost hull</span> — it absorbs the hit and fades.');this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'GHOST','#b9aef5');Sound.miss();continue;}
       const t=this.player.grid[r][c];t.shot=true;t.seen=this.turn;neighbors(r,c,this.rows,this.cols).forEach(([rr,cc])=>this.player.grid[rr][cc].seen=this.turn);
       if(t.ship){
-        if(this.evade&&Math.random()<0.5){this.log(`<span class="gd">Evaded</span> ${COLS[c]}${r+1}.`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'DODGE','#3ee08a');Sound.draw();continue;}
+        if(this.evade&&Math.random()<(this.evadeChance||0.5)){this.log(`<span class="gd">Evaded</span> ${COLS[c]}${r+1}.`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'DODGE','#3ee08a');Sound.draw();continue;}
         if(this.ironHull>0){this.ironHull--;t.deflect=true;this.log(`<span class="gd">Blocked</span> ${COLS[c]}${r+1}. (${this.ironHull} left)`);this.render();const p=FX.atCell('player-grid',r,c);if(p)FX.popup(p.x,p.y,'BLOCK','#ffc23c');Sound.draw();continue;}
         t.hit=true;const s=t.shipRef;s.hits++;this.ai.targets.push(...neighbors(r,c,this.rows,this.cols).filter(([rr,cc])=>!this.player.grid[rr][cc].shot));
         this.render();const p=FX.atCell('player-grid',r,c);if(p){FX.burst(p.x,p.y,'#ff5a3c',12);if(p.el)p.el.classList.add('pop');}Sound.hit();FX.shake();
@@ -955,16 +1145,31 @@ const game={
     }
     this.afterEnemy();
   },
-  afterEnemy(){this.evade=false;if(this.player.sync)this.player.sync();if(this.player.alive<=0){this.render();return this.defeat();}this.turn++;this.startTurn(false);this.render();},
+  afterEnemy(){this.evade=false;this.specialsTick();this.bossTickRun();if(this.player.sync)this.player.sync();if(this.player.alive<=0){this.render();return this.defeat();}this.turn++;this.startTurn(false);this.render();},
+  specialsTick(){if(!this.enemy)return;this.enemy.ships.filter(s=>!s.sunk&&s.kind==='tender').forEach(td=>{
+    const adj=this.enemy.ships.find(o=>o!==td&&!o.sunk&&o.hits>0&&o.cells.some(([r,c])=>td.cells.some(([tr,tc])=>Math.abs(tr-r)+Math.abs(tc-c)===1)));
+    if(adj){const cell=adj.cells.find(([r,c])=>this.enemy.grid[r][c].hit);if(cell){const[r,c]=cell;const t=this.enemy.grid[r][c];t.hit=false;t.shot=false;t.sonar=null;adj.hits--;this.log('<span class="bd">🟩 A repair tender patches an enemy hull.</span>');}}});},
+  bossTickRun(){if(!this.bossMech)return;this.bossTick++;
+    if(this.bossMech==='regen'&&this.bossTick%2===0){const d=this.enemy.ships.find(s=>!s.sunk&&s.hits>0);if(d){const cell=d.cells.find(([r,c])=>this.enemy.grid[r][c].hit);if(cell){const[r,c]=cell;const t=this.enemy.grid[r][c];t.hit=false;t.shot=false;t.sonar=null;d.hits--;this.log('<span class="bd">🛡️ The Iron Armada reseals a breach!</span>');}}}
+    if(this.bossMech==='spawn'&&this.bossTick%3===0){if(this.spawnEnemy(2))this.log('<span class="bd">☠️ The Carrion Fleet swells — a fresh hull surfaces!</span>');}
+    if(this.bossMech==='kraken'&&this.bossTick%2===0){let n=0;const seen=[];for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.enemy.grid[r][c];if((t.shot&&!t.hit)||t.sonar)seen.push([r,c]);}shuffle(seen);seen.slice(0,3).forEach(([r,c])=>{const t=this.enemy.grid[r][c];t.shot=false;t.sonar=null;n++;});
+      const open=[];for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.player.grid[r][c];if(t.ship&&!t.hit)open.push([r,c]);}
+      if(open.length){if(this.ironHull>0){this.ironHull--;this.log('<span class="gd">A tentacle is turned aside by your iron hull.</span>');}else{const[r,c]=open[Math.floor(Math.random()*open.length)];const t=this.player.grid[r][c];t.hit=true;t.shot=true;const s=t.shipRef;s.hits++;if(s.hits>=s.len&&!s.sunk){s.sunk=true;s.cells.forEach(([rr,cc])=>this.player.grid[rr][cc].sunkx=true);this.player.alive--;}this.log('<span class="bd">🦑 A tentacle smashes your deck!</span>');}}
+      if(n)this.log('<span class="bd">🌊 The Kraken drags '+n+' contact(s) back into the deep.</span>');}
+    if(this.bossMech==='mega'){const big=this.enemy.ships.filter(s=>!s.sunk&&s.hits===0).sort((a,b)=>b.len-a.len)[0];if(big){relocateShip(this.enemy,big,this.rows,this.cols);big.cells.forEach(([r,c])=>{this.enemy.grid[r][c].sonar=null;});this.log('<span class="bd">🦈 The Megalodon submerges and resurfaces elsewhere!</span>');}}},
+  spawnEnemy(len){for(let g=0;g<200;g++){const horiz=Math.random()<.5;const maxR=horiz?this.rows:this.rows-len+1,maxC=horiz?this.cols-len+1:this.cols;if(maxR<=0||maxC<=0)return false;
+    const r=Math.floor(Math.random()*maxR),c=Math.floor(Math.random()*maxC);const cells=[];let ok=true;
+    for(let i=0;i<len;i++){const rr=horiz?r:r+i,cc=horiz?c+i:c;const t=this.enemy.grid[rr][cc];if(t.ship||t.shot){ok=false;break;}cells.push([rr,cc]);}
+    if(!ok)continue;const s={name:'Destroyer',len,hits:0,sunk:false,cells};cells.forEach(([rr,cc])=>{this.enemy.grid[rr][cc].ship=true;this.enemy.grid[rr][cc].shipRef=s;this.enemy.grid[rr][cc].sonar=null;});this.enemy.ships.push(s);this.enemy.alive++;return true;}return false;},
   aiPick(){
-    while(this.ai.targets.length){const[r,c]=this.ai.targets.pop();if(!this.player.grid[r][c].shot)return[r,c];}
+    while(this.ai.targets.length){const[r,c]=this.ai.targets.pop();if(this.weather&&this.weather.id==='fog'&&Math.random()<0.4)continue;if(!this.player.grid[r][c].shot)return[r,c];}
     if(this.faction.ai==='sniper'){const big=this.player.ships.filter(s=>!s.sunk).sort((a,b)=>b.len-a.len)[0];
       if(big){const cand=[];big.cells.forEach(([r,c])=>{if(!this.player.grid[r][c].shot)cand.push([r,c]);neighbors(r,c,this.rows,this.cols).forEach(([rr,cc])=>{if(!this.player.grid[rr][cc].shot)cand.push([rr,cc]);});});if(cand.length&&Math.random()<0.6)return cand[Math.floor(Math.random()*cand.length)];}}
     const opts=[];for(let r=0;r<this.rows;r++)for(let c=0;c<this.cols;c++){const t=this.player.grid[r][c];if(t.shot)continue;if(this.faction.ai==='hunter'&&(r+c)%2!==0)continue;opts.push([r,c]);}
     const pool=opts.length?opts:allUnshot(this.player);if(!pool.length)return null;return pool[Math.floor(Math.random()*pool.length)];},
 
   /* ---------- SCORING ---------- */
-  addGold(n){let g=n;if(this.hasRelic('anchor'))g=Math.round(g*1.25);this.gold+=g;this.renderTop();Sound.coin();},
+  addGold(n){let g=n;if(this.hasRelic('anchor'))g=Math.round(g*1.25);if(this.doctrine==='fortune')g=Math.round(g*1.5);this.gold+=g;this.renderTop();Sound.coin();},
   bump(){const el=document.getElementById('scorehud');el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');this.renderScore();},
   renderScore(){document.getElementById('h-chips').textContent=Math.round(this.chips);document.getElementById('h-mult').textContent=this.mult.toFixed(1);},
 
@@ -1018,10 +1223,27 @@ const game={
   grantShip(name){this.fleet.push({name,len:SHIP_DEFS[name],hits:0,sunk:false});this.toast('+1 '+name+' joins your fleet');Sound.coin();this.afterReward();},
   grantPermShot(){this.permShot+=1;this.toast('+1 permanent shot/turn');Sound.coin();this.afterReward();},
   afterReward(){this.closeModal();this.finishNode();},
-  recordRun(win){if(this._recorded)return;this._recorded=true;const d=Meta.data;d.runs++;if(win){d.wins++;if(!this.usedSonar)d.sonarless=true;d.asc=Math.max(d.asc,Math.min(5,(this.ascension||0)+1));}if(this.runScore>d.best)d.best=this.runScore;this.recordDaily();Meta.save();},
-  runComplete(){this.recordRun(true);const m=document.getElementById('modal');m.innerHTML=`<h2 class="win">VICTORY — ALL SEAS CLEARED</h2><p>You broke all three acts and their bosses. A legendary run.</p>${this.summary()}<button class="btn btn-go" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');Sound.win();},
-  defeat(){this.recordRun(false);Sound.lose();this.clearAuto();const m=document.getElementById('modal');m.innerHTML=`<h2 class="lose">FLEET LOST</h2><p>Sunk in Act ${this.act} by the ${this.faction?this.faction.name:'sea'}.</p>${this.summary()}<button class="btn btn-fire" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');this.phase='dead';},
-  summary(){return `<div class="tally"><div class="big" style="font-size:1.8rem">${this.runScore.toLocaleString()}</div>
+  recordRun(win){if(this._recorded)return;this._recorded=true;const d=Meta.data;d.runs++;d.totalSinks=(d.totalSinks||0)+((this.stats&&this.stats.sinks)||0);if(win){d.wins++;if(!this.usedSonar)d.sonarless=true;d.asc=Math.max(d.asc,Math.min(5,(this.ascension||0)+1));}if(this.runScore>d.best)d.best=this.runScore;this.recordDaily();this.clearSave();Meta.save();this.evalAchievements();},
+  runComplete(){this.recordRun(true);const m=document.getElementById('modal');m.innerHTML=`<h2 class="win">VICTORY — ALL SEAS CLEARED</h2><p>You broke all three acts and their bosses. A legendary run.</p>${this.summary()}${this.lbForm('win')}<button class="btn btn-go" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');Sound.win();},
+  defeat(){this.recordRun(false);Sound.lose();this.clearAuto();const m=document.getElementById('modal');m.innerHTML=`<h2 class="lose">FLEET LOST</h2><p>Sunk in Act ${this.act} by the ${this.faction?this.faction.name:'sea'}.</p>${this.summary()}${this.lbForm('loss')}<button class="btn btn-fire" onclick="game.restart()">↻ New Run</button>`;document.getElementById('ovl').classList.add('show');this.phase='dead';},
+  lbForm(result){let nm='';try{nm=localStorage.getItem('dr_name')||'';}catch(e){}
+    return `<div id="lbf" style="margin-top:12px;border-top:1px solid var(--line2);padding-top:10px"><div style="font-size:.74rem;color:var(--ink2);margin-bottom:5px">🏆 Submit to leaderboard${this.dailyActive?` · <b>Daily ${this.dailySeed}</b>`:''}</div>
+      <input id="lbname" maxlength="14" placeholder="Your name" value="${nm.replace(/"/g,'')}" style="font-family:inherit;font-size:.9rem;padding:7px 10px;border-radius:9px;border:2px solid var(--line);background:#0a2030;color:#fff;width:150px;text-align:center">
+      <button class="btn btn-gold btn-sm" onclick="game.submitScore('${result}')">Submit ▸</button>
+      <button class="btn btn-end btn-sm" onclick="game.showLeaderboard()">View board</button></div>`;},
+  submitScore(result){const inp=document.getElementById('lbname');const name=((inp&&inp.value.trim())||'Anon').slice(0,14);try{localStorage.setItem('dr_name',name);}catch(e){}
+    LB.submit({name,score:this.runScore,seed:this.runSeed,admiral:this.admiral.name,arch:this.admiral.arch,act:this.act,result,asc:this.ascension||0,sinks:this.stats.sinks,date:new Date().toISOString().slice(0,10)});
+    const f=document.getElementById('lbf');if(f)f.innerHTML='<div style="color:var(--good);font-size:.82rem;padding:6px 0">✓ Submitted as <b>'+name+'</b>! <button class="btn btn-end btn-sm" onclick="game.showLeaderboard()">View board</button></div>';Sound.coin();},
+  showLeaderboard(){this.closeModal();const sheet=document.getElementById('sheet');this.show('sheet');sheet.innerHTML='<h2 style="color:var(--gold)">🏆 LEADERBOARD</h2><div class="desc">Loading…</div>';
+    const row=(r,i)=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:.78rem;padding:3px 8px;border-bottom:1px solid var(--line2)"><span>${i+1}. <b>${(r.name||'?')}</b> <span style="color:var(--ink3)">${r.admiral||''}${r.asc?' A'+r.asc:''}</span></span><span style="color:var(--son);font-weight:700">${(r.score||0).toLocaleString()}</span></div>`;
+    const block=(rows,online,label)=>`<div style="font-size:.72rem;color:var(--ink2);margin:8px 0 2px">${label} ${online?'· 🌐 online':'· 💾 local'}</div>${rows.length?rows.map(row).join(''):'<div style="color:var(--ink3);font-size:.8rem">No scores yet — be the first!</div>'}`;
+    LB.top('daily '+todaySeed(),(daily,on)=>{LB.top(null,(all,on2)=>{sheet.innerHTML=`<h2 style="color:var(--gold)">🏆 LEADERBOARD</h2>
+      <div style="max-width:440px;margin:0 auto;text-align:left">${block(daily,on,"Today's daily — "+todaySeed())}<div style="height:8px"></div>${block(all.slice(0,10),on2,'All-time top 10')}</div>
+      <div style="font-size:.66rem;color:var(--ink3);margin-top:8px">${LB_URL?'':'(local only — set LB_URL to a Cloudflare Worker to go global)'}</div>
+      <button class="btn btn-go" style="margin-top:10px" onclick="game.restart()">Back to title</button>`;});});},
+  mvpHtml(){const cc=this.cardCounts||{};let best=null,n=0;for(const id in cc){if(cc[id]>n){n=cc[id];best=id;}}if(!best||!n)return '';const c=cardTpl(best);if(!c)return '';
+    return `<div style="margin:10px 0 2px;font-size:.74rem;color:var(--gold)">⭐ MVP CARD — played ${n}×</div><div style="display:flex;justify-content:center"><div class="card${c.up?' up':''}" style="animation:none;transform:scale(.92)">${cardInner(c)}</div></div>`;},
+  summary(){return this.mvpHtml()+`<div class="tally"><div class="big" style="font-size:1.8rem">${this.runScore.toLocaleString()}</div>
     <div class="row"><span>Admiral</span><span>${this.admiral.name}</span></div>
     <div class="row"><span>Best battle</span><span>${this.stats.bestBattle.toLocaleString()}</span></div>
     <div class="row"><span>Peak Mult</span><span class="mm">×${this.stats.bestMult.toFixed(1)}</span></div>
@@ -1036,29 +1258,43 @@ const game={
     const relicHtml=st.relic?`<div class="buy ${st.bought.includes('r')?'sold':''}"><div class="relic-card" onclick="game.buyRelic()"><div class="ri">${st.relic.ic}</div><div class="rn">${st.relic.name}</div><div class="rd">${st.relic.ds}</div></div><div class="price">${st.bought.includes('r')?'SOLD':'🪙 '+relicPrice()}</div></div>`:'';
     s.innerHTML=`<h2 style="color:var(--gold)">🪙 SMUGGLER'S WHARF</h2><div class="desc">Spend gold. Thinning your deck is power — remove a card for 🪙 30.</div>
       <div class="shop-row">${cardHtml}</div><div class="shop-row">${relicHtml}</div>
-      <div class="choices"><div class="choice" onclick="game.removeMenu()"><div class="ct">🗑️ Remove a card — 🪙 30</div><div class="cd">Trim a weak card.</div></div></div>
+      <div class="choices"><div class="choice" onclick="game.removeMenu()"><div class="ct">🗑️ Remove a card — 🪙 30</div><div class="cd">Trim a weak card.</div></div>
+      <div class="choice" onclick="game.forgeMenu('shop')"><div class="ct">🔨 Forge a card (+) — 🪙 40</div><div class="cd">Upgrade a card.</div></div></div>
       <button class="btn btn-go" style="margin-top:14px" onclick="game.finishNode()">Leave Wharf ▸</button>`;},
   buyCard(i){const st=this.shopState;if(st.bought.includes('c'+i))return;const p=cardPrice(st.cards[i]);if(this.gold<p){this.toast('Not enough gold');return;}this.gold-=p;this.deck.push({...st.cards[i]});st.bought.push('c'+i);Sound.coin();this.renderTop();this.renderShop();},
   buyRelic(){const st=this.shopState;if(st.bought.includes('r'))return;const p=relicPrice();if(this.gold<p){this.toast('Not enough gold');return;}this.gold-=p;this.addRelic(st.relic.id);st.bought.push('r');Sound.coin();this.renderTop();this.renderShop();},
   removeMenu(){if(this.gold<30){this.toast('Need 🪙 30');return;}const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--gold)">🗑️ REMOVE A CARD</h2><div class="desc">Scrap one (🪙 30).</div><div class="rewards" id="rm"></div><button class="btn btn-end" onclick="game.renderShop()">Cancel</button>`;
     const z=s.querySelector('#rm');this.deck.forEach((c,i)=>{const el=document.createElement('div');el.className='card';el.style.animation='none';el.innerHTML=cardInner(c);el.onclick=()=>{this.gold-=30;this.deck.splice(i,1);Sound.coin();this.renderTop();this.renderShop();};z.appendChild(el);});},
   openEvent(){const events=[
-      {t:'DERELICT FREIGHTER',d:'A ghost ship drifts in the fog.',ch:[{ct:'Salvage the hold',cd:'+45 gold',fn:()=>this.addGold(45)},{ct:'Strip its guns',cd:'Random Ordnance card',fn:()=>this.grantCard('ORDNANCE')},{ct:'Scuttle for parts',cd:'Repair 2 hull damage',fn:()=>this.repairFleet(2)}]},
-      {t:'MUTINOUS CREW',d:'Half want plunder, half want safe passage.',ch:[{ct:'Promise plunder',cd:'+60 gold, take 1 damage',fn:()=>{this.addGold(60);this.damageFleet(1);}},{ct:'Keep discipline',cd:'Random Repair card',fn:()=>this.grantCard('REPAIR')}]},
+      {t:'DERELICT FREIGHTER',d:'A ghost ship drifts in the fog.',ch:[{ct:'Salvage the hold',cd:'+45 gold',fn:()=>this.addGold(45)},{ct:'Strip its guns',cd:'Random Ordnance card',fn:()=>this.grantCard('ORDNANCE')},{ct:'Log the wreck',cd:'+250 score',fn:()=>{this.runScore+=250;this.renderTop();}}]},
+      {t:'MUTINOUS CREW',d:'Half want plunder, half want safe passage.',ch:[{ct:'Promise plunder',cd:'+70 gold, take 1 damage',fn:()=>{this.addGold(70);this.damageFleet(1);}},{ct:'Keep discipline',cd:'Random Maneuver card',fn:()=>this.grantCard('MANEUVER')}]},
       {t:'BLACK MARKET BUOY',d:'A cache blinks with contraband.',ch:[{ct:'Crack it open',cd:'Random relic',fn:()=>this.grantRelic()},{ct:'Sell the coords',cd:'+35 gold',fn:()=>this.addGold(35)}]},
-      {t:'STORM FRONT',d:'A squall — cover, or a battering.',ch:[{ct:'Sail through',cd:'Sonar card, risk 1 damage',fn:()=>{this.grantCard('SONAR');if(Math.random()<.5)this.damageFleet(1);}},{ct:'Wait it out',cd:'Repair all damage',fn:()=>this.repairFleet(99)}]},
+      {t:'MESSAGE IN A BOTTLE',d:'A faded chart hints at buried plunder.',ch:[{ct:'Follow the chart',cd:'+300 score',fn:()=>{this.runScore+=300;this.renderTop();}},{ct:'Trade it at port',cd:'+50 gold',fn:()=>this.addGold(50)}]},
+      {t:'PRESS-GANGED SAILORS',d:'Rough hands looking for a berth.',ch:[{ct:'Sign them on (🪙40)',cd:'+1 permanent shot/turn',fn:()=>{if(this.gold>=40){this.gold-=40;this.permShot+=1;this.renderTop();this.toast('+1 permanent shot');}else this.toast('Not enough gold');}},{ct:'Wave them off',cd:'Random Sonar card',fn:()=>this.grantCard('SONAR')}]},
+      {t:'CURSED IDOL',d:'A golden idol grins from a rotting altar.',ch:[{ct:'Take it',cd:'Random relic, take 2 damage',fn:()=>{this.grantRelic();this.damageFleet(2);}},{ct:'Leave it be',cd:'+30 gold for the timbers',fn:()=>this.addGold(30)}]},
+      {t:'WHIRLPOOL',d:'The sea spirals into a hungry funnel.',ch:[{ct:'Gun through it',cd:'Gamble: +90 gold or lose 30',fn:()=>{if(Math.random()<0.55){this.addGold(90);this.toast('Through clean! +90 gold');}else{this.gold=Math.max(0,this.gold-30);this.renderTop();this.toast('Battered — lost 30 gold');}}},{ct:'Go around',cd:'Safe passage',fn:()=>this.toast('You sail safely around.')}]},
+      {t:'SIREN SONG',d:'Voices on the wind promise power.',ch:[{ct:'Listen closer',cd:'A free random card',fn:()=>this.grantCard(['ORDNANCE','SONAR','MANEUVER','DECOY','REPAIR','FLAGSHIP'][Math.floor(Math.random()*6)])},{ct:'Plug your ears',cd:'+35 gold',fn:()=>this.addGold(35)}]},
+      {t:'FRIENDLY CONVOY',d:'A merchant escort offers spare parts.',ch:[{ct:'Take repairs',cd:'Repair 2 hull damage',fn:()=>this.repairFleet(2)},{ct:'Trade cargo',cd:'+40 gold',fn:()=>this.addGold(40)}]},
     ];this.eventState=events[Math.floor(Math.random()*events.length)];const ev=this.eventState;const s=document.getElementById('sheet');
     s.innerHTML=`<h2 style="color:var(--son)">📜 ${ev.t}</h2><div class="desc">${ev.d}</div><div class="choices" id="ev"></div>`;
     const z=s.querySelector('#ev');ev.ch.forEach(c=>{const el=document.createElement('div');el.className='choice';el.innerHTML=`<div class="ct">${c.ct}</div><div class="cd">${c.cd}</div>`;el.onclick=()=>{c.fn();this.eventDone(c);};z.appendChild(el);});this.show('sheet');},
   eventDone(c){const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--son)">📜 ${this.eventState.t}</h2><div class="desc">You chose: <b>${c.ct}</b>. ${c.cd}.</div><button class="btn btn-go" onclick="game.finishNode()">Continue ▸</button>`;},
   grantCard(cat){const c=shuffle(LIB.filter(x=>x.cat===cat))[0];this.deck.push({...c});this.toast('Gained '+c.name);},
   grantRelic(){const owned=this.relics.map(r=>r.id);const r=shuffle(RELICS.filter(x=>!owned.includes(x.id)))[0];if(r)this.addRelic(r.id);},
-  repairFleet(n){let left=n;this.fleet.forEach(s=>{while(left>0&&s.hits>0){s.hits--;left--;}if(s.sunk&&s.hits<s.len)s.sunk=false;});this.toast('Hull repaired');},
+  repairFleet(n){if(n>=99){let glitch=Math.random()<0.15,f=0;this.fleet.forEach(s=>{if(s.sunk)s.sunk=false;if(s.hits>0){if(glitch){s.hits=1;glitch=false;f=1;}else s.hits=0;}});this.toast(f?'Fleet repaired — one breach held':'Fleet fully repaired');return;}
+    let left=n,fails=0;this.fleet.forEach(s=>{while(left>0&&s.hits>0){if(Math.random()<0.15){fails++;left--;continue;}s.hits--;left--;}if(s.sunk&&s.hits<s.len)s.sunk=false;});this.toast(fails?'Hull repaired (some patches failed)':'Hull repaired');},
   damageFleet(n){const live=this.fleet.filter(s=>!s.sunk);for(let k=0;k<n&&live.length;k++){const s=live[Math.floor(Math.random()*live.length)];s.hits=Math.min(s.len,s.hits+1);if(s.hits>=s.len)s.sunk=true;}if(this.fleet.every(s=>s.sunk))this.defeat();},
   openRest(){const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--man)">🛠 DRY DOCK</h2><div class="desc">A quiet harbor. Patch hulls or refit.</div>
     <div class="choices"><div class="choice" onclick="game.restRepair()"><div class="ct">🔧 Full Repair</div><div class="cd">Remove all hull damage.</div></div>
     <div class="choice" onclick="game.restCard()"><div class="ct">⚒️ Salvage Yard</div><div class="cd">Gain a free random card.</div></div>
+    <div class="choice" onclick="game.forgeMenu('rest')"><div class="ct">🔨 Forge a Card (+)</div><div class="cd">Permanently upgrade one card.</div></div>
     <div class="choice" onclick="game.addGold(40);game.finishNode()"><div class="ct">💰 Trade Run</div><div class="cd">+40 gold.</div></div></div>`;this.show('sheet');},
+  forgeMenu(ctx){if(ctx==='shop'&&this.gold<40){this.toast('Need 🪙 40');return;}
+    const elig=this.deck.filter(c=>!c.up&&UP[c.id]);const s=document.getElementById('sheet');
+    s.innerHTML=`<h2 style="color:var(--gold)">🔨 FORGE A CARD</h2><div class="desc">Upgrade one card to its <b>+</b> version${ctx==='shop'?' (🪙 40)':''}.</div><div class="rewards" id="fg"></div><button class="btn btn-end" onclick="${ctx==='shop'?'game.renderShop()':'game.openRest()'}">Cancel</button>`;
+    const z=s.querySelector('#fg');if(!elig.length){z.innerHTML='<div style="color:var(--ink2);font-size:.8rem">No upgradeable cards in your deck.</div>';return;}
+    elig.forEach(c=>{const el=document.createElement('div');el.className='card';el.style.animation='none';el.innerHTML=cardInner(c)+`<div style="position:absolute;bottom:18px;left:0;right:0;text-align:center;font-size:.55rem;color:var(--gold)">→ ${UP[c.id]}</div>`;
+      el.onclick=()=>{if(ctx==='shop'){if(this.gold<40){this.toast('Need 🪙 40');return;}this.gold-=40;this.renderTop();}upgradeCard(c);Sound.coin();this.toast(c.name+' forged!');if(ctx==='shop')this.renderShop();else this.finishNode();};z.appendChild(el);});},
   restRepair(){this.repairFleet(99);this.toast('Fleet fully repaired');this.finishNode();},
   restCard(){const c=shuffle(weightedCards())[0];this.deck.push({...c});this.toast('Gained '+c.name);this.finishNode();},
   openTreasure(){const s=document.getElementById('sheet');const owned=this.relics.map(r=>r.id);const picks=shuffle(RELICS.filter(r=>!owned.includes(r.id))).slice(0,2);
@@ -1067,12 +1303,13 @@ const game={
     if(!picks.length)s.innerHTML+=`<button class="btn btn-go" onclick="game.finishNode()">Take the gold ▸</button>`;this.show('sheet');},
 
   /* ---------- RENDER ---------- */
-  show(which){['title','map','place','combat','sheet','pirate'].forEach(id=>document.getElementById(id).classList.toggle('hidden',id!==which));document.getElementById('relics').classList.toggle('hidden',which==='title');document.getElementById('cmdrs').classList.toggle('hidden',!(which==='combat'||which==='pirate'));if(which!=='pirate'&&Pirate.loop){clearInterval(Pirate.loop);Pirate.loop=null;}},
+  show(which){['title','map','place','combat','sheet','pirate','bm'].forEach(id=>document.getElementById(id).classList.toggle('hidden',id!==which));document.getElementById('relics').classList.toggle('hidden',which==='title');document.getElementById('cmdrs').classList.toggle('hidden',!(which==='combat'||which==='pirate'));if(which!=='pirate'&&Pirate.loop){clearInterval(Pirate.loop);Pirate.loop=null;}},
   renderTop(){document.getElementById('s-act').textContent=this.act?this.act+'/3':'—';document.getElementById('s-gold').textContent=this.gold;document.getElementById('s-score').textContent=this.runScore.toLocaleString();this.renderRelics();},
   renderRelics(){const el=document.getElementById('relics');if(!this.relics||!this.relics.length){el.innerHTML='<span class="empty">No relics yet — clear elites & bosses to earn them.</span>';return;}el.innerHTML=this.relics.map(r=>`<div class="relic">${r.ic}<div class="tip"><b>${r.name}</b><br>${r.ds}</div></div>`).join('');},
   banner(t){const b=document.getElementById('selbanner');b.textContent=t;b.classList.toggle('show',!!t);},
   render(){this.renderTop();if(this.phase!=='combat')return;
     document.getElementById('s-shots').textContent=this.shots;document.getElementById('s-enemyships').textContent=this.enemy.alive;
+    if(this.weather){const w=document.getElementById('s-weather');w.textContent=this.weather.ic;w.title=this.weather.name+' — '+this.weather.ds;}
     const ed=document.getElementById('energy');ed.innerHTML='';for(let i=0;i<this.maxEnergy;i++){const d=document.createElement('span');d.className='dot'+(i<this.energy?' on':'');ed.appendChild(d);}
     this.renderScore();this.renderGrid('enemy-grid',this.enemy,true);this.renderGrid('player-grid',this.player,false);this.renderRoster();this.renderFleet();this.renderHand();},
   renderGrid(id,board,isEnemy){const g=document.getElementById(id);let html='';
@@ -1098,7 +1335,7 @@ const game={
         html+=`<div class="${cls}" data-r="${r}" data-c="${c}">${inner}</div>`;
       }}
     g.style.setProperty('--cols',this.cols);g.innerHTML=html;},
-  renderRoster(){const el=document.getElementById('roster');el.innerHTML=this.enemy.ships.map(s=>s.sunk?`<span class="rchip sunk">${s.name} (${s.len}) ✓</span>`:`<span class="rchip">??? </span>`).join('');},
+  renderRoster(){const el=document.getElementById('roster');el.innerHTML=this.enemy.ships.map(s=>s.sunk?`<span class="rchip sunk${s.kind?' officer':''}">${s.kind?SPECIALS[s.kind].ic+' ':''}${s.name} (${s.len}) ✓</span>`:`<span class="rchip">??? </span>`).join('');},
   renderFleet(){const el=document.getElementById('fleet');el.innerHTML='';
     this.player.ships.forEach(s=>{const pct=Math.max(0,100*(s.len-s.hits)/s.len);let b='b-ok',txt='Intact';if(s.sunk){b='b-sunk';txt='Sunk';}else if(s.hits>0){b='b-dmg';txt=`Hit ${s.hits}/${s.len}`;}
       const d=document.createElement('div');d.className='fitem';d.innerHTML=`<span style="min-width:70px">${s.name} (${s.len})</span><span class="fbar"><span class="ffill" style="width:${pct}%"></span></span><span class="badge ${b}">${txt}</span>`;el.appendChild(d);});
@@ -1106,7 +1343,7 @@ const game={
   renderHand(){const h=document.getElementById('hand');h.innerHTML='';
     this.hand.forEach((c,i)=>{let cost=c.cost;if(this.admiral.id==='silas'&&c.cat==='DECOY')cost=0;const can=!this.fired&&cost<=this.energy;
       const armed=(this.armed&&this.armed.idx===i)||(this.targeting&&this.targeting.idx===i);
-      const el=document.createElement('div');el.className='card'+(can?'':' cant')+(armed?' armed':'')+(this.dealAnim?' deal':'');el.style.animationDelay=this.dealAnim?(i*0.05)+'s':'';
+      const el=document.createElement('div');el.className='card'+(can?'':' cant')+(armed?' armed':'')+(c.up?' up':'')+(this.dealAnim?' deal':'');el.style.animationDelay=this.dealAnim?(i*0.05)+'s':'';
       el.innerHTML=cardInner(c,cost);el.onclick=()=>this.playCard(i,el);h.appendChild(el);});
     this.dealAnim=false;document.getElementById('btn-end').disabled=false;},
 
@@ -1123,6 +1360,7 @@ const game={
 };
 
 /* ---- card render ---- */
+function cardTpl(id){return LIB.find(c=>c.id===id)||Object.values(SIGS).find(c=>c.id===id)||null;}
 function cardInner(c,cost){const cc=(cost===0||cost)?cost:c.cost;return `<div class="cost">${cc}</div><div class="cat cat-${c.cat}" style="padding-top:3px">${c.cat}</div><div class="art">${ART[c.id]||'⚓'}</div><div class="nm">${c.name}</div><div class="ds">${c.ds}</div><div class="rar r-${c.rar}">${RAR_LABEL[c.rar]}</div>`;}
 function cardEl(c){return `<div class="card" style="animation:none">${cardInner(c)}</div>`;}
 function cardPrice(c){return ({common:35,rare:55,forge:65,contra:80,omega:110})[c.rar]||40;}
@@ -1185,6 +1423,13 @@ function enemyFleetFor(rows,cols,variant){
   while(used<budget&&guard++<30&&names.length<cap){const remaining=budget-used;const choices=pool.filter(s=>s[1]<=remaining+1);if(!choices.length)break;const pick=choices[Math.floor(Math.random()*choices.length)];names.push(pick[0]);used+=pick[1];}
   while(names.length<2&&pool.length)names.push(pool[pool.length-1][0]);
   if(!names.length)names.push('Destroyer');return names.map(n=>({name:n,len:SHIP_DEFS[n]}));}
+function assignSpecials(board,kind,act){const out=[];const ships=board.ships.slice();shuffle(ships);
+  const add=k=>{const s=ships.find(x=>!x.kind&&!(k==='sub'&&x.len>=4));if(s){s.kind=k;out.push(k);}};
+  const R=()=>['sub','tender','artillery'][Math.floor(Math.random()*3)];
+  if(kind==='boss'){add('tender');add('sub');}
+  else if(kind==='elite'){add(R());}
+  else if(act>=2&&Math.random()<0.30){add(R());}
+  return out;}
 
 /* ---- map gen with node variance (Sprint 2) ---- */
 function pickNodeType(){const r=Math.random();
@@ -1259,14 +1504,14 @@ const Pirate={
     this.wind=this.rdir();this.windT=3;this.ships=[];this.bs=null;this.sunk=[];this.btUsed=false;this.smokeT=0;
     game.faction={name:kind==='boss'?(BOSSES[game.act-1]||'Carrion Fleet'):['Corsair Skiffs','Reef Swarm','Ghost Tide'][Math.floor(Math.random()*3)],ai:'pirate'};
     game.fleet.filter(s=>!s.sunk).forEach(s=>this.add(s.name,s.len,'p'));
-    const ec=kind==='scout'?2:kind==='boss'?5:kind==='elite'?4:3;
+    const ec=kind==='scout'?1:kind==='boss'?4:kind==='elite'?3:2;
     const types=[['Destroyer',2],['Cruiser',3],['Battleship',4],['Submarine',3],['Carrier',5]];
     for(let i=0;i<ec;i++){const t=types[i%types.length];this.add(t[0],t[1],'e');}
     this.place();this.buildUI();game.show('pirate');setupPortraits();
     this.render();this.loop=setInterval(()=>this.tick(),2000);
   },
   rdir(){return ['N','S','E','W'][Math.floor(Math.random()*4)];},
-  add(name,len,owner){this.ships.push({name,owner,len,r:0,c:0,dir:null,hull:len,maxHull:len,crew:len,maxCrew:len,grapT:0,grapBy:null,boarding:false,captured:false,_dead:false});},
+  add(name,len,owner){const hull=owner==='p'?len+1:len;this.ships.push({name,owner,len,r:0,c:0,dir:null,hull,maxHull:hull,crew:len,maxCrew:len,grapT:0,grapBy:null,boarding:false,captured:false,_dead:false});},
   place(){const occ=new Set();this.ships.forEach(s=>{for(let g=0;g<300;g++){const r=s.owner==='p'?this.rows-1-(g%2):(g%2);const c=Math.floor(Math.random()*this.cols);if(occ.has(r+','+c))continue;occ.add(r+','+c);s.r=r;s.c=c;return;}});},
   inb(r,c){return r>=0&&c>=0&&r<this.rows&&c<this.cols;},
   occ(r,c,ex){return this.ships.find(s=>s!==ex&&s.hull>0&&s.r===r&&s.c===c);},
@@ -1307,7 +1552,7 @@ const Pirate={
     document.getElementById('ovl').classList.add('show');},
   bsFire(i){if(!this.bs||this.bs.shown[i])return;this.bs.shown[i]=true;const {p,e}=this.bs;const s=this.bs.sec[i];
     if(s==='H'){e.hull--;Sound.hit();}else if(s==='C'){e.crew--;Sound.hit();}else Sound.miss();
-    if(e.hull>0&&e.crew>0)p.hull--;this.bsCheck();},
+    this.bs.rf=(this.bs.rf||0)+1;if(e.hull>0&&e.crew>0&&this.bs.rf%2===0)p.hull--;this.bsCheck();},
   bsCheck(){const {p,e}=this.bs;
     if(e.crew<=0&&e.hull>0&&!e.captured){e.captured=true;e.owner='p';e.hull=1;e.crew=e.maxCrew;e.dir=null;e.boarding=false;game.fleet.push({name:e.name,len:e.len,hits:e.len-1,sunk:false});this.log('⚓ <b>Captured the '+e.name+'!</b> She flies your colours now.');portrait('triumph');foePortrait('grimace');Sound.sink();return this.closeBroadside();}
     if(e.hull<=0){e._dead=true;e.hull=0;if(e.ttl==null)this.sunk.push({name:e.name,len:e.len,r:e.r,c:e.c});this.log('The '+e.name+' is blown apart at point-blank!');portrait('triumph');Sound.sink();return this.closeBroadside();}
@@ -1373,6 +1618,133 @@ const Pirate={
     game.runScore+=total;game.battlesWon++;game.actBattle++;game.addGold(({boss:55,elite:35,scout:8,standard:15})[this.kind]||15);game.renderTop();Sound.win();
     const m=document.getElementById('modal');m.innerHTML=`<h2 class="win">${this.kind==='boss'?'BOSS BOARDED':'WATERS TAKEN'}</h2><p>Boarding action won${captures?` — ${captures} ship(s) captured`:''}. +${total} score.</p>${game.summary()}<button class="btn btn-go" onclick="game.closeModal();game.finishNode()">Continue ▸</button>`;document.getElementById('ovl').classList.add('show');},
   lose(){if(this.over)return;this.over=true;if(this.loop){clearInterval(this.loop);this.loop=null;}portrait('grimace');game.defeat();},
+};
+
+/* ============ BATTLE MODE (Phase B — synced 1v1 duel) ============ */
+const BM_CARDS={
+  salvo:{name:'Double Salvo',ic:'💥',cat:'ORDNANCE',cost:1,ds:'+1 shot this turn.',type:'off'},
+  barrage:{name:'Barrage',ic:'🔱',cat:'ORDNANCE',cost:2,ds:'+2 shots this turn.',type:'off'},
+  spread:{name:'Spread Shot',ic:'🎯',cat:'ORDNANCE',cost:1,ds:'Next shot hits a 1×3 row.',type:'arm',shape:'spread'},
+  torpedo:{name:'Torpedo',ic:'🚀',cat:'ORDNANCE',cost:1,ds:'Next shot hits a 3×1 column.',type:'arm',shape:'torpedo'},
+  ironhull:{name:'Iron Hull',ic:'🛡️',cat:'MANEUVER',cost:1,ds:'Block the next 2 hits.',type:'iron'},
+  evade:{name:'Evasive',ic:'🌀',cat:'MANEUVER',cost:1,ds:'50% to dodge each shot next enemy turn.',type:'evade'},
+  smoke:{name:'Smoke Screen',ic:'💨',cat:'MANEUVER',cost:2,ds:'Enemy wholly misses next turn.',type:'smoke'},
+  decoy:{name:'Ghost Buoy',ic:'🛟',cat:'DECOY',cost:1,ds:'Waste the enemy’s next would-be hit.',type:'decoy'},
+  sabotage:{name:'Sabotage',ic:'📡',cat:'FLAGSHIP',cost:2,ds:'Foe draws 1 fewer card next turn.',type:'mp'},
+};
+const BM_DEFAULT_DECK=['salvo','salvo','spread','torpedo','ironhull','evade','decoy','barrage','smoke','sabotage'];
+function bmShape(shape,r,c){if(shape==='spread')return [[r,c-1],[r,c],[r,c+1]];if(shape==='torpedo')return [[r-1,c],[r,c],[r+1,c]];return [[r,c]];}
+const BM={
+  send(o){}, // overridden: real game -> Net.send; tests -> opponent.onMsg
+  start(side,opts){this.opts=opts||{};this.threshold=this.opts.bestOf||2;this.side=side;this.foeSide=side==='a'?'b':'a';this.wins={a:0,b:0};this.round=1;this.gold=60;this.deck=BM_DEFAULT_DECK.slice();this.over=false;
+    if(!this.opts.noHandler)game._mpHandler=m=>this.onMsg(m);this.drawPile=null;this.newRound();this.show();},
+  newRound(){this.R=8;this.C=8;this.myReady=false;this.foeReady=false;this.phase='deploy';
+    this.deploy=placeFleet(Object.keys(SHIP_DEFS).map(n=>({name:n,len:SHIP_DEFS[n]})),this.R,this.C);
+    this.foe={grid:emptyGrid(this.R,this.C),alive:5,sunk:[]};this.flags={iron:0,decoy:0,smoke:false,evade:false};
+    this.armed=null;this.energy=2;this.shots=1;this.hand=[];this.waiting=false;this.drawPenalty=0;this.myTurn=false;},
+  randomize(){if(this.phase!=='deploy'||this.myReady)return;this.deploy=placeFleet(Object.keys(SHIP_DEFS).map(n=>({name:n,len:SHIP_DEFS[n]})),this.R,this.C);Sound.card();this.show();},
+  ready(){if(this.phase!=='deploy'||this.myReady)return;this.myReady=true;this.my=bakeBoard(this.deploy,this.R,this.C);this.send({t:'ready'});Sound.win();if(this.foeReady)this.begin();else this.show();},
+  begin(){this.phase='combat';this.myTurn=(this.side==='a');this.startTurn();},
+  startTurn(){this.flags.smoke=false;this.flags.evade=false;this.armed=null;this.energy=2;this.shots=1;this.waiting=false;
+    this.drawPile=this.drawPile&&this.drawPile.length?this.drawPile:shuffle(this.deck.slice());
+    const want=4-this.drawPenalty;this.drawPenalty=0;this.hand=[];for(let i=0;i<want;i++){if(!this.drawPile.length)this.drawPile=shuffle(this.deck.slice());this.hand.push(this.drawPile.pop());}
+    this.show();},
+  playCard(i){if(this.phase!=='combat'||!this.myTurn||this.waiting)return;const id=this.hand[i];if(!id)return;const c=BM_CARDS[id];if(c.cost>this.energy){game.toast&&game.toast('Not enough energy');return;}
+    this.energy-=c.cost;this.hand.splice(i,1);Sound.card();
+    if(c.type==='off')this.shots+=(id==='barrage'?2:1);
+    else if(c.type==='arm')this.armed=c.shape;
+    else if(c.type==='iron')this.flags.iron+=2;
+    else if(c.type==='evade')this.flags.evade=true;
+    else if(c.type==='smoke')this.flags.smoke=true;
+    else if(c.type==='decoy')this.flags.decoy+=1;
+    else if(c.type==='mp'){this.send({t:'sabotage'});}
+    this.show();},
+  fire(r,c){if(this.phase!=='combat'||!this.myTurn||this.waiting||this.shots<=0)return;if(this.foe.grid[r][c].shot){game.toast&&game.toast('Already fired there');return;}
+    const shape=this.armed||'single';this.armed=null;this.waiting=true;this.send({t:'fire',r,c,shape});this.show();},
+  resolveIncoming(shape,r,c){const out=[];for(const [rr,cc] of bmShape(shape,r,c)){if(rr<0||cc<0||rr>=this.R||cc>=this.C)continue;const t=this.my.grid[rr][cc];if(t.shot)continue;t.shot=true;
+      if(t.ship){let dmg=true;
+        if(this.flags.smoke)dmg=false;else if(this.flags.evade&&Math.random()<0.5)dmg=false;else if(this.flags.decoy>0){this.flags.decoy--;dmg=false;}else if(this.flags.iron>0){this.flags.iron--;dmg=false;t.deflect=true;}
+        if(dmg){t.hit=true;const s=t.shipRef;s.hits++;let sunk=false;if(s.hits>=s.len&&!s.sunk){s.sunk=true;s.cells.forEach(([a,b])=>this.my.grid[a][b].sunkx=true);this.my.alive--;sunk=true;}out.push({r:rr,c:cc,hit:true,sunk,ship:sunk?s.name:null});}
+        else out.push({r:rr,c:cc,hit:false});
+      } else out.push({r:rr,c:cc,hit:false});}
+    return {cells:out,alive:this.my.alive};},
+  onMsg(m){switch(m.t){
+    case 'ready':this.foeReady=true;if(this.myReady)this.begin();else this.show();break;
+    case 'sabotage':this.drawPenalty=1;break;
+    case 'fire':{const res=this.resolveIncoming(m.shape,m.r,m.c);this.send({t:'result',cells:res.cells,alive:res.alive});Sound.hit();
+      if(res.alive<=0){this.send({t:'roundover',winner:this.foeSide});this.roundOver(this.foeSide);}else this.show();break;}
+    case 'result':{for(const cell of m.cells){const t=this.foe.grid[cell.r][cell.c];t.shot=true;if(cell.hit){t.hit=true;if(cell.sunk){t.sunkx=true;this.foe.sunk.push(cell.ship);}}}this.foe.alive=m.alive;this.waiting=false;
+      if(m.alive<=0){/* wait for roundover from foe */}else{this.shots--;if(this.shots<=0){this.send({t:'endturn'});this.myTurn=false;}this.show();}break;}
+    case 'endturn':this.myTurn=true;this.startTurn();break;
+    case 'roundover':this.roundOver(m.winner);break;
+    case 'shopdone':this.foeShop=true;if(this.myShop)this.nextRound();break;
+    case 'rematch':this.foeRe=true;if(this.myRe){this.wins={a:0,b:0};this.round=0;this.gold=60;this.deck=BM_DEFAULT_DECK.slice();this.myRe=this.foeRe=false;this.nextRound();}break;
+    case 'left':this.phase='left';this.show();break;
+  }},
+  roundOver(winner){if(this.phase==='shop'||this.phase==='over')return;this.wins[winner]=(this.wins[winner]||0)+1;
+    if(this.wins[winner]>=this.threshold){this.phase='over';this.winner=winner;if(this.opts&&this.opts.onEnd){this.opts.onEnd(winner);return;}if(winner===this.side){Meta.data.mpWins=(Meta.data.mpWins||0)+1;Meta.save();game.evalAchievements&&game.evalAchievements();}this.show();return;}
+    this.phase='shop';this.myShop=false;this.foeShop=false;this.gold+=50;this.shopCards=shuffle(Object.keys(BM_CARDS)).slice(0,3);this.show();},
+  buyShop(id){if(this.phase!=='shop'||this.myShop)return;if(this.gold<40){game.toast&&game.toast('Need 🪙40');return;}this.gold-=40;this.deck.push(id);Sound.coin();this.shopCards=this.shopCards.filter(x=>x!==id);this.show();},
+  shopReady(){if(this.phase!=='shop'||this.myShop)return;this.myShop=true;this.send({t:'shopdone'});if(this.foeShop)this.nextRound();else this.show();},
+  nextRound(){this.round++;this.drawPile=null;this.newRound();this.show();},
+  rematch(){if(this.phase!=='over')return;this.myRe=true;this.send({t:'rematch'});if(this.foeRe){this.wins={a:0,b:0};this.round=0;this.gold=60;this.deck=BM_DEFAULT_DECK.slice();this.myRe=this.foeRe=false;this.nextRound();}else{game.toast&&game.toast('Waiting for opponent…');}},
+  leave(){this.over=true;Net.close();game.renderHome();game.show('title');},
+  /* ---- render ---- */
+  show(){const el=document.getElementById('bm');if(!el)return;const meW=this.wins[this.side]||0,foeW=this.wins[this.foeSide]||0;
+    let body='';
+    if(this.phase==='deploy'){
+      body=`<div class="bm-status">DEPLOY YOUR FLEET · Round ${this.round}</div>
+        <div style="display:flex;justify-content:center"><div class="board" style="--cols:${this.C};max-width:360px">${this.deployGrid()}</div></div>
+        <div class="place-btns" style="margin-top:10px">${this.myReady?'<div style="color:var(--ink2);font-size:.85rem">Waiting for opponent…</div>':'<button class="btn btn-end" onclick="BM.randomize()">⚄ Randomize</button><button class="btn btn-go" onclick="BM.ready()">⚓ Ready</button>'}</div>`;
+    } else if(this.phase==='combat'){
+      const turn=this.myTurn?'<span style="color:var(--good)">YOUR TURN</span>':'<span style="color:var(--bad)">OPPONENT’S TURN</span>';
+      body=`<div class="bm-status">⚔️ Battle ${meW}–${foeW} · Round ${this.round} · ${turn}${this.waiting?' · …':''}</div>
+        <div class="grids"><div class="panel enemy"><div class="panel-label">Enemy Waters <span class="tag">hulls left: ${this.foe.alive}</span></div><div class="board" style="--cols:${this.C}">${this.foeGrid()}</div></div>
+        <div class="panel"><div class="panel-label">Your Fleet <span class="tag">hulls: ${this.my.alive}</span></div><div class="board" style="--cols:${this.C}">${this.myGrid()}</div></div></div>
+        <div class="handlbl">⟡ Hand · ⚡${this.energy} · 🎯${this.shots} shots ⟡</div><div class="hand">${this.handHtml()}</div>
+        <button class="btn btn-end btn-sm" onclick="BM.leave()">Forfeit</button>`;
+    } else if(this.phase==='shop'){
+      body=`<div class="bm-status">🪙 SHOP · Round ${this.round} won by ${(this.wins[this.side]>foeW?'YOU':'OPPONENT')} · Score ${meW}–${foeW}</div>
+        <div class="desc">Gold: <b>${this.gold}</b> — buy cards into your deck (🪙40 each), then ready up.</div>
+        <div class="rewards">${this.shopCards.map(id=>`<div class="card" style="animation:none;cursor:pointer" onclick="BM.buyShop('${id}')">${this.cardInner(id)}</div>`).join('')}</div>
+        ${this.myShop?'<div style="color:var(--ink2)">Waiting for opponent…</div>':'<button class="btn btn-go" onclick="BM.shopReady()">Ready ▸</button>'}`;
+    } else if(this.phase==='over'){
+      const won=this.winner===this.side;body=`<div class="bm-status" style="font-size:1.1rem;color:${won?'var(--good)':'var(--bad)'}">${won?'🏆 VICTORY':'☠ DEFEAT'} — ${meW}–${foeW}</div>
+        <div style="margin-top:12px"><button class="btn btn-go" onclick="BM.rematch()">↻ Rematch</button> <button class="btn btn-end" onclick="BM.leave()">Leave</button></div>`;
+    } else if(this.phase==='left'){body=`<div class="bm-status" style="color:var(--bad)">Opponent left the battle.</div><button class="btn btn-go" onclick="BM.leave()">Back</button>`;}
+    el.innerHTML=`<div style="text-align:center;padding-top:6px">${body}</div>`;game.show('bm');},
+  deployGrid(){let h='';for(let r=0;r<this.R;r++)for(let c=0;c<this.C;c++){const cell=this.deploy.find(s=>cellsOf(s).some(([a,b])=>a===r&&b===c));h+=`<div class="cell ${cell?'ship':''}">${cell?'<div class="hull"></div>':''}</div>`;}return h;},
+  foeGrid(){let h='';for(let r=0;r<this.R;r++)for(let c=0;c<this.C;c++){const t=this.foe.grid[r][c];let cls='cell';if(t.sunkx)cls+=' sunkx';else if(t.hit)cls+=' dmg';else if(t.shot)cls+=' miss';else cls+=' fog';const ev=(this.myTurn&&!this.waiting&&!t.shot)?`onclick="BM.fire(${r},${c})"`:'';h+=`<div class="${cls}" ${ev}></div>`;}return h;},
+  myGrid(){let h='';for(let r=0;r<this.R;r++)for(let c=0;c<this.C;c++){const t=this.my.grid[r][c];let cls='cell',inner='';if(t.sunkx){cls+=' sunkx';inner='<div class="hull"></div>';}else if(t.hit){cls+=' shiphit';inner='<div class="hull"></div>';}else if(t.ship){cls+=' ship';inner='<div class="hull"></div>';}else if(t.shot)cls+=' miss';if(t.deflect)cls+=' deflect';h+=`<div class="${cls}">${inner}</div>`;}return h;},
+  handHtml(){return this.hand.map((id,i)=>{const c=BM_CARDS[id];const can=this.myTurn&&!this.waiting&&c.cost<=this.energy;return `<div class="card ${can?'':'cant'}" onclick="BM.playCard(${i})">${this.cardInner(id)}</div>`;}).join('');},
+  cardInner(id){const c=BM_CARDS[id];return `<div class="cost">${c.cost}</div><div class="cat cat-${c.cat}">${c.cat}</div><div class="art">${c.ic}</div><div class="nm">${c.name}</div><div class="ds">${c.ds}</div>`;},
+};
+
+/* ============ CLASSIC MODE (Phase C — each act boss is your rival) ============ */
+const Classic={
+  start(side,seed){this.side=side;this.foeSide=side==='a'?'b':'a';this.seed=seed;this.duelWins={a:0,b:0};this.atBoss=false;this.foeAtBoss=false;this.foeBossAct=0;this.inDuel=false;
+    game.classicMode=true;game.doctrine=null;game._classicSeed=seed;game._mpHandler=m=>this.route(m);
+    _seeded=mulberry32(hashStr('classic:'+seed+':act1'));
+    game.admiral=ADMIRALS[0];game.ascension=0;game.dailyActive=false;game.orientation=(_seeded()<0.5?'portrait':'landscape');
+    game.startRun();},
+  route(m){if(['ready','sabotage','fire','result','endturn','roundover','shopdone','rematch'].indexOf(m.t)>=0)BM.onMsg(m);else this.onMsg(m);},
+  onMsg(m){switch(m.t){
+    case 'atboss':this.foeAtBoss=true;this.foeBossAct=m.act;if(this.atBoss&&this.curAct===m.act&&!this.inDuel)this.launchDuel(m.act);break;
+    case 'left':if(!this.inDuel)game.toast&&game.toast('Your rival left the campaign.');break;
+  }},
+  bossDuel(act){this.curAct=act;this.atBoss=true;
+    const s=document.getElementById('sheet');s.innerHTML=`<h2 style="color:var(--gold)">⚔️ ACT ${act} — RIVAL DUEL</h2><div class="desc">The act boss is your rival captain. Waiting for them to reach the Act ${act} boss…</div><div class="bm-status">Duels won — you ${this.duelWins[this.side]||0} · rival ${this.duelWins[this.foeSide]||0}</div>`;game.show('sheet');
+    Net.send({t:'atboss',act});if(this.foeAtBoss&&this.foeBossAct===act)this.launchDuel(act);},
+  launchDuel(act){this.inDuel=true;this.atBoss=false;this.foeAtBoss=false;BM.send=o=>Net.send(o);
+    BM.start(this.side,{bestOf:1,noHandler:true,onEnd:w=>this.duelDone(act,w)});},
+  duelDone(act,winner){this.inDuel=false;this.duelWins[winner]=(this.duelWins[winner]||0)+1;
+    if(winner===this.side)game.toast&&game.toast('🏆 You won the Act '+act+' rival duel!');
+    else{game.toast&&game.toast('You lost the duel — a hull is damaged.');game.damageFleet&&game.damageFleet(1);}
+    if(act>=3)return this.matchOver();game.classicNextAct();},
+  matchOver(){game.classicMode=false;const me=this.duelWins[this.side]||0,fo=this.duelWins[this.foeSide]||0;const won=me>fo;
+    if(won){Meta.data.mpWins=(Meta.data.mpWins||0)+1;Meta.save();game.evalAchievements&&game.evalAchievements();}
+    const m=document.getElementById('modal');m.innerHTML=`<h2 class="${won?'win':'lose'}">${won?'🏆 ADMIRAL OF THE FLEET':'☠ OUTMATCHED'}</h2><p>Rival boss-duels won: <b>${me}</b> — ${fo}.<br>${won?'You bested your rival across all three acts!':'Your rival won more boss duels.'}</p><button class="btn btn-go" onclick="Net.close();game.renderHome();game.show('title')">Back to title</button>`;
+    document.getElementById('ovl').classList.add('show');Sound.win();},
 };
 
 /* ---- boot ---- */
