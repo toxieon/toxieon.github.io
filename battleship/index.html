@@ -653,7 +653,18 @@ const game={
   mpSay(s){const e=document.getElementById('mpstatus');if(e)e.innerHTML=s;},
   genCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=a[Math.floor(Math.random()*a.length)];return s;},
   mpConnect(path){return Net.open(path,m=>this.mpMsg(m),null,()=>this.mpSay('Disconnected from server.'));},
-  mpCreate(){const code=this._roomCode=this.genCode();if(this.mpConnect('/room/'+code))this.mpSay(`Room <b style="color:var(--gold);font-size:1.1rem">${code}</b> created — share it. Waiting for an opponent…`);},
+  mpCreate(){const code=this._roomCode=this.genCode();if(this.mpConnect('/room/'+code))this.renderWaitingRoom(code);},
+  copyCode(){const c=this._roomCode||'';let ok=false;try{const ta=document.createElement('textarea');ta.value=c;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:-1000px;left:-1000px;opacity:0';document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,c.length);ok=document.execCommand('copy');document.body.removeChild(ta);}catch(e){ok=false;}if(ok){this.toast&&this.toast('📋 Copied: '+c);return;}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(c).then(()=>this.toast&&this.toast('📋 Copied: '+c)).catch(()=>this.toast&&this.toast('Code is '+c+' — copy it manually'));return;}this.toast&&this.toast('Code is '+c+' — copy it manually');},
+  setWaitMode(m){this.mpMode=m;this.renderWaitingRoom(this._roomCode);},
+  renderWaitingRoom(code){const t=document.getElementById('title');const mode=this.mpMode||'battle';
+    t.innerHTML=`<div class="big" style="font-size:clamp(18px,5vw,26px)">ROOM CREATED</div><div class="tag">Share this code — your friend taps Join and enters it</div>
+      <div style="margin:18px auto 6px;max-width:360px;background:linear-gradient(180deg,rgba(16,44,66,.9),rgba(7,24,38,.95));border:2px solid var(--gold);border-radius:16px;padding:20px;box-shadow:0 6px 0 rgba(0,0,0,.3)">
+        <div style="font-size:.7rem;letter-spacing:2px;color:var(--ink3);text-transform:uppercase;margin-bottom:8px">Room code</div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:clamp(32px,11vw,54px);letter-spacing:8px;color:var(--gold);text-shadow:0 3px 0 #0a2236,0 0 24px rgba(255,207,69,.5)">${code}</div>
+        <button class="btn btn-gold btn-sm" style="margin-top:14px" onclick="game.copyCode()">📋 Copy code</button></div>
+      <div class="metabar">Mode: <button class="mbtn" style="${mode==='battle'?'border-color:var(--ord);color:#fff':''}" onclick="game.setWaitMode('battle')">⚔ Battle</button><button class="mbtn" style="${mode==='classic'?'border-color:var(--ord);color:#fff':''}" onclick="game.setWaitMode('classic')">🗺 Classic</button></div>
+      <div id="mpstatus" style="font-size:.92rem;color:var(--son);min-height:26px;margin:8px 0 4px">⏳ Waiting for an opponent to join…</div>
+      <button class="btn btn-end btn-sm" onclick="Net.close();game.renderMPLobby();">✕ Cancel</button>`;},
   mpJoin(){const code=((document.getElementById('mpcode')||{}).value||'').toUpperCase().trim();if(code.length<3){this.mpSay('Enter a valid room code.');return;}this._roomCode=code;if(this.mpConnect('/room/'+code))this.mpSay('Joining '+code+'…');},
   mpQuick(){if(this.mpConnect('/quick'))this.mpSay('🎲 Searching for an opponent…');},
   mpMsg(m){switch(m.type){
@@ -664,7 +675,7 @@ const game={
     case 'left':this.mpSay('Opponent disconnected.');break;
     default:if(this._mpHandler)this._mpHandler(m);}},
   startBattleMode(m){Sound.win();this.mpSide=m.side;Net.side=m.side;
-    if(m.side==='a'){const mode=this.mpMode||'battle';const seed=this._roomCode||this.genCode();this.launchMode(mode,seed);Net.send({t:'mode',mode,seed});}
+    if(m.side==='a'){const mode=this.mpMode||'battle';const seed=this._roomCode||this.genCode();this.launchMode(mode,seed);Net.send({type:'mode',mode,seed});}
     else this.mpSay('Opponent found — waiting for host to choose a mode…');},
   launchMode(mode,seed){if(mode==='classic'){game._classicSeed=seed;Classic.start(this.mpSide,seed);}else{BM.send=o=>Net.send(o);BM.start(this.mpSide);}},
   classicNextAct(){if(this.map&&this.map.cur){const[f,i]=this.map.cur;const node=this.map.floors[f]&&this.map.floors[f][i];if(node)node.done=true;}this.battlesWon++;this.act++;this.actBattle=0;_seeded=mulberry32(hashStr('classic:'+(this._classicSeed||'x')+':act'+this.act));this.newMap();},
@@ -676,8 +687,7 @@ const game={
     t.innerHTML=`<div class="big">DEAD RECKONING</div><div class="tag">a battleship roguelike · chase the high score</div>
       <div class="metabar"><button class="mbtn" onclick="game.renderHome()">← Home</button> ⚓ Runs ${d.runs} · 🏆 Wins ${d.wins} · ⭐ Best ${d.best.toLocaleString()}
         <button class="mbtn" onclick="game.records()">🏅 Records</button>
-        <button class="mbtn" onclick="game.showLeaderboard()">🏆 Leaderboard</button>
-        <button class="mbtn" onclick="game.devUnlock()">🧪 Unlock all</button></div>
+        <button class="mbtn" onclick="game.showLeaderboard()">🏆 Leaderboard</button></div>
       <div class="metabar"><button class="mbtn" style="border-color:var(--gold);color:var(--gold)" onclick="game.startDaily()">📅 Daily Run</button> seed <b>${todaySeed()}</b>${dbest?` · your best ${dbest.toLocaleString()}`:''} · same run for everyone today</div>
       ${ascSel}
       <div class="pick">CHOOSE YOUR ADMIRAL · CHOOSE YOUR THEATRE</div><div class="admirals" id="adm-list"></div>`;
@@ -1758,4 +1768,4 @@ addEventListener('keydown',e=>{
 game.boot();
 </script>
 </body>
-</html>
+</htm
