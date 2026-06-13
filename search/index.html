@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f1117" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Search Files</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      window.SEARCH_CONFIG = {
+        googleApiKey: "AIzaSyBZ2b4fa-YV89q6Ld_LfGlzbqM798iCMsA",
+        googleClientId: "418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com",
+        driveRootFolderName: "NeillPlanner",
+        adminFolderName: "Admin Files",
+        batchFolderName: "Batch",
+        projectsRootFolderName: "NeillPlanner Projects",
+        unfiledRootFolderName: "Unfiled Projects",
+        uploadSheetName: "Upload Log",
+        masterSpreadsheetId: "1NmPyp5Ie0afzVS6VXDBSP1M1AX3EX3F7puufE5QaftQ",
+        masterSpreadsheetName: "NeillPlanner-Master",
+        adminEmail: "brandon.j.neill@gmail.com",
+        scopes: [
+          "https://www.googleapis.com/auth/drive",
+          "https://www.googleapis.com/auth/spreadsheets",
+          "openid",
+          "email",
+          "profile"
+        ]
+      };
+    </script>
+    <script src="https://apis.google.com/js/api.js" defer></script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>
