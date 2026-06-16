@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f1117">
+    <title>Hub</title>
+    <link rel="icon" href="favicon.svg?v=0.3.0" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css?v=0.3.0">
+  </head>
+  <body>
+    <div class="hub-shell">
+      <div class="hub-frame">
+        <header class="topbar">
+          <a class="brand" href="./" aria-label="Hub home">
+            <span class="brand-mark">H</span>
+            <span>
+              <span class="brand-name">Hub</span>
+              <span class="brand-subtitle">Neilldata app drawer</span>
+            </span>
+          </a>
+
+          <div class="topbar-actions">
+            <button class="tab is-active" type="button" data-view="apps" aria-label="Apps" title="Apps">
+              <span class="grid-glyph" aria-hidden="true"></span>
+              <span>Apps</span>
+            </button>
+            <button class="tab" type="button" data-view="settings" aria-label="Settings" title="Settings">
+              <span class="settings-glyph" aria-hidden="true"></span>
+              <span>Settings</span>
+            </button>
+            <button id="refreshBtn" class="icon-button" type="button" title="Refresh" aria-label="Refresh">
+              <span aria-hidden="true">R</span>
+            </button>
+          </div>
+        </header>
+
+        <main class="main">
+          <section id="appsView" class="view is-active" aria-labelledby="appsHeading">
+            <div class="view-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <h1 id="appsHeading">Apps</h1>
+                  <p id="status" class="status">Loading Hub...</p>
+                </div>
+                <div class="summary" aria-live="polite">
+                  <span id="visibleCount">0</span>
+                  <small>visible</small>
+                </div>
+              </div>
+
+              <div class="filter-panel">
+                <div class="target-row">
+                  <label class="field-label" for="targetInput">Source</label>
+                  <input id="targetInput" type="url" value="https://neilldata.com" autocomplete="url" spellcheck="false">
+                </div>
+                <div class="controls">
+                  <label class="search-box" for="searchInput">
+                    <span class="search-glyph" aria-hidden="true"></span>
+                    <input id="searchInput" type="search" placeholder="Search apps" autocomplete="off">
+                  </label>
+                  <select id="branchFilter" aria-label="Filter by branch">
+                    <option value="all">All branches</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="bulk-bar">
+                <button id="bulkModeBtn" class="ghost-button" type="button">Bulk blacklist</button>
+                <button id="applyBulkBlacklistBtn" class="primary-button" type="button" disabled>Blacklist selected</button>
+                <button id="cancelBulkBtn" class="ghost-button" type="button" hidden>Cancel</button>
+                <span id="selectedCount" class="selected-count">0 selected</span>
+              </div>
+
+              <div id="grid" class="app-grid" aria-label="Discovered branches"></div>
+            </div>
+          </section>
+
+          <section id="settingsView" class="view" aria-labelledby="settingsHeading">
+            <div class="settings-layout">
+              <section class="settings-panel">
+                <div class="panel-title">
+                  <h1 id="settingsHeading">Settings</h1>
+                  <p>Blacklist</p>
+                </div>
+                <form id="blacklistForm" class="blacklist-form">
+                  <input id="blacklistInput" type="text" placeholder="neilldata.com/suburbs*" autocomplete="off" spellcheck="false">
+                  <button class="primary-button" type="submit">Add</button>
+                </form>
+                <div class="preset-row" aria-label="Common blacklist presets">
+                  <button class="chip-button" type="button" data-pattern="neilldata.com/suburbs*">suburbs*</button>
+                  <button class="chip-button" type="button" data-pattern="neilldata.com/postcode*">postcode*</button>
+                  <button class="chip-button" type="button" data-pattern="neilldata.com/seo*">seo*</button>
+                </div>
+              </section>
+
+              <section class="settings-panel">
+                <div class="settings-heading-row">
+                  <div class="panel-title">
+                    <h2>Active rules</h2>
+                  </div>
+                  <button id="clearBlacklistBtn" class="ghost-button" type="button">Clear</button>
+                </div>
+                <div id="blacklistList" class="blacklist-list" aria-live="polite"></div>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <template id="cardTemplate">
+      <article class="app-card">
+        <a class="app-link" target="_blank" rel="noreferrer">
+          <span class="icon-wrap">
+            <img alt="" loading="lazy">
+            <span class="fallback-icon"></span>
+          </span>
+          <span class="app-title"></span>
+          <span class="app-path"></span>
+        </a>
+      </article>
+    </template>
+
+    <script src="app.js?v=0.3.0" type="module"></script>
+  </body>
+</html>
