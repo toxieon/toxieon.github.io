@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0d0d0d" />
+<title>Timesheet — Neill Data</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="assets/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<style>
+:root {
+  --bg-base: #0d0d0d; --text-primary: #f0f0f0; --text-muted: #888888;
+  --mono-font: 'JetBrains Mono', 'Courier Prime', monospace;
+  --sans-font: 'Inter', system-ui, -apple-system, sans-serif;
+  --off-primary: #e07b2a; --off-glow: #7a3a0d; --off-accent: #f5a05a;
+  --on-primary: #3ab87a; --on-glow: #0e5c36; --on-accent: #6ddba3;
+  --surface: #1a1a1a; --border: #2a2a2a; --radius: 14px; --radius-sm: 8px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg-base); color: var(--text-primary); font-family: var(--sans-font); -webkit-font-smoothing: antialiased; min-height: 100vh; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select, textarea { font-family: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.mono { font-family: var(--mono-font); }
+.muted { color: var(--text-muted); }
+.view { display: none; }
+.view.active { display: block; }
+.tabbar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; background: rgba(20,20,20,0.92); backdrop-filter: blur(10px); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); z-index: 50; }
+.tabbar a { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); padding: 4px 14px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+.tabbar a.active { color: var(--text-primary); }
+.tabbar svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.page { padding: 18px 18px calc(90px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; }
+.page-title { font-size: 22px; font-weight: 600; margin: 6px 0 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: 999px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; font-size: 13px; transition: transform 80ms ease; }
+.btn:active { transform: scale(0.96); }
+.btn-primary { background: var(--text-primary); color: #111; }
+.btn-ghost { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.btn-block { width: 100%; padding: 16px; font-size: 15px; }
+.sync-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; position: fixed; top: 14px; right: 14px; z-index: 60; }
+.sync-synced { background: var(--on-primary); }
+.sync-pending { background: var(--off-accent); animation: pulse 1.4s infinite; }
+.sync-failed { background: #e0473f; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.ts-toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(10px); background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 100; max-width: 86%; text-align: center; }
+.ts-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.field input, .field select { width: 100%; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.switch { position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--border); flex-shrink: 0; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms; }
+.switch input:checked + .knob { transform: translateX(18px); }
+.switch.on { background: var(--on-primary); }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+.home-screen { position: relative; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.env-layer { position: fixed; inset: 0; z-index: 0; transform: translateY(100%); transition: transform 1000ms cubic-bezier(0.4, 0, 0.2, 1); }
+.env-layer.active { transform: translateY(0%); }
+.env-off { background: radial-gradient(ellipse at bottom, var(--off-glow) 0%, var(--bg-base) 65%); }
+.env-on  { background: radial-gradient(ellipse at bottom, var(--on-glow) 0%, var(--bg-base) 65%); }
+.home-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px calc(110px + env(safe-area-inset-bottom)); text-align: center; min-height: 100vh; }
+.home-top { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.clock-date { font-family: var(--mono-font); color: var(--text-muted); font-size: 14px; letter-spacing: 0.05em; }
+.home-middle { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.big-time { font-family: var(--mono-font); font-weight: 400; font-size: 18vw; line-height: 1; transition: opacity 400ms ease; letter-spacing: -0.02em; }
+@media (min-width: 480px) { .big-time { font-size: 88px; } }
+.job-name { font-size: 17px; font-weight: 500; }
+.job-address { font-size: 13px; color: var(--text-muted); max-width: 320px; }
+.clock-on-time { font-family: var(--mono-font); font-size: 12px; color: var(--text-muted); }
+.last-shift { font-size: 13px; color: var(--text-muted); max-width: 320px; }
+.home-bottom { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+.clock-btn { width: 168px; height: 168px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; background: var(--off-primary); color: #1a0c00; box-shadow: 0 0 50px 0 rgba(224,123,42,0.35); transition: transform 80ms ease, background 600ms ease, box-shadow 600ms ease; }
+.clock-btn:active { transform: scale(0.96); }
+.home-content.state-on .clock-btn { background: var(--on-primary); color: #022014; box-shadow: 0 0 50px 0 rgba(58,184,122,0.35); }
+.secondary-btn { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; }
+.cross-fade { transition: opacity 500ms ease; }
+.cross-fade.fading { opacity: 0; }
+.note-modal-backdrop, .picker-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 80; display: flex; align-items: flex-end; justify-content: center; }
+.note-modal, .picker-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 18px 18px 0 0; width: 100%; max-width: 560px; padding: 20px; animation: sheetUp 220ms ease; max-height: 86vh; overflow-y: auto; }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.note-modal textarea, .picker-modal textarea { width: 100%; min-height: 90px; resize: vertical; }
+.modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+.modal-actions .btn { flex: 1; }
+.picker-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.picker-item { padding: 12px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; display: flex; flex-direction: column; gap: 2px; }
+.picker-item .pname { font-weight: 500; }
+.picker-item .paddr { font-size: 12px; color: var(--text-muted); }
+.week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.week-nav button { font-size: 20px; padding: 6px 12px; color: var(--text-muted); }
+.week-nav .week-label { font-size: 14px; font-weight: 500; text-align: center; }
+.week-nav .week-sub { font-size: 11px; color: var(--text-muted); text-align: center; }
+.day-card { opacity: 0; transform: translateY(8px); animation: fadeUp 320ms ease forwards; }
+.day-card:nth-child(1) { animation-delay: 0ms; } .day-card:nth-child(2) { animation-delay: 40ms; }
+.day-card:nth-child(3) { animation-delay: 80ms; } .day-card:nth-child(4) { animation-delay: 120ms; }
+.day-card:nth-child(5) { animation-delay: 160ms; } .day-card:nth-child(6) { animation-delay: 200ms; }
+.day-card:nth-child(7) { animation-delay: 240ms; }
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+.day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.day-head .dname { font-weight: 600; }
+.day-head .ddate { font-size: 12px; color: var(--text-muted); }
+.session-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.session-row:first-child { border-top: none; }
+.session-row .sjob { font-weight: 500; }
+.session-row .stime { color: var(--text-muted); font-family: var(--mono-font); font-size: 12px; }
+.session-row .shrs { font-family: var(--mono-font); }
+.static-badge { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+.day-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; }
+.ot-flag { color: var(--off-accent); }
+.week-summary { position: sticky; bottom: 76px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; justify-content: space-between; margin-top: 16px; }
+.session-detail { display: flex; flex-direction: column; gap: 10px; }
+.empty-week { text-align: center; color: var(--text-muted); padding: 60px 0; }
+.preview-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-family: var(--mono-font); font-size: 12.5px; white-space: pre-wrap; line-height: 1.6; max-height: 50vh; overflow-y: auto; }
+.export-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.export-actions .btn { width: 100%; }
+@media print { .tabbar, .sync-dot, .export-actions { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-export { display: block !important; } }
+.settings-section { margin-bottom: 22px; }
+.settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
+.msg-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+.msg-item:first-child { border-top: none; }
+.msg-item .mtext { font-size: 13px; flex: 1; }
+.msg-item .mmeta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; }
+.tpl-card { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.tpl-card:first-child { border-top: none; }
+.tpl-name { font-weight: 500; }
+.tpl-meta { font-size: 11px; color: var(--text-muted); }
+.slider { width: 100%; }
+.connect-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.dot-yes { width: 8px; height: 8px; border-radius: 50%; background: var(--on-primary); display: inline-block; }
+.dot-no { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
+.day-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.day-chip { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-muted); border: 1px solid var(--border); cursor: pointer; user-select: none; }
+.day-chip.sel { background: var(--text-primary); color: #111; border-color: var(--text-primary); }
+.icon-btn { color: var(--text-muted); font-size: 16px; padding: 4px 8px; }
+.icon-btn.pinned { color: var(--off-accent); }
+</style>
+</head>
+<body>
+
+<section class="view" id="view-clock">
+  <div class="env-layer env-off" id="env-off"></div>
+  <div class="env-layer env-on" id="env-on"></div>
+  <div class="home-screen">
+    <div class="home-content" id="home-content">
+      <div class="home-top"><div class="clock-date mono" id="clock-date">—</div></div>
+      <div class="home-middle">
+        <div class="big-time mono cross-fade" id="big-time">00:00</div>
+        <div id="on-info" style="display:none;">
+          <div class="job-name" id="job-name"></div>
+          <div class="job-address" id="job-address"></div>
+          <div class="clock-on-time mono" id="clock-on-time"></div>
+        </div>
+        <div id="off-info"><div class="last-shift" id="last-shift">No shifts yet.</div></div>
+      </div>
+      <div class="home-bottom">
+        <button class="clock-btn" id="clock-btn">Clock On</button>
+        <button class="secondary-btn" id="secondary-btn">Choose job manually</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="view-history">
+  <div class="page" id="touch-area">
+    <div class="page-title">History</div>
+    <div class="week-nav">
+      <button id="wk-prev">&#8249;</button>
+      <div><div class="week-label" id="wk-label">—</div><div class="week-sub" id="wk-sub">—</div></div>
+      <button id="wk-next">&#8250;</button>
+    </div>
+    <div id="day-cards"></div>
+    <div class="week-summary">
+      <div><div class="muted" style="font-size:11px;">TOTAL</div><div class="mono" id="wk-total">0.00 hrs</div></div>
+      <div><div class="muted" style="font-size:11px;">OT</div><div class="mono" id="wk-ot">0.00 hrs</div></div>
+      <div><div class="muted" style="font-size:11px;">DAYS</div><div class="mono" id="wk-days">0</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="view-export">
+  <div class="page">
+    <div class="page-title">Export</div>
+    <div class="week-nav">
+      <button id="ex-prev">&#8249;</button>
+      <div><div class="week-label" id="ex-label">—</div></div>
+      <button id="ex-next">&#8250;</button>
+    </div>
+    <div class="preview-box" id="preview"></div>
+    <div class="export-actions">
+      <button class="btn btn-primary btn-block" id="btn-send">Send Timesheet</button>
+      <button class="btn btn-ghost btn-block" id="btn-csv">Export CSV</button>
+      <button class="btn btn-ghost btn-block" id="btn-pdf">Export / Print PDF</button>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="view-settings">
+  <div class="page">
+    <div class="page-title">Settings</div>
+    <div class="settings-section">
+      <h3>Google Account</h3>
+      <div class="card">
+        <div class="row-between">
+          <div>
+            <div id="acct-status">Not connected</div>
+            <div class="muted" style="font-size:12px;" id="acct-sub">Sign in to sync to Google Sheets</div>
+          </div>
+          <button class="btn btn-primary" id="btn-signin">Sign in</button>
+          <button class="btn btn-ghost" id="btn-signout" style="display:none;">Sign out</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Work Profile</h3>
+      <div class="card">
+        <div class="field"><label>Employer Name</label><input id="s-employerName"></div>
+        <div class="field"><label>Employer Email</label><input id="s-employerEmail" type="email"></div>
+        <div class="field"><label>Pay Period Type</label>
+          <select id="s-payPeriodType"><option>Weekly</option><option>Fortnightly</option><option>Monthly</option></select>
+        </div>
+        <div class="field"><label>Pay Period Start Day</label>
+          <select id="s-payPeriodStartDay"><option>Monday</option><option>Sunday</option></select>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>Standard Clock On</label><input type="time" id="s-standardClockOn"></div>
+          <div class="field" style="flex:1;"><label>Standard Clock Off</label><input type="time" id="s-standardClockOff"></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>OT after (hrs/day)</label><input type="number" step="0.5" id="s-otThresholdDay"></div>
+          <div class="field" style="flex:1;"><label>OT after (hrs/week)</label><input type="number" step="0.5" id="s-otThresholdWeek"></div>
+          <div class="field" style="flex:1;"><label>OT multiplier</label><input type="number" step="0.1" id="s-otMultiplier"></div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Time Rounding</h3>
+      <div class="card">
+        <div class="field"><label>Round clock-on/off to nearest</label>
+          <select id="s-roundingMin">
+            <option value="0">No rounding</option><option value="5">5 min</option><option value="10">10 min</option>
+            <option value="15">15 min</option><option value="30">30 min</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Static Day Templates</h3>
+      <div class="card">
+        <div id="tpl-list"></div>
+        <button class="btn btn-ghost btn-block" id="btn-add-tpl" style="margin-top:10px;">+ Add Template</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Auto-Emailer</h3>
+      <div class="card">
+        <div class="field"><label>Recipient Name</label><input id="s-recipientName"></div>
+        <div class="field"><label>Recipient Email</label><input id="s-recipientEmail" type="email"></div>
+        <div class="field"><label>CC Email (optional)</label><input id="s-ccEmail" type="email"></div>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>Send Day</label>
+            <select id="s-sendDay"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select>
+          </div>
+          <div class="field" style="flex:1;"><label>Send Time</label><input type="time" id="s-sendTime"></div>
+        </div>
+        <div class="field"><label>Message Rotations</label><div id="msg-list"></div>
+          <button class="btn btn-ghost btn-block" id="btn-add-msg" style="margin-top:8px;">+ Add Message</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Geolocation</h3>
+      <div class="card">
+        <div class="field"><label>Default site radius: <span id="radius-val"></span> m</label>
+          <input type="range" class="slider" min="50" max="500" step="10" id="s-radiusM">
+        </div>
+        <div class="field"><label>Missed clock-off detection delay (min)</label><input type="number" id="s-missedClockOffDelayMin"></div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Neill Quote Integration</h3>
+      <div class="card">
+        <div class="row-between">
+          <span class="connect-status"><span id="nq-dot" class="dot-no"></span><span id="nq-text">Not connected</span></span>
+          <button class="btn btn-primary" id="btn-nq-connect">Connect</button>
+          <button class="btn btn-ghost" id="btn-nq-disconnect" style="display:none;">Disconnect</button>
+        </div>
+        <div class="field row-between" style="margin-top:12px;"><label style="margin:0;">Auto-flag projects</label>
+          <div class="switch"><input type="checkbox" id="s-autoFlagProjects"><span class="knob"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>Notifications</h3>
+      <div class="card">
+        <div class="field row-between"><label style="margin:0;">Missed clock-off alerts</label><div class="switch"><input type="checkbox" id="s-notif-missed"><span class="knob"></span></div></div>
+        <div class="field row-between"><label style="margin:0;">Friday timesheet reminder</label><div class="switch"><input type="checkbox" id="s-notif-friday"><span class="knob"></span></div></div>
+        <div class="field row-between"><label style="margin:0;">Weekly hours summary</label><div class="switch"><input type="checkbox" id="s-notif-weekly"><span class="knob"></span></div></div>
+        <button class="btn btn-ghost btn-block" id="btn-notif-perm" style="margin-top:10px;">Enable notifications</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>More</h3>
+      <div class="card">
+        <div class="field"><label>Default job notes</label><input id="s-defaultJobNote" placeholder="e.g. Standard electrical works"></div>
+        <div class="field"><label>First day of week</label>
+          <select id="s-firstDayOfWeek"><option>Monday</option><option>Sunday</option></select>
+        </div>
+        <div class="field row-between"><label style="margin:0;">24-hour time</label><div class="switch"><input type="checkbox" id="s-use24hr"><span class="knob"></span></div></div>
+        <div class="row-between" style="margin-top:14px;">
+          <button class="btn btn-ghost" id="btn-backup">Force sync now</button>
+          <button class="btn btn-ghost" id="btn-clear-cache">Clear local cache</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="tabbar-root"></div>
+
+<div class="note-modal-backdrop" id="note-backdrop" style="display:none;">
+  <div class="note-modal">
+    <h3 style="margin-top:0;">Add note</h3>
+    <textarea id="note-text" placeholder="Optional memo for this shift"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="note-cancel">Cancel</button>
+      <button class="btn btn-primary" id="note-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="picker-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 id="picker-title" style="margin-top:0;">Choose a job</h3>
+    <div id="picker-body"></div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="offmodal-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 style="margin-top:0;" id="offmodal-title">Clock off</h3>
+    <div id="offmodal-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="offmodal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="offmodal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="detail-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 style="margin-top:0;">Edit session</h3>
+    <div id="detail-body" class="session-detail"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="detail-cancel">Cancel</button>
+      <button class="btn btn-primary" id="detail-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="tpl-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 style="margin-top:0;">Static day template</h3>
+    <div id="tpl-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="tpl-cancel">Cancel</button>
+      <button class="btn btn-primary" id="tpl-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="msg-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 style="margin-top:0;">Message</h3>
+    <div class="field"><textarea id="msg-text" placeholder="Use [Name] for recipient name"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="msg-cancel">Cancel</button>
+      <button class="btn btn-primary" id="msg-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="picker-modal-backdrop" id="nq-backdrop" style="display:none;">
+  <div class="picker-modal">
+    <h3 style="margin-top:0;">Connect to Neill Quote</h3>
+    <p class="muted" style="font-size:13px;">Enter your Neill Quote passcode. It's used once to authenticate with Quote's own backend and isn't stored.</p>
+    <div class="field"><input type="password" id="nq-passcode" placeholder="Passcode"></div>
+    <div id="nq-error" style="color:#e0473f; font-size:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="nq-cancel">Cancel</button>
+      <button class="btn btn-primary" id="nq-submit">Connect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
+
+/* ----- CONFIG ----- */
+window.TIMESHEET_CONFIG = {
+  googleApiKey: "AIzaSyBZ2b4fa-YV89q6Ld_LfGlzbqM798iCMsA",
+  googleClientId: "418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com",
+  primaryOwnerEmail: "brandon.j.neill@gmail.com",
+  scopes: ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive.file","openid","email","profile"],
+  mapsKey: "AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w",
+  neillQuote: {
+    sheetId: "1uxaEppfmUoC0l1nZXS3rvsvKsysDxH5m1AyBK2biUeE",
+    backendUrl: "https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec",
+    jobsTab: "History"
+  },
+  driveRootFolderName: "Timesheet",
+  sheetFileName: "Timesheet-Data",
+  defaults: {
+    radiusM: 150, missedClockOffDelayMin: 30, missedClockOffDistanceM: 300,
+    standardClockOn: "07:00", standardClockOff: "15:30",
+    otThresholdDay: 8, otThresholdWeek: 38, otMultiplier: 1.5, roundingMin: 30,
+    payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
+    sendDay: "Friday", sendTime: "16:00", syncFrequency: "On app open",
+    use24hr: true, exportFormats: ["Plain text email", "CSV"]
+  }
+};
+
+/* ----- UTILS ----- */
+function uid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16);
+  });
+}
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function isoDate(d = new Date()) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function dayOfWeek(d) { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(d).getDay()]; }
+function hhmm(d = new Date()) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+function fmtTime(hhmmStr, use24hr = true) {
+  if (!hhmmStr) return '';
+  const [h, m] = hhmmStr.split(':').map(Number);
+  if (use24hr) return `${pad2(h)}:${pad2(m)}`;
+  const period = h >= 12 ? 'PM' : 'AM'; const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${pad2(m)} ${period}`;
+}
+function timeToMinutes(hhmmStr) { if (!hhmmStr) return 0; const [h, m] = hhmmStr.split(':').map(Number); return h * 60 + m; }
+function minutesToHHMM(mins) { mins = ((mins % 1440) + 1440) % 1440; return `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`; }
+function roundToNearest(hhmmStr, stepMin) {
+  if (!stepMin || stepMin <= 0) return hhmmStr;
+  const mins = timeToMinutes(hhmmStr); const rounded = Math.round(mins / stepMin) * stepMin; return minutesToHHMM(rounded);
+}
+function hoursBetween(onHHMM, offHHMM) {
+  let on = timeToMinutes(onHHMM); let off = timeToMinutes(offHHMM);
+  if (off < on) off += 1440; return Math.round(((off - on) / 60) * 100) / 100;
+}
+function netHours(onHHMM, offHHMM, breakTaken) { let h = hoursBetween(onHHMM, offHHMM); if (breakTaken) h = Math.max(0, h - 0.5); return Math.round(h * 100) / 100; }
+function overtimeHours(totalHours, dayThreshold) { return Math.max(0, Math.round((totalHours - dayThreshold) * 100) / 100); }
+function distanceMetres(lat1, lng1, lat2, lng2) {
+  lat1 = parseFloat(lat1); lng1 = parseFloat(lng1); lat2 = parseFloat(lat2); lng2 = parseFloat(lng2);
+  if ([lat1, lng1, lat2, lng2].some(v => v === null || v === undefined || Number.isNaN(v))) return Infinity;
+  const R = 6371000; const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1); const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function startOfWeek(date, firstDay = 'Monday') {
+  const d = new Date(date); const want = firstDay === 'Sunday' ? 0 : 1;
+  const diff = (d.getDay() - want + 7) % 7; d.setDate(d.getDate() - diff); d.setHours(0, 0, 0, 0); return d;
+}
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function fmtDateHeader(date) { return new Date(date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function vibrate(pattern) { if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} } }
+function toast(msg, ms = 2400) {
+  let el = document.getElementById('ts-toast');
+  if (!el) { el = document.createElement('div'); el.id = 'ts-toast'; el.className = 'ts-toast'; document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add('show'); clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* ----- OFFLINE QUEUE ----- */
+const QUEUE_KEY = 'ts_offline_queue_v1';
+let syncStatus = 'synced';
+let syncTimer = null;
+function loadQueue() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; } }
+function saveQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+function queueSheetWrite(sheetName, row, isUpdate = false) {
+  const q = loadQueue(); q.push({ id: uid(), sheetName, row, isUpdate, ts: Date.now() }); saveQueue(q);
+  setSyncStatus('pending'); renderSyncDot(); scheduleSync();
+}
+function setSyncStatus(s) { syncStatus = s; renderSyncDot(); }
+function renderSyncDot() {
+  const dot = document.getElementById('sync-dot'); if (!dot) return;
+  dot.className = 'sync-dot sync-' + syncStatus;
+  dot.title = { synced: 'Synced', pending: 'Pending sync', failed: 'Sync failed — will retry' }[syncStatus];
+}
+function scheduleSync() {
+  clearTimeout(syncTimer); syncTimer = setTimeout(flushQueue, 1000);
+  if (!window._ts_sync_loop) { window._ts_sync_loop = setInterval(flushQueue, 30000); }
+}
+async function flushQueue() {
+  if (!navigator.onLine) { setSyncStatus('pending'); return; }
+  if (!window.TsSheets || !window.TsSheets.isReady()) { setSyncStatus('pending'); return; }
+  let q = loadQueue(); if (!q.length) { setSyncStatus('synced'); return; }
+  const remaining = [];
+  for (const item of q) {
+    try { await window.TsSheets.writeRow(item.sheetName, item.row, item.isUpdate); }
+    catch (e) { console.warn('sync failed for', item, e); remaining.push(item); }
+  }
+  saveQueue(remaining); setSyncStatus(remaining.length ? 'failed' : 'synced');
+}
+function flushQueueOnNextOpen() { return flushQueue(); }
+window.addEventListener('online', flushQueue);
+window.addEventListener('offline', () => setSyncStatus('pending'));
+
+/* ----- STATE / SESSIONS ----- */
+const STATE_KEY = 'ts_state_v1';
+const DEFAULT_STATE = () => ({
+  version: 1, sessions: [], jobs: [], payPeriods: [], staticDays: [],
+  settings: Object.assign({
+    employerName: '', employerEmail: '', recipientName: '', recipientEmail: '', ccEmail: '',
+    messages: defaultMessages(), pinnedMessageId: null, lastSentMessageId: null,
+    neillQuoteConnected: false, autoFlagProjects: false,
+    notifications: { missedClockOff: true, fridayReminder: true, weeklySummary: true },
+    defaultJobNote: '',
+  }, window.TIMESHEET_CONFIG.defaults),
+  currentSession: null, lastClosedSession: null
+});
+function defaultMessages() {
+  const texts = [
+    "Hi [Name], please find my timesheet for the week attached. Let me know if you need anything else.",
+    "Hi [Name], timesheet for the week is below. All the best.",
+    "Hi [Name], here's this week's timesheet. Happy to clarify anything if needed.",
+    "Hi [Name], sending through my hours for the week. Cheers.",
+    "Hi [Name], timesheet attached for your records. Have a good weekend."
+  ];
+  return texts.map(t => ({ id: uid(), text: t, pinned: false, lastSent: null }));
+}
+let state = loadState();
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return DEFAULT_STATE();
+    const parsed = JSON.parse(raw);
+    return Object.assign(DEFAULT_STATE(), parsed, { settings: Object.assign(DEFAULT_STATE().settings, parsed.settings || {}) });
+  } catch (e) { console.warn('loadState failed', e); return DEFAULT_STATE(); }
+}
+function saveState() { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+function getState() { return state; }
+function findJobByLocation(lat, lng) {
+  let best = null, bestDist = Infinity;
+  for (const job of state.jobs) {
+    const d = distanceMetres(lat, lng, job.lat, job.lng);
+    const radius = job.radius_m || state.settings.radiusM;
+    if (d <= radius && d < bestDist) { best = job; bestDist = d; }
+  }
+  return best;
+}
+function createJob({ job_name, address, lat, lng, job_type, neill_quote_id, neill_quote_status }) {
+  const job = {
+    job_id: uid(), job_name, address, lat, lng, radius_m: state.settings.radiusM,
+    job_type: job_type || 'unclassified', neill_quote_id: neill_quote_id || null,
+    neill_quote_status: neill_quote_status || null, first_visit: isoDate(), visit_count: 1
+  };
+  state.jobs.push(job); saveState(); queueSheetWrite('jobs', job); return job;
+}
+function bumpJobVisit(jobId) { const job = state.jobs.find(j => j.job_id === jobId); if (job) { job.visit_count = (job.visit_count || 0) + 1; saveState(); } }
+function payPeriodFor(date) {
+  const weekStart = isoDate(startOfWeek(date, state.settings.firstDayOfWeek));
+  const existing = state.payPeriods.find(p => p.week_start === weekStart);
+  if (existing) return existing.label || weekStart;
+  return weekStart;
+}
+function clockOn({ job, lat, lng, addressConfirmed }) {
+  if (state.currentSession) return state.currentSession;
+  const now = new Date();
+  const session = {
+    session_id: uid(), date: isoDate(now), day_of_week: dayOfWeek(now),
+    job_id: job.job_id, job_name: job.job_name, address_confirmed: addressConfirmed || job.address || '',
+    lat_on: lat, lng_on: lng, lat_off: null, lng_off: null,
+    time_on: hhmm(now), time_off: null,
+    time_on_rounded: roundToNearest(hhmm(now), state.settings.roundingMin), time_off_rounded: null,
+    break_taken: false, total_hours: null, overtime_hours: null, job_type: job.job_type,
+    notes: state.settings.defaultJobNote || '', departed_offsite: false, manual_departure_time: null,
+    missed_clockoff: false, pay_period: payPeriodFor(now), _open: true
+  };
+  state.currentSession = session; saveState(); vibrate(60); return session;
+}
+function addNoteToCurrentSession(text) {
+  if (!state.currentSession) return;
+  state.currentSession.notes = [state.currentSession.notes, text].filter(Boolean).join(' / '); saveState();
+}
+function clockOff({ lat, lng, breakTaken, notes, manualTime, departedOffsite, missed }) {
+  const session = state.currentSession; if (!session) return null;
+  const now = new Date(); const offTime = manualTime || hhmm(now);
+  session.lat_off = lat ?? null; session.lng_off = lng ?? null; session.time_off = offTime;
+  session.time_off_rounded = roundToNearest(offTime, state.settings.roundingMin);
+  session.break_taken = !!breakTaken;
+  session.total_hours = netHours(session.time_on_rounded, session.time_off_rounded, session.break_taken);
+  session.overtime_hours = overtimeHours(session.total_hours, state.settings.otThresholdDay);
+  session.notes = [session.notes, notes].filter(Boolean).join(' / ');
+  session.departed_offsite = !!departedOffsite;
+  session.manual_departure_time = departedOffsite ? offTime : null;
+  session.missed_clockoff = !!missed; delete session._open;
+  state.sessions.unshift(session); state.lastClosedSession = session; state.currentSession = null;
+  bumpJobVisit(session.job_id); saveState(); queueSheetWrite('sessions', session); vibrate([40, 60, 40]); return session;
+}
+function updateSession(sessionId, patch) {
+  const s = state.sessions.find(s => s.session_id === sessionId); if (!s) return null;
+  Object.assign(s, patch);
+  s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, s.break_taken);
+  s.overtime_hours = overtimeHours(s.total_hours, state.settings.otThresholdDay);
+  saveState(); queueSheetWrite('sessions', s, true); return s;
+}
+function sessionsForWeek(weekStartDate) {
+  const start = startOfWeek(weekStartDate, state.settings.firstDayOfWeek); const end = addDays(start, 7);
+  return state.sessions.filter(s => { const d = new Date(s.date); return d >= start && d < end; });
+}
+function staticDaysForWeek(weekStartDate) {
+  const start = startOfWeek(weekStartDate, state.settings.firstDayOfWeek); const out = [];
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(start, i); const dow = dayOfWeek(day);
+    for (const tpl of state.staticDays.filter(t => t.active && (t.days || []).includes(dow))) { out.push({ date: isoDate(day), dow, template: tpl }); }
+  }
+  return out;
+}
+function weekTotals(sessions, staticDays) {
+  let total = 0, ot = 0;
+  for (const s of sessions) { total += parseFloat(s.total_hours) || 0; ot += parseFloat(s.overtime_hours) || 0; }
+  for (const sd of staticDays) { total += hoursBetween(sd.template.clock_on, sd.template.clock_off); }
+  return { total: Math.round(total * 100) / 100, ot: Math.round(ot * 100) / 100 };
+}
+function saveSettings(patch) { Object.assign(state.settings, patch); saveState(); queueSheetWrite('settings', state.settings, true); }
+function addStaticDay(tpl) {
+  const row = {
+    id: uid(), name: tpl.name || 'Static Day', type: tpl.type || 'Custom', days: tpl.days || [],
+    clock_on: tpl.clock_on || '09:00', clock_off: tpl.clock_off || '15:00', location: tpl.location || '', active: tpl.active !== false
+  };
+  state.staticDays.push(row); saveState(); queueSheetWrite('static_days', row); return row;
+}
+function updateStaticDay(id, patch) {
+  const t = state.staticDays.find(t => t.id === id); if (!t) return null;
+  Object.assign(t, patch); saveState(); queueSheetWrite('static_days', t, true); return t;
+}
+function removeStaticDay(id) { state.staticDays = state.staticDays.filter(t => t.id !== id); saveState(); }
+function addMessage(text) { const m = { id: uid(), text, pinned: false, lastSent: null }; state.settings.messages.push(m); saveSettings({ messages: state.settings.messages }); return m; }
+function updateMessage(id, patch) { const m = state.settings.messages.find(m => m.id === id); if (!m) return null; Object.assign(m, patch); saveSettings({ messages: state.settings.messages }); return m; }
+function removeMessage(id) { state.settings.messages = state.settings.messages.filter(m => m.id !== id); saveSettings({ messages: state.settings.messages }); }
+function togglePinMessage(id) { const m = state.settings.messages.find(m => m.id === id); if (!m) return; m.pinned = !m.pinned; saveSettings({ messages: state.settings.messages }); }
+
+/* ----- GEO ----- */
+const TsGeo = (() => {
+  let watchId = null; let lastPosition = null;
+  function getPosition(opts = {}) {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error('Geolocation unsupported')); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => { lastPosition = pos; resolve(pos); }, err => reject(err),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000, ...opts }
+      );
+    });
+  }
+  function startWatching() {
+    if (watchId !== null || !navigator.geolocation) return;
+    watchId = navigator.geolocation.watchPosition(
+      pos => { lastPosition = pos; checkMissedClockOff(pos); },
+      err => console.warn('watchPosition error', err),
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 20000 }
+    );
+  }
+  function stopWatching() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
+  async function reverseGeocode(lat, lng) {
+    const key = window.TIMESHEET_CONFIG.mapsKey; if (!key) return null;
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${encodeURIComponent(key)}`;
+      const r = await fetch(url); const data = await r.json();
+      if (data.status === 'OK' && data.results.length) return data.results[0].formatted_address; return null;
+    } catch (e) { console.warn('reverseGeocode failed', e); return null; }
+  }
+  async function resolveClockOnTarget(lat, lng) {
+    const known = findJobByLocation(lat, lng); if (known) return { type: 'known', job: known };
+    if (window.TsNeillQuote) { const quoteJob = await window.TsNeillQuote.matchLocation(lat, lng); if (quoteJob) return { type: 'neill_quote', quoteJob }; }
+    const address = await reverseGeocode(lat, lng); return { type: 'unknown', address };
+  }
+  function checkMissedClockOff(pos) {
+    const st = getState(); const session = st.currentSession; if (!session) return;
+    const job = st.jobs.find(j => j.job_id === session.job_id); if (!job) return;
+    const dist = distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng);
+    const openMinutes = (Date.now() - new Date(`${session.date}T${session.time_on}`).getTime()) / 60000;
+    const cfg = st.settings;
+    if (dist > (cfg.missedClockOffDistanceM || 300) && openMinutes > (cfg.missedClockOffDelayMin || 30)) {
+      if (window.TsNotifications) { window.TsNotifications.notifyMissedClockOff(job, lastPosition); }
+    }
+  }
+  return { getPosition, startWatching, stopWatching, reverseGeocode, resolveClockOnTarget, get lastPosition() { return lastPosition; } };
+})();
+window.TsGeo = TsGeo;
+
+/* ----- GOOGLE SHEETS ----- */
+const TsSheets = (() => {
+  const cfg = window.TIMESHEET_CONFIG;
+  let tokenClient = null, accessToken = null, expiresAt = 0;
+  let spreadsheetId = localStorage.getItem('ts_sheet_id') || null;
+  let profile = null, gapiReady = false, onStatusChange = () => {};
+  const HEADERS = {
+    sessions: ['session_id','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period'],
+    jobs: ['job_id','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count'],
+    pay_periods: ['week_start','label'],
+    static_days: ['id','name','type','days','clock_on','clock_off','location','active']
+  };
+  function isTokenValid() { return accessToken && Date.now() < expiresAt - 30000; }
+  function isReady() { return isTokenValid() && !!spreadsheetId; }
+  function isSignedIn() { return isTokenValid(); }
+  function getProfile() { return profile; }
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if ([...document.scripts].some(s => s.src === src)) return resolve();
+      const s = document.createElement('script'); s.src = src; s.async = true; s.defer = true;
+      s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+    });
+  }
+  async function boot() {
+    await Promise.all([ loadScript('https://apis.google.com/js/api.js'), loadScript('https://accounts.google.com/gsi/client') ]);
+    await new Promise((resolve, reject) => { gapi.load('client', { callback: resolve, onerror: reject }); });
+    await gapi.client.init({ apiKey: cfg.googleApiKey });
+    await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
+    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+    gapiReady = true;
+    tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cfg.googleClientId, scope: cfg.scopes.join(' '), callback: handleTokenResponse });
+  }
+  function handleTokenResponse(resp) {
+    if (resp.error) { onStatusChange('error', resp); return; }
+    accessToken = resp.access_token; expiresAt = Date.now() + (resp.expires_in * 1000);
+    gapi.client.setToken({ access_token: accessToken });
+    fetchProfile().then(() => onStatusChange('signed-in'));
+  }
+  async function fetchProfile() {
+    try {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+      profile = await r.json();
+    } catch (e) { profile = null; }
+  }
+  function signIn() {
+    if (!tokenClient) { toast('Google sign-in still loading — try again in a moment'); return; }
+    tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+  }
+  function signOut() {
+    if (accessToken && window.google?.accounts?.oauth2) { try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {} }
+    accessToken = null; expiresAt = 0; profile = null; onStatusChange('signed-out');
+  }
+  async function findSpreadsheet() {
+    const q = `name='${cfg.sheetFileName}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+    const res = await gapi.client.drive.files.list({ q, fields: 'files(id,name)' });
+    return res.result.files && res.result.files[0] ? res.result.files[0].id : null;
+  }
+  async function createSpreadsheet() {
+    const res = await gapi.client.sheets.spreadsheets.create({
+      properties: { title: cfg.sheetFileName },
+      sheets: Object.keys(HEADERS).concat(['settings']).map(name => ({ properties: { title: name } }))
+    });
+    const id = res.result.spreadsheetId;
+    const data = Object.entries(HEADERS).map(([name, headers]) => ({ range: `${name}!A1`, values: [headers] }));
+    data.push({ range: 'settings!A1', values: [['key', 'value']] });
+    await gapi.client.sheets.spreadsheets.values.batchUpdate({ spreadsheetId: id, resource: { valueInputOption: 'RAW', data } });
+    return id;
+  }
+  async function ensureSpreadsheet() {
+    if (spreadsheetId) return spreadsheetId;
+    let id = await findSpreadsheet(); if (!id) id = await createSpreadsheet();
+    spreadsheetId = id; localStorage.setItem('ts_sheet_id', id); return id;
+  }
+  async function appendRow(sheetName, row) {
+    const headers = HEADERS[sheetName]; const values = [headers.map(h => formatCell(row[h]))];
+    await gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId, range: `${sheetName}!A1`, valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS', resource: { values }
+    });
+  }
+  async function updateRowById(sheetName, row) {
+    const headers = HEADERS[sheetName]; const idCol = headers[0];
+    const r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:A` });
+    const col = (r.result.values || []).map(v => v[0]); const idx = col.indexOf(row[idCol]);
+    if (idx === -1) return appendRow(sheetName, row);
+    const rowNum = idx + 1; const values = [headers.map(h => formatCell(row[h]))];
+    await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId, range: `${sheetName}!A${rowNum}`, valueInputOption: 'RAW', resource: { values } });
+  }
+  function formatCell(v) { if (v === null || v === undefined) return ''; if (Array.isArray(v)) return v.join('|'); return v; }
+  async function writeSettings(settingsObj) {
+    const entries = Object.entries(settingsObj).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)]);
+    await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId, range: 'settings!A2:B10000' });
+    if (entries.length) { await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId, range: 'settings!A2', valueInputOption: 'RAW', resource: { values: entries } }); }
+  }
+  async function writeRow(sheetName, row, isUpdate) {
+    await ensureSpreadsheet();
+    if (sheetName === 'settings') return writeSettings(row);
+    if (isUpdate) return updateRowById(sheetName, row);
+    return appendRow(sheetName, row);
+  }
+  async function readAll(sheetName) {
+    await ensureSpreadsheet(); const headers = HEADERS[sheetName];
+    const r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A2:Z10000` });
+    return (r.result.values || []).map(row => { const obj = {}; headers.forEach((h, i) => obj[h] = row[i] ?? ''); return obj; });
+  }
+  return {
+    boot, signIn, signOut, isReady, isSignedIn, getProfile, ensureSpreadsheet, writeRow, readAll,
+    get spreadsheetId() { return spreadsheetId; }, set onStatusChange(fn) { onStatusChange = fn; }
+  };
+})();
+window.TsSheets = TsSheets;
+
+/* ----- NEILL QUOTE BRIDGE ----- */
+const TsNeillQuote = (() => {
+  const cfg = window.TIMESHEET_CONFIG.neillQuote;
+  let sessionHash = null; let cachedJobs = []; let lastFetch = 0;
+  async function sha256Hex(str) {
+    const buf = new TextEncoder().encode(String(str || ''));
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  function getFingerprint() {
+    const KEY = 'ts_device_fp_v1'; let fp = localStorage.getItem(KEY);
+    if (!fp) {
+      const rand = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('');
+      fp = 'fp-' + Date.now().toString(36) + '-' + rand; try { localStorage.setItem(KEY, fp); } catch (e) {}
+    }
+    return fp;
+  }
+  async function backendCall(action, body) {
+    if (!cfg.backendUrl) throw new Error('No Neill Quote backend configured');
+    const payload = Object.assign({}, body || {}, { action, fingerprint: getFingerprint() });
+    const r = await fetch(cfg.backendUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, redirect: 'follow' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json(); if (data && data.error) throw new Error(data.error); return data;
+  }
+  async function connect(passcode) {
+    const hash = await sha256Hex(passcode);
+    const data = await backendCall('login', { passwordHash: hash });
+    if (!data || !data.ok) throw new Error('Quote login failed');
+    sessionHash = hash; saveSettings({ neillQuoteConnected: true }); refreshJobs().catch(() => {}); return true;
+  }
+  function disconnect() { sessionHash = null; saveSettings({ neillQuoteConnected: false }); }
+  function isConnected() { return !!sessionHash; }
+  function mapStatus(status) { if (status === 'quote') return 'quoting'; if (status === 'in_progress') return 'working'; return null; }
+  async function refreshJobs() {
+    if (!sessionHash) return [];
+    try { const data = await backendCall('get_quotes', { passwordHash: sessionHash }); cachedJobs = (data.quotes || []).filter(q => q.clientLat && q.clientLng); lastFetch = Date.now(); }
+    catch (e) { console.warn('Neill Quote refresh failed', e); }
+    return cachedJobs;
+  }
+  async function matchLocation(lat, lng) {
+    if (!sessionHash) return null;
+    if (Date.now() - lastFetch > 15 * 60 * 1000) await refreshJobs();
+    for (const q of cachedJobs) {
+      const d = distanceMetres(lat, lng, q.clientLat, q.clientLng);
+      if (d <= 150) {
+        return { neill_quote_id: q.id, job_name: (q.client && q.client.name) || 'Neill Data job', address: (q.client && q.client.address) || '', lat: q.clientLat, lng: q.clientLng, status: mapStatus(q.status) };
+      }
+    }
+    return null;
+  }
+  async function flagProject(quoteId, target) {
+    const st = getState(); if (!st.settings.autoFlagProjects) return; if (!sessionHash) return;
+    try { await backendCall('change_status', { passwordHash: sessionHash, id: quoteId, status: target }); }
+    catch (e) { console.warn('Neill Quote write-back skipped:', e.message); }
+  }
+  return { connect, disconnect, isConnected, refreshJobs, matchLocation, flagProject, get cachedJobs() { return cachedJobs; } };
+})();
+window.TsNeillQuote = TsNeillQuote;
+
+/* ----- NOTIFICATIONS ----- */
+const TsNotifications = (() => {
+  let lastMissedNotifyAt = 0;
+  async function requestPermission() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'default') return Notification.permission = await Notification.requestPermission();
+    return Notification.permission;
+  }
+  function show(title, body, tag) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') { toast(title + ' — ' + body); return; }
+    try {
+      navigator.serviceWorker?.getRegistration().then(reg => { if (reg) reg.showNotification(title, { body, tag, vibrate: [80, 40, 80] }); else new Notification(title, { body, tag }); }).catch(() => new Notification(title, { body, tag }));
+    } catch (e) { toast(title + ' — ' + body); }
+  }
+  function notifyMissedClockOff(job, pos) {
+    const st = getState(); if (!st.settings.notifications.missedClockOff) return;
+    if (Date.now() - lastMissedNotifyAt < 10 * 60 * 1000) return;
+    lastMissedNotifyAt = Date.now(); vibrate([100, 50, 100, 50, 100]);
+    show('Did you forget to clock off?', `Looks like you've left ${job.job_name}.`, 'missed-clockoff');
+  }
+  function notifyFridayReminder() {
+    const st = getState(); if (!st.settings.notifications.fridayReminder) return;
+    show('Timesheet due', 'Friday — don’t forget to send your timesheet.', 'friday-reminder');
+  }
+  function checkFridayReminder() {
+    const st = getState(); const now = new Date();
+    if (dayOfWeek(now) !== (st.settings.sendDay || 'Friday')) return;
+    if (hhmm(now) < (st.settings.sendTime || '16:00')) return;
+    const key = 'ts_last_friday_reminder';
+    if (localStorage.getItem(key) === isoDate(now)) return;
+    localStorage.setItem(key, isoDate(now)); notifyFridayReminder();
+  }
+  return { requestPermission, show, notifyMissedClockOff, notifyFridayReminder, checkFridayReminder };
+})();
+window.TsNotifications = TsNotifications;
+
+/* ----- EXPORT LOGIC ----- */
+const TsExport = (() => {
+  function formatWeekPreview(weekStart) {
+    const st = getState(); const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const sessions = sessionsForWeek(start); const staticDays = staticDaysForWeek(start); const lines = [];
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i); const iso = isoDate(day);
+      const daySessions = sessions.filter(s => s.date === iso); const dayStatic = staticDays.filter(sd => sd.date === iso);
+      if (!daySessions.length && !dayStatic.length) continue;
+      lines.push(`${dayOfWeek(day)} ${fmtDateHeader(day)}`);
+      let dayTotal = 0, dayOt = 0;
+      daySessions.forEach(s => { lines.push(`${s.job_name}  ${fmtTime(s.time_on_rounded, st.settings.use24hr)} -> ${fmtTime(s.time_off_rounded, st.settings.use24hr)}`); dayTotal += parseFloat(s.total_hours) || 0; dayOt += parseFloat(s.overtime_hours) || 0; });
+      dayStatic.forEach(sd => { lines.push(`${sd.template.name} (${sd.template.type})  ${fmtTime(sd.template.clock_on, st.settings.use24hr)} -> ${fmtTime(sd.template.clock_off, st.settings.use24hr)}`); dayTotal += hoursBetween(sd.template.clock_on, sd.template.clock_off); });
+      lines.push(`Total: ${dayTotal.toFixed(2)} hrs  |  OT: ${dayOt.toFixed(2)} hrs`); lines.push('');
+    }
+    const totals = weekTotals(sessions, staticDays);
+    lines.push(`Week Total: ${totals.total.toFixed(2)} hrs  |  OT: ${totals.ot.toFixed(2)} hrs`);
+    return lines.join('\n');
+  }
+  function pickNextMessage() {
+    const st = getState(); const msgs = st.settings.messages || []; if (!msgs.length) return null;
+    const pinned = msgs.find(m => m.pinned); if (pinned && msgs.length === 1) return pinned;
+    const candidates = msgs.filter(m => !m.pinned && m.id !== st.settings.lastSentMessageId);
+    const pool = candidates.length ? candidates : msgs.filter(m => m.id !== st.settings.lastSentMessageId);
+    return pinned || pool[Math.floor(Math.random() * pool.length)] || msgs[0];
+  }
+  function buildEmail(weekStart) {
+    const st = getState(); const msg = pickNextMessage();
+    const body = (msg ? msg.text.replace('[Name]', st.settings.recipientName || 'there') : '') + '\n\n' + formatWeekPreview(weekStart);
+    const subject = `Timesheet — Week of ${isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek))}`;
+    return { to: st.settings.recipientEmail || '', cc: st.settings.ccEmail || '', subject, body, messageId: msg && msg.id };
+  }
+  function sendTimesheet(weekStart) {
+    const email = buildEmail(weekStart);
+    const params = new URLSearchParams({ subject: email.subject, body: email.body });
+    if (email.cc) params.set('cc', email.cc);
+    const href = `mailto:${encodeURIComponent(email.to)}?${params.toString()}`;
+    window.location.href = href;
+    if (email.messageId) {
+      const st = getState(); const m = st.settings.messages.find(m => m.id === email.messageId);
+      if (m) m.lastSent = new Date().toISOString();
+      saveSettings({ lastSentMessageId: email.messageId, messages: st.settings.messages });
+    }
+  }
+  function exportCsv(weekStart) {
+    const st = getState(); const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const sessions = sessionsForWeek(start);
+    const headers = ['date','day_of_week','job_name','address_confirmed','time_on','time_off','break_taken','total_hours','overtime_hours','job_type','notes'];
+    const rows = [headers.join(',')];
+    sessions.forEach(s => { rows.push(headers.map(h => csvCell(s[h])).join(',')); });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    downloadBlob(blob, `timesheet-${isoDate(start)}.csv`);
+  }
+  function csvCell(v) { const s = String(v ?? ''); return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function printPdf() { window.print(); }
+  return { formatWeekPreview, buildEmail, sendTimesheet, exportCsv, printPdf, pickNextMessage };
+})();
+window.TsExport = TsExport;
+
+/* ===== VIEW MODULES ===== */
+window.Views = {};
+
+/* CLOCK */
+(function () {
+  let tickTimer = null;
+  function $(id) { return document.getElementById(id); }
+  function render() {
+    const st = getState(); const session = st.currentSession; const isOn = !!session;
+    $('env-off').classList.toggle('active', !isOn);
+    $('env-on').classList.toggle('active', isOn);
+    $('home-content').classList.toggle('state-on', isOn);
+    $('on-info').style.display = isOn ? 'block' : 'none';
+    $('off-info').style.display = isOn ? 'none' : 'block';
+    $('clock-btn').textContent = isOn ? 'Clock Off' : 'Clock On';
+    $('secondary-btn').textContent = isOn ? 'Add Note' : 'Choose job manually';
+    if (isOn) {
+      $('job-name').textContent = session.job_name;
+      $('job-address').textContent = session.address_confirmed || '';
+      $('clock-on-time').textContent = 'On since ' + fmtTime(session.time_on_rounded, st.settings.use24hr);
+    } else {
+      const last = st.lastClosedSession;
+      $('last-shift').textContent = last ? `Last: ${last.job_name} · ${fmtTime(last.time_on_rounded, st.settings.use24hr)} → ${fmtTime(last.time_off_rounded, st.settings.use24hr)} · ${last.total_hours} hrs` : 'No shifts yet.';
+    }
+  }
+  function tick() {
+    const st = getState(); const now = new Date();
+    $('clock-date').textContent = `${dayOfWeek(now)} ${now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
+    const timeEl = $('big-time');
+    if (st.currentSession) {
+      const onDate = new Date(`${st.currentSession.date}T${st.currentSession.time_on}:00`);
+      let diff = Math.max(0, Math.floor((now - onDate) / 1000));
+      const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+      timeEl.textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+    } else { timeEl.textContent = fmtTime(hhmm(now), st.settings.use24hr); }
+  }
+  function startTicking() { clearInterval(tickTimer); tick(); tickTimer = setInterval(tick, 1000); }
+  async function handleClockOn() {
+    let pos;
+    try { pos = await TsGeo.getPosition(); } catch (e) { toast('Could not get GPS location: ' + e.message); return; }
+    const { latitude: lat, longitude: lng } = pos.coords; toast('Checking location…');
+    const result = await TsGeo.resolveClockOnTarget(lat, lng);
+    if (result.type === 'known') showConfirmKnown(result.job, lat, lng);
+    else if (result.type === 'neill_quote') showNeillQuotePrompt(result.quoteJob, lat, lng);
+    else showUnknownSiteFlow(result.address, lat, lng);
+  }
+  function openPicker(title, bodyHtml) { $('picker-title').textContent = title; $('picker-body').innerHTML = bodyHtml; $('picker-backdrop').style.display = 'flex'; }
+  function closePicker() { $('picker-backdrop').style.display = 'none'; }
+  function showConfirmKnown(job, lat, lng) {
+    openPicker(`You're at ${escapeHtml(job.job_name)}`, `<p class="muted">Clocking on?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-cancel">Cancel</button><button class="btn btn-primary" id="pk-confirm">Clock On</button></div>`);
+    $('pk-cancel').onclick = closePicker;
+    $('pk-confirm').onclick = () => { closePicker(); doClockOn(job, lat, lng); };
+  }
+  function showNeillQuotePrompt(quoteJob, lat, lng) {
+    openPicker('Neill Data job site detected', `<p class="muted">First time here — are you quoting or working?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-quoting">Quoting</button><button class="btn btn-primary" id="pk-working">Working</button></div>`);
+    const finish = async (status) => {
+      closePicker();
+      const job = createJob({ job_name: quoteJob.job_name, address: quoteJob.address, lat: quoteJob.lat, lng: quoteJob.lng, job_type: 'neill_data', neill_quote_id: quoteJob.neill_quote_id, neill_quote_status: status });
+      TsNeillQuote.flagProject(quoteJob.neill_quote_id, status === 'quoting' ? 'quote' : 'in_progress');
+      doClockOn(job, lat, lng);
+    };
+    $('pk-quoting').onclick = () => finish('quoting');
+    $('pk-working').onclick = () => finish('working');
+  }
+  function showUnknownSiteFlow(address, lat, lng) {
+    openPicker('Is this your location?', `<p class="muted" id="pk-address">${escapeHtml(address || 'Unknown address')}</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-edit">Edit</button><button class="btn btn-primary" id="pk-confirm-addr">Confirm</button></div>`);
+    $('pk-edit').onclick = () => {
+      $('picker-body').innerHTML = `<div class="field"><label>Address</label><input id="pk-addr-input" value="${escapeHtml(address || '')}"></div><div class="modal-actions"><button class="btn btn-primary" id="pk-confirm-addr2">Continue</button></div>`;
+      $('pk-confirm-addr2').onclick = () => askJobName($('pk-addr-input').value, lat, lng);
+    };
+    $('pk-confirm-addr').onclick = () => askJobName(address, lat, lng);
+  }
+  function askJobName(address, lat, lng) {
+    openPicker("What's this job called?", `<div class="field"><input id="pk-jobname" placeholder="Job / site name" autofocus></div><div class="field row"><label style="margin:0;">Employer job</label><div class="switch"><input type="checkbox" id="pk-employer"><span class="knob"></span></div></div><div class="modal-actions"><button class="btn btn-primary" id="pk-create">Create &amp; Clock On</button></div>`);
+    $('pk-create').onclick = () => {
+      const name = $('pk-jobname').value.trim() || 'Unnamed site';
+      const jobType = $('pk-employer').checked ? 'employer' : 'unclassified';
+      closePicker();
+      const job = createJob({ job_name: name, address, lat, lng, job_type: jobType });
+      doClockOn(job, lat, lng);
+    };
+  }
+  function doClockOn(job, lat, lng) {
+    TsGeo.reverseGeocode(lat, lng).then(addr => {
+      clockOn({ job, lat, lng, addressConfirmed: job.address || addr });
+      render(); TsGeo.startWatching(); toast(`Clocked on at ${job.job_name}`);
+    });
+  }
+  function showManualPicker() {
+    const st = getState();
+    if (!st.jobs.length) { toast('No saved jobs yet — clock on once to create one.'); return; }
+    const items = st.jobs.slice().sort((a, b) => (b.visit_count||0) - (a.visit_count||0)).map(j => `<div class="picker-item" data-job="${j.job_id}"><span class="pname">${escapeHtml(j.job_name)}</span><span class="paddr">${escapeHtml(j.address || '')}</span></div>`).join('');
+    openPicker('Choose a job', `<div class="picker-list">${items}</div>`);
+    $('picker-body').querySelectorAll('.picker-item').forEach(el => {
+      el.onclick = async () => {
+        const job = st.jobs.find(j => j.job_id === el.dataset.job); closePicker();
+        let pos; try { pos = await TsGeo.getPosition(); } catch (e) { pos = null; }
+        doClockOn(job, pos ? pos.coords.latitude : job.lat, pos ? pos.coords.longitude : job.lng);
+      };
+    });
+  }
+  async function handleClockOff() {
+    const st = getState(); const session = st.currentSession; if (!session) return;
+    const job = st.jobs.find(j => j.job_id === session.job_id);
+    let pos; try { pos = await TsGeo.getPosition(); } catch (e) { pos = null; }
+    const within = pos && job ? distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng) <= (job.radius_m || st.settings.radiusM) : true;
+    openOffModal(within, pos);
+  }
+  function openOffModal(within, pos) {
+    $('offmodal-title').textContent = within ? 'Clock off' : "Looks like you've left the site";
+    $('offmodal-body').innerHTML = `${within ? '' : `<div class="field"><label>What time did you finish up?</label><input type="time" id="off-time" value="${hhmm()}"></div>`}<div class="field"><label>Notes (optional)</label><textarea id="off-notes" placeholder="Any notes for this shift?"></textarea></div><div class="field row-between"><label style="margin:0;">Break taken (-30 min)</label><div class="switch"><input type="checkbox" id="off-break"><span class="knob"></span></div></div>`;
+    $('offmodal-backdrop').style.display = 'flex';
+    $('offmodal-cancel').onclick = () => { $('offmodal-backdrop').style.display = 'none'; };
+    $('offmodal-confirm').onclick = () => {
+      const manualTime = within ? null : $('off-time').value;
+      const notes = $('off-notes').value.trim(); const breakTaken = $('off-break').checked;
+      $('offmodal-backdrop').style.display = 'none';
+      clockOff({ lat: pos ? pos.coords.latitude : null, lng: pos ? pos.coords.longitude : null, breakTaken, notes, manualTime, departedOffsite: !within });
+      TsGeo.stopWatching(); render(); toast('Clocked off');
+    };
+  }
+  function openNoteModal() { $('note-text').value = ''; $('note-backdrop').style.display = 'flex'; }
+  function init() {
+    render(); startTicking();
+    $('clock-btn').addEventListener('click', () => { const st = getState(); if (st.currentSession) handleClockOff(); else handleClockOn(); });
+    $('secondary-btn').addEventListener('click', () => { const st = getState(); if (st.currentSession) openNoteModal(); else showManualPicker(); });
+    $('note-cancel').addEventListener('click', () => { $('note-backdrop').style.display = 'none'; });
+    $('note-save').addEventListener('click', () => { addNoteToCurrentSession($('note-text').value.trim()); $('note-backdrop').style.display = 'none'; toast('Note added'); });
+    [$('picker-backdrop'), $('offmodal-backdrop'), $('note-backdrop')].forEach(el => { el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; }); });
+  }
+  window.Views.clock = { init, render };
+})();
+
+/* HISTORY */
+(function () {
+  let weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
+  let touchStartX = null;
+  function $(id) { return document.getElementById(id); }
+  function render() {
+    const st = getState();
+    const sessions = sessionsForWeek(weekCursor); const staticDays = staticDaysForWeek(weekCursor);
+    const totals = weekTotals(sessions, staticDays);
+    $('wk-label').textContent = `${fmtDateHeader(weekCursor)} – ${fmtDateHeader(addDays(weekCursor, 6))}`;
+    $('wk-sub').textContent = payPeriodFor(weekCursor) === isoDate(weekCursor) ? 'Calendar week' : payPeriodFor(weekCursor);
+    $('wk-total').textContent = totals.total.toFixed(2) + ' hrs';
+    $('wk-ot').textContent = totals.ot.toFixed(2) + ' hrs';
+    $('wk-days').textContent = new Set(sessions.map(s => s.date)).size;
+    const daysHtml = []; let daysWithData = 0;
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekCursor, i); const iso = isoDate(day);
+      const daySessions = sessions.filter(s => s.date === iso); const dayStatic = staticDays.filter(sd => sd.date === iso);
+      if (!daySessions.length && !dayStatic.length) continue;
+      daysWithData++; let dayTotal = 0, dayOt = 0;
+      const rows = daySessions.map(s => {
+        dayTotal += parseFloat(s.total_hours) || 0; dayOt += parseFloat(s.overtime_hours) || 0;
+        return `<div class="session-row" data-session="${s.session_id}"><span class="sjob">${escapeHtml(s.job_name)}</span><span class="stime">${fmtTime(s.time_on_rounded, st.settings.use24hr)} &rarr; ${fmtTime(s.time_off_rounded, st.settings.use24hr)}</span><span class="shrs">${(parseFloat(s.total_hours) || 0).toFixed(2)} hrs</span></div>`;
+      }).join('');
+      const staticRows = dayStatic.map(sd => {
+        dayTotal += hoursBetween(sd.template.clock_on, sd.template.clock_off);
+        return `<div class="session-row"><span class="sjob">${escapeHtml(sd.template.name)}<span class="static-badge">${escapeHtml(sd.template.type)}</span></span><span class="stime">${fmtTime(sd.template.clock_on, st.settings.use24hr)} &rarr; ${fmtTime(sd.template.clock_off, st.settings.use24hr)}</span><span class="shrs"></span></div>`;
+      }).join('');
+      daysHtml.push(`<div class="card day-card"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
+    }
+    $('day-cards').innerHTML = daysWithData ? daysHtml.join('') : '<div class="empty-week">No sessions this week.</div>';
+    $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', () => openDetail(el.dataset.session)); });
+  }
+  function openDetail(sessionId) {
+    const s = getState().sessions.find(s => s.session_id === sessionId); if (!s) return;
+    $('detail-body').innerHTML = `<div class="field"><label>Job</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field row-between"><label style="margin:0;">Break taken</label><div class="switch"><input type="checkbox" id="d-break" ${s.break_taken ? 'checked' : ''}><span class="knob"></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div>`;
+    $('detail-backdrop').style.display = 'flex';
+    $('detail-save').onclick = () => {
+      updateSession(sessionId, { job_name: $('d-job').value.trim(), time_on_rounded: $('d-on').value, time_off_rounded: $('d-off').value, break_taken: $('d-break').checked, notes: $('d-notes').value.trim() });
+      $('detail-backdrop').style.display = 'none'; render(); toast('Session updated');
+    };
+  }
+  function init() {
+    weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
+    render();
+    $('wk-prev').addEventListener('click', () => { weekCursor = addDays(weekCursor, -7); render(); });
+    $('wk-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
+    $('detail-cancel').addEventListener('click', () => { $('detail-backdrop').style.display = 'none'; });
+    $('detail-backdrop').addEventListener('click', e => { if (e.target === $('detail-backdrop')) $('detail-backdrop').style.display = 'none'; });
+    const area = $('touch-area');
+    area.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    area.addEventListener('touchend', e => {
+      if (touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 60) { weekCursor = addDays(weekCursor, dx < 0 ? 7 : -7); render(); }
+      touchStartX = null;
+    }, { passive: true });
+  }
+  window.Views.history = { init, render };
+})();
+
+/* EXPORT */
+(function () {
+  let weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
+  function $(id) { return document.getElementById(id); }
+  function render() {
+    $('ex-label').textContent = `${fmtDateHeader(weekCursor)} – ${fmtDateHeader(addDays(weekCursor, 6))}`;
+    $('preview').textContent = TsExport.formatWeekPreview(weekCursor) || 'No sessions this week.';
+  }
+  function init() {
+    weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
+    render();
+    $('ex-prev').addEventListener('click', () => { weekCursor = addDays(weekCursor, -7); render(); });
+    $('ex-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
+    $('btn-send').addEventListener('click', () => { const st = getState(); if (!st.settings.recipientEmail) { toast('Set a recipient email in Settings -> Auto-Emailer first'); return; } TsExport.sendTimesheet(weekCursor); });
+    $('btn-csv').addEventListener('click', () => TsExport.exportCsv(weekCursor));
+    $('btn-pdf').addEventListener('click', () => TsExport.printPdf());
+  }
+  window.Views.export = { init, render };
+})();
+
+/* SETTINGS */
+(function () {
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const TPL_TYPES = ['School Day','Travel Day','Office Day','RDO','Custom'];
+  let editingTplId = null; let tplDraftDays = []; let editingMsgId = null; let wired = false;
+  function $(id) { return document.getElementById(id); }
+  function bindText(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: el.value })); }
+  function bindNumber(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: parseFloat(el.value) || 0 })); }
+  function bindSelect(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: el.value })); }
+  function bindToggle(id, getVal, onChange) { const el = $(id); el.checked = !!getVal(); syncSwitchClass(el); if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => { onChange(el.checked); syncSwitchClass(el); }); }
+  function syncSwitchClass(input) { const wrap = input.closest('.switch'); if (wrap) wrap.classList.toggle('on', input.checked); }
+  function renderAll() {
+    const st = getState(); const s = st.settings;
+    bindText('s-employerName', 'employerName', s); bindText('s-employerEmail', 'employerEmail', s);
+    bindSelect('s-payPeriodType', 'payPeriodType', s); bindSelect('s-payPeriodStartDay', 'payPeriodStartDay', s);
+    bindText('s-standardClockOn', 'standardClockOn', s); bindText('s-standardClockOff', 'standardClockOff', s);
+    bindNumber('s-otThresholdDay', 'otThresholdDay', s); bindNumber('s-otThresholdWeek', 'otThresholdWeek', s); bindNumber('s-otMultiplier', 'otMultiplier', s);
+    $('s-roundingMin').value = String(s.roundingMin ?? 30);
+    if (!$('s-roundingMin')._tsBound) { $('s-roundingMin')._tsBound = true; $('s-roundingMin').addEventListener('change', e => saveSettings({ roundingMin: parseInt(e.target.value, 10) })); }
+    bindText('s-recipientName', 'recipientName', s); bindText('s-recipientEmail', 'recipientEmail', s); bindText('s-ccEmail', 'ccEmail', s);
+    bindSelect('s-sendDay', 'sendDay', s); bindText('s-sendTime', 'sendTime', s);
+    $('radius-val').textContent = s.radiusM ?? 150;
+    const radiusEl = $('s-radiusM'); radiusEl.value = s.radiusM ?? 150;
+    if (!radiusEl._tsBound) { radiusEl._tsBound = true; radiusEl.addEventListener('input', () => { $('radius-val').textContent = radiusEl.value; }); radiusEl.addEventListener('change', () => saveSettings({ radiusM: parseInt(radiusEl.value, 10) })); }
+    bindNumber('s-missedClockOffDelayMin', 'missedClockOffDelayMin', s);
+    renderNeillQuoteStatus();
+    bindToggle('s-autoFlagProjects', () => s.autoFlagProjects, v => saveSettings({ autoFlagProjects: v }));
+    bindToggle('s-notif-missed', () => s.notifications.missedClockOff, v => saveSettings({ notifications: Object.assign({}, s.notifications, { missedClockOff: v }) }));
+    bindToggle('s-notif-friday', () => s.notifications.fridayReminder, v => saveSettings({ notifications: Object.assign({}, s.notifications, { fridayReminder: v }) }));
+    bindToggle('s-notif-weekly', () => s.notifications.weeklySummary, v => saveSettings({ notifications: Object.assign({}, s.notifications, { weeklySummary: v }) }));
+    bindText('s-defaultJobNote', 'defaultJobNote', s); bindSelect('s-firstDayOfWeek', 'firstDayOfWeek', s);
+    bindToggle('s-use24hr', () => s.use24hr, v => saveSettings({ use24hr: v }));
+    renderTemplates(); renderMessages(); renderAccountStatus();
+  }
+  function renderTemplates() {
+    const st = getState(); const list = $('tpl-list');
+    if (!st.staticDays.length) { list.innerHTML = `<div class="muted" style="font-size:13px;">No templates yet.</div>`; return; }
+    list.innerHTML = st.staticDays.map(t => `<div class="tpl-card"><div><div class="tpl-name">${escapeHtml(t.name)} ${t.active ? '' : '<span class="muted">(off)</span>'}</div><div class="tpl-meta">${escapeHtml(t.type)} · ${(t.days || []).map(d => d.slice(0,3)).join(' ')} · ${fmtTime(t.clock_on, st.settings.use24hr)}–${fmtTime(t.clock_off, st.settings.use24hr)}</div></div><div class="row"><button class="icon-btn" data-tpl-edit="${t.id}">Edit</button><button class="icon-btn" data-tpl-del="${t.id}">✕</button></div></div>`).join('');
+    list.querySelectorAll('[data-tpl-edit]').forEach(b => b.addEventListener('click', () => openTplModal(b.dataset.tplEdit)));
+    list.querySelectorAll('[data-tpl-del]').forEach(b => b.addEventListener('click', () => { removeStaticDay(b.dataset.tplDel); renderTemplates(); }));
+  }
+  function openTplModal(id) {
+    editingTplId = id || null; const st = getState();
+    const tpl = id ? st.staticDays.find(t => t.id === id) : { name: '', type: 'School Day', days: [], clock_on: '09:00', clock_off: '15:00', location: '', active: true };
+    tplDraftDays = (tpl.days || []).slice();
+    $('tpl-body').innerHTML = `<div class="field"><label>Name</label><input id="tpl-name" value="${escapeHtml(tpl.name)}"></div><div class="field"><label>Type</label><select id="tpl-type">${TPL_TYPES.map(t => `<option ${t === tpl.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="field"><label>Days</label><div class="day-chips" id="tpl-days">${DAYS.map(d => `<span class="day-chip ${tplDraftDays.includes(d) ? 'sel' : ''}" data-day="${d}">${d.slice(0,3)}</span>`).join('')}</div></div><div class="row"><div class="field" style="flex:1;"><label>Clock On</label><input type="time" id="tpl-on" value="${tpl.clock_on}"></div><div class="field" style="flex:1;"><label>Clock Off</label><input type="time" id="tpl-off" value="${tpl.clock_off}"></div></div><div class="field"><label>Location (optional)</label><input id="tpl-loc" value="${escapeHtml(tpl.location || '')}"></div><div class="field row-between"><label style="margin:0;">Active</label><div class="switch ${tpl.active !== false ? 'on' : ''}"><input type="checkbox" id="tpl-active" ${tpl.active !== false ? 'checked' : ''}><span class="knob"></span></div></div>`;
+    $('tpl-days').querySelectorAll('.day-chip').forEach(chip => {
+      chip.addEventListener('click', () => { const d = chip.dataset.day; if (tplDraftDays.includes(d)) tplDraftDays = tplDraftDays.filter(x => x !== d); else tplDraftDays.push(d); chip.classList.toggle('sel'); });
+    });
+    $('tpl-active').addEventListener('change', e => e.target.closest('.switch').classList.toggle('on', e.target.checked));
+    $('tpl-backdrop').style.display = 'flex';
+  }
+  function saveTplModal() {
+    const payload = { name: $('tpl-name').value.trim() || 'Static Day', type: $('tpl-type').value, days: tplDraftDays, clock_on: $('tpl-on').value, clock_off: $('tpl-off').value, location: $('tpl-loc').value.trim(), active: $('tpl-active').checked };
+    if (editingTplId) updateStaticDay(editingTplId, payload); else addStaticDay(payload);
+    $('tpl-backdrop').style.display = 'none'; renderTemplates();
+  }
+  function renderMessages() {
+    const st = getState(); const msgs = st.settings.messages || []; const list = $('msg-list');
+    list.innerHTML = msgs.map(m => `<div class="msg-item"><div class="mtext">${escapeHtml(m.text)}</div><div class="mmeta"><button class="icon-btn ${m.pinned ? 'pinned' : ''}" data-msg-pin="${m.id}" title="Pin">${m.pinned ? '★' : '☆'}</button><button class="icon-btn" data-msg-edit="${m.id}">Edit</button><button class="icon-btn" data-msg-del="${m.id}">✕</button></div></div>`).join('') || `<div class="muted" style="font-size:13px;">No messages.</div>`;
+    list.querySelectorAll('[data-msg-pin]').forEach(b => b.addEventListener('click', () => { togglePinMessage(b.dataset.msgPin); renderMessages(); }));
+    list.querySelectorAll('[data-msg-edit]').forEach(b => b.addEventListener('click', () => openMsgModal(b.dataset.msgEdit)));
+    list.querySelectorAll('[data-msg-del]').forEach(b => b.addEventListener('click', () => { removeMessage(b.dataset.msgDel); renderMessages(); }));
+  }
+  function openMsgModal(id) { editingMsgId = id || null; const st = getState(); const m = id ? st.settings.messages.find(m => m.id === id) : null; $('msg-text').value = m ? m.text : ''; $('msg-backdrop').style.display = 'flex'; }
+  function saveMsgModal() {
+    const text = $('msg-text').value.trim(); if (!text) { $('msg-backdrop').style.display = 'none'; return; }
+    if (editingMsgId) updateMessage(editingMsgId, { text }); else addMessage(text);
+    $('msg-backdrop').style.display = 'none'; renderMessages();
+  }
+  function renderAccountStatus() {
+    const signedIn = window.TsSheets && TsSheets.isSignedIn();
+    $('acct-status').textContent = signedIn ? (TsSheets.getProfile()?.email || 'Connected') : 'Not connected';
+    $('acct-sub').textContent = signedIn ? 'Synced to Google Sheets' : 'Sign in to sync to Google Sheets';
+    $('btn-signin').style.display = signedIn ? 'none' : '';
+    $('btn-signout').style.display = signedIn ? '' : 'none';
+  }
+  function renderNeillQuoteStatus() {
+    const connected = TsNeillQuote.isConnected() || getState().settings.neillQuoteConnected;
+    $('nq-dot').className = connected ? 'dot-yes' : 'dot-no';
+    $('nq-text').textContent = connected ? 'Connected' : 'Not connected';
+    $('btn-nq-connect').style.display = connected ? 'none' : '';
+    $('btn-nq-disconnect').style.display = connected ? '' : 'none';
+  }
+  function wireEvents() {
+    if (wired) return; wired = true;
+    $('btn-signin').addEventListener('click', () => TsSheets.signIn());
+    $('btn-signout').addEventListener('click', () => { TsSheets.signOut(); renderAccountStatus(); });
+    document.addEventListener('ts:auth-changed', renderAccountStatus);
+    $('btn-add-tpl').addEventListener('click', () => openTplModal(null));
+    $('tpl-cancel').addEventListener('click', () => { $('tpl-backdrop').style.display = 'none'; });
+    $('tpl-save').addEventListener('click', saveTplModal);
+    $('btn-add-msg').addEventListener('click', () => openMsgModal(null));
+    $('msg-cancel').addEventListener('click', () => { $('msg-backdrop').style.display = 'none'; });
+    $('msg-save').addEventListener('click', saveMsgModal);
+    $('btn-nq-connect').addEventListener('click', () => { $('nq-error').textContent = ''; $('nq-passcode').value = ''; $('nq-backdrop').style.display = 'flex'; });
+    $('nq-cancel').addEventListener('click', () => { $('nq-backdrop').style.display = 'none'; });
+    $('nq-submit').addEventListener('click', async () => {
+      const pass = $('nq-passcode').value; if (!pass) return; $('nq-error').textContent = '';
+      try { await TsNeillQuote.connect(pass); $('nq-backdrop').style.display = 'none'; renderNeillQuoteStatus(); toast('Connected to Neill Quote'); }
+      catch (e) { $('nq-error').textContent = e.message || 'Connection failed'; }
+    });
+    $('btn-nq-disconnect').addEventListener('click', () => { TsNeillQuote.disconnect(); renderNeillQuoteStatus(); });
+    $('btn-notif-perm').addEventListener('click', async () => { const perm = await TsNotifications.requestPermission(); toast(perm === 'granted' ? 'Notifications enabled' : 'Notifications ' + perm); });
+    $('btn-backup').addEventListener('click', async () => { toast('Syncing…'); await flushQueue(); toast(navigator.onLine ? 'Sync complete' : 'Offline — will sync later'); });
+    $('btn-clear-cache').addEventListener('click', () => {
+      if (!confirm('Clear local sync queue and device cache? Your sessions and settings are kept — this only clears the offline write queue and device fingerprint.')) return;
+      localStorage.removeItem('ts_offline_queue_v1'); localStorage.removeItem('ts_device_fp_v1'); toast('Local cache cleared');
+    });
+    [$('tpl-backdrop'), $('msg-backdrop'), $('nq-backdrop')].forEach(el => { el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; }); });
+  }
+  function init() { renderAll(); wireEvents(); }
+  window.Views.settings = { init, render: renderAll };
+})();
+
+/* ===== APP SHELL ===== */
+const NAV_ITEMS = [
+  { view: 'clock', label: 'Clock', icon: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 100 10 5 5 0 000-10z' },
+  { view: 'history', label: 'History', icon: 'M3 5h18M3 12h18M3 19h18' },
+  { view: 'export', label: 'Export', icon: 'M12 3v12m0 0l-4-4m4 4l4-4M4 21h16' },
+  { view: 'settings', label: 'Settings', icon: 'M10.3 2.6a2 2 0 013.4 0l.4.7a2 2 0 002.3 1l.8-.2a2 2 0 012.4 1.4l.2.8a2 2 0 001 1.4l.7.4a2 2 0 010 3.4l-.7.4a2 2 0 00-1 1.4l-.2.8a2 2 0 01-2.4 1.4l-.8-.2a2 2 0 00-2.3 1l-.4.7a2 2 0 01-3.4 0l-.4-.7a2 2 0 00-2.3-1l-.8.2a2 2 0 01-2.4-1.4l-.2-.8a2 2 0 00-1-1.4l-.7-.4a2 2 0 010-3.4l.7-.4a2 2 0 001-1.4l.2-.8a2 2 0 012.4-1.4l.8.2a2 2 0 002.3-1l.4-.7zM12 9a3 3 0 100 6 3 3 0 000-6z' }
+];
+let currentView = 'clock';
+function renderTabbar() {
+  const root = document.getElementById('tabbar-root'); if (!root) return;
+  root.innerHTML = `<nav class="tabbar">${NAV_ITEMS.map(item => `<a data-view="${item.view}" class="${item.view === currentView ? 'active' : ''}"><svg viewBox="0 0 24 24"><path d="${item.icon}" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${item.label}</span></a>`).join('')}</nav>`;
+  root.querySelectorAll('.tabbar a').forEach(a => { a.addEventListener('click', () => showView(a.dataset.view)); });
+}
+function showView(name) {
+  currentView = name;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + name); if (el) el.classList.add('active');
+  document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+  if (window.Views[name] && window.Views[name].render) window.Views[name].render();
+  window.scrollTo(0, 0);
+}
+function ensureSyncDot() {
+  if (document.getElementById('sync-dot')) return;
+  const dot = document.createElement('div'); dot.id = 'sync-dot'; dot.className = 'sync-dot sync-synced';
+  document.body.appendChild(dot); renderSyncDot();
+}
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
+}
+async function bootApp() {
+  registerServiceWorker(); ensureSyncDot(); renderTabbar();
+  window.Views.clock.init(); window.Views.history.init(); window.Views.export.init(); window.Views.settings.init();
+  showView('clock');
+  await flushQueueOnNextOpen();
+  TsSheets.boot().catch(() => {});
+  TsSheets.onStatusChange = (status) => { if (status === 'signed-in') { flushQueue(); } document.dispatchEvent(new CustomEvent('ts:auth-changed', { detail: status })); };
+  if (getState().currentSession) TsGeo.startWatching();
+  TsNotifications.checkFridayReminder();
+}
+document.addEventListener('DOMContentLoaded', bootApp);
+</script>
+</body>
+</html>
