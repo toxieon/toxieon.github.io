@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>DEAD RECKONING — Test Bench & Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{--ord:#ff5a3c;--son:#34c6ff;--man:#3ee08a;--dec:#ffc23c;--fla:#a98bff;--rep:#8f7dff;--gold:#ffcf45;--good:#5fe0b0;--bad:#ff7a78;
+    --com:#9fc2dd;--rare:#5fb8ff;--forge:#3ee08a;--contra:#ff7a3c;--omega:#e05fff;--ink:#eaf4ff;--ink2:#9fc2dd;--ink3:#5d86a6;--card:#15324c;--cardlip:#0c2236;--line:#2a557c;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{font-size:clamp(13px,3.3vw,17px)}body{margin:0;font-family:'Pixelify Sans',system-ui,sans-serif;color:var(--ink);min-height:100vh;
+    background:radial-gradient(1300px 700px at 50% -8%,#15506b,#0a2740 42%,#061726 100%);-webkit-font-smoothing:none;padding:14px;padding-bottom:60px}
+  .frame{max-width:1080px;margin:0 auto}
+  h1{font-family:'Press Start 2P',monospace;font-size:1rem;margin:0;text-shadow:0 2px 0 #0a2236,0 0 16px rgba(52,198,255,.5)}
+  .sub{color:var(--son);font-size:.8rem;margin:4px 0 2px}
+  .note{font-size:.74rem;color:var(--ink2);background:rgba(255,207,69,.1);border:1px solid var(--gold);border-radius:9px;padding:8px 11px;margin:10px 0}
+  .note a{color:var(--gold)}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+  .tab{background:rgba(8,26,42,.7);border:2px solid var(--line);color:var(--ink2);border-radius:10px;padding:7px 13px;font-family:inherit;font-size:.82rem;cursor:pointer}
+  .tab.on{border-color:var(--son);background:rgba(52,198,255,.15);color:#fff}
+  .panel{background:linear-gradient(180deg,rgba(10,38,58,.5),rgba(5,22,36,.7));border:2px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  .grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+  .lbl{font-size:.74rem;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin:6px 0 2px;text-align:center}
+  .btn{cursor:pointer;border-radius:10px;font-size:.82rem;font-weight:700;border:none;padding:7px 13px;font-family:inherit;text-transform:uppercase;letter-spacing:.4px}
+  .btn-go{background:linear-gradient(180deg,#46e39a,#1fae6e);color:#06301f;box-shadow:0 4px 0 #0c6b41}
+  .btn-end{background:#1d4a6b;color:#cfeaff;box-shadow:0 3px 0 #0e2c43}
+  .btn:active{transform:translateY(2px)}
+
+  /* cards */
+  .card{width:124px;height:168px;border-radius:13px;position:relative;background:linear-gradient(180deg,var(--card),var(--cardlip));border:2px solid var(--line);padding:9px;box-shadow:0 7px 0 rgba(0,0,0,.35),inset 0 2px 0 rgba(255,255,255,.08)}
+  .card .cat{font-size:.55rem;letter-spacing:1px;font-weight:700;text-transform:uppercase}
+  .card .art{height:44px;margin:4px 0;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;background:rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.08)}
+  .card .nm{font-size:.82rem;font-weight:700;color:#fff;line-height:1.05;margin-bottom:3px}.card .ds{font-size:.6rem;color:var(--ink2);line-height:1.22}
+  .card .cost{position:absolute;top:-9px;left:-9px;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe27a,#e0a319);border:2px solid #fff3c4;color:#4a2c00;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .card .rar{position:absolute;bottom:4px;right:6px;font-size:.46rem;letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+  .card.sig{border-color:var(--omega);box-shadow:0 7px 0 rgba(0,0,0,.35),0 0 16px rgba(224,95,255,.45);cursor:pointer}
+  .cat-ORDNANCE{color:var(--ord)}.cat-SONAR{color:var(--son)}.cat-MANEUVER{color:var(--man)}.cat-DECOY{color:var(--dec)}.cat-FLAGSHIP{color:var(--fla)}.cat-REPAIR{color:var(--rep)}
+  .r-common{color:var(--com)}.r-rare{color:var(--rare)}.r-forge{color:var(--forge)}.r-contra{color:var(--contra)}.r-omega{color:var(--omega)}
+
+  /* portraits */
+  .pcol{display:flex;flex-direction:column;align-items:center;gap:6px;width:140px}
+  .portrait{width:64px;height:88px;border-radius:10px;background:linear-gradient(180deg,var(--coat,#26456b),#0a1a29);border:2px solid var(--line);position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;box-shadow:0 3px 0 rgba(0,0,0,.4)}
+  .portrait .face{width:100%;height:calc(100% - 12px);display:flex;align-items:flex-end;justify-content:center;padding:3px 4px 0;font-size:2.1rem;line-height:1;transition:transform .15s}
+  .portrait .face svg{width:100%;height:100%}
+  .portrait .cn{font-size:.5rem;color:#dfeefb;background:rgba(0,0,0,.4);width:100%;text-align:center;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .portrait.idle .face{animation:breathe 3s ease-in-out infinite}@keyframes breathe{50%{transform:translateY(-2px) scale(1.05)}}
+  .portrait.hit{animation:pflinch .45s}@keyframes pflinch{0%{filter:none}25%{filter:brightness(1.8) sepia(1) hue-rotate(-35deg) saturate(4);transform:translateX(-3px)}60%{transform:translateX(3px)}100%{filter:none}}
+  .portrait.triumph .face{animation:ptri .55s}@keyframes ptri{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-8px) scale(1.2)}}
+  .portrait.grimace{filter:grayscale(.55) brightness(.82)}.portrait.grimace .face{transform:rotate(-8deg)}
+  .portrait.victory{box-shadow:0 0 18px var(--gold);border-color:var(--gold)}.portrait.victory .face{animation:ptri .55s infinite}
+  .arch{font-size:.66rem;color:var(--gold);text-align:center}.pass{font-size:.62rem;color:var(--ink2);text-align:center;line-height:1.3}
+  .states{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
+  .states button{font-size:.56rem;padding:3px 5px;border-radius:6px;border:1px solid var(--line);background:#0c2236;color:var(--ink2);cursor:pointer;font-family:inherit}
+
+  /* relics */
+  .relic-card{width:150px;background:linear-gradient(180deg,#173a55,#0c2236);border:2px solid var(--gold);border-radius:12px;padding:11px;text-align:center}
+  .relic-card .ri{font-size:1.7rem}.relic-card .rn{font-size:.78rem;font-weight:700;color:var(--gold);margin:4px 0}.relic-card .rd{font-size:.66rem;color:var(--ink2);line-height:1.3}
+
+  /* ships */
+  .shiprow{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+  .board-mini{display:flex;gap:2px}.board-mini.vert{flex-direction:column}
+  .cell{width:30px;height:30px;border-radius:4px;border:1.5px solid rgba(52,198,255,.18);background:rgba(7,26,42,.45);position:relative}
+  .cell.ship{background:linear-gradient(180deg,#3f78ac,#235d8f);border-color:#7fc0ee}
+  .hull{position:absolute;inset:14%;background:linear-gradient(180deg,#6a7b88,#33424f);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+  .cap-l{border-top-left-radius:50%;border-bottom-left-radius:50%}.cap-r{border-top-right-radius:50%;border-bottom-right-radius:50%}
+  .cap-t{border-top-left-radius:50%;border-top-right-radius:50%}.cap-b{border-bottom-left-radius:50%;border-bottom-right-radius:50%}
+  .turret{position:absolute;left:50%;top:50%;width:6px;height:6px;border-radius:50%;background:#0c1a26;transform:translate(-50%,-50%)}
+  .cell.dmg{background:radial-gradient(circle at 50% 45%,#ff8a5c,#e23a28);border-color:#8d1d12}.cell.dmg .hull{filter:brightness(.8) saturate(.6)}
+  .cell.sunk{background:linear-gradient(180deg,#7a1f1f,#4a0f0f)}
+  .otok{width:34px;height:34px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;background:rgba(11,36,56,.8);border:1px solid rgba(120,180,220,.2)}
+  .otok.p{background:rgba(55,138,221,.2)}.otok.e{background:rgba(226,75,74,.2)}
+
+  /* cutscene */
+  #cut{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:#020608;cursor:pointer}
+  #cut.show{display:flex}
+  .cutart{text-align:center;max-width:640px;padding:24px}
+  .cutart .scene{font-size:4.4rem;margin-bottom:14px;letter-spacing:10px;filter:drop-shadow(0 0 30px rgba(255,180,60,.5));animation:cscene 1.2s ease-out}
+  @keyframes cscene{0%{transform:scale(.6);opacity:0;filter:blur(8px)}100%{transform:scale(1);opacity:1;filter:blur(0)}}
+  .cutart .cn{font-family:'Press Start 2P',monospace;font-size:1.5rem;color:#ffcf45;letter-spacing:2px;margin-bottom:14px;animation:cglow 1.5s ease-in-out infinite alternate}
+  @keyframes cglow{to{text-shadow:0 0 34px rgba(255,207,69,.95)}}
+  .cutart .cd{font-size:1.05rem;color:#cfe3f2;font-style:italic;line-height:1.6}
+  .cutart .tip{margin-top:18px;font-size:.7rem;color:var(--ink3)}
+  #cut.flash .cutart{animation:cflash 1s ease-out}@keyframes cflash{0%{transform:scale(1.2);opacity:0}25%{opacity:1}100%{transform:scale(1);opacity:.92}}
+  .toolbar{display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:10px;flex-wrap:wrap;font-size:.74rem;color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="frame">
+  <h1>DEAD RECKONING</h1>
+  <div class="sub">🧪 Test Bench & Gallery — everything unlocked</div>
+  <div class="note">Full playable game is in <b>dead_reckoning.html</b>. <a href="dead_reckoning.html">▶ Open the game</a> — on the title screen press <b>🧪 Unlock all</b> to enable every admiral (incl. Blacktide / pirate mode) and ascension A1–A5. This file is a viewer for all the new art & cutscenes.</div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+</div>
+
+<div id="cut" onclick="this.classList.remove('show')"><div class="cutart" id="cutart"></div></div>
+
+<script>
+"use strict";
+/* ---- data (mirrors the game) ---- */
+const ADMIRALS=[
+  {id:'voss',face:'🎖️',name:'Adm. Voss',arch:'The Tactician',coat:'#26456b',ap:'First salvo each turn costs 0 energy.'},
+  {id:'kael',face:'🔥',name:'Cmdr. Kael',arch:'The Blitz',coat:'#7a1f1f',ap:'When any ship sinks, draw 1 card.'},
+  {id:'silas',face:'👻',name:'Capt. Silas',arch:'The Ghost',coat:'#3a4a44',ap:'Decoys invisible to enemy sonar; decoys cost 0.'},
+  {id:'yara',face:'💥',name:'Cmdr. Yara',arch:'The Devastator',coat:'#5a2f5a',ap:'Hits splash to an adjacent tile (35%).'},
+  {id:'blacktide',face:'🏴‍☠️',name:'Capt. Blacktide',arch:'The Pirate',coat:'#3a2a12',ap:'Crew-depleted enemies join your fleet. RTS mode.'},
+];
+const FACTIONS=[['Corsair Skiffs','🏴‍☠️'],['Ghost Tide','👻'],['Reef Swarm','🦑'],['Iron Armada','🛡️'],['Deepwatch Snipers','🎯'],['Carrion Fleet','☠️']];
+const SIGS=[
+  {id:'sig_voss',adm:'Adm. Voss',cat:'FLAGSHIP',name:'Full Broadside',cost:3,rar:'omega',ds:"Fire every tile on the enemy's back row.",scene:'🌩️ ⛴️ 🔭',sceneText:'Voss at the helm in the storm, the whole fleet arrayed behind him, telescope raised. Deliberate. Inevitable.'},
+  {id:'sig_kael',adm:'Cmdr. Kael',cat:'FLAGSHIP',name:'Into the Fire',cost:2,rar:'omega',ds:'+2 shots this turn. Your smallest ship takes 1 hit.',scene:'🔥 🚢 😈',sceneText:'Kael on the bow of a burning enemy ship, coat alight, laughing into the gale.'},
+  {id:'sig_silas',adm:'Capt. Silas',cat:'FLAGSHIP',name:"Dead Man's Course",cost:2,rar:'omega',ds:'Your fleet is invisible for 3 enemy turns.',scene:'🌫️ 👻 🚢',sceneText:'Silas alone on a fogbound deck, the ship dissolving into mist around him. Absolute silence.'},
+  {id:'sig_yara',adm:'Cmdr. Yara',cat:'FLAGSHIP',name:'Nuclear Option',cost:3,rar:'omega',ds:'Reveal then obliterate a 4×4 zone.',scene:'💥 🌊 🔱',sceneText:'Yara silhouetted against a wall of fire, arms wide, laughing. The sea itself turns orange.'},
+  {id:'sig_blacktide',adm:'Capt. Blacktide',cat:'FLAGSHIP',name:'The Black Tide Rises',cost:3,rar:'omega',ds:'Sunken ships rise under your flag for 3 turns.',scene:'🌊 🏴‍☠️ ⚡',sceneText:'Blacktide at the prow of a vast black galleon, a dozen ghost ships rising around him. Lightning splits the sky.'},
+];
+const ART={salvo:'💥',spread:'🎯',barrage:'🔱',pinpoint:'📍',depthcharge:'🧨',chainshot:'⛓️',torpedo:'🚀',overkill:'☄️',ping:'📡',heat:'🌡️',widescan:'📶',recon:'🛰️',activesonar:'🔊',hull:'🛡️',evade:'🌀',flank:'⚡',battlestations:'🎺',smoke:'💨',buoy:'🛟',mirror:'🪞',chaff:'✨',eye:'👁️',allhands:'⚓',doctrine:'📜',nuke:'☢️',damagecontrol:'🔧',bulkhead:'🚪',tow:'🪢',drydock:'🛠️',scuttle:'💀',salvage:'♻️',crewtransfer:'🔀',blacktide:'🌊'};
+const LIB=[
+  {id:'salvo',cat:'ORDNANCE',name:'Double Salvo',cost:1,rar:'common',ds:'+1 shot this turn.'},
+  {id:'spread',cat:'ORDNANCE',name:'Spread Shot',cost:1,rar:'common',ds:'Next shot hits a 1×3 row.'},
+  {id:'torpedo',cat:'ORDNANCE',name:'Torpedo Run',cost:1,rar:'rare',ds:'Next shot hits a 3×1 column.'},
+  {id:'depthcharge',cat:'ORDNANCE',name:'Depth Charge',cost:2,rar:'rare',ds:'Next shot hits a 2×2 block.'},
+  {id:'barrage',cat:'ORDNANCE',name:'Barrage',cost:2,rar:'rare',ds:'+2 shots this turn.'},
+  {id:'pinpoint',cat:'ORDNANCE',name:'Pinpoint',cost:1,rar:'forge',ds:'Next shot auto-finds a hull in that row.'},
+  {id:'chainshot',cat:'ORDNANCE',name:'Chain Shot',cost:1,rar:'forge',ds:'If your next shot hits, +1 shot.'},
+  {id:'overkill',cat:'ORDNANCE',name:'Overkill',cost:1,rar:'contra',ds:'This turn, hits on damaged hulls score double.'},
+  {id:'ping',cat:'SONAR',name:'Sonar Ping',cost:1,rar:'common',ds:'Scan a 3×3 area for hulls.'},
+  {id:'widescan',cat:'SONAR',name:'Wide Scan',cost:1,rar:'common',ds:'Reveal hulls in a row.'},
+  {id:'recon',cat:'SONAR',name:'Recon Drone',cost:1,rar:'forge',ds:'Reveal 2 random hull cells.'},
+  {id:'heat',cat:'SONAR',name:'Heat Map',cost:2,rar:'rare',ds:'Reveal the hottest column.'},
+  {id:'activesonar',cat:'SONAR',name:'Active Sonar',cost:2,rar:'rare',ds:'Reveal the densest 3×3.'},
+  {id:'hull',cat:'MANEUVER',name:'Iron Hull',cost:1,rar:'common',ds:'Block the next 2 hits.'},
+  {id:'evade',cat:'MANEUVER',name:'Evasive',cost:1,rar:'common',ds:'50% dodge each shot next turn.'},
+  {id:'flank',cat:'MANEUVER',name:'Flank Speed',cost:0,rar:'common',ds:'+1 energy now.'},
+  {id:'battlestations',cat:'MANEUVER',name:'Battle Stations',cost:1,rar:'rare',ds:'Draw 2 cards.'},
+  {id:'smoke',cat:'MANEUVER',name:'Smoke Screen',cost:2,rar:'contra',ds:'Enemy entirely misses next turn.'},
+  {id:'buoy',cat:'DECOY',name:'Ghost Buoy',cost:1,rar:'common',ds:'Enemy wastes its next shot.'},
+  {id:'chaff',cat:'DECOY',name:'Chaff Cloud',cost:1,rar:'forge',ds:'Reset enemy hunt targeting.'},
+  {id:'mirror',cat:'DECOY',name:'Mirror Fleet',cost:2,rar:'rare',ds:'Enemy wastes its next 2 shots.'},
+  {id:'eye',cat:'FLAGSHIP',name:"Admiral's Eye",cost:2,rar:'rare',ds:'Reveal one whole enemy hull.'},
+  {id:'allhands',cat:'FLAGSHIP',name:'All Hands',cost:2,rar:'forge',ds:'+1 energy, +1 shot, draw 1.'},
+  {id:'doctrine',cat:'FLAGSHIP',name:'Salvo Doctrine',cost:3,rar:'contra',ds:'+3 shots this turn.'},
+  {id:'nuke',cat:'FLAGSHIP',name:'Saturation Strike',cost:3,rar:'omega',ds:'Next shot hits a 3×3 block.'},
+  {id:'damagecontrol',cat:'REPAIR',name:'Damage Control',cost:1,rar:'common',ds:'Restore 1 tile on a damaged ship.'},
+  {id:'bulkhead',cat:'REPAIR',name:'Bulkhead Seal',cost:1,rar:'common',ds:'Next 2 hits deal no damage. Once/battle.'},
+  {id:'tow',cat:'REPAIR',name:'Emergency Tow',cost:1,rar:'rare',ds:'Reposition a ship. Enemy loses its track.'},
+  {id:'drydock',cat:'REPAIR',name:'Dry Dock',cost:2,rar:'rare',ds:'Fully repair a ship. Skip your shot.'},
+  {id:'scuttle',cat:'REPAIR',name:'Scuttle Protocol',cost:1,rar:'rare',ds:'Sink your smallest ship: draw 3, +1 shot.'},
+  {id:'salvage',cat:'REPAIR',name:'Salvage Op',cost:1,rar:'forge',ds:'Raise a 1-tile ghost hull (absorbs 1 hit).'},
+  {id:'crewtransfer',cat:'REPAIR',name:'Crew Transfer',cost:1,rar:'forge',ds:'Reposition your two largest ships.'},
+  {id:'blacktide',cat:'REPAIR',name:'Black Tide Salvage',cost:2,rar:'omega',ds:'All sunk ships rise as ghosts for 3 turns. Once/run.'},
+];
+const RELICS=[
+  ['🔭','Brass Spyglass','+1 max hand size.'],['🛢️','Powder Monkey','+1 max energy.'],['🎯','Targeting Computer','Hits score +50% chips.'],['📜','Letters of Marque','+5 gold per sink.'],['⚛️','Overcharged Reactor','+0.3 Mult per card played each turn.'],['🐙',"Kraken's Eye",'Reveal a random enemy hull cell each turn.'],['⚓','Iron Keel','Block the first hit of every battle.'],['🍀','Lucky Charm','+40 chips per unused shot at battle end.'],['🪝','Salvage Rights','+3 gold per hit.'],['🔗','Combo Engine','Hit streak builds Mult 50% faster.'],['🦈',"Predator's Instinct",'+1 Mult each time you sink a hull.'],['🏅','Golden Anchor','+25% gold from all sources.'],['🌫️','Fog Machine','25% of enemy shots auto-miss.'],['🥁','War Drum','+1 shot on the first turn of each battle.'],['💰','War Chest','Start each battle with +1 energy.'],['🔨',"Shipwright's Kit",'Repair 1 hull damage after each battle.'],
+];
+const RAR={common:'common',rare:'rare',forge:'forged',contra:'contraband',omega:'omega'};
+const SHIPS=[['Carrier',5],['Battleship',4],['Cruiser',3],['Submarine',3],['Destroyer',2]];
+
+/* ---- pixel-art portrait busts (SVG) ---- */
+const PCFG={
+  voss:{skin:'#e3b48f',sk:'#bf8a5f',coat:'#26456b',cd:'#16304a',hair:'#5b4a32',hat:'tricorn',hatC:'#1b2f4a',acc:'#d9a82a',buttons:1,scope:1},
+  kael:{skin:'#dca87e',sk:'#b07a50',coat:'#7a1f1f',cd:'#4e1212',hair:'#1c1813',hat:'wild',hatC:'',acc:'#c9c2b8',scar:1},
+  silas:{skin:'#cabfa6',sk:'#9a8c6e',coat:'#2f3a36',cd:'#1c2420',hair:'',hat:'hood',hatC:'#3c4a44',acc:'#7a8a80',pale:1},
+  yara:{skin:'#caa07a',sk:'#9c734f',coat:'#5a2f5a',cd:'#3a1f3a',hair:'#1a1410',hat:'tie',hatC:'#7a2f4a',acc:'#d9a82a',epaul:1,grin:1},
+  blacktide:{skin:'#c79a72',sk:'#946843',coat:'#191515',cd:'#000000',hair:'#15110d',hat:'pirate',hatC:'#1a1414',acc:'#d9a82a',feather:1,scar:1,gold:1},
+  foe:{skin:'#b9c2c0',sk:'#8b9492',coat:'#3a1c1c',cd:'#240f0f',hair:'#0d0d0d',hat:'cap',hatC:'#222222',acc:'#7a3030',skull:1},
+};
+function pixelBust(id){const P=4,W=12,H=14,c=PCFG[id]||PCFG.foe,r=[];
+  const px=(x,y,w,h,col)=>r.push(`<rect x="${x*P}" y="${y*P}" width="${w*P}" height="${h*P}" fill="${col}"/>`);
+  px(1,11,10,3,c.coat);px(0,12,12,2,c.coat);px(1,11,10,1,c.cd);px(5,11,2,3,c.cd);
+  if(c.buttons){px(5,12,1,1,c.acc);px(6,13,1,1,c.acc);}
+  if(c.epaul){px(0,11,2,1,c.acc);px(10,11,2,1,c.acc);}
+  px(5,10,2,1,c.sk);
+  px(3,4,6,6,c.skin);px(8,4,1,6,c.sk);px(3,9,6,1,c.sk);
+  px(4,6,1,1,c.pale?'#1c3a44':'#10161c');px(7,6,1,1,c.pale?'#1c3a44':'#10161c');
+  if(c.grin)px(5,8,3,1,'#f1e6d6');else px(5,8,2,1,c.sk);
+  if(c.gold)px(5,8,1,1,c.acc);
+  if(c.scar)px(7,4,1,3,'#aa3333');
+  if(c.hat==='wild'){px(2,2,8,2,c.hair);px(2,3,1,4,c.hair);px(9,3,1,4,c.hair);px(3,3,6,1,c.hair);px(2,1,3,1,c.hair);px(7,1,3,1,c.hair);}
+  if(c.hat==='tricorn'){px(0,3,12,1,c.cd);px(1,3,10,1,c.hatC);px(3,1,6,2,c.hatC);px(4,0,4,1,c.hatC);px(5,1,2,1,c.acc);}
+  if(c.hat==='hood'){px(2,1,8,2,c.hatC);px(1,2,2,8,c.hatC);px(9,2,2,8,c.hatC);px(3,3,6,1,c.hatC);}
+  if(c.hat==='tie'){px(3,2,6,2,c.hair);px(2,3,1,3,c.hair);px(9,3,1,3,c.hair);px(8,2,3,1,c.acc);}
+  if(c.hat==='pirate'){px(0,3,12,1,c.hatC);px(1,2,10,1,c.hatC);px(3,1,6,1,c.hatC);px(2,2,2,1,c.acc);if(c.feather){px(9,0,1,3,'#cc4433');px(10,1,1,2,'#cc4433');}}
+  if(c.hat==='cap'){px(2,2,8,2,c.hatC);px(1,3,10,1,c.cd);if(c.skull){px(4,4,1,1,'#1a1a1a');px(7,4,1,1,'#1a1a1a');}}
+  if(c.scope){px(9,6,3,1,c.acc);px(11,5,1,3,'#cfe3f2');}
+  return `<svg viewBox="0 0 ${W*P} ${H*P}" width="100%" height="100%" shape-rendering="crispEdges" style="image-rendering:pixelated;display:block">${r.join('')}</svg>`;}
+
+/* ---- render helpers ---- */
+const cardHTML=(c,sig)=>`<div class="card${sig?' sig':''}" ${sig?`onclick="playCut('${c.id}')"`:''}><div class="cost">${c.cost}</div><div class="cat cat-${c.cat}">${c.cat}</div><div class="art">${ART[c.id]||(sig?'⭐':'⚓')}</div><div class="nm">${c.name}</div><div class="ds">${c.ds}</div><div class="rar r-${c.rar}">${RAR[c.rar]}</div></div>`;
+function shipMini(len,horiz,dmg){let cells='';for(let i=0;i<len;i++){let caps='';if(horiz){if(i===0)caps=' cap-l';else if(i===len-1)caps=' cap-r';}else{if(i===0)caps=' cap-t';else if(i===len-1)caps=' cap-b';}
+  const turret=i===Math.floor(len/2)?'<div class="turret"></div>':'';const hit=dmg&&i<dmg;cells+=`<div class="cell ${hit?'dmg':'ship'}"><div class="hull${caps}"></div>${turret}</div>`;}
+  return `<div class="board-mini ${horiz?'':'vert'}">${cells}</div>`;}
+
+/* ---- tabs ---- */
+const TABS=['🎬 Cutscenes','🎖️ Admirals','🃏 Cards','💎 Relics','⛴️ Ships'];
+let tab=0;
+function renderTabs(){document.getElementById('tabs').innerHTML=TABS.map((t,i)=>`<button class="tab${i===tab?' on':''}" onclick="setTab(${i})">${t}</button>`).join('');}
+function setTab(i){tab=i;renderTabs();render();}
+
+function render(){const v=document.getElementById('view');
+  if(tab===0){ // cutscenes
+    v.innerHTML=`<div class="panel"><div class="toolbar">Tap a signature to play its full cutscene · <label><input type="checkbox" id="flashmode"> preview as 2-sec repeat flash</label></div>
+      <div class="grid">${SIGS.map(s=>cardHTML(s,true)).join('')}</div>
+      <div class="lbl" style="margin-top:14px">Cutscene key art</div>
+      <div class="grid">${SIGS.map(s=>`<div style="text-align:center;width:150px"><div style="font-size:2.2rem;letter-spacing:4px">${s.scene}</div><div style="font-size:.72rem;color:var(--gold);font-weight:700">${s.name}</div><div style="font-size:.6rem;color:var(--ink3)">${s.adm}</div></div>`).join('')}</div></div>`;
+  } else if(tab===1){ // admirals
+    v.innerHTML=`<div class="panel"><div class="lbl">Playable admirals — tap a state to trigger its animation</div><div class="grid">${ADMIRALS.map(a=>`
+      <div class="pcol"><div class="portrait idle" id="port-${a.id}" style="--coat:${a.coat}"><span class="face">${pixelBust(a.id)}</span><span class="cn">${a.name.replace(/^\\w+\\. /,'')}</span></div>
+      <div class="arch">${a.arch}</div><div class="pass">${a.ap}</div>
+      <div class="states">${['idle','hit','triumph','grimace','victory'].map(s=>`<button onclick="setState('${a.id}','${s}')">${s}</button>`).join('')}</div></div>`).join('')}</div>
+      <div class="lbl" style="margin-top:16px">Enemy commanders</div><div class="grid">${FACTIONS.map(f=>`<div class="pcol" style="width:96px"><div class="portrait idle" style="--coat:#3a1c1c"><span class="face">${pixelBust('foe')}</span><span class="cn">${f[0]}</span></div></div>`).join('')}</div></div>`;
+  } else if(tab===2){ // cards
+    const cats=['ORDNANCE','SONAR','MANEUVER','DECOY','REPAIR','FLAGSHIP'];
+    v.innerHTML=`<div class="panel">${cats.map(cat=>`<div class="lbl">${cat}</div><div class="grid">${LIB.filter(c=>c.cat===cat).map(c=>cardHTML(c)).join('')}</div>`).join('')}
+      <div class="lbl" style="margin-top:14px;color:var(--omega)">⭐ SIGNATURE CARDS (Omega · tap to play cutscene)</div><div class="grid">${SIGS.map(s=>cardHTML(s,true)).join('')}</div></div>`;
+  } else if(tab===3){ // relics
+    v.innerHTML=`<div class="panel"><div class="lbl">All relics (${RELICS.length})</div><div class="grid">${RELICS.map(r=>`<div class="relic-card"><div class="ri">${r[0]}</div><div class="rn">${r[1]}</div><div class="rd">${r[2]}</div></div>`).join('')}</div></div>`;
+  } else if(tab===4){ // ships
+    v.innerHTML=`<div class="panel"><div class="lbl">Ship hull sprites (horizontal · vertical · damaged)</div>
+      ${SHIPS.map(s=>`<div class="shiprow"><span style="min-width:90px;font-size:.8rem">${s[0]} (${s[1]})</span>${shipMini(s[1],true,0)}${shipMini(s[1],false,0)}${shipMini(s[1],true,Math.ceil(s[1]/2))}</div>`).join('')}
+      <div class="lbl" style="margin-top:14px">Combat cell states</div>
+      <div class="shiprow"><div class="cell ship"><div class="hull"></div></div><span style="font-size:.7rem">ship</span>
+        <div class="cell dmg"><div class="hull"></div></div><span style="font-size:.7rem">hit (●)</span>
+        <div class="cell sunk"><div class="hull"></div></div><span style="font-size:.7rem">sunk</span></div>
+      <div class="lbl" style="margin-top:14px">Pirate ocean tokens</div>
+      <div class="shiprow"><div class="otok p">⛵</div><span style="font-size:.7rem">your ship</span><div class="otok e">🚢</div><span style="font-size:.7rem">enemy</span><div class="otok p">🏴</div><span style="font-size:.7rem">captured</span><div class="otok p">👻</div><span style="font-size:.7rem">ghost (Black Tide)</span></div></div>`;
+  }
+}
+function setState(id,st){const el=document.getElementById('port-'+id);if(!el)return;el.className='portrait '+st;if(st!=='idle'&&st!=='victory'&&st!=='grimace')setTimeout(()=>{el.className='portrait idle';},1200);}
+function playCut(id){const s=SIGS.find(x=>x.id===id);if(!s)return;const flash=document.getElementById('flashmode')&&document.getElementById('flashmode').checked;
+  const cut=document.getElementById('cut'),art=document.getElementById('cutart');
+  art.innerHTML=`<div class="scene">${s.scene}</div><div class="cn">${s.name}</div>${flash?'':`<div class="cd">${s.sceneText}</div>`}<div class="tip">${flash?'(repeat-play flash — ~1s)':'(first-play cutscene — ~3s)'} · tap to dismiss</div>`;
+  cut.classList.toggle('flash',!!flash);cut.classList.add('show');
+  clearTimeout(playCut._t);playCut._t=setTimeout(()=>cut.classList.remove('show'),flash?1100:3000);}
+
+renderTabs();render();
+</script>
+</body>
+</html>

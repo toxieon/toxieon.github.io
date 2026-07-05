@@ -1,0 +1,240 @@
+/* =========================================================================
+ *  nd-core.css — Neill Data Suite design tokens + shared components (§1.5)
+ *
+ *  Tokens are namespaced --nd-* so they never collide with an app's own
+ *  variables. Component classes are namespaced .nd-*.
+ *  The one exception: .loading-skeleton is a pixel-copy of Quote's
+ *  existing skeleton (Quote consumes the shared copy with ZERO visible
+ *  change — its own --brand/--card vars win via var() fallback chains).
+ *
+ *  Language: #0d0d0d base, amber/green environment states, mono accents
+ *  (Timesheet is the reference implementation).
+ * ========================================================================= */
+
+:root {
+  /* base */
+  --nd-bg: #0d0d0d;
+  --nd-surface: #1a1a1a;
+  --nd-surface-2: #242424;
+  --nd-border: #2a2a2a;
+  --nd-border-strong: #3a3a3a;
+  --nd-text: #f0f0f0;
+  --nd-muted: #888888;
+
+  /* environment states (amber = off/unsaved, green = on/synced) */
+  --nd-amber: #e07b2a;
+  --nd-amber-glow: #7a3a0d;
+  --nd-amber-soft: #f5a05a;
+  --nd-green: #3ab87a;
+  --nd-green-glow: #0e5c36;
+  --nd-green-soft: #6ddba3;
+  --nd-red: #e53e3e;
+  --nd-red-bg: rgba(229, 62, 62, 0.12);
+
+  /* type */
+  --nd-mono: 'JetBrains Mono', 'Courier Prime', monospace;
+  --nd-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* spacing / shape */
+  --nd-space-1: 4px;  --nd-space-2: 8px;  --nd-space-3: 12px;
+  --nd-space-4: 16px; --nd-space-5: 24px; --nd-space-6: 32px;
+  --nd-radius: 14px;  --nd-radius-sm: 8px;
+  --nd-tap: 44px;                    /* §0.2 minimum tap target */
+  --nd-shadow: 0 20px 70px rgba(0, 0, 0, 0.42);
+  --nd-z-toast: 900; --nd-z-dialog: 950; --nd-z-lightbox: 960;
+}
+
+/* ── Skeletons ─────────────────────────────────────────────────────────
+ * 1) Quote's whole-app shimmer, extracted verbatim (fallbacks = ND tokens)
+ * 2) NDUI.skeleton() element skeletons: list-row / card / grid-tile / table-row
+ * ------------------------------------------------------------------- */
+@keyframes nd-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+.loading-skeleton { pointer-events: none; }
+.loading-skeleton main { opacity: 0.4; filter: blur(1px); }
+.loading-skeleton::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0;
+  height: 3px; z-index: 1000;
+  background: linear-gradient(90deg, transparent 0%, var(--brand, var(--nd-green)) 40%, var(--brand-2, var(--nd-green-soft)) 60%, transparent 100%);
+  background-size: 50% 100%;
+  animation: nd-shimmer 1.4s infinite linear;
+}
+.loading-skeleton::after {
+  content: 'Loading your data…'; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); color: var(--text, var(--nd-text));
+  background: var(--card, var(--nd-surface)); padding: 14px 22px; border-radius: 999px;
+  border: 1px solid var(--card-border, var(--nd-border)); font-weight: 700;
+  box-shadow: var(--shadow, var(--nd-shadow)); z-index: 1001;
+}
+
+.nd-skel { display: block; }
+.nd-skel-item {
+  position: relative; overflow: hidden;
+  background: var(--nd-surface); border-radius: var(--nd-radius-sm);
+  border: 1px solid var(--nd-border);
+}
+.nd-skel-item::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: nd-shimmer 1.4s infinite linear;
+}
+.nd-skel--list-row .nd-skel-item  { height: 56px; margin-bottom: var(--nd-space-2); }
+.nd-skel--card .nd-skel-item      { height: 120px; margin-bottom: var(--nd-space-3); border-radius: var(--nd-radius); }
+.nd-skel--table-row .nd-skel-item { height: 36px; margin-bottom: var(--nd-space-1); }
+.nd-skel--grid-tile { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--nd-space-2); }
+.nd-skel--grid-tile .nd-skel-item { aspect-ratio: 1; height: auto; margin: 0; }
+
+/* ── Toasts (single suite implementation, incl. action toasts) ──────── */
+.nd-toast-wrap {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: var(--nd-space-2);
+  z-index: var(--nd-z-toast); width: max-content; max-width: calc(100vw - 32px);
+  align-items: center; pointer-events: none;
+}
+.nd-toast {
+  display: flex; align-items: center; gap: var(--nd-space-3);
+  background: rgba(20, 20, 20, 0.94); backdrop-filter: blur(10px);
+  color: var(--nd-text); border: 1px solid var(--nd-border-strong);
+  border-radius: 999px; padding: 12px 18px;
+  font-family: var(--nd-sans); font-size: 14px; font-weight: 500;
+  box-shadow: var(--nd-shadow);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: auto; max-width: 100%;
+}
+.nd-toast.nd-in { opacity: 1; transform: translateY(0); }
+.nd-toast-action {
+  min-height: var(--nd-tap); margin: -12px -6px -12px 0; padding: 0 14px;
+  display: inline-flex; align-items: center;
+  background: none; border: none; cursor: pointer;
+  color: var(--nd-green-soft); font: inherit; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; font-size: 13px;
+}
+.nd-toast-action:active { transform: scale(0.96); }
+
+/* ── Confirm dialog (non-blocking replacement for native confirm()) ─── */
+.nd-dialog-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px); z-index: var(--nd-z-dialog);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.nd-dialog-backdrop.nd-in { opacity: 1; }
+.nd-dialog {
+  background: var(--nd-surface); color: var(--nd-text);
+  border: 1px solid var(--nd-border-strong);
+  border-radius: var(--nd-radius) var(--nd-radius) 0 0;
+  padding: var(--nd-space-5) var(--nd-space-4) calc(var(--nd-space-5) + env(safe-area-inset-bottom));
+  width: 100%; max-width: 480px; font-family: var(--nd-sans);
+  transform: translateY(16px); transition: transform 0.2s ease;
+  max-height: 80vh; overflow-y: auto;
+}
+.nd-dialog-backdrop.nd-in .nd-dialog { transform: translateY(0); }
+@media (min-width: 640px) {
+  .nd-dialog-backdrop { align-items: center; }
+  .nd-dialog { border-radius: var(--nd-radius); padding-bottom: var(--nd-space-5); }
+}
+.nd-dialog h3 { margin: 0 0 var(--nd-space-2); font-size: 17px; font-weight: 600; }
+.nd-dialog p { margin: 0 0 var(--nd-space-4); color: var(--nd-muted); font-size: 14px; line-height: 1.5; }
+.nd-dialog-input {
+  width: 100%; min-height: var(--nd-tap); margin-bottom: var(--nd-space-4);
+  background: var(--nd-bg); color: var(--nd-text);
+  border: 1px solid var(--nd-border-strong); border-radius: var(--nd-radius-sm);
+  padding: 10px 12px; font-family: var(--nd-mono); font-size: 15px;
+}
+.nd-dialog-actions { display: flex; gap: var(--nd-space-3); }
+.nd-dialog-actions button {
+  flex: 1; min-height: var(--nd-tap); border-radius: 999px;
+  font-family: var(--nd-sans); font-size: 14px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border: none; cursor: pointer; transition: transform 80ms ease;
+}
+.nd-dialog-actions button:active { transform: scale(0.96); }
+.nd-dialog-cancel { background: rgba(255, 255, 255, 0.08); color: var(--nd-text); }
+.nd-dialog-confirm { background: var(--nd-text); color: #111; }
+.nd-dialog-confirm.nd-danger { background: var(--nd-red); color: #fff; }
+.nd-dialog-confirm:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Lightbox (shared photo viewer) ──────────────────────────────────── */
+.nd-lightbox-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88);
+  z-index: var(--nd-z-lightbox); display: flex; flex-direction: column;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.nd-lightbox-backdrop.nd-in { opacity: 1; }
+.nd-lightbox-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--nd-space-3) var(--nd-space-4);
+  padding-top: calc(var(--nd-space-3) + env(safe-area-inset-top));
+  color: var(--nd-text); font-family: var(--nd-sans); font-size: 14px;
+  gap: var(--nd-space-3);
+}
+.nd-lightbox-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-lightbox-close {
+  min-width: var(--nd-tap); min-height: var(--nd-tap);
+  background: rgba(255, 255, 255, 0.08); color: var(--nd-text);
+  border: none; border-radius: 999px; font-size: 18px; cursor: pointer;
+  flex: none;
+}
+.nd-lightbox-img {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+  padding: 0 var(--nd-space-2) calc(var(--nd-space-4) + env(safe-area-inset-bottom));
+}
+.nd-lightbox-img img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  border-radius: var(--nd-radius-sm);
+}
+
+/* ── Sync status chip (§1.6) ─────────────────────────────────────────── */
+.nd-sync-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 28px; padding: 3px 10px;
+  background: var(--nd-surface); border: 1px solid var(--nd-border);
+  border-radius: 999px; cursor: pointer;
+  font-family: var(--nd-mono); font-size: 11px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--nd-muted);
+  transition: border-color 0.6s ease, color 0.6s ease;
+  -webkit-tap-highlight-color: transparent;
+  border: none; outline: 1px solid var(--nd-border);
+}
+.nd-sync-chip::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--nd-green);
+  box-shadow: 0 0 6px var(--nd-green-glow);
+  transition: background 0.6s ease, box-shadow 0.6s ease;   /* subtle shift, no abrupt flips */
+}
+.nd-sync-chip[data-sync="pending"]::before,
+.nd-sync-chip[data-sync="flushing"]::before {
+  background: var(--nd-amber); box-shadow: 0 0 6px var(--nd-amber-glow);
+}
+.nd-sync-chip[data-sync="failed"]::before {
+  background: var(--nd-red); box-shadow: 0 0 6px rgba(229, 62, 62, 0.5);
+}
+.nd-sync-chip[data-sync="pending"], .nd-sync-chip[data-sync="flushing"] { color: var(--nd-amber-soft); outline-color: var(--nd-amber-glow); }
+.nd-sync-chip[data-sync="failed"] { color: var(--nd-red); outline-color: var(--nd-red); }
+
+.nd-sync-panel {
+  position: fixed; right: 12px; top: 52px; z-index: var(--nd-z-dialog);
+  width: min(320px, calc(100vw - 24px));
+  background: var(--nd-surface); border: 1px solid var(--nd-border-strong);
+  border-radius: var(--nd-radius); box-shadow: var(--nd-shadow);
+  font-family: var(--nd-sans); color: var(--nd-text); font-size: 13px;
+  padding: var(--nd-space-3);
+}
+.nd-sync-panel h4 { margin: 0 0 var(--nd-space-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--nd-muted); }
+.nd-sync-panel-empty { color: var(--nd-muted); padding: var(--nd-space-2) 0; }
+.nd-sync-row {
+  display: flex; justify-content: space-between; gap: var(--nd-space-2);
+  padding: 6px 0; border-top: 1px solid var(--nd-border);
+  font-family: var(--nd-mono); font-size: 11px;
+}
+.nd-sync-row .nd-err { color: var(--nd-red); }
+.nd-sync-retry {
+  margin-top: var(--nd-space-2); width: 100%; min-height: var(--nd-tap);
+  background: rgba(255, 255, 255, 0.08); color: var(--nd-text);
+  border: none; border-radius: 999px; cursor: pointer;
+  font-family: var(--nd-sans); font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}

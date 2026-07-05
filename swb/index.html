@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>SWB — Switchboard Planner</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="stylesheet" href="styles.css?v=2.0.0" />
+    <script>
+      /* Shared Google credentials — same project as NeillPlanner */
+      window.NEILL_PLANNER_CONFIG = {
+        googleApiKey:        "AIzaSyBZ2b4fa-YV89q6Ld_LfGlzbqM798iCMsA",
+        googleClientId:      "418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com",
+        driveRootFolderName: "NeillPlanner",
+        primaryOwnerEmail:   "brandon.j.neill@gmail.com",
+        addressCountry:      "au",
+        scopes: [
+          "https://www.googleapis.com/auth/drive",
+          "https://www.googleapis.com/auth/spreadsheets",
+          "openid",
+          "email",
+          "profile"
+        ]
+      };
+    </script>
+    <script src="https://apis.google.com/js/api.js" defer></script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
+      <script src="../shared/nd-pwa.js" defer></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- v2.0 — AS/NZS 3008 cable + C1/C2 max-demand engine (loads before app.js) -->
+    <script src="swb_engine.js?v=2.0.2" defer></script>
+    <script src="app.js?v=2.0.2" defer></script>
+  </body>
+</html>

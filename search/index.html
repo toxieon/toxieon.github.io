@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f1117" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Search Files</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0f1117" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="../shared/nd-config.js"></script>
+    <script src="../shared/nd-auth.js"></script>
+    <script src="../shared/nd-match.js"></script>
+    <script>
+      /* All keys/IDs live in shared/nd-config.js (handoff §6) */
+      window.SEARCH_CONFIG = window.ND.config.forApp("search");
+    </script>
+    <script src="https://apis.google.com/js/api.js" defer></script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
+      <script src="../shared/nd-pwa.js" defer></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>
