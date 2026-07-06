@@ -6,6 +6,10 @@
 <meta name="robots" content="noindex, nofollow" />
 <link rel="icon" type="image/svg+xml" href="/quote/favicon.svg" />
     <link rel="manifest" href="manifest.json" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-cache.js"></script>
+<script src="../shared/nd-queue.js"></script>
+<script src="../shared/nd-ui.js"></script>
     <meta name="theme-color" content="#07111f" />
 <title>ND • On-site Quote Tool</title>
 <style>
@@ -433,24 +437,23 @@ input[type=number] { -moz-appearance: textfield; }
 
 footer-note { display: block; text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 24px; opacity: 0.6; }
 
-/* Skeleton loading on unlock */
-@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-.loading-skeleton { pointer-events: none; }
-.loading-skeleton main { opacity: 0.4; filter: blur(1px); }
-.loading-skeleton::before {
-  content: ''; position: fixed; top: 0; left: 0; right: 0;
-  height: 3px; z-index: 1000;
-  background: linear-gradient(90deg, transparent 0%, var(--brand) 40%, var(--brand-2) 60%, transparent 100%);
-  background-size: 50% 100%;
-  animation: shimmer 1.4s infinite linear;
+/* Skeleton loading on unlock — extracted to shared/nd-core.css (§1.5).
+ * Quote consumes the shared copy; rendering is pixel-identical because the
+ * shared rules resolve Quote's own --brand/--card/--text variables. */
+
+
+/* ── §3.6 Quote settings rebuild (scoped to the Settings tab ONLY) ── */
+[data-panel="settings"] details.card > summary { min-height: 48px; }
+[data-panel="settings"] .field input,
+[data-panel="settings"] .field select,
+[data-panel="settings"] .field textarea { min-height: 44px; width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) {
+  [data-panel="settings"] .grid-2 { grid-template-columns: 1fr; }  /* no cramped side-by-side fields */
+  [data-panel="settings"] .btn-row .btn { min-height: 48px; }
 }
-.loading-skeleton::after {
-  content: 'Loading your data…'; position: fixed; top: 50%; left: 50%;
-  transform: translate(-50%, -50%); color: var(--text);
-  background: var(--card); padding: 14px 22px; border-radius: 999px;
-  border: 1px solid var(--card-border); font-weight: 700;
-  box-shadow: var(--shadow); z-index: 1001;
-}
+/* danger separation: any settings card holding a destructive action reads as such */
+[data-panel="settings"] details.card:has(.btn-danger) { border-color: rgba(255, 107, 136, 0.4); }
+[data-panel="settings"] details.card:has(.btn-danger) > summary h3 { color: var(--danger); }
 
 /* Collapsible Settings cards (uses <details>) */
 details.card { padding: 0; overflow: hidden; transition: 0.2s; }
@@ -945,9 +948,9 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
     <!-- SETTINGS -->
     <section class="panel" data-panel="settings">
       <h2 class="panel-title">Settings</h2>
-      <p class="panel-sub">Tap any section to expand. Business info is at the top — most-used settings first.</p>
+      <p class="panel-sub">Tap any section to expand. Sections remember what you leave open.</p>
 
-      <details class="card" open>
+      <details class="card">
         <summary><h3>Business info</h3></summary>
         <div class="card-body">
           <div class="grid-2">
@@ -1309,6 +1312,42 @@ const lockErr = document.getElementById('lock-err');
 document.getElementById('passcode-submit').onclick = tryUnlock;
 passcodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
 
+/* §4 — "never asks them to sign in mid-day": a successful unlock persists
+ * for the working day (14h). Boot restores it silently and re-verifies with
+ * the backend in the background; a locked/changed account wipes it. */
+const QUOTE_SESSION_KEY = 'nq_session_v1';
+function saveUnlockSession() {
+  try { localStorage.setItem(QUOTE_SESSION_KEY, JSON.stringify({ user: currentUser, at: Date.now() })); } catch (e) {}
+}
+function loadUnlockSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(QUOTE_SESSION_KEY));
+    if (s && s.user && s.user.passwordHash && Date.now() - s.at < 14 * 3600 * 1000) return s;
+  } catch (e) {}
+  return null;
+}
+function clearUnlockSession() { try { localStorage.removeItem(QUOTE_SESSION_KEY); } catch (e) {} }
+
+function tryRestoreSession() {
+  const s = loadUnlockSession();
+  if (!s) return false;
+  currentUser = s.user;
+  lockScreen.style.display = 'none';
+  document.getElementById('app').hidden = false;
+  finishUnlock();
+  // background re-verify — kicks the user out only if the account changed
+  backendCall('login', { passwordHash: currentUser.passwordHash })
+    .then(data => {
+      if (data && data.ok && data.user) { currentUser = Object.assign({}, data.user, { passwordHash: currentUser.passwordHash }); saveUnlockSession(); }
+    })
+    .catch(err => {
+      if (err && err.detail && err.detail.locked) {
+        clearUnlockSession(); wipeLocalCache(); location.reload();
+      } /* network errors: stay unlocked — offline quoting is the point */
+    });
+  return true;
+}
+
 async function tryUnlock() {
   const passcode = passcodeInput.value;
   if (!passcode) return;
@@ -1346,7 +1385,7 @@ async function tryUnlock() {
     }
   } catch (e) { backendOnline = false; }
 
-  if (backendOk) { finishUnlock(); return; }
+  if (backendOk) { saveUnlockSession(); finishUnlock(); return; }
   if (locked) {
     document.body.classList.remove('loading-skeleton');
     document.getElementById('app').hidden = true;
@@ -1495,7 +1534,47 @@ function getDeviceFingerprint() {
   return fp;
 }
 
+/* §4 — offline-safe quoting: write actions that fail on NETWORK are queued
+ * (nd-queue: 1s debounce, 30s retry, flush on 'online') and replayed with
+ * identical payloads. Reads and auth never queue. */
+const QUEUEABLE_ACTIONS = ['save_quote', 'delete_quote', 'set_status', 'set_favourites'];
+const quoteQueue = window.ND?.queueKit
+  ? ND.queueKit.createQueue({ name: 'quote', ready: () => !!(currentUser && currentUser.passwordHash) })
+  : null;
+if (quoteQueue) {
+  window.NDQueue = quoteQueue;   // sync chip convention (§1.6)
+  quoteQueue.handler('backend', (payload) => backendCallDirect(payload.action, payload.body));
+}
+
+/* network-first CSV with IndexedDB fallback: a price sync in a signal
+ * black spot serves the last good copy instead of failing (§4/nd-cache). */
+async function cachedCsvFetch(url) {
+  const key = 'quote:csv:' + url;
+  try {
+    const r = await fetch(url);
+    const text = r.ok ? await r.text() : null;
+    if (text && window.NDCache) NDCache.put(key, text).catch(() => {});
+    if (text) return text;
+  } catch (e) { /* fall through to cache */ }
+  if (window.NDCache) { try { const cached = await NDCache.get(key); if (cached) return cached; } catch (e) {} }
+  return null;
+}
+
 async function backendCall(action, body) {
+  try {
+    return await backendCallDirect(action, body);
+  } catch (e) {
+    const isNetworkError = (e instanceof TypeError) || !navigator.onLine || /Failed to fetch|NetworkError/i.test(e.message || '');
+    if (isNetworkError && quoteQueue && QUEUEABLE_ACTIONS.includes(action)) {
+      const key = body && (body.id || (body.quote && body.quote.id)) ? action + ':' + (body.id || body.quote.id) : undefined;
+      quoteQueue.enqueue('backend', { action, body }, { key, supersede: action === 'delete_quote' });
+      return { ok: true, queued: true };
+    }
+    throw e;
+  }
+}
+
+async function backendCallDirect(action, body) {
   const url = getBackendUrl();
   if (!url) throw new Error('No backend URL configured');
   body = Object.assign({}, body || {}, { action });
@@ -1519,6 +1598,7 @@ async function backendCall(action, body) {
   return data;
 }
 function wipeLocalCache() {
+  clearUnlockSession();
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(HISTORY_KEY);
   localStorage.removeItem(FAVS_KEY);
@@ -2202,7 +2282,7 @@ async function syncFromSheet(silent) {
     // Fetch all the tabs we need
     const fetches = {};
     [...SYSTEM_TABS, ...extrasTabNames].forEach(t => {
-      fetches[t] = fetch(sheetCsvUrl(id, t)).then(r => r.ok ? r.text() : null).catch(() => null);
+      fetches[t] = cachedCsvFetch(sheetCsvUrl(id, t));
     });
     const data = {};
     for (const [tab, p] of Object.entries(fetches)) data[tab] = await p;
@@ -2257,7 +2337,7 @@ async function syncFromSheet(silent) {
     if (!allTabs && manualExtras && manualExtras.length) {
       const newOnes = manualExtras.filter(t => !tabsList.includes(t));
       if (newOnes.length) {
-        const more = await Promise.all(newOnes.map(t => fetch(sheetCsvUrl(id, t)).then(r => r.ok ? r.text() : null).catch(() => null)));
+        const more = await Promise.all(newOnes.map(t => cachedCsvFetch(sheetCsvUrl(id, t))));
         newOnes.forEach((t, i) => {
           if (more[i]) {
             const items = parseProduct(more[i]);
@@ -3253,7 +3333,40 @@ document.getElementById('ns-submit').onclick = async () => {
 /* =====================================================
    SETTINGS
    ===================================================== */
+/* §3.6 (Quote settings rebuild — the one sanctioned UI change, §0.3):
+ * collapsed by default, open state remembered, keyboard-aware scrolling.
+ * Same pattern as Timesheet's settings. */
+const QUOTE_ACC_KEY = 'nq-settings-acc';
+let _settingsAccWired = false;
+function wireSettingsAccordion() {
+  const panel = document.querySelector('[data-panel="settings"]');
+  if (!panel) return;
+  let openSet;
+  try { openSet = new Set(JSON.parse(localStorage.getItem(QUOTE_ACC_KEY)) || []); } catch (e) { openSet = new Set(); }
+  panel.querySelectorAll('details.card').forEach(d => {
+    const name = (d.querySelector('summary h3')?.textContent || '').trim();
+    if (!name) return;
+    if (!_settingsAccWired) d.open = openSet.has(name);
+    if (d.dataset.accWired) return;
+    d.dataset.accWired = '1';
+    d.addEventListener('toggle', () => {
+      if (d.open) openSet.add(name); else openSet.delete(name);
+      try { localStorage.setItem(QUOTE_ACC_KEY, JSON.stringify([...openSet])); } catch (e) {}
+    });
+  });
+  if (!_settingsAccWired) {
+    // keyboard-aware: keep the focused field visible above the on-screen keyboard
+    panel.addEventListener('focusin', (e) => {
+      if (e.target.matches('input, select, textarea')) {
+        setTimeout(() => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+      }
+    });
+  }
+  _settingsAccWired = true;
+}
+
 function renderSettings() {
+  wireSettingsAccordion();
   renderPhoneBook();  // refresh phone book each time Settings is opened
   const setVal = (id, saved, hard) => {
     const el = document.getElementById(id);
@@ -5217,6 +5330,9 @@ function init() {
     }
   } catch (e) { /* ignore corrupt draft */ }
 }
+
+/* §4 boot: restore today's unlock (no passcode prompt mid-day) */
+tryRestoreSession();
 </script>
 </body>
 </html>

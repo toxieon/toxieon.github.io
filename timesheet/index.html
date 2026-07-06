@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#0d0d0d" />
 <title>Timesheet — Neill Data</title>
 <link rel="manifest" href="manifest.json" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
+<script src="../shared/nd-ui.js"></script>
 <link rel="icon" href="assets/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -118,7 +122,24 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .preview-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-family: var(--mono-font); font-size: 12.5px; white-space: pre-wrap; line-height: 1.6; max-height: 50vh; overflow-y: auto; }
 .export-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .export-actions .btn { width: 100%; }
-@media print { .tabbar, .sync-dot, .export-actions { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-export { display: block !important; } }
+
+/* ── Slice 3 additions ── */
+.today-chip { display:inline-flex; align-items:center; min-height:34px; margin:0 0 10px; padding:4px 16px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-primary); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; }
+.period-summary { margin-top:10px; }
+.export-panel { border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-top:12px; padding:0 14px 14px; }
+.export-panel summary { list-style:none; cursor:pointer; min-height:48px; display:flex; align-items:center; font-weight:600; }
+.export-panel summary::-webkit-details-marker { display:none; }
+.export-panel summary::after { content:'▾'; margin-left:auto; color:var(--text-muted); transition:transform 0.2s; }
+.export-panel:not([open]) summary::after { transform:rotate(-90deg); }
+.fab { position:fixed; right:16px; bottom:calc(78px + env(safe-area-inset-bottom)); width:56px; height:56px; border-radius:50%; background:var(--text-primary); color:#111; font-size:26px; font-weight:600; border:none; box-shadow:0 8px 24px rgba(0,0,0,0.45); z-index:49; cursor:pointer; }
+.add-shift-mini { margin-left:auto; width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.08); color:var(--text-primary); font-size:18px; border:none; cursor:pointer; flex:none; }
+.day-head { display:flex; align-items:center; gap:8px; }
+.mini-chip-btn { min-height:44px; min-width:44px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text-primary); font-family:var(--mono-font); cursor:pointer; }
+.chip-row { display:flex; gap:6px; margin-left:8px; }
+.nudge-card { border-color:var(--on-glow); background:linear-gradient(135deg, rgba(58,184,122,0.14), var(--surface)); margin:14px 0 0; width:100%; max-width:420px; }
+.icon-x { background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; min-width:44px; min-height:44px; }
+
+@media print { .tabbar, .sync-dot, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
 .settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
 .msg-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
@@ -174,29 +195,25 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       <div><div class="week-label" id="wk-label">—</div><div class="week-sub" id="wk-sub">—</div></div>
       <button id="wk-next">&#8250;</button>
     </div>
+    <button class="today-chip" id="wk-today" style="display:none;">Today</button>
     <div id="day-cards"></div>
     <div class="week-summary">
       <div><div class="muted" style="font-size:11px;">TOTAL</div><div class="mono" id="wk-total">0.00 hrs</div></div>
       <div><div class="muted" style="font-size:11px;">OT</div><div class="mono" id="wk-ot">0.00 hrs</div></div>
       <div><div class="muted" style="font-size:11px;">DAYS</div><div class="mono" id="wk-days">0</div></div>
     </div>
-  </div>
-</section>
-
-<section class="view" id="view-export">
-  <div class="page">
-    <div class="page-title">Export</div>
-    <div class="week-nav">
-      <button id="ex-prev">&#8249;</button>
-      <div><div class="week-label" id="ex-label">—</div></div>
-      <button id="ex-next">&#8250;</button>
-    </div>
-    <div class="preview-box" id="preview"></div>
-    <div class="export-actions">
-      <button class="btn btn-primary btn-block" id="btn-send">Send Timesheet</button>
-      <button class="btn btn-ghost btn-block" id="btn-csv">Export CSV</button>
-      <button class="btn btn-ghost btn-block" id="btn-pdf">Export / Print PDF</button>
-    </div>
+    <div class="week-summary period-summary" id="period-summary" style="display:none;"></div>
+    <details class="export-panel" id="export-panel">
+      <summary>Export &amp; send this week</summary>
+      <div class="preview-box" id="preview"></div>
+      <div class="export-actions">
+        <button class="btn btn-primary btn-block" id="btn-send">Send Timesheet</button>
+        <button class="btn btn-ghost btn-block" id="btn-send-mail">Open in Mail app instead</button>
+        <button class="btn btn-ghost btn-block" id="btn-csv">Export CSV</button>
+        <button class="btn btn-ghost btn-block" id="btn-pdf">Export / Print PDF</button>
+      </div>
+    </details>
+    <button class="fab" id="btn-add-shift" aria-label="Add shift">+</button>
   </div>
 </section>
 
@@ -240,8 +257,9 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       </div>
     </div>
     <div class="settings-section">
-      <h3>Time Rounding</h3>
+      <h3>Time Rounding &amp; Breaks</h3>
       <div class="card">
+        <div class="field"><label>Default break (minutes)</label><input type="number" min="0" step="5" id="s-defaultBreakMin"></div>
         <div class="field"><label>Round clock-on/off to nearest</label>
           <select id="s-roundingMin">
             <option value="0">No rounding</option><option value="5">5 min</option><option value="10">10 min</option>
@@ -327,7 +345,6 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
         <button class="btn btn-ghost btn-block" id="btn-import" style="margin-bottom:10px;">Import previous hours (CSV)</button>
         <input type="file" id="import-file" accept=".csv,text/csv" style="display:none;">
         <button class="btn btn-ghost btn-block" id="btn-csv-template" style="margin-bottom:10px;">Download CSV template</button>
-        <button class="btn btn-ghost btn-block" id="btn-copy-prompt">Copy AI conversion prompt</button>
         <div class="muted" id="import-status" style="font-size:12px; margin-top:10px;"></div>
       </div>
     </div>
@@ -433,10 +450,15 @@ window.TIMESHEET_CONFIG = {
     standardClockOn: "07:00", standardClockOff: "15:30",
     otThresholdDay: 8, otThresholdWeek: 38, otMultiplier: 1.5, roundingMin: 30,
     payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
-    sendDay: "Friday", sendTime: "16:00", syncFrequency: "On app open",
+    sendDay: "Friday", sendTime: "16:00", syncFrequency: "On app open", defaultBreakMin: 30,
     use24hr: true, exportFormats: ["Plain text email", "CSV"]
   }
 };
+/* §5.4: creds + scope union come from the shared config (one key swap, §6) */
+if (window.ND?.config) {
+  const _nd = ND.config.forApp("timesheet");
+  Object.assign(window.TIMESHEET_CONFIG, { googleApiKey: _nd.googleApiKey, googleClientId: _nd.googleClientId, mapsKey: _nd.mapsKey, scopes: _nd.scopes });
+}
 
 /* ----- UTILS ----- */
 function uid() {
@@ -466,7 +488,14 @@ function hoursBetween(onHHMM, offHHMM) {
   let on = timeToMinutes(onHHMM); let off = timeToMinutes(offHHMM);
   if (off < on) off += 1440; return Math.round(((off - on) / 60) * 100) / 100;
 }
-function netHours(onHHMM, offHHMM, breakTaken) { let h = hoursBetween(onHHMM, offHHMM); if (breakTaken) h = Math.max(0, h - 0.5); return Math.round(h * 100) / 100; }
+function netHours(onHHMM, offHHMM, breakMinutes) {
+  let h = hoursBetween(onHHMM, offHHMM);
+  // §3.5: break is minutes now. Booleans (legacy sessions) mean the old 30.
+  const mins = (breakMinutes === true) ? 30 : (Number(breakMinutes) || 0);
+  h = Math.max(0, h - mins / 60);
+  return Math.round(h * 100) / 100;
+}
+function sessionBreakMinutes(s) { return s.break_minutes !== undefined && s.break_minutes !== '' ? (Number(s.break_minutes) || 0) : (s.break_taken ? 30 : 0); }
 function overtimeHours(totalHours, dayThreshold) { return Math.max(0, Math.round((totalHours - dayThreshold) * 100) / 100); }
 function distanceMetres(lat1, lng1, lat2, lng2) {
   lat1 = parseFloat(lat1); lng1 = parseFloat(lng1); lat2 = parseFloat(lat2); lng2 = parseFloat(lng2);
@@ -622,22 +651,28 @@ function addNoteToCurrentSession(text) {
 function clockOff({ lat, lng, breakTaken, notes, manualTime, departedOffsite, missed }) {
   const session = state.currentSession; if (!session) return null;
   const now = new Date(); const offTime = manualTime || hhmm(now);
+  const jobRec = state.jobs.find(j => j.job_id === session.job_id);
+  if (jobRec) jobRec.last_visit = new Date().toISOString();
   session.lat_off = lat ?? null; session.lng_off = lng ?? null; session.time_off = offTime;
   session.time_off_rounded = roundToNearest(offTime, state.settings.roundingMin);
   session.break_taken = !!breakTaken;
-  session.total_hours = netHours(session.time_on_rounded, session.time_off_rounded, session.break_taken);
+  session.break_minutes = breakTaken ? (Number(state.settings.defaultBreakMin) || 30) : 0;
+  session.total_hours = netHours(session.time_on_rounded, session.time_off_rounded, session.break_minutes);
   session.overtime_hours = overtimeHours(session.total_hours, state.settings.otThresholdDay);
   session.notes = [session.notes, notes].filter(Boolean).join(' / ');
   session.departed_offsite = !!departedOffsite;
   session.manual_departure_time = departedOffsite ? offTime : null;
   session.missed_clockoff = !!missed; delete session._open;
   state.sessions.unshift(session); state.lastClosedSession = session; state.currentSession = null;
-  bumpJobVisit(session.job_id); saveState(); queueSheetWrite('sessions', session); vibrate([40, 60, 40]); return session;
+  bumpJobVisit(session.job_id); saveState(); queueSheetWrite('sessions', session); vibrate([40, 60, 40]);
+  if (window.NDUI?.recordVisit) NDUI.recordVisit('timesheet', session.job_id || 'shift', 'Shift: ' + (session.job_name || 'job'), '/timesheet/');
+  return session;
 }
 function updateSession(sessionId, patch) {
   const s = state.sessions.find(s => s.session_id === sessionId); if (!s) return null;
   Object.assign(s, patch);
-  s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, s.break_taken);
+  if (patch.break_minutes !== undefined) s.break_taken = Number(patch.break_minutes) > 0;
+  s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, sessionBreakMinutes(s));
   s.overtime_hours = overtimeHours(s.total_hours, state.settings.otThresholdDay);
   saveState(); queueSheetWrite('sessions', s, true); return s;
 }
@@ -845,12 +880,12 @@ window.TsGeo = TsGeo;
 /* ----- GOOGLE SHEETS ----- */
 const TsSheets = (() => {
   const cfg = window.TIMESHEET_CONFIG;
-  let tokenClient = null, accessToken = null, expiresAt = 0;
+  let accessToken = null, expiresAt = 0;
   let spreadsheetId = localStorage.getItem('ts_sheet_id') || null;
   let profile = null, gapiReady = false, onStatusChange = () => {};
   const HEADERS = {
-    sessions: ['session_id','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period'],
-    jobs: ['job_id','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count'],
+    sessions: ['session_id','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','break_minutes','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period','entry_method'],
+    jobs: ['job_id','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count','last_visit'],
     pay_periods: ['week_start','label'],
     static_days: ['id','name','type','days','clock_on','clock_off','location','active'],
     account_link: ['google_email','neill_quote_connected','device_fingerprint','linked_at']
@@ -874,28 +909,28 @@ const TsSheets = (() => {
     await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
     await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
     gapiReady = true;
-    tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cfg.googleClientId, scope: cfg.scopes.join(' '), callback: handleTokenResponse });
-  }
-  function handleTokenResponse(resp) {
-    if (resp.error) { onStatusChange('error', resp); return; }
-    accessToken = resp.access_token; expiresAt = Date.now() + (resp.expires_in * 1000);
-    gapi.client.setToken({ access_token: accessToken });
-    fetchProfile().then(() => onStatusChange('signed-in'));
-  }
-  async function fetchProfile() {
-    try {
-      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
-      profile = await r.json();
-    } catch (e) { profile = null; }
+    // §5.4 — shared suite auth: one sign-in serves Timesheet + the rest
+    NDAuth.onAuthChange((ev) => {
+      if (ev.type === 'signin' || ev.type === 'refresh' || ev.type === 'external') {
+        accessToken = NDAuth.getToken(); expiresAt = NDAuth.getExpiry() || 0;
+        gapi.client.setToken({ access_token: accessToken });
+        if (ev.profile) profile = ev.profile;
+        if (ev.type === 'signin') onStatusChange('signed-in');
+      } else if (ev.type === 'signout') {
+        if (window.gapi?.client) gapi.client.setToken(null);
+        accessToken = null; expiresAt = 0; profile = null; onStatusChange('signed-out');
+      } else if (ev.type === 'error') {
+        onStatusChange('error', { error: ev.error });
+      }
+    });
+    NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
+    if (!NDAuth.isSignedIn()) NDAuth.ensureToken().catch(() => {});
   }
   function signIn() {
-    if (!tokenClient) { toast('Google sign-in still loading — try again in a moment'); return; }
-    tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+    if (!window.NDAuth || !gapiReady) { toast('Google sign-in still loading — try again in a moment'); return; }
+    NDAuth.ensureToken({ interactive: true }).catch((e) => onStatusChange('error', { error: e?.message }));
   }
-  function signOut() {
-    if (accessToken && window.google?.accounts?.oauth2) { try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {} }
-    accessToken = null; expiresAt = 0; profile = null; onStatusChange('signed-out');
-  }
+  function signOut() { NDAuth.signOut(); }
   async function findSpreadsheet() {
     const q = `name='${cfg.sheetFileName}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
     const res = await gapi.client.drive.files.list({ q, fields: 'files(id,name)' });
@@ -1111,6 +1146,37 @@ const TsExport = (() => {
     const subject = `Timesheet — Week of ${isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek))}`;
     return { to: st.settings.recipientEmail || '', cc: st.settings.ccEmail || '', subject, body, messageId: msg && msg.id };
   }
+  /* §3.4 — one-tap send through the Apps Script backend (MailApp).
+   * Falls back gracefully; "Open in Mail app instead" stays available. */
+  async function sendViaBackend(weekStart) {
+    const st = getState();
+    if (!st.settings.recipientEmail) { toast('Set a recipient email in Settings first'); return; }
+    const url = (st.settings.backendUrl && st.settings.backendUrl.trim()) || (window.TIMESHEET_CONFIG?.neillQuote?.backendUrl) || '';
+    if (!url) { toast('No backend URL configured — using Mail app'); return sendTimesheet(weekStart); }
+    const email = buildEmail(weekStart);
+    toast('Sending…');
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // avoids CORS preflight for Apps Script
+        body: JSON.stringify({ action: 'sendTimesheet', to: email.to, cc: email.cc, subject: email.subject, body: email.body })
+      });
+      const out = await resp.json().catch(() => ({}));
+      if (!resp.ok || out.ok === false) throw new Error(out.error || ('HTTP ' + resp.status));
+      const start = isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek));
+      if (email.messageId) {
+        const m = st.settings.messages.find(m => m.id === email.messageId);
+        if (m) m.lastSent = new Date().toISOString();
+      }
+      saveSettings({ lastSent: new Date().toISOString(), lastSentWeek: start, lastSentMessageId: email.messageId || st.settings.lastSentMessageId, messages: st.settings.messages });
+      toast('Sent ✓');
+      document.getElementById('send-nudge')?.remove();
+    } catch (e) {
+      console.warn('Backend send failed', e);
+      toast('Send failed (' + (e.message || 'network') + ') — try "Open in Mail app instead"', 4200);
+    }
+  }
+
   function sendTimesheet(weekStart) {
     const email = buildEmail(weekStart);
     const params = new URLSearchParams({ subject: email.subject, body: email.body });
@@ -1126,7 +1192,7 @@ const TsExport = (() => {
   function exportCsv(weekStart) {
     const st = getState(); const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
     const sessions = sessionsForWeek(start);
-    const headers = ['date','day_of_week','job_name','address_confirmed','time_on','time_off','break_taken','total_hours','overtime_hours','job_type','notes'];
+    const headers = ['date','day_of_week','job_name','address_confirmed','time_on','time_off','break_minutes','total_hours','overtime_hours','job_type','notes','entry_method'];
     const rows = [headers.join(',')];
     sessions.forEach(s => { rows.push(headers.map(h => csvCell(s[h])).join(',')); });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -1134,9 +1200,33 @@ const TsExport = (() => {
   }
   function csvCell(v) { const s = String(v ?? ''); return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
   function printPdf() { window.print(); }
-  return { formatWeekPreview, buildEmail, sendTimesheet, exportCsv, printPdf, pickNextMessage };
+  return { formatWeekPreview, buildEmail, sendTimesheet, sendViaBackend, exportCsv, printPdf, pickNextMessage };
 })();
 window.TsExport = TsExport;
+
+/* §3.4 — send-day nudge: on the configured sendDay, once the week has
+ * sessions and nothing has been sent yet, offer one-tap send on the clock
+ * screen. Dismissible per-week. */
+function maybeShowSendNudge() {
+  const st = getState();
+  const weekStart = isoDate(startOfWeek(new Date(), st.settings.firstDayOfWeek));
+  const nudgeHost = document.querySelector('#view-clock .home-content');
+  const existing = document.getElementById('send-nudge');
+  const due = dayOfWeek(new Date()) === (st.settings.sendDay || 'Friday')
+    && sessionsForWeek(startOfWeek(new Date(), st.settings.firstDayOfWeek)).length > 0
+    && st.settings.lastSentWeek !== weekStart
+    && localStorage.getItem('ts_nudge_dismissed') !== weekStart;
+  if (!due) { existing?.remove(); return; }
+  if (existing || !nudgeHost) return;
+  const card = document.createElement('div');
+  card.id = 'send-nudge';
+  card.className = 'card nudge-card';
+  card.innerHTML = `<div class="row-between"><div><strong>Week's done — send timesheet?</strong><div class="muted" style="font-size:12px;">It hasn't gone out yet this week.</div></div><button class="icon-x" id="nudge-x" aria-label="Dismiss">✕</button></div><div class="row" style="margin-top:10px; gap:8px;"><button class="btn btn-ghost" id="nudge-preview" style="flex:1;">Preview</button><button class="btn btn-primary" id="nudge-send" style="flex:1;">Send</button></div>`;
+  nudgeHost.insertBefore(card, nudgeHost.children[1] || null);
+  card.querySelector('#nudge-x').addEventListener('click', () => { localStorage.setItem('ts_nudge_dismissed', weekStart); card.remove(); });
+  card.querySelector('#nudge-preview').addEventListener('click', () => { showView('history'); const panel = document.getElementById('export-panel'); if (panel) { panel.open = true; } window.Views.history.render(); });
+  card.querySelector('#nudge-send').addEventListener('click', () => TsExport.sendViaBackend(new Date()));
+}
 
 /* ===== VIEW MODULES ===== */
 window.Views = {};
@@ -1238,7 +1328,8 @@ window.Views = {};
   function showManualPicker() {
     const st = getState();
     if (!st.jobs.length) { toast('No saved jobs yet — clock on once to create one.'); return; }
-    const items = st.jobs.slice().sort((a, b) => (b.visit_count||0) - (a.visit_count||0)).map(j => `<div class="picker-item" data-job="${j.job_id}"><span class="pname">${escapeHtml(j.job_name)}</span><span class="paddr">${escapeHtml(j.address || '')}</span></div>`).join('');
+    // §5.3: most-recent jobs first (falls back to visit count for old data)
+    const items = st.jobs.slice().sort((a, b) => (b.last_visit || '').localeCompare(a.last_visit || '') || (b.visit_count||0) - (a.visit_count||0)).map(j => `<div class="picker-item" data-job="${j.job_id}"><span class="pname">${escapeHtml(j.job_name)}</span><span class="paddr">${escapeHtml(j.address || '')}</span></div>`).join('');
     openPicker('Choose a job', `<div class="picker-list">${items}</div>`);
     $('picker-body').querySelectorAll('.picker-item').forEach(el => {
       el.onclick = async () => {
@@ -1295,6 +1386,11 @@ window.Views = {};
     $('wk-total').textContent = totals.total.toFixed(2) + ' hrs';
     $('wk-ot').textContent = totals.ot.toFixed(2) + ' hrs';
     $('wk-days').textContent = new Set(sessions.map(s => s.date)).size;
+    // §3.5: Today jump chip whenever not viewing the current week
+    const isCurrentWeek = isoDate(weekCursor) === isoDate(startOfWeek(new Date(), st.settings.firstDayOfWeek));
+    $('wk-today').style.display = isCurrentWeek ? 'none' : 'inline-flex';
+    renderPeriodSummary(st);
+    if ($('export-panel').open) renderExportPreview();
     const daysHtml = []; let daysWithData = 0;
     for (let i = 0; i < 7; i++) {
       const day = addDays(weekCursor, i); const iso = isoDate(day);
@@ -1309,31 +1405,108 @@ window.Views = {};
         dayTotal += hoursBetween(sd.template.clock_on, sd.template.clock_off);
         return `<div class="session-row"><span class="sjob">${escapeHtml(sd.template.name)}<span class="static-badge">${escapeHtml(sd.template.type)}</span></span><span class="stime">${fmtTime(sd.template.clock_on, st.settings.use24hr)} &rarr; ${fmtTime(sd.template.clock_off, st.settings.use24hr)}</span><span class="shrs"></span></div>`;
       }).join('');
-      daysHtml.push(`<div class="card day-card"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
+      daysHtml.push(`<div class="card day-card"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
     }
     $('day-cards').innerHTML = daysWithData ? daysHtml.join('') : '<div class="empty-week">No sessions this week.</div>';
     $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', () => openDetail(el.dataset.session)); });
+    $('day-cards').querySelectorAll('[data-add-shift]').forEach(el => { el.addEventListener('click', (e) => { e.stopPropagation(); openAddShift(el.dataset.addShift); }); });
+  }
+
+  /* §3.5 — honour payPeriodType: period totals + a 4-week hours summary */
+  function renderPeriodSummary(st) {
+    const el = $('period-summary');
+    const type = st.settings.payPeriodType || 'Weekly';
+    const parts = [];
+    if (type !== 'Weekly') {
+      const span = type === 'Fortnightly' ? 14 : 28;
+      const anchor = startOfWeek(weekCursor, st.settings.payPeriodStartDay || st.settings.firstDayOfWeek);
+      let pTotal = 0, pOt = 0;
+      for (let i = 0; i < span / 7; i++) {
+        const t = weekTotals(sessionsForWeek(addDays(anchor, i * 7)), staticDaysForWeek(addDays(anchor, i * 7)));
+        pTotal += t.total; pOt += t.ot;
+      }
+      parts.push(`<div><div class="muted" style="font-size:11px;">${type.toUpperCase()} TOTAL</div><div class="mono">${pTotal.toFixed(2)} hrs</div></div>`);
+      parts.push(`<div><div class="muted" style="font-size:11px;">${type.toUpperCase()} OT</div><div class="mono">${pOt.toFixed(2)} hrs</div></div>`);
+    }
+    const fourWeeks = [];
+    for (let i = 3; i >= 0; i--) {
+      const ws = addDays(startOfWeek(new Date(), st.settings.firstDayOfWeek), -7 * i);
+      fourWeeks.push(weekTotals(sessionsForWeek(ws), staticDaysForWeek(ws)).total.toFixed(1));
+    }
+    parts.push(`<div><div class="muted" style="font-size:11px;">LAST 4 WKS</div><div class="mono">${fourWeeks.join(' · ')}</div></div>`);
+    el.innerHTML = parts.join('');
+    el.style.display = parts.length ? 'flex' : 'none';
+  }
+
+  function renderExportPreview() {
+    $('preview').textContent = TsExport.formatWeekPreview(weekCursor) || 'No sessions this week.';
   }
   function openDetail(sessionId) {
     const s = getState().sessions.find(s => s.session_id === sessionId); if (!s) return;
-    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field row-between"><label style="margin:0;">Break taken</label><div class="switch${s.break_taken?' on':''}"><input type="checkbox" id="d-break" ${s.break_taken ? 'checked' : ''}><span class="knob"></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${sessionBreakMinutes(s)}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
     $('detail-backdrop').style.display = 'flex';
-    $('d-break').addEventListener('change', e => e.target.closest('.switch').classList.toggle('on', e.target.checked));
+    document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
     $('d-delete').onclick = () => {
       if (!confirm('Delete this session? It will be removed from your timesheet and the Google Sheet.')) return;
       removeSession(sessionId);
       $('detail-backdrop').style.display = 'none'; render(); toast('Session deleted');
     };
     $('detail-save').onclick = () => {
-      updateSession(sessionId, { job_name: $('d-job').value.trim(), address_confirmed: $('d-addr').value.trim(), time_on_rounded: $('d-on').value, time_off_rounded: $('d-off').value, job_type: $('d-type').value, break_taken: $('d-break').checked, notes: $('d-notes').value.trim() });
+      updateSession(sessionId, { job_name: $('d-job').value.trim(), address_confirmed: $('d-addr').value.trim(), time_on_rounded: $('d-on').value, time_off_rounded: $('d-off').value, job_type: $('d-type').value, break_minutes: Number($('d-breakmin').value) || 0, notes: $('d-notes').value.trim() });
       $('detail-backdrop').style.display = 'none'; render(); toast('Session updated');
     };
   }
+
+  /* §3.1 — "+ Add shift": the missing manual past-session entry.
+   * Reuses the detail modal; save creates entry_method:'manual'. */
+  function openAddShift(dateIso) {
+    const st = getState();
+    const date = dateIso || isoDate(weekCursor <= new Date() ? new Date() : weekCursor);
+    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><input id="d-addr" value="" placeholder="Optional"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${Number(st.settings.defaultBreakMin) || 30}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
+    $('detail-backdrop').style.display = 'flex';
+    document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
+    $('d-delete') && ($('d-delete').style.display = 'none');
+    $('detail-save').onclick = () => {
+      const jobName = $('d-job').value.trim();
+      if (!jobName) { toast('Give the shift a job name'); return; }
+      const on = roundToNearest($('d-on').value, st.settings.roundingMin);
+      const off = roundToNearest($('d-off').value, st.settings.roundingMin);
+      const breakMin = Number($('d-breakmin').value) || 0;
+      const d = $('d-date').value || date;
+      const session = {
+        session_id: uid(), date: d, day_of_week: dayOfWeek(d),
+        job_id: '', job_name: jobName, address_confirmed: $('d-addr').value.trim(),
+        lat_on: null, lng_on: null, lat_off: null, lng_off: null,
+        time_on: $('d-on').value, time_off: $('d-off').value,
+        time_on_rounded: on, time_off_rounded: off,
+        break_taken: breakMin > 0, break_minutes: breakMin,
+        total_hours: netHours(on, off, breakMin),
+        overtime_hours: 0,
+        job_type: $('d-type').value, notes: $('d-notes').value.trim(),
+        departed_offsite: false, manual_departure_time: null, missed_clockoff: false,
+        pay_period: payPeriodFor(new Date(d)), entry_method: 'manual'
+      };
+      session.overtime_hours = overtimeHours(session.total_hours, st.settings.otThresholdDay);
+      getState().sessions.unshift(session);
+      saveState(); queueSheetWrite('sessions', session);
+      $('detail-backdrop').style.display = 'none';
+      weekCursor = startOfWeek(new Date(d), st.settings.firstDayOfWeek);
+      render(); toast('Shift added');
+    };
+  }
+  window.TsOpenAddShift = openAddShift;
   function init() {
     weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
     render();
     $('wk-prev').addEventListener('click', () => { weekCursor = addDays(weekCursor, -7); render(); });
     $('wk-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
+    $('wk-today').addEventListener('click', () => { weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek); render(); });
+    $('btn-add-shift').addEventListener('click', () => openAddShift(isoDate(new Date())));
+    $('export-panel').addEventListener('toggle', () => { if ($('export-panel').open) renderExportPreview(); });
+    $('btn-send').addEventListener('click', () => TsExport.sendViaBackend(weekCursor));
+    $('btn-send-mail').addEventListener('click', () => { const st = getState(); if (!st.settings.recipientEmail) { toast('Set a recipient email in Settings first'); return; } TsExport.sendTimesheet(weekCursor); });
+    $('btn-csv').addEventListener('click', () => TsExport.exportCsv(weekCursor));
+    $('btn-pdf').addEventListener('click', () => { renderExportPreview(); $('export-panel').open = true; TsExport.printPdf(); });
     $('detail-cancel').addEventListener('click', () => { $('detail-backdrop').style.display = 'none'; });
     $('detail-backdrop').addEventListener('click', e => { if (e.target === $('detail-backdrop')) $('detail-backdrop').style.display = 'none'; });
     const area = $('touch-area');
@@ -1348,25 +1521,7 @@ window.Views = {};
   window.Views.history = { init, render };
 })();
 
-/* EXPORT */
-(function () {
-  let weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
-  function $(id) { return document.getElementById(id); }
-  function render() {
-    $('ex-label').textContent = `${fmtDateHeader(weekCursor)} – ${fmtDateHeader(addDays(weekCursor, 6))}`;
-    $('preview').textContent = TsExport.formatWeekPreview(weekCursor) || 'No sessions this week.';
-  }
-  function init() {
-    weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
-    render();
-    $('ex-prev').addEventListener('click', () => { weekCursor = addDays(weekCursor, -7); render(); });
-    $('ex-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
-    $('btn-send').addEventListener('click', () => { const st = getState(); if (!st.settings.recipientEmail) { toast('Set a recipient email in Settings -> Auto-Emailer first'); return; } TsExport.sendTimesheet(weekCursor); });
-    $('btn-csv').addEventListener('click', () => TsExport.exportCsv(weekCursor));
-    $('btn-pdf').addEventListener('click', () => TsExport.printPdf());
-  }
-  window.Views.export = { init, render };
-})();
+/* EXPORT view removed — merged into History (§3.3) */
 
 /* SETTINGS */
 (function () {
@@ -1374,26 +1529,6 @@ window.Views = {};
   const TPL_TYPES = ['School Day','Travel Day','Office Day','RDO','Custom'];
   let editingTplId = null; let tplDraftDays = []; let editingMsgId = null; let wired = false;
   function $(id) { return document.getElementById(id); }
-  const AI_IMPORT_PROMPT = [
-    "You are converting my existing timesheets into a CSV that my Timesheet app can import.",
-    "Output ONLY the CSV — no explanation, no code fences — starting with this exact header row:",
-    "",
-    "date,job_name,address,time_on,time_off,break_taken,job_type,notes",
-    "",
-    "Rules:",
-    "- date: ISO format YYYY-MM-DD.",
-    "- time_on / time_off: 24-hour HH:MM (e.g. 07:00, 15:30).",
-    "- break_taken: true if a 30-minute unpaid break was taken that shift, otherwise false.",
-    "- job_type: 'employer' for normal paid work, 'neill_data' for my own jobs, 'unclassified' if unsure. Default to employer.",
-    "- address: the site address if I mention one, otherwise leave blank.",
-    "- notes: any extra detail for the shift, otherwise blank.",
-    "- Wrap any field that contains a comma in double quotes.",
-    "- One row per shift. If a day had two sites, output two separate rows.",
-    "- Do not invent data. If a time is missing, skip that shift.",
-    "",
-    "Here are my timesheets to convert:",
-    "[paste your hours / timesheets here]"
-  ].join('\n');
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; }
     catch (e) {
@@ -1416,6 +1551,7 @@ window.Views = {};
     if (!$('s-roundingMin')._tsBound) { $('s-roundingMin')._tsBound = true; $('s-roundingMin').addEventListener('change', e => saveSettings({ roundingMin: parseInt(e.target.value, 10) })); }
     bindText('s-recipientName', 'recipientName', s); bindText('s-recipientEmail', 'recipientEmail', s); bindText('s-ccEmail', 'ccEmail', s);
     bindSelect('s-sendDay', 'sendDay', s); bindText('s-sendTime', 'sendTime', s);
+    bindNumber('s-defaultBreakMin', 'defaultBreakMin', s);
     $('radius-val').textContent = s.radiusM ?? 150;
     const radiusEl = $('s-radiusM'); radiusEl.value = s.radiusM ?? 150;
     if (!radiusEl._tsBound) { radiusEl._tsBound = true; radiusEl.addEventListener('input', () => { $('radius-val').textContent = radiusEl.value; }); radiusEl.addEventListener('change', () => saveSettings({ radiusM: parseInt(radiusEl.value, 10) })); }
@@ -1514,7 +1650,7 @@ window.Views = {};
       const pulled = await pullFromSheet();
       renderAll();
       if (window.Views.history && window.Views.history.render) window.Views.history.render();
-      if (window.Views.export && window.Views.export.render) window.Views.export.render();
+      /* export view merged into history (§3.3) */
       toast(pulled ? 'Synced with Google Sheets' : 'Sign in to Google to sync across devices');
     });
     $('btn-clear-cache').addEventListener('click', () => {
@@ -1541,21 +1677,26 @@ window.Views = {};
       const tpl = 'date,job_name,address,time_on,time_off,break_taken,job_type,notes\n2026-06-09,Smith residence,"12 Main St, Townsville QLD",07:00,15:30,true,employer,Standard electrical works\n2026-06-10,School run,Brightwater State School,08:30,15:00,false,employer,\n';
       downloadBlob(new Blob([tpl], { type: 'text/csv' }), 'timesheet-import-template.csv');
     });
-    $('btn-copy-prompt').addEventListener('click', async () => {
-      const ok = await copyText(AI_IMPORT_PROMPT);
-      toast(ok ? 'Conversion prompt copied to clipboard' : 'Copy failed — select and copy manually');
-    });
     [$('tpl-backdrop'), $('msg-backdrop'), $('nq-backdrop')].forEach(el => { el.addEventListener('click', e => { if (e.target === el) el.style.display = 'none'; }); });
   }
-  function init() { renderAll(); wireEvents(); }
+  function init() {
+    renderAll(); wireEvents();
+    if (window.NDUI && NDUI.accordion) {
+      NDUI.accordion(document.querySelector('#view-settings .page'), {
+        sectionSelector: '.settings-section',
+        titleSelector: 'h3',
+        storageKey: 'ts-settings-acc',
+        danger: ['More']   // Clear cache / disconnects live here
+      });
+    }
+  }
   window.Views.settings = { init, render: renderAll };
 })();
 
 /* ===== APP SHELL ===== */
-const NAV_ITEMS = [
+const NAV_ITEMS = [ // §3.3: Clock · History · Settings (Export merged into History)
   { view: 'clock', label: 'Clock', icon: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 100 10 5 5 0 000-10z' },
   { view: 'history', label: 'History', icon: 'M3 5h18M3 12h18M3 19h18' },
-  { view: 'export', label: 'Export', icon: 'M12 3v12m0 0l-4-4m4 4l4-4M4 21h16' },
   { view: 'settings', label: 'Settings', icon: 'M10.3 2.6a2 2 0 013.4 0l.4.7a2 2 0 002.3 1l.8-.2a2 2 0 012.4 1.4l.2.8a2 2 0 001 1.4l.7.4a2 2 0 010 3.4l-.7.4a2 2 0 00-1 1.4l-.2.8a2 2 0 01-2.4 1.4l-.8-.2a2 2 0 00-2.3 1l-.4.7a2 2 0 01-3.4 0l-.4-.7a2 2 0 00-2.3-1l-.8.2a2 2 0 01-2.4-1.4l-.2-.8a2 2 0 00-1-1.4l-.7-.4a2 2 0 010-3.4l.7-.4a2 2 0 001-1.4l.2-.8a2 2 0 012.4-1.4l.8.2a2 2 0 002.3-1l.4-.7zM12 9a3 3 0 100 6 3 3 0 000-6z' }
 ];
 let currentView = 'clock';
@@ -1573,7 +1714,7 @@ function showView(name) {
   window.scrollTo(0, 0);
 }
 function refreshAllViews() {
-  ['clock', 'history', 'export', 'settings'].forEach(n => { if (window.Views[n] && window.Views[n].render) window.Views[n].render(); });
+  ['clock', 'history', 'settings'].forEach(n => { if (window.Views[n] && window.Views[n].render) window.Views[n].render(); });
 }
 function ensureSyncDot() {
   if (document.getElementById('sync-dot')) return;
@@ -1586,7 +1727,7 @@ function registerServiceWorker() {
 }
 async function bootApp() {
   registerServiceWorker(); ensureSyncDot(); renderTabbar();
-  window.Views.clock.init(); window.Views.history.init(); window.Views.export.init(); window.Views.settings.init();
+  window.Views.clock.init(); window.Views.history.init(); window.Views.settings.init();
   showView('clock');
   await flushQueueOnNextOpen();
   TsSheets.boot().catch(() => {});
@@ -1602,6 +1743,8 @@ async function bootApp() {
   };
   if (getState().currentSession) TsGeo.startWatching();
   TsNotifications.checkFridayReminder();
+  maybeShowSendNudge();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeShowSendNudge(); });
 }
 document.addEventListener('DOMContentLoaded', bootApp);
 </script>

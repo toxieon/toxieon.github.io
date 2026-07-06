@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'planner-v2';
+const CACHE_VERSION = 'planner-v3';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -19,9 +19,16 @@ const SHELL_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./favicon.svg",
+  "../shared/nd-core.css",
   "./styles.css?v=0.7.2",
   "../shared/nd-config.js",
   "../shared/nd-auth.js",
+  "../shared/nd-cache.js",
+  "../shared/nd-ui.js",
+  "../shared/nd-match.js",
+  "../shared/nd-sheets.js",
+  "../shared/nd-inbox.js",
+  "../shared/nd-pwa.js",
   "./app.js?v=0.7.2"
 ];
 

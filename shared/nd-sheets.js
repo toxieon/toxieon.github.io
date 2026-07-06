@@ -186,6 +186,12 @@
           spreadsheetId: spreadsheetId, range: range, valueInputOption: "RAW", insertDataOption: "INSERT_ROWS"
         }, { values: values });
       },
+      addSheet: function (spreadsheetId, title) {
+        ensure();
+        return gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId: spreadsheetId }, {
+          requests: [{ addSheet: { properties: { title: title } } }]
+        });
+      },
       deleteRow: function (spreadsheetId, tab, rowNumber) {
         ensure();
         return gapi.client.sheets.spreadsheets.get({ spreadsheetId: spreadsheetId, fields: "sheets.properties" })

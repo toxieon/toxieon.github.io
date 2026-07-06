@@ -626,7 +626,13 @@ function bindEvents() {
   document.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", () => handleAction(button.dataset.action)));
   document.querySelectorAll("[data-action-file]").forEach((button) => button.addEventListener("click", () => handleFileAction(button.dataset.actionFile, button.dataset.id)));
   document.querySelectorAll("[data-repair-action]").forEach((button) => button.addEventListener("click", () => handleRepairAction(button.dataset.repairAction, button.dataset.id)));
-  document.querySelectorAll("[data-preview]").forEach((button) => button.addEventListener("click", () => { state.lightbox = button.dataset.preview; render(); }));
+  document.querySelectorAll("[data-preview]").forEach((button) => button.addEventListener("click", () => {
+    const file = state.files.find((entry) => entry.id === button.dataset.preview) ||
+      state.repair.issues.find((issue) => issue.file.id === button.dataset.preview)?.file;
+    if (!file) return;
+    if (window.NDUI) NDUI.lightbox({ src: file.thumbnailLink, title: file.name });   // shared viewer, regex fix baked in
+    else { state.lightbox = button.dataset.preview; render(); }
+  }));
   document.querySelectorAll("[data-filter]").forEach((input) => {
     const eventName = input.tagName === "INPUT" ? "input" : "change";
     input.addEventListener(eventName, () => {
@@ -763,6 +769,77 @@ function handleAuthEvent(ev) {
   }
 }
 
+/* v1.0 §4.7 — Search reads the unified Inbox tab (UNFILED | FILED_TO_PROJECT)
+ * and updates it as files move. §2.8 — cached index boots instantly. */
+function applyIndex(masterIndex, inboxRecords) {
+  state.projects = masterIndex.projects;
+  state.floors = masterIndex.floors;
+  state.nodes = masterIndex.nodes;
+  state.folders = masterIndex.folders;
+  state.rooms = masterIndex.rooms;
+  state.photos = masterIndex.photos;
+  state.jobs = masterIndex.destinations;
+  state.projectNames = [...new Set(state.projects.map((project) => project.name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  state.files = inboxRecords.map(inboxRecordToFile);
+  state.files.forEach(matchFile);
+}
+
+let _searchInboxApi = null;
+function getInboxApi() {
+  if (_searchInboxApi) return _searchInboxApi;
+  if (!window.NDInbox || !window.ND?.sheetsKit || !state.drive.jobSheetId) return null;
+  const sheets = ND.sheetsKit.create({ gateway: ND.sheetsKit.gapiGateway() });
+  _searchInboxApi = NDInbox.createInboxApi({ sheets, spreadsheetId: state.drive.jobSheetId });
+  return _searchInboxApi;
+}
+
+async function loadInboxRecords() {
+  const api = getInboxApi();
+  if (!api) throw new Error("Inbox tab unavailable");
+  await NDInbox.ensureInboxTab(ND.sheetsKit.gapiGateway(), state.drive.jobSheetId).catch(() => {});
+  const all = await api.list();
+  const S = NDInbox.STATUS;
+  return all.filter((r) => r.status === S.UNFILED || r.status === S.UPLOADED || r.status === S.FILED_TO_PROJECT);
+}
+
+function inboxRecordToFile(rec) {
+  const proj = rec.projectId ? state.projects?.find?.((p) => p.id === rec.projectId) : null;
+  return {
+    id: rec.driveFileId,
+    name: rec.name,
+    mimeType: rec.mimeType || "",
+    thumbnailLink: rec.thumbnailLink || "",
+    webViewLink: rec.webViewLink || "",
+    size: "",
+    parents: [],
+    createdTime: rec.uploadedAt || "",
+    status: "batch",
+    type: clean(rec.type),
+    address: clean(rec.address),
+    room: clean(rec.room),
+    location: clean(rec.location),
+    projectId: clean(rec.projectId),
+    projectName: clean(proj?.name || ""),
+    folderGroup: "",
+    floorId: clean(rec.floorId),
+    floorName: "",
+    nodeId: clean(rec.nodeId),
+    nodeName: "",
+    category: "",
+    lineItem: "",
+    uploadedByEmail: clean(rec.uploader),
+    uploadedByName: "",
+    uploadedAt: clean(rec.uploadedAt || rec.capturedAt),
+    photoId: clean(rec.photoId),
+    isFloorPlan: rec.isFloorPlan,
+    appProperties: {},
+    manualDestination: Boolean(rec.projectId || rec.floorId || rec.nodeId),
+    deleting: false,
+    match: null,
+    matchDetails: null
+  };
+}
+
 async function refreshAll() {
   if (!isTokenValid()) return signIn();
   if (!isAdmin()) {
@@ -771,26 +848,24 @@ async function refreshAll() {
     return;
   }
   state.loading = true;
+  // §2.8: cached index first — real data in <500ms, silent refresh after
+  if (window.NDCache && !state.files.length) {
+    try {
+      const cached = await NDCache.get("search:index");
+      if (cached) { applyIndex(cached.masterIndex, cached.inboxRecords); state.loading = "refreshing"; }
+    } catch (e) {}
+  }
   render();
   try {
     await ensureDriveReady();
-    const [uploadRows, masterIndex, files] = await Promise.all([
-      loadUploadRows(),
+    const [masterIndex, inboxRecords] = await Promise.all([
       loadMasterIndex(),
-      loadBatchFiles()
+      loadInboxRecords()
     ]);
-    state.uploadRows = uploadRows;
-    state.projects = masterIndex.projects;
-    state.floors = masterIndex.floors;
-    state.nodes = masterIndex.nodes;
-    state.folders = masterIndex.folders;
-    state.rooms = masterIndex.rooms;
-    state.photos = masterIndex.photos;
-    state.jobs = masterIndex.destinations;
-    state.projectNames = [...new Set(state.projects.map((project) => project.name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    state.files = files.map((file) => enrichFile(file));
-    state.files.forEach(matchFile);
-    toast("Batch scanned");
+    state.uploadRows = [];   // Upload Log is a receipt, no longer a filing source (v1.0 §3.1)
+    applyIndex(masterIndex, inboxRecords);
+    if (window.NDCache) NDCache.put("search:index", { masterIndex, inboxRecords }).catch(() => {});
+    toast("Inbox scanned");
   } catch (error) {
     state.googleAuth.lastError = describeError(error);
     toast("Scan failed");
@@ -1183,7 +1258,11 @@ async function saveFileMetadata(file) {
 }
 
 async function deleteFile(file) {
-  if (file.deleting || !confirm(`Delete "${file.name}" from Drive? It will be moved to the Drive bin.`)) return;
+  if (file.deleting) return;
+  const sure = window.NDUI
+    ? await NDUI.confirm({ title: "Delete photo", message: `Delete "${file.name}" from Drive? It will be moved to the Drive bin.`, confirmLabel: "Delete", danger: true })
+    : confirm(`Delete "${file.name}" from Drive? It will be moved to the Drive bin.`);
+  if (!sure) return;
   file.deleting = true;
   render();
   try {
@@ -1193,6 +1272,7 @@ async function deleteFile(file) {
       fields: "id,trashed"
     }));
     const photosStatus = await removePhotoRow(file.id).catch(() => "cleanup failed");
+    try { const api = getInboxApi(); if (api) await api.remove(file.id); } catch (e) { console.warn("Inbox row cleanup failed", e); }
     await appendSearchAudit(file, "", photosStatus, "Deleted from batch").catch(() => {});
     state.files = state.files.filter((entry) => entry.id !== file.id);
     toast(photosStatus === "cleanup failed" ? "Photo deleted; Photos row cleanup failed" : "Photo moved to the Drive bin");
@@ -1298,13 +1378,30 @@ async function moveFileToJob(file) {
     }));
     applyMovedDriveResult(file, staged.result);
     const photosStatus = await upsertPhotoRow(file, staged.result);
-    const response = await googleCall(() => gapi.client.drive.files.update({
-      fileId: file.id,
-      removeParents: state.drive.batchFolderId,
-      fields: "id,parents"
-    }));
-    file.parents = response.result.parents || [];
+    // Remove whatever it was in before (Batch OR a project folder) — the
+    // file may have been FILED_TO_PROJECT by Planner (v1.0 §3.2).
+    const oldParents = (staged.result.parents || []).filter((parentId) => parentId !== destination);
+    if (oldParents.length) {
+      const response = await googleCall(() => gapi.client.drive.files.update({
+        fileId: file.id,
+        removeParents: oldParents.join(","),
+        fields: "id,parents"
+      }));
+      file.parents = response.result.parents || [];
+    }
     file.status = "moved";
+    // graduate the Inbox row (v1.0 §3.2: FILED_TO_NODE)
+    try {
+      const api = getInboxApi();
+      if (api) await api.upsert({
+        driveFileId: file.id, name: file.name, status: NDInbox.STATUS.FILED_TO_NODE,
+        address: file.address, room: file.room, location: file.location, type: file.type,
+        projectId: file.projectId, floorId: file.floorId, nodeId: file.nodeId,
+        uploader: file.uploadedByEmail, uploadedAt: file.uploadedAt,
+        mimeType: file.mimeType, webViewLink: file.webViewLink, thumbnailLink: file.thumbnailLink,
+        photoId: file.photoId
+      });
+    } catch (e) { console.warn("Inbox status update failed", e); }
     await appendSearchAudit(file, destination, photosStatus).catch(() => {});
     toast(`File moved; Photos ${photosStatus}`);
     render();
@@ -1321,7 +1418,10 @@ async function moveAllReadyFiles() {
     toast("No ready files to move");
     return;
   }
-  if (!confirm(`Move ${ready.length} ready file${ready.length === 1 ? "" : "s"} now?`)) return;
+  const goMove = window.NDUI
+    ? await NDUI.confirm({ title: "Move all ready", message: `Move ${ready.length} ready file${ready.length === 1 ? "" : "s"} now?`, confirmLabel: "Move all" })
+    : confirm(`Move ${ready.length} ready file${ready.length === 1 ? "" : "s"} now?`);
+  if (!goMove) return;
   state.movingAll = { active: true, total: ready.length, completed: 0, error: "" };
   render();
   for (const file of ready) {
@@ -1570,7 +1670,10 @@ async function repairAllProjectImageIssues() {
     toast("No project image issues to repair");
     return;
   }
-  if (!confirm(`Repair ${issues.length} project image issue${issues.length === 1 ? "" : "s"} using the current folder locations?`)) return;
+  const goRepair = window.NDUI
+    ? await NDUI.confirm({ title: "Repair project images", message: `Repair ${issues.length} project image issue${issues.length === 1 ? "" : "s"} using the current folder locations?`, confirmLabel: "Repair" })
+    : confirm(`Repair ${issues.length} project image issue${issues.length === 1 ? "" : "s"} using the current folder locations?`);
+  if (!goRepair) return;
   state.repair.repairing = true;
   render();
   let fixed = 0;

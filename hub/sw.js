@@ -11,16 +11,22 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'hub-v2';
+const CACHE_VERSION = 'hub-v3';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./apps.json",
   "./favicon.svg?v=0.4.1",
-  "./styles.css?v=0.4.1",
-  "./app.js?v=0.4.1"
+  "../shared/nd-core.css",
+  "./styles.css?v=0.5.0",
+  "../shared/nd-match.js",
+  "../shared/nd-cache.js",
+  "../shared/nd-ui.js",
+  "../shared/nd-pwa.js",
+  "./app.js?v=0.5.0"
 ];
 
 const IS_API_HOST = (url) =>

@@ -56,6 +56,14 @@ const state = {
   step: "welcome",
   filesChosen: false,
   items: [],
+  /* v1.0 §4.1A — sticky detail header. apply[field]=true means the header
+   * value is the batch default and rows inherit (greyed). Toggling OFF
+   * makes that field per-image editable. */
+  header: {
+    values: { type: "", address: "", room: "", location: "" },
+    apply: { type: true, address: true, room: true, location: true },
+    detectedAddress: false
+  },
   invalid: {},
   lightbox: null,
   toast: "",
@@ -251,6 +259,7 @@ function renderDetails() {
           <input class="hidden-input" type="file" multiple data-file-input />
         </div>
       </div>
+      ${renderStickyHeader()}
       ${renderBatchTools()}
       <div class="details-table">
         <div class="details-head">
@@ -269,6 +278,34 @@ function renderDetails() {
         <button type="button" class="primary-button" data-action="upload" ${state.items.length ? "" : "disabled"}>${icon("upload")}Upload</button>
       </div>
     </section>
+  `;
+}
+
+function renderStickyHeader() {
+  const h = state.header;
+  const fieldDefs = [["address", "Address", "12 Sample Street"], ["type", "Type", "Thermostat"], ["room", "Room", "Apt 4 / Room 2"], ["location", "Location", "Level 3 / North side"]];
+  return `
+    <div class="sticky-header" data-sticky-header>
+      <div class="sticky-header-title">
+        <strong>Batch details</strong>
+        <span>Applies to every file while a field's toggle is on — toggle off to set it per image.</span>
+      </div>
+      <div class="sticky-header-grid">
+        ${fieldDefs.map(([field, label, ph]) => `
+          <div class="sticky-field ${h.apply[field] ? "" : "is-off"}">
+            <div class="sticky-field-head">
+              <label for="hdr-${field}">${label}</label>
+              <button type="button" class="toggle-pill ${h.apply[field] ? "is-on" : ""}" data-header-toggle="${field}"
+                aria-pressed="${h.apply[field]}" title="${h.apply[field] ? "Applying to all — tap for per-image" : "Per-image — tap to apply to all"}">
+                <span></span>${h.apply[field] ? "All" : "Each"}
+              </button>
+            </div>
+            <input id="hdr-${field}" data-header-field="${field}" ${field === "address" ? 'data-address-field="true"' : ""}
+              value="${escapeHtml(h.values[field])}" placeholder="${escapeHtml(ph)}" ${field === "address" ? 'autocomplete="off"' : ""} />
+            ${field === "address" && h.detectedAddress && h.values.address ? `<span class="detected-chip">📍 Detected from photos — tap to correct</span>` : ""}
+          </div>`).join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -297,8 +334,9 @@ function renderFileRow(item) {
         ${
           item.previewUrl
             ? `<button type="button" class="thumb-preview" data-preview="${escapeHtml(item.id)}" aria-label="Preview ${escapeHtml(item.file.name)}"><img src="${escapeHtml(item.previewUrl)}" alt="" /></button>`
-            : `<div class="thumb-preview">${icon("file")}</div>`
+            : `<div class="thumb-preview thumb-ext" aria-hidden="true">${escapeHtml(fileExtLabel(item.file))}</div>`
         }
+        ${item.isFloorPlan ? `<span class="floorplan-badge">PLAN</span>` : ""}
         <div class="file-name">
           <strong title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</strong>
           <span>${escapeHtml(readableSize(item.file.size))}</span>
@@ -310,6 +348,9 @@ function renderFileRow(item) {
       ${renderField(item, "room", "Room", "Apt 4 / Room 2")}
       ${renderField(item, "location", "Location", "Level 3 / North side")}
       <div class="mobile-file-actions">
+        <button type="button" class="floorplan-toggle ${item.isFloorPlan ? "is-on" : ""}" data-floorplan="${escapeHtml(item.id)}" aria-pressed="${item.isFloorPlan}">
+          ${item.isFloorPlan ? "✓ This is the floor plan" : "This is the floor plan"}
+        </button>
         <button type="button" class="copy-button" data-copy-row="${escapeHtml(item.id)}">${icon("copy")}Copy this file to all</button>
       </div>
     </div>
@@ -318,10 +359,19 @@ function renderFileRow(item) {
 
 function renderField(item, field, label, placeholder) {
   const key = `${item.id}:${field}`;
-  const optional = field === "room" || field === "location";
+  const requiredForItem = !(field === "room" || field === "location") && !(field === "type" && item.isFloorPlan);
+  const inherited = state.header.apply[field] && String(state.header.values[field]).trim();
+  if (inherited) {
+    return `
+      <div class="field is-inherited">
+        <label for="${key}">${escapeHtml(label)}</label>
+        <input id="${key}" value="${escapeHtml(state.header.values[field])}" disabled title="Set by the batch header — toggle the header field off to edit per image" />
+      </div>
+    `;
+  }
   return `
     <div class="field">
-      <label for="${key}">${escapeHtml(label)}${optional ? "" : " *"}</label>
+      <label for="${key}">${escapeHtml(label)}${requiredForItem ? " *" : ""}</label>
       <input
         id="${key}"
         data-field="${escapeHtml(field)}"
@@ -332,6 +382,7 @@ function renderField(item, field, label, placeholder) {
         placeholder="${escapeHtml(placeholder)}"
         ${field === "address" ? 'autocomplete="off"' : ""}
       />
+      ${field === "address" && item.addressSource === "exif" && item.address ? `<span class="detected-chip">📍 Detected — tap to correct</span>` : ""}
     </div>
   `;
 }
@@ -464,6 +515,19 @@ function renderTermsModal() {
 function bindEvents() {
   document.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", () => handleAction(button.dataset.action)));
   document.querySelectorAll("[data-field]").forEach((input) => input.addEventListener("input", () => updateField(input)));
+  document.querySelectorAll("[data-header-field]").forEach((input) => input.addEventListener("input", () => {
+    state.header.values[input.dataset.headerField] = input.value;
+    if (input.dataset.headerField === "address") state.header.detectedAddress = false;
+  }));
+  document.querySelectorAll("[data-header-toggle]").forEach((button) => button.addEventListener("click", () => {
+    const field = button.dataset.headerToggle;
+    state.header.apply[field] = !state.header.apply[field];
+    render();
+  }));
+  document.querySelectorAll("[data-floorplan]").forEach((button) => button.addEventListener("click", () => {
+    const item = state.items.find((i) => i.id === button.dataset.floorplan);
+    setFloorPlan(button.dataset.floorplan, !(item && item.isFloorPlan));
+  }));
   document.querySelectorAll("[data-copy-field]").forEach((button) => button.addEventListener("click", () => copyFieldToAll(button.dataset.copyField)));
   document.querySelectorAll("[data-copy-row]").forEach((button) => button.addEventListener("click", () => copyItemToAll(button.dataset.copyRow)));
   document.querySelectorAll("[data-preview]").forEach((button) => button.addEventListener("click", () => { state.lightbox = button.dataset.preview; render(); }));
@@ -496,13 +560,24 @@ function handleAction(action) {
   if (action === "close-lightbox") { state.lightbox = null; render(); return; }
 }
 
+function isHeicFile(file) {
+  return /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+}
+
+function fileExtLabel(file) {
+  const m = file.name.match(/\.([a-z0-9]+)$/i);
+  return (m ? m[1] : (file.type.split("/")[1] || "file")).toUpperCase().slice(0, 5);
+}
+
 function handleFiles(fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) return;
   const newItems = files.map((file) => ({
     id: uid("file"),
     file,
-    previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+    // §2.7: browsers can't render HEIC via object URL — preview comes from
+    // the EXIF-embedded thumbnail (extractExif), or a typed placeholder.
+    previewUrl: file.type.startsWith("image/") && !isHeicFile(file) ? URL.createObjectURL(file) : "",
     type: "",
     address: "",
     room: "",
@@ -512,12 +587,112 @@ function handleFiles(fileList) {
     progress: 0,
     result: null,
     duplicateOf: null,
-    error: ""
+    error: "",
+    /* v1.0 §4.1B/§4.2 */
+    lat: null,
+    lng: null,
+    capturedAt: "",
+    addressSource: "manual",
+    detectedAddress: "",
+    isFloorPlan: false
   }));
   state.items.push(...newItems);
   state.filesChosen = true;
   state.invalid = {};
   toast(`${files.length} file${files.length === 1 ? "" : "s"} selected`);
+  render();
+  extractExifBatch(newItems);   // best-effort, never blocks (§4.1 hard truths)
+}
+
+/* ── EXIF auto-location (v1.0 §4.1B) — best-effort, never blocks ──────── */
+async function extractExifBatch(items) {
+  if (!window.exifr) return;
+  await Promise.all(items.map(async (item) => {
+    if (!item.file.type.startsWith("image/") && !isHeicFile(item.file)) return;
+    try {
+      const gps = await exifr.gps(item.file);
+      if (gps && isFinite(gps.latitude) && isFinite(gps.longitude)) {
+        item.lat = Math.round(gps.latitude * 1e5) / 1e5;   // 5dp — geocode dedup key
+        item.lng = Math.round(gps.longitude * 1e5) / 1e5;
+      }
+    } catch (e) {}
+    try {
+      const tags = await exifr.parse(item.file, { pick: ["DateTimeOriginal"] });
+      if (tags?.DateTimeOriginal) item.capturedAt = new Date(tags.DateTimeOriginal).toISOString();
+    } catch (e) {}
+    if (!item.previewUrl && isHeicFile(item.file)) {
+      try {
+        const thumb = await exifr.thumbnail(item.file);
+        if (thumb) item.previewUrl = URL.createObjectURL(new Blob([thumb], { type: "image/jpeg" }));
+      } catch (e) {}   // undecodable -> typed placeholder card, never a broken tile
+    }
+  }));
+  render();
+  geocodeClusters().catch(() => {});
+}
+
+/* One reverse-geocode call per unique 5dp coordinate cluster per batch
+ * (v1.0 §4.1 hard truths — a 40-photo site = one call, not 40). */
+const _geocodedClusters = {};
+async function geocodeClusters() {
+  const pending = state.items.filter((i) => i.lat !== null && !i.detectedAddress);
+  if (!pending.length) return;
+  const clusters = {};
+  pending.forEach((i) => { (clusters[i.lat + "," + i.lng] = clusters[i.lat + "," + i.lng] || []).push(i); });
+  let resolvedAny = false;
+  for (const key of Object.keys(clusters)) {
+    if (!(key in _geocodedClusters)) {
+      try {
+        await loadPlacesLibrary();
+        const [lat, lng] = key.split(",").map(Number);
+        const res = await new google.maps.Geocoder().geocode({ location: { lat, lng } });
+        _geocodedClusters[key] = res?.results?.[0]?.formatted_address || "";
+      } catch (e) { _geocodedClusters[key] = ""; }
+    }
+    const address = _geocodedClusters[key];
+    if (!address) continue;
+    clusters[key].forEach((item) => {
+      item.detectedAddress = address;
+      if (!String(item.address).trim()) { item.address = address; item.addressSource = "exif"; }
+      resolvedAny = true;
+    });
+  }
+  if (!resolvedAny) return;
+  // §4.1B.4: if EVERY located photo agrees, auto-fill the header (toggle stays ON)
+  const keys = state.items.filter((i) => i.detectedAddress).map((i) => window.NDMatch.addressKey(i.detectedAddress));
+  const uniq = Array.from(new Set(keys));
+  if (uniq.length === 1 && !String(state.header.values.address).trim()) {
+    state.header.values.address = state.items.find((i) => i.detectedAddress).detectedAddress;
+    state.header.detectedAddress = true;
+  }
+  render();
+}
+
+/* Effective value: header wins while its apply-toggle is ON (v1.0 §4.1A). */
+function effectiveValue(item, field) {
+  const h = state.header;
+  if (h.apply[field] && String(h.values[field]).trim()) return h.values[field];
+  return item[field];
+}
+
+function addressGroupKeyFor(item) {
+  return window.NDMatch.addressKey(effectiveValue(item, "address") || "");
+}
+
+/* v1.0 §4.2 — at most ONE floor plan per address group. */
+function setFloorPlan(id, on) {
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  if (on) {
+    const groupKey = addressGroupKeyFor(item);
+    const prev = state.items.find((i) => i.isFloorPlan && i.id !== id && addressGroupKeyFor(i) === groupKey);
+    if (prev) {
+      prev.isFloorPlan = false;
+      toast(`Floor plan set to ${item.file.name} (only one allowed per site)`);
+    }
+    delete state.invalid[`${item.id}:type`];   // plans skip Type validation
+  }
+  item.isFloorPlan = on;
   render();
 }
 
@@ -598,17 +773,21 @@ function copyItemToAll(id) {
 }
 
 function countMissingRequired() {
-  return state.items.reduce((count, item) => count + (item.type.trim() ? 0 : 1) + (item.address.trim() ? 0 : 1), 0);
+  let missing = 0;
+  state.items.forEach((item) => {
+    if (!String(effectiveValue(item, "address")).trim()) missing += 1;
+    if (!item.isFloorPlan && !String(effectiveValue(item, "type")).trim()) missing += 1;   // §4.2: plans skip Type
+  });
+  return missing;
 }
 
 function validateItems() {
-  const invalid = {};
+  state.invalid = {};
   state.items.forEach((item) => {
-    if (!item.type.trim()) invalid[`${item.id}:type`] = true;
-    if (!item.address.trim()) invalid[`${item.id}:address`] = true;
+    if (!String(effectiveValue(item, "address")).trim()) state.invalid[`${item.id}:address`] = true;
+    if (!item.isFloorPlan && !String(effectiveValue(item, "type")).trim()) state.invalid[`${item.id}:type`] = true;
   });
-  state.invalid = invalid;
-  return Object.keys(invalid).length === 0;
+  return !Object.keys(state.invalid).length;
 }
 
 function resetBatch() {
@@ -977,6 +1156,10 @@ function appPropertyValue(value) {
 }
 
 function buildDriveFileName(item, index) {
+  if (item.isFloorPlan) {
+    const address = String(item.address || "site").trim();
+    return `FloorPlan - ${address} - ${item.file.name}`;
+  }
   const extMatch = item.file.name.match(/(\.[^.]+)$/);
   const ext = extMatch ? extMatch[1] : "";
   const baseName = item.file.name.replace(/(\.[^.]+)$/, "");
@@ -1066,6 +1249,41 @@ function uploadRow(item, status, result = null, duplicate = null) {
   ];
 }
 
+/* ── unified Inbox ledger (v1.0 §3.1/§5.1, Slice 2 #13) ─────────────── */
+let _inboxApi = null;
+function getInboxApi() {
+  if (_inboxApi) return _inboxApi;
+  if (!window.NDInbox || !window.ND?.sheetsKit || !CONFIG.masterSpreadsheetId) return null;
+  const sheets = ND.sheetsKit.create({ gateway: ND.sheetsKit.gapiGateway() });
+  _inboxApi = NDInbox.createInboxApi({ sheets, spreadsheetId: CONFIG.masterSpreadsheetId });
+  return _inboxApi;
+}
+
+function inboxRecordFor(item, result) {
+  const address = String(effectiveValue(item, "address")).trim();
+  return {
+    driveFileId: result.id,
+    name: result.name,
+    status: NDInbox.STATUS.UNFILED,
+    address,
+    addressKey: window.NDMatch.addressKey(address),
+    addressSource: item.addressSource,
+    lat: item.lat === null ? "" : item.lat,
+    lng: item.lng === null ? "" : item.lng,
+    type: item.isFloorPlan ? "" : String(effectiveValue(item, "type")).trim(),   // §5.1: blank for plans
+    room: String(effectiveValue(item, "room")).trim(),
+    location: String(effectiveValue(item, "location")).trim(),
+    isFloorPlan: item.isFloorPlan,
+    uploader: state.googleAuth.profile?.email || "",
+    uploadedAt: new Date().toISOString(),
+    capturedAt: item.capturedAt || "",
+    mimeType: item.file.type || result.mimeType || "",
+    webViewLink: result.webViewLink || "",
+    thumbnailLink: result.thumbnailLink || "",
+    contentHash: item.hash
+  };
+}
+
 async function uploadBatch() {
   if (!validateItems()) {
     toast("Type and address are required for every file");
@@ -1103,6 +1321,26 @@ async function uploadBatch() {
     const batchRootId = await ensureDriveReady();
     const seenHashes = new Map();
 
+    // Materialise effective (header-inherited) values onto each item so the
+    // rest of the pipeline and the Upload Log see the final fields.
+    state.items.forEach((item) => {
+      item.type = item.isFloorPlan ? "" : String(effectiveValue(item, "type")).trim();
+      item.address = String(effectiveValue(item, "address")).trim();
+      item.room = String(effectiveValue(item, "room")).trim();
+      item.location = String(effectiveValue(item, "location")).trim();
+    });
+
+    // v1.0 §7: dedup must check contentHash across the WHOLE Inbox/Photos
+    // set, not just the Batch folder (files move out of Batch when filed).
+    const inboxApi = getInboxApi();
+    let inboxRecords = [];
+    if (inboxApi) {
+      try {
+        await NDInbox.ensureInboxTab(ND.sheetsKit.gapiGateway(), CONFIG.masterSpreadsheetId);
+        inboxRecords = await inboxApi.list();
+      } catch (e) { console.warn("Inbox ledger unavailable, continuing with folder-only dedup", e); }
+    }
+
     for (const [index, item] of state.items.entries()) {
       if (state.upload.cancelRequested) throw new Error("Upload cancelled");
       item.status = "Checking duplicate";
@@ -1112,8 +1350,12 @@ async function uploadBatch() {
       item.hash = await hashFile(item.file);
       if (state.upload.cancelRequested) throw new Error("Upload cancelled");
       const localDuplicate = seenHashes.get(item.hash);
-      const driveDuplicate = localDuplicate ? null : await findExistingDuplicate(item.hash, batchRootId);
-      const duplicate = localDuplicate || driveDuplicate;
+      const ledgerDuplicate = localDuplicate ? null : (() => {
+        const hit = window.NDInbox ? NDInbox.findByContentHash(inboxRecords, item.hash) : null;
+        return hit ? { id: hit.driveFileId, name: hit.name, webViewLink: hit.webViewLink } : null;
+      })();
+      const driveDuplicate = (localDuplicate || ledgerDuplicate) ? null : await findExistingDuplicate(item.hash, batchRootId);
+      const duplicate = localDuplicate || ledgerDuplicate || driveDuplicate;
 
       if (duplicate) {
         item.status = "Duplicate skipped";
@@ -1134,15 +1376,30 @@ async function uploadBatch() {
         name: buildDriveFileName(item, index),
         parents: [batchRootId],
         description: itemDescription(item),
-        appProperties: {
-          source: "Upload",
-          originalName: appPropertyValue(item.file.name),
-          fileType: appPropertyValue(item.type),
-          address: appPropertyValue(item.address),
-          room: appPropertyValue(item.room),
-          location: appPropertyValue(item.location),
-          contentHash: appPropertyValue(item.hash)
-        }
+        appProperties: Object.assign(
+          {
+            source: "Upload",
+            originalName: appPropertyValue(item.file.name),
+            fileType: appPropertyValue(item.type)
+          },
+          // v1.0 §5.2 — appProperties are the source of truth if a sheet row is lost
+          window.NDInbox ? NDInbox.toAppProperties({
+            addressKey: window.NDMatch.addressKey(item.address),
+            address: item.address,
+            addressSource: item.addressSource,
+            type: item.type,
+            room: item.room,
+            location: item.location,
+            isFloorPlan: item.isFloorPlan,
+            contentHash: item.hash,
+            capturedAt: item.capturedAt
+          }, "Upload") : {
+            address: appPropertyValue(item.address),
+            room: appPropertyValue(item.room),
+            location: appPropertyValue(item.location),
+            contentHash: appPropertyValue(item.hash)
+          }
+        )
       };
 
       const result = await uploadFileToDrive(item.file, batchRootId, driveMetadata);
@@ -1152,10 +1409,22 @@ async function uploadBatch() {
       state.upload.completed += 1;
       seenHashes.set(item.hash, result);
       await appendUploadRows([uploadRow(item, "Uploaded", result, null)]);
+      // One ledger (v1.0 §3.1): every upload lands in the Inbox tab as UNFILED.
+      if (inboxApi) {
+        try {
+          const rec = inboxRecordFor(item, result);
+          await inboxApi.upsert(rec);
+          inboxRecords.push(rec);
+        } catch (e) { console.warn("Inbox row write failed (photo IS in Drive + Upload Log)", e); }
+      }
       render();
     }
 
     state.step = "complete";
+    if (window.NDUI?.recordVisit) {
+      const addr = state.items[0] ? String(state.items[0].address || "").split(",")[0] : "";
+      NDUI.recordVisit("upload", "batch", `${state.upload.completed} photo${state.upload.completed === 1 ? "" : "s"} uploaded${addr ? " — " + addr : ""}`, "/upload/");
+    }
     render();
   } catch (error) {
     const active = state.items.find((item) => item.status === "Checking duplicate" || item.status === "Uploading");
@@ -1218,17 +1487,28 @@ async function initAddressAutocomplete() {
         strictBounds: true,
         componentRestrictions: ADDRESS_COUNTRY ? { country: ADDRESS_COUNTRY } : undefined
       });
-      autocomplete.addListener("place_changed", () => {
+      autocomplete.addListener("place_changed", async () => {
         const place = autocomplete.getPlace();
-        if (!isVictorianPlace(place)) {
-          state.invalid[`${input.dataset.id}:address`] = true;
-          toast("Select a street address in Victoria, Australia");
-          render();
-          return;
-        }
         const address = place.formatted_address || input.value;
+        if (!isVictorianPlace(place)) {
+          // §2.1.5: keep the VIC lock but make it a visible choice, not a landmine
+          const saveAnyway = window.NDUI
+            ? await NDUI.confirm({ title: "Outside Victoria", message: `"${address}" looks like it's outside Victoria. Save it anyway?`, confirmLabel: "Save anyway", cancelLabel: "Fix" })
+            : window.confirm(`"${address}" looks like it's outside Victoria. Save it anyway?`);
+          if (!saveAnyway) {
+            if (input.dataset.id) state.invalid[`${input.dataset.id}:address`] = true;
+            input.focus();
+            render();
+            return;
+          }
+        }
         input.value = address;
-        updateField(input);
+        if (input.dataset.headerField) {
+          state.header.values.address = address;
+          state.header.detectedAddress = false;
+        } else {
+          updateField(input);
+        }
       });
     });
   } catch (error) {

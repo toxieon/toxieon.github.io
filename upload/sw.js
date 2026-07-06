@@ -1,10 +1,17 @@
-/* Service worker — app-shell caching for offline use.
- * Generated from the suite PWA kit (shared, §1.8), which follows
- * Timesheet's proven sw.js pattern: shell cached, Google APIs network-only
- * (nd-queue owns write resilience, not this cache).
+/* Service worker — offline app shell for the Neill Data suite (§1.8).
+ *
+ * Strategy (v2 — fixes the frozen-deploy bug):
+ *   - navigations (HTML): network-first, cache fallback when offline
+ *   - same-origin assets (js/css/img): stale-while-revalidate — served from
+ *     cache instantly, refreshed in the background, so a deploy lands on
+ *     the next load instead of never
+ *   - Google APIs (Sheets/Drive/Maps/OAuth): network-only, never cached —
+ *     nd-queue owns write resilience, not this cache
+ *   - install precaches with {cache:'reload'} to bypass the HTTP cache
+ *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'upload-v1';
+const CACHE_VERSION = 'upload-v3';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -12,9 +19,16 @@ const SHELL_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./favicon.svg",
+  "../shared/nd-core.css",
   "./styles.css",
   "../shared/nd-config.js",
   "../shared/nd-auth.js",
+  "../shared/nd-match.js",
+  "../shared/nd-sheets.js",
+  "../shared/nd-inbox.js",
+  "../shared/nd-ui.js",
+  "../shared/vendor/exifr.umd.js",
+  "../shared/nd-pwa.js",
   "./app.js"
 ];
 
@@ -24,7 +38,11 @@ const IS_API_HOST = (url) =>
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then((cache) => Promise.all(
+        SHELL_ASSETS.map((u) =>
+          cache.add(new Request(u, { cache: 'reload' })).catch(() => null)
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });
@@ -41,22 +59,34 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;    // writes belong to nd-queue, never the cache
   if (IS_API_HOST(req.url)) return;    // Sheets/Drive/Maps/OAuth always hit the network
+  if (new URL(req.url).origin !== self.location.origin) return; // CDN etc: browser default
 
-  event.respondWith(
-    caches.match(req, { ignoreSearch: false }).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
+  if (req.mode === 'navigate') {
+    // network-first: fresh HTML when online, cached shell when offline
+    event.respondWith(
+      fetch(req)
         .then((res) => {
-          if (res.ok && new URL(req.url).origin === self.location.origin) {
-            const copy = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-          }
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => {
-          if (req.mode === 'navigate') return caches.match('./index.html');
-          return new Response('', { status: 504, statusText: 'Offline' });
-        });
-    })
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // stale-while-revalidate for everything else same-origin
+  event.respondWith(
+    caches.open(CACHE_VERSION).then((cache) =>
+      cache.match(req).then((cached) => {
+        const refresh = fetch(req)
+          .then((res) => {
+            if (res.ok) cache.put(req, res.clone());
+            return res;
+          })
+          .catch(() => cached);
+        return cached || refresh;
+      })
+    )
   );
 });

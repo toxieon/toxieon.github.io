@@ -1,17 +1,26 @@
-/* Service worker — app-shell caching for offline use (spec section 7 / 9).
- * The whole app is now a single self-contained index.html, so the shell is
- * just that file plus the PWA manifest/icons. Google Sheets/Drive/Maps API
- * calls are network-only and never intercepted: the offline write-queue
- * inside index.html is what makes those resilient, not the cache here. */
+/* Service worker — offline app shell for the Neill Data suite (§1.8).
+ *
+ * Strategy (v2 — fixes the frozen-deploy bug):
+ *   - navigations (HTML): network-first, cache fallback when offline
+ *   - same-origin assets (js/css/img): stale-while-revalidate — served from
+ *     cache instantly, refreshed in the background, so a deploy lands on
+ *     the next load instead of never
+ *   - Google APIs (Sheets/Drive/Maps/OAuth): network-only, never cached —
+ *     nd-queue owns write resilience, not this cache
+ *   - install precaches with {cache:'reload'} to bypass the HTTP cache
+ *     (a stale CDN copy must not get frozen into the SW cache)
+ */
 
-const CACHE_VERSION = 'timesheet-v2';
+const CACHE_VERSION = 'timesheet-v3';
 const SHELL_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './assets/nd-logo.svg',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./assets/nd-logo.svg",
+  "./assets/icons/icon-192.png",
+  "./assets/icons/icon-512.png",
+  "../shared/nd-core.css",
+  "../shared/nd-ui.js"
 ];
 
 const IS_API_HOST = (url) =>
@@ -20,7 +29,11 @@ const IS_API_HOST = (url) =>
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then((cache) => Promise.all(
+        SHELL_ASSETS.map((u) =>
+          cache.add(new Request(u, { cache: 'reload' })).catch(() => null)
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });
@@ -35,36 +48,36 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return; // never cache writes; let queueSheetWrite/offline.js own those
-  if (IS_API_HOST(req.url)) return; // Sheets/Drive/Maps/OAuth always go to the network
+  if (req.method !== 'GET') return;    // writes belong to nd-queue, never the cache
+  if (IS_API_HOST(req.url)) return;    // Sheets/Drive/Maps/OAuth always hit the network
+  if (new URL(req.url).origin !== self.location.origin) return; // CDN etc: browser default
 
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
+  if (req.mode === 'navigate') {
+    // network-first: fresh HTML when online, cached shell when offline
+    event.respondWith(
+      fetch(req)
         .then((res) => {
-          if (res.ok && new URL(req.url).origin === self.location.origin) {
-            const copy = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-          }
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => {
-          // Offline and not cached — fall back to the shell for navigations
-          if (req.mode === 'navigate') return caches.match('./index.html');
-          return new Response('', { status: 504, statusText: 'Offline' });
-        });
-    })
-  );
-});
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
 
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clients) => {
-      const existing = clients.find((c) => c.url.includes('index.html'));
-      if (existing) return existing.focus();
-      return self.clients.openWindow('./index.html');
-    })
+  // stale-while-revalidate for everything else same-origin
+  event.respondWith(
+    caches.open(CACHE_VERSION).then((cache) =>
+      cache.match(req).then((cached) => {
+        const refresh = fetch(req)
+          .then((res) => {
+            if (res.ok) cache.put(req, res.clone());
+            return res;
+          })
+          .catch(() => cached);
+        return cached || refresh;
+      })
+    )
   );
 });

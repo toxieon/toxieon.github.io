@@ -1065,3 +1065,59 @@ input.is-invalid {
     width: 100%;
   }
 }
+
+/* ── Slice 2 #13: sticky batch header + EXIF/floor-plan UI (v1.0 §4.1/4.2) ── */
+.sticky-header {
+  position: sticky; top: 8px; z-index: 20;
+  background: var(--panel, #171b24); border: 1px solid var(--line, #2c3645);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+}
+.sticky-header-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.sticky-header-title span { color: var(--muted, #9aa8ba); font-size: 0.8rem; }
+.sticky-header-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.sticky-field-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.sticky-field-head label { font-size: 0.78rem; color: var(--muted, #9aa8ba); }
+.sticky-field input { width: 100%; min-height: 44px; }
+.sticky-field.is-off input { opacity: 0.55; }
+.toggle-pill {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px;
+  padding: 2px 10px 2px 4px; border-radius: 999px; border: 1px solid var(--line, #2c3645);
+  background: var(--panel-2, #1d2430); color: var(--muted, #9aa8ba);
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer; transition: color 0.25s, border-color 0.25s;
+}
+.toggle-pill span { width: 16px; height: 16px; border-radius: 50%; background: var(--line-strong, #3d4b60); transition: background 0.25s; }
+.toggle-pill.is-on { color: #6ddba3; border-color: rgba(58, 184, 122, 0.45); }
+.toggle-pill.is-on span { background: #3ab87a; box-shadow: 0 0 6px rgba(58, 184, 122, 0.6); }
+.field.is-inherited input { opacity: 0.5; font-style: italic; }
+.detected-chip {
+  display: inline-block; margin-top: 4px; font-size: 0.72rem; color: #6ddba3;
+  background: rgba(58, 184, 122, 0.1); border: 1px solid rgba(58, 184, 122, 0.3);
+  border-radius: 999px; padding: 2px 8px;
+}
+.floorplan-toggle {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px;
+  border: 1px dashed var(--line-strong, #3d4b60); background: transparent;
+  color: var(--muted, #9aa8ba); font-size: 0.8rem; cursor: pointer;
+}
+.floorplan-toggle.is-on {
+  border-style: solid; border-color: rgba(14, 165, 233, 0.55);
+  color: #7dd3fc; background: rgba(14, 165, 233, 0.1);
+}
+.floorplan-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  background: rgba(14, 165, 233, 0.9); color: #06202e;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 6px;
+}
+.thumb { position: relative; }
+.thumb-ext {
+  display: grid; place-items: center; font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.06em; color: var(--muted, #9aa8ba);
+  background: var(--panel-2, #1d2430); border: 1px solid var(--line, #2c3645);
+}
+@media (max-width: 480px) {
+  .sticky-header { top: 4px; padding: 10px 12px; }
+  .sticky-header-grid { grid-template-columns: 1fr; }
+}

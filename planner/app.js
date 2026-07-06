@@ -211,11 +211,97 @@ function persist(opts = {}) {
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
     bulkSelection: [],
     googleAuth: { bootstrapped: state.googleAuth.bootstrapped, profile: state.googleAuth.profile },
-    auditView: { ...freshState().auditView, filters: state.auditView.filters }
+    auditView: { ...freshState().auditView, filters: state.auditView.filters },
+    floorPlans: {}   // §2.3: plan images live in IndexedDB (nd-cache), not localStorage
   };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(saveable)); }
   catch (e) { console.warn("Persist failed", e); }
   if (!opts.skipSync) scheduleMasterSync();
+}
+
+/* ── §2.3 floor-plan store: IndexedDB via nd-cache ──────────────────────
+ * localStorage keeps only the reference (floor.planDriveFileId); the
+ * working image (long edge <= 2000px) lives in nd-cache. Drive keeps the
+ * full-res original. */
+const PLAN_CACHE_PREFIX = "plan:";
+const PLAN_MAX_EDGE = 2000;
+
+function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const long = Math.max(img.naturalWidth, img.naturalHeight);
+      if (!long || long <= maxEdge) return resolve(dataUrl);
+      const scale = maxEdge / long;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.88));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function cacheFloorPlan(floorId, dataUrl, meta) {
+  const working = await downscaleDataUrl(dataUrl);
+  state.floorPlans[floorId] = working;
+  if (window.NDCache) NDCache.put(PLAN_CACHE_PREFIX + floorId, working, meta || null).catch((e) => console.warn("plan cache put failed", e));
+  return working;
+}
+
+function evictFloorPlan(floorId) {
+  delete state.floorPlans[floorId];
+  if (window.NDCache) NDCache.remove(PLAN_CACHE_PREFIX + floorId).catch(() => {});
+}
+
+/* One-time migration + boot hydration: pull any plans a previous version
+ * left in localStorage into IndexedDB, then hydrate memory from the cache. */
+async function hydrateFloorPlansFromCache() {
+  if (!window.NDCache) return;
+  const legacy = Object.entries(state.floorPlans || {}).filter(([, v]) => typeof v === "string" && v.startsWith("data:"));
+  for (const [floorId, dataUrl] of legacy) {
+    try { await cacheFloorPlan(floorId, dataUrl); } catch (e) {}
+  }
+  if (legacy.length) { persist({ skipSync: true }); console.info(`Migrated ${legacy.length} floor plan(s) from localStorage to IndexedDB`); }
+  const floorIds = [];
+  state.projects.forEach((p) => (p.floors || []).forEach((f) => floorIds.push(f.id)));
+  let hydrated = 0;
+  for (const id of floorIds) {
+    if (state.floorPlans[id]) continue;
+    try {
+      const cached = await NDCache.get(PLAN_CACHE_PREFIX + id);
+      if (cached) { state.floorPlans[id] = cached; hydrated++; }
+    } catch (e) {}
+  }
+  if (hydrated) render();
+}
+
+/* §2.4 — soft-delete with action-toast undo. Local state is removed
+ * immediately (delta sync mirrors it); the IRREVERSIBLE part (Drive trash)
+ * is deferred until the undo window expires. Undo restores state and the
+ * next delta flush upserts the rows straight back. */
+function undoableDelete(message, { undo, commit }) {
+  if (window.NDUI) {
+    NDUI.toast(message, {
+      action: "Undo",
+      onAction: () => { try { undo(); persist(); render(); toast("Restored"); } catch (e) { console.warn("undo failed", e); } },
+      onExpire: () => { if (commit) Promise.resolve(commit()).catch((e) => console.warn("deferred delete", e)); }
+    });
+  } else {
+    toast(message);
+    if (commit) Promise.resolve(commit()).catch((e) => console.warn(e));
+  }
+}
+
+async function confirmWipeLocal() {
+  if (!(await ndConfirm({ title: "Wipe local cache", message: "Wipe all local cache? Files in Drive are not touched, just the browser copy.", confirmLabel: "Wipe", danger: true, typeToConfirm: "WIPE" }))) return;
+  localStorage.removeItem(STORAGE_KEY); location.reload();
+}
+
+async function ndConfirm(opts) {
+  return window.NDUI ? NDUI.confirm(opts) : Promise.resolve(window.confirm(opts.message || opts.title || "Are you sure?"));
 }
 
 /* ============================================================ HELPERS */
@@ -427,6 +513,14 @@ async function bootstrapDrive() {
     state.googleAuth.bootstrapped = true;
     state.googleAuth.bootstrapping = false;
     persist({ skipSync: true });
+    // Slice 2 (§6.1): make sure the unified Inbox tab exists — idempotent,
+    // header-guarded, and NEVER rewrites an existing tab (§0.4).
+    if (state.drive.masterSheetId && window.NDInbox) {
+      NDInbox.ensureInboxTab(ND.sheetsKit.gapiGateway(), state.drive.masterSheetId)
+        .then((created) => { if (created) console.info("Inbox tab created in master sheet"); })
+        .catch((e) => console.warn("Inbox tab ensure failed", e));
+    }
+
     const tasks = [flushAuditQueue(), refreshCategories(), refreshBulkPhotos({ silent: true })];
     if (isPrimaryOwner()) tasks.push(refreshTeamAccess());
     await Promise.all(tasks);
@@ -438,7 +532,8 @@ async function bootstrapDrive() {
     hydrateFromHash();
     maybeFetchPlanForCurrentFloor();
     startMasterPhotoImportLoop();
-    syncMasterSheet({ silent: true }).catch((e) => console.warn("Initial master sync failed", e));
+    refreshInbox({ silent: true }).then(() => migrateLegacyBulkPhotos()).catch((e) => console.warn("Initial inbox refresh failed", e));
+    flushMasterDeltas({ silent: true }).catch((e) => console.warn("Initial master sync failed", e));
     toast(isPrimaryOwner() ? "Connected. Drive ready." : `Connected. Using ${PRIMARY_OWNER_EMAIL}'s NeillPlanner.`);
     render();
   } catch (e) {
@@ -806,35 +901,45 @@ async function renameDriveFile(fileId, name) {
 }
 
 function uploadBulkPhotos() {
-  if (!requireAuth("upload bulk photos") || !requirePlannerDrive("upload bulk photos")) return;
-  if (!state.drive.bulkPhotosFolderId || !state.drive.photoAllocationSheetId) { toast("Bulk photo folders are not bootstrapped yet"); return; }
+  if (!requireAuth("upload photos") || !requirePlannerDrive("upload photos")) return;
   const input = document.createElement("input");
   input.type = "file"; input.accept = "image/*"; input.multiple = true;
   input.onchange = async () => {
     const files = Array.from(input.files || []); if (!files.length) return;
-    toast(`Uploading ${files.length} bulk photo${files.length === 1 ? "" : "s"}...`);
-    const rows = [];
+    const api = getPlannerInboxApi();
+    if (!api) { toast("Inbox not ready yet"); return; }
+    // One pipeline (v1.0 §3.1): inside a project -> straight to the project's
+    // tray (FILED_TO_PROJECT); otherwise -> Batch as UNFILED.
+    const proj = project();
+    const floor = proj ? (currentFloor() || proj.floors?.[0]) : null;
+    let parentId = null;
+    if (proj) { try { parentId = await ensureProjectDriveFolder(proj); } catch (e) {} }
+    if (!parentId) { try { parentId = await ensureBatchFolderId(); } catch (e) {} }
+    if (!parentId) { toast("Drive folders not ready"); return; }
+    toast(`Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`);
+    let ok = 0;
     for (const file of files) {
       try {
-        const uploaded = await uploadFileToDrive(file, state.drive.bulkPhotosFolderId);
-        rows.push({
-          id: uid("bulk-photo"), driveFileId: uploaded.id, name: uploaded.name, status: "Inbox",
-          uploader: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "owner",
-          uploadedAt: nowStamp(), mimeType: uploaded.mimeType || file.type || "",
-          webViewLink: uploaded.webViewLink || "", thumbnailLink: uploaded.thumbnailLink || "",
-          suggestedNodeId: "", allocatedNodeId: "", allocatedNodeName: "", projectId: "", floorId: "", roomId: "", notes: ""
-        });
-      } catch (e) {
-        console.warn("Bulk photo upload failed", file.name, e);
-      }
+        const uploaded = await uploadFileToDrive(file, parentId);
+        const rec = {
+          driveFileId: uploaded.id, name: uploaded.name,
+          status: proj ? NDInbox.STATUS.FILED_TO_PROJECT : NDInbox.STATUS.UNFILED,
+          address: proj?.address || "", addressSource: "manual",
+          projectId: proj?.id || "", floorId: proj ? (floor?.id || "") : "",
+          uploader: state.googleAuth.profile?.email || "",
+          uploadedAt: new Date().toISOString(),
+          mimeType: uploaded.mimeType || file.type || "",
+          webViewLink: uploaded.webViewLink || "", thumbnailLink: uploaded.thumbnailLink || ""
+        };
+        await api.upsert(rec);
+        _inboxRecords.push(rec);
+        ok++;
+      } catch (e) { console.warn("Photo upload failed", file.name, e); }
     }
-    if (rows.length) {
-      state.bulkPhotos = [...rows, ...state.bulkPhotos];
-      await appendPhotoAllocationRows(rows);
-      persist({ skipSync: true }); render();
-      logAudit("Bulk Photos Uploaded", { details: `${rows.length} file(s)` });
-      toast(`Uploaded ${rows.length} bulk photo${rows.length === 1 ? "" : "s"}`);
-    } else toast("No photos uploaded");
+    persist({ skipSync: true }); render();
+    logAudit("Photos Uploaded", { details: `${ok} file(s) via unified inbox${proj ? ` -> ${proj.name}` : ""}` });
+    toast(ok ? `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${proj ? " — in the To sort tray" : ""}` : "No photos uploaded");
+    if (ok && proj) { state.modal = { mode: "sort-tray", projectId: proj.id }; render(); }
   };
   input.click();
 }
@@ -896,7 +1001,7 @@ async function addUserRow(email, role) {
 async function removeUserRow(email) {
   if (!isAdmin() || !state.drive.usersSheetId) return;
   if (email.toLowerCase() === PRIMARY_OWNER_EMAIL) { toast("Cannot remove the owner"); return; }
-  if (!confirm("Remove " + email + " from users sheet?")) return;
+  if (!(await ndConfirm({ title: "Remove user", message: "Remove " + email + " from the users sheet?", confirmLabel: "Remove", danger: true }))) return;
   try {
     const meta = await gapi.client.sheets.spreadsheets.get({
       spreadsheetId: state.drive.usersSheetId,
@@ -1085,21 +1190,31 @@ async function importMasterPhotos(opts = {}) {
   }
 }
 
-let _masterPhotoImportTimer = null;
-function startMasterPhotoImportLoop() {
-  if (_masterPhotoImportTimer) window.clearInterval(_masterPhotoImportTimer);
-  _masterPhotoImportTimer = null;
+/* §2.2: the 3-minute polling loop is gone. Photos are imported on
+ * focus/visibility return (the moment you'd actually look for them),
+ * immediately after this app's own uploads, and via the manual
+ * "Import photos" button. Throttled so tab-flapping doesn't spam. */
+let _photoImportBound = false;
+let _lastPhotoImportAt = 0;
+const PHOTO_IMPORT_MIN_GAP_MS = 15000;
+
+function maybeImportMasterPhotos() {
   if (!isTokenValid() || !state.drive.masterSheetId) return;
-  _masterPhotoImportTimer = window.setInterval(() => {
-    if (document.hidden) return;
-    importMasterPhotos({ silent: true }).catch((e) => console.warn("Auto photo import failed", e));
-  }, MASTER_PHOTO_IMPORT_INTERVAL_MS);
+  const now = Date.now();
+  if (now - _lastPhotoImportAt < PHOTO_IMPORT_MIN_GAP_MS) return;
+  _lastPhotoImportAt = now;
+  importMasterPhotos({ silent: true }).catch((e) => console.warn("Auto photo import failed", e));
+  refreshInbox({ silent: true }).catch((e) => console.warn("Inbox refresh failed", e));
 }
 
-function stopMasterPhotoImportLoop() {
-  if (_masterPhotoImportTimer) window.clearInterval(_masterPhotoImportTimer);
-  _masterPhotoImportTimer = null;
+function startMasterPhotoImportLoop() {   // name kept for existing call sites
+  if (_photoImportBound) return;
+  _photoImportBound = true;
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeImportMasterPhotos(); });
+  window.addEventListener("focus", () => maybeImportMasterPhotos());
 }
+
+function stopMasterPhotoImportLoop() { /* listeners self-guard via isTokenValid */ }
 
 async function hydrateFromMasterSheet(opts = {}) {
   const silent = opts.silent || false;
@@ -1222,89 +1337,290 @@ async function hydrateFromMasterSheet(opts = {}) {
 let _masterSyncTimer = null;
 let _masterSyncing = false;
 let _masterSyncQueued = false;
-function scheduleMasterSync() {
-  if (!state.drive.masterSheetId || !isTokenValid()) return;
-  if (_masterSyncing) { _masterSyncQueued = true; return; }
-  clearTimeout(_masterSyncTimer);
-  _masterSyncTimer = setTimeout(() => { syncMasterSheet({ silent: true }).catch((e) => console.warn("auto master sync", e)); }, 3000);
+/* ============================================================ MASTER SYNC
+ * Slice 2 §2.2 — dirty-set delta model (kills the clobber).
+ * Every flush: rebuild rows in memory, diff against the last-synced
+ * snapshot (id -> row hash), write ONLY changed rows (upsert by ID),
+ * delete ONLY rows we previously wrote that no longer exist locally.
+ * Full rewrite survives ONLY as rebuildMasterSheet() (danger-zone
+ * recovery). Neither path ever touches the Inbox tab (§0.4).
+ * ======================================================================= */
+
+const MASTER_SNAPSHOT_KEY = "np-master-snapshot-v1";
+const MASTER_SYNC_DEBOUNCE_MS = 1500;   // Quote-feel (§2.2)
+
+
+
+
+let _masterSheetMeta = null;            // tab title -> sheetId (for row deletes)
+let _syncStatus = "synced";             // synced | pending | flushing | failed
+let _syncStatusListeners = [];
+let _pendingSummary = [];               // [{kind, key, lastError}] for the chip panel
+let _lastSyncError = null;
+
+function setSyncStatus(s) {
+  if (s === _syncStatus) return;
+  _syncStatus = s;
+  _syncStatusListeners.forEach((cb) => { try { cb(s); } catch (e) {} });
+  const chip = document.querySelector("[data-sync-chip]");
+  if (chip && window.NDUI) {
+    chip.dataset.sync = s;
+    chip.textContent = NDUI.syncChipLabel(s, _pendingSummary.length);
+  }
 }
 
-async function syncMasterSheet(opts = {}) {
+/* §1.6 facade — quacks like nd-queue so NDUI.syncChip + future consumers work */
+window.NDQueue = {
+  status: () => _syncStatus,
+  size: () => _pendingSummary.length,
+  pending: () => _pendingSummary.map((x) => ({ ...x })),
+  onStatus: (cb) => { _syncStatusListeners.push(cb); return () => { _syncStatusListeners = _syncStatusListeners.filter((l) => l !== cb); }; },
+  flush: () => flushMasterDeltas({ manual: true })
+};
+
+function rowHash(row) {
+  const s = JSON.stringify(row.map((v) => String(v ?? "")));
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+function loadSnapshot() {
+  try { return JSON.parse(localStorage.getItem(MASTER_SNAPSHOT_KEY)) || null; } catch (e) { return null; }
+}
+function saveSnapshot(snap) {
+  try { localStorage.setItem(MASTER_SNAPSHOT_KEY, JSON.stringify(snap)); } catch (e) { console.warn("snapshot persist failed", e); }
+}
+
+/* One place that knows how to turn local state into master-sheet rows —
+ * shared by the delta flush AND the danger-zone rebuild. Column order is
+ * MASTER_TABS; column A is always the row ID. */
+function buildMasterRows() {
+  const out = { Projects: new Map(), Floors: new Map(), Nodes: new Map(), Photos: new Map(), Folders: new Map(), Rooms: new Map() };
+  state.projects.forEach((p) => {
+    const nodes = state.nodes.filter((n) => n.projectId === p.id);
+    out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : ""]);
+    (p.floors || []).forEach((f) => {
+      const count = state.nodes.filter((n) => n.floorId === f.id).length;
+      out.Floors.set(f.id, [f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || ""]);
+    });
+  });
+  state.nodes.forEach((n) => {
+    const proj = projectById(n.projectId);
+    const floor = proj?.floors?.find((f) => f.id === n.floorId);
+    const photoIds = (n.imageRefs || []).map((img) => img.driveFileId || img.id).filter(Boolean).join(", ");
+    out.Nodes.set(n.id, [n.id, n.projectId, proj?.name || "", n.floorId || "", floor?.name || "", n.type || "marker", nodeDisplayTitle(n), n.customTitle || "", n.category || "", n.lineItem || "", n.status || "", n.assignedTo || "", (n.tags || []).join(", "), n.position?.x ?? "", n.position?.y ?? "", n.size ?? 1, n.description || "", (n.imageRefs || []).length, (n.comments || []).length, n.createdBy || "", n.createdAt || "", n.updatedAt || "", state.drive.nodeFolderMap[n.id] || "", n.linkedProjectId || "", n.linkedFloorId || "", n.linkedNodeId || "", photoIds, n.roomId || "", roomName(n.roomId), n.linkedRoomId || "", n.circuit || "", n.cableRunM ?? "", n.boardLabel || "", n.phaseConfig || "", n.mainBreakerA ?? "", n.swbProjectId || "", n.swbSchemaVersion || ""]);
+    (n.imageRefs || []).forEach((img) => {
+      const pid = img.id || img.driveFileId || "";
+      if (!pid) return;
+      out.Photos.set(pid, [pid, img.driveFileId || "", img.name || "", n.id, nodeDisplayTitle(n), n.floorId || "", floor?.name || "", n.projectId, proj?.name || "", img.uploader || "", img.uploadedAt || "", img.mimeType || "", img.webViewLink || "", img.thumbnailLink || ""]);
+    });
+  });
+  state.projectFolders.forEach((f) => out.Folders.set(f.id, [f.id, f.name, f.color || "", state.projects.filter((p) => p.folderId === f.id).length, f.driveFolderId || ""]));
+  state.rooms.forEach((r) => out.Rooms.set(r.id, [r.id, r.projectId || "", r.floorId || "", r.name || "", r.createdAt || "", r.updatedAt || "", r.order || 0]));
+  return out;
+}
+
+function computeDeltas(rows, snapshot) {
+  const deltas = {};
+  let count = 0;
+  const summary = [];
+  Object.keys(MASTER_TABS).forEach((tab) => {
+    const snapTab = (snapshot && snapshot[tab]) || {};
+    const upserts = new Map();
+    const deletes = [];
+    rows[tab].forEach((row, id) => {
+      const h = rowHash(row);
+      if (snapTab[id] !== h) upserts.set(id, row);
+    });
+    Object.keys(snapTab).forEach((id) => { if (!rows[tab].has(id)) deletes.push(id); });
+    if (upserts.size || deletes.length) {
+      deltas[tab] = { upserts, deletes };
+      count += upserts.size + deletes.length;
+      upserts.forEach((_, id) => summary.push({ kind: tab, key: id, op: "upsert", lastError: _lastSyncError }));
+      deletes.forEach((id) => summary.push({ kind: tab, key: id, op: "delete", lastError: _lastSyncError }));
+    }
+  });
+  return { deltas, count, summary };
+}
+
+function scheduleMasterSync() {
+  if (!state.drive.masterSheetId || !isTokenValid()) return;
+  setSyncStatus("pending");
+  if (_masterSyncing) { _masterSyncQueued = true; return; }
+  clearTimeout(_masterSyncTimer);
+  _masterSyncTimer = setTimeout(() => { flushMasterDeltas({ silent: true }).catch((e) => console.warn("auto master sync", e)); }, MASTER_SYNC_DEBOUNCE_MS);
+}
+
+async function masterSheetIdFor(tab) {
+  if (!_masterSheetMeta) {
+    const r = await googleCall(() => gapi.client.sheets.spreadsheets.get({ spreadsheetId: state.drive.masterSheetId, fields: "sheets.properties" }));
+    _masterSheetMeta = {};
+    (r.result.sheets || []).forEach((s) => { _masterSheetMeta[s.properties.title] = s.properties.sheetId; });
+  }
+  return _masterSheetMeta[tab];
+}
+
+/* Seed the snapshot from what's already IN the sheet, so migrating to the
+ * delta model doesn't mass-rewrite (or mass-delete) anything. */
+async function seedSnapshotFromSheet() {
+  const tabs = Object.keys(MASTER_TABS);
+  const r = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
+    spreadsheetId: state.drive.masterSheetId,
+    ranges: tabs.map((t) => `${t}!A2:AK`)
+  }));
+  const snap = {};
+  tabs.forEach((tab, i) => {
+    snap[tab] = {};
+    const width = MASTER_TABS[tab].length;
+    ((r.result.valueRanges?.[i]?.values) || []).forEach((raw) => {
+      const id = String(raw[0] || "");
+      if (!id) return;
+      const row = Array.from({ length: width }, (_, c) => raw[c] === undefined ? "" : raw[c]);
+      snap[tab][id] = rowHash(row);
+    });
+  });
+  return snap;
+}
+
+async function applyTabDelta(tab, delta) {
+  const width = MASTER_TABS[tab].length;
+  const endCol = ND.sheetsKit.colLetter(width - 1);
+  const colA = await googleCall(() => gapi.client.sheets.spreadsheets.values.get({
+    spreadsheetId: state.drive.masterSheetId, range: `${tab}!A:A`
+  }));
+  const idToRow = {};
+  ((colA.result.values) || []).forEach((cells, i) => { if (i > 0 && cells[0]) idToRow[String(cells[0])] = i + 1; });
+
+  const updates = [];
+  const appends = [];
+  delta.upserts.forEach((row, id) => {
+    const rowNumber = idToRow[id];
+    if (rowNumber) updates.push({ range: `${tab}!A${rowNumber}:${endCol}${rowNumber}`, values: [row] });
+    else appends.push(row);
+  });
+  if (updates.length) {
+    await googleCall(() => gapi.client.sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: state.drive.masterSheetId,
+      resource: { valueInputOption: "RAW", data: updates }
+    }));
+  }
+  if (appends.length) {
+    await googleCall(() => gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: state.drive.masterSheetId, range: `${tab}!A1`,
+      valueInputOption: "RAW", insertDataOption: "INSERT_ROWS"
+    }, { values: appends }));
+  }
+  const deleteRowNumbers = delta.deletes.map((id) => idToRow[id]).filter(Boolean).sort((a, b) => b - a);
+  if (deleteRowNumbers.length) {
+    const sheetId = await masterSheetIdFor(tab);
+    if (sheetId !== undefined) {
+      await googleCall(() => gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId: state.drive.masterSheetId }, {
+        requests: deleteRowNumbers.map((n) => ({ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: n - 1, endIndex: n } } }))
+      }));
+    }
+  }
+}
+
+async function flushMasterDeltas(opts = {}) {
+  const { silent = false, manual = false } = opts;
+  if (!isTokenValid()) { if (manual) toast("Sign in first"); return; }
+  if (!state.drive.masterSheetId) { if (manual) toast("Master sheet not bootstrapped"); return; }
+  if (_masterSyncing) { _masterSyncQueued = true; return; }
+  _masterSyncing = true;
+  setSyncStatus("flushing");
+  try {
+    await ensureMasterTabsExist();
+    let snapshot = loadSnapshot();
+    if (!snapshot) snapshot = await seedSnapshotFromSheet();
+    const rows = buildMasterRows();
+    const { deltas, count, summary } = computeDeltas(rows, snapshot);
+    _pendingSummary = summary;
+    if (!count) {
+      _lastSyncError = null;
+      setSyncStatus("synced");
+      if (manual) toast("Master sheet already up to date");
+      return;
+    }
+    for (const tab of Object.keys(deltas)) {
+      await applyTabDelta(tab, deltas[tab]);
+      // commit this tab's snapshot only after its writes landed
+      snapshot[tab] = {};
+      rows[tab].forEach((row, id) => { snapshot[tab][id] = rowHash(row); });
+      saveSnapshot(snapshot);
+    }
+    _pendingSummary = [];
+    _lastSyncError = null;
+    setSyncStatus("synced");
+    if (!silent || manual) toast(`Synced ${count} change${count === 1 ? "" : "s"}`);
+  } catch (e) {
+    console.warn("Delta sync failed", e);
+    _lastSyncError = describeError(e);
+    _pendingSummary = _pendingSummary.map((x) => ({ ...x, lastError: _lastSyncError }));
+    setSyncStatus("failed");
+    if (manual) toast("Sync failed: " + _lastSyncError);
+  } finally {
+    _masterSyncing = false;
+    if (_masterSyncQueued) { _masterSyncQueued = false; scheduleMasterSync(); }
+  }
+}
+
+/* Danger-zone recovery ONLY (§2.2/§2.6): full clobber-and-rewrite of the
+ * six MASTER_TABS. Never touches Inbox — it isn't in MASTER_TABS (§0.4). */
+async function confirmRebuildMasterSheet() {
+  const go = window.NDUI
+    ? await NDUI.confirm({
+        title: "Rebuild master sheet",
+        message: "Recovery tool: wipes and rewrites the Projects/Floors/Nodes/Photos/Folders/Rooms tabs from this device's data. The Inbox tab is never touched. Only use this if the sheet is corrupted.",
+        confirmLabel: "Rebuild", danger: true, typeToConfirm: "REBUILD"
+      })
+    : window.confirm("Full rebuild of the master sheet from local data?");
+  if (go) return rebuildMasterSheet();
+}
+
+async function rebuildMasterSheet(opts = {}) {
   const { silent = false } = opts;
   if (!isTokenValid()) { if (!silent) toast("Sign in first"); return; }
   if (!state.drive.masterSheetId) { if (!silent) toast("Master sheet not bootstrapped"); return; }
   if (_masterSyncing) { if (!silent) toast("Sync already running"); return; }
   _masterSyncing = true;
-  if (!silent) toast("Syncing master sheet...");
+  setSyncStatus("flushing");
+  if (!silent) toast("Rebuilding master sheet...");
   try {
     await ensureMasterTabsExist();
     await importMasterPhotos({ silent: true, renderOnChange: false, scheduleSync: false });
-    const projectRows = state.projects.map((p) => {
-      const nodes = state.nodes.filter((n) => n.projectId === p.id);
-      return [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : ""];
-    });
-    const floorRows = [];
-    state.projects.forEach((p) => {
-      (p.floors || []).forEach((f) => {
-        const count = state.nodes.filter((n) => n.floorId === f.id).length;
-        floorRows.push([f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || ""]);
-      });
-    });
-    const nodeRows = state.nodes.map((n) => {
-      const proj = projectById(n.projectId);
-      const floor = proj?.floors?.find((f) => f.id === n.floorId);
-      const photoIds = (n.imageRefs || []).map((img) => img.driveFileId || img.id).filter(Boolean).join(", ");
-      return [n.id, n.projectId, proj?.name || "", n.floorId || "", floor?.name || "", n.type || "marker", nodeDisplayTitle(n), n.customTitle || "", n.category || "", n.lineItem || "", n.status || "", n.assignedTo || "", (n.tags || []).join(", "), n.position?.x ?? "", n.position?.y ?? "", n.size ?? 1, n.description || "", (n.imageRefs || []).length, (n.comments || []).length, n.createdBy || "", n.createdAt || "", n.updatedAt || "", state.drive.nodeFolderMap[n.id] || "", n.linkedProjectId || "", n.linkedFloorId || "", n.linkedNodeId || "", photoIds, n.roomId || "", roomName(n.roomId), n.linkedRoomId || "", n.circuit || "", n.cableRunM ?? "", n.boardLabel || "", n.phaseConfig || "", n.mainBreakerA ?? "", n.swbProjectId || "", n.swbSchemaVersion || ""];
-    });
-    const photoRows = [];
-    state.nodes.forEach((n) => {
-      const proj = projectById(n.projectId);
-      const floor = proj?.floors?.find((f) => f.id === n.floorId);
-      (n.imageRefs || []).forEach((img) => {
-        photoRows.push([
-          img.id || img.driveFileId || "",
-          img.driveFileId || "",
-          img.name || "",
-          n.id,
-          nodeDisplayTitle(n),
-          n.floorId || "",
-          floor?.name || "",
-          n.projectId,
-          proj?.name || "",
-          img.uploader || "",
-          img.uploadedAt || "",
-          img.mimeType || "",
-          img.webViewLink || "",
-          img.thumbnailLink || ""
-        ]);
-      });
-    });
-    const folderRows = state.projectFolders.map((f) => [f.id, f.name, f.color || "", state.projects.filter((p) => p.folderId === f.id).length, f.driveFolderId || ""]);
-    const roomRows = state.rooms.map((r) => [r.id, r.projectId || "", r.floorId || "", r.name || "", r.createdAt || "", r.updatedAt || "", r.order || 0]);
+    const rows = buildMasterRows();
     await googleCall(() => gapi.client.sheets.spreadsheets.values.batchClear({
       spreadsheetId: state.drive.masterSheetId,
       resource: { ranges: Object.keys(MASTER_TABS).map((t) => t === "Nodes" ? "Nodes!A2:AK" : `${t}!A2:AD`) }
     }));
     const data = [];
-    if (projectRows.length) data.push({ range: "Projects!A2", values: projectRows });
-    if (floorRows.length) data.push({ range: "Floors!A2", values: floorRows });
-    if (nodeRows.length) data.push({ range: "Nodes!A2", values: nodeRows });
-    if (photoRows.length) data.push({ range: "Photos!A2", values: photoRows });
-    if (folderRows.length) data.push({ range: "Folders!A2", values: folderRows });
-    if (roomRows.length) data.push({ range: "Rooms!A2", values: roomRows });
+    Object.keys(MASTER_TABS).forEach((tab) => {
+      const values = Array.from(rows[tab].values());
+      if (values.length) data.push({ range: `${tab}!A2`, values });
+    });
     if (data.length) {
       await googleCall(() => gapi.client.sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: state.drive.masterSheetId,
         resource: { valueInputOption: "RAW", data }
       }));
     }
-    if (!silent) toast(`Master sheet synced: ${projectRows.length} projects / ${floorRows.length} floors / ${nodeRows.length} nodes / ${photoRows.length} photos / ${roomRows.length} rooms`);
+    const snapshot = {};
+    Object.keys(MASTER_TABS).forEach((tab) => {
+      snapshot[tab] = {};
+      rows[tab].forEach((row, id) => { snapshot[tab][id] = rowHash(row); });
+    });
+    saveSnapshot(snapshot);
+    _pendingSummary = [];
+    _lastSyncError = null;
+    setSyncStatus("synced");
+    if (!silent) toast(`Master sheet rebuilt: ${rows.Projects.size} projects / ${rows.Floors.size} floors / ${rows.Nodes.size} nodes / ${rows.Photos.size} photos / ${rows.Rooms.size} rooms`);
   } catch (e) {
-    console.warn("Master sync failed", e);
-    if (!silent) toast("Master sync failed: " + describeError(e));
+    console.warn("Master rebuild failed", e);
+    setSyncStatus("failed");
+    if (!silent) toast("Master rebuild failed: " + describeError(e));
   } finally {
     _masterSyncing = false;
-    if (_masterSyncQueued) { _masterSyncQueued = false; scheduleMasterSync(); }
   }
 }
 
@@ -1353,7 +1669,7 @@ async function addTeamMember(email, role = "writer") {
 
 async function removeTeamMember(permissionId, email) {
   if (!isPrimaryOwner()) return;
-  if (!confirm(`Revoke access for ${email}?`)) return;
+  if (!(await ndConfirm({ title: "Revoke access", message: `Revoke access for ${email}?`, confirmLabel: "Revoke", danger: true }))) return;
   try {
     await gapi.client.drive.permissions.delete({ fileId: state.drive.rootFolderId, permissionId });
     toast(`${email} access revoked`);
@@ -1693,7 +2009,7 @@ function renderTopbar() {
   const folderName = folder?.name || (proj && !proj.folderId ? DRIVE_UNFILED_FOLDER : "");
   const folderColor = folder?.color || "#64748b";
   const auth = state.googleAuth;
-  return `<header class="topbar"><div class="topbar-title"><h2>${proj ? escapeHtml(proj.name) : "NeillPlanner"}</h2><p>${proj ? `<span class="inline-folder" style="--folder:${folderColor}">${escapeHtml(folderName)}</span> / ${escapeHtml(proj.address || "No address")}` : "Welcome"}</p></div><div class="topbar-actions"><button class="user-pill" data-action="${isAdmin() ? "go-settings" : "google-sign-out"}" title="${escapeHtml(isAdmin() ? "Settings" : "Sign out")}"><span class="avatar">${initials(auth.profile?.name || auth.profile?.email || "?")}</span><span class="hide-mobile">${escapeHtml(auth.profile?.name || auth.profile?.email || "Signed in")}${isPrimaryOwner() ? " (owner)" : ""}</span></button></div></header>`;
+  return `<header class="topbar"><div class="topbar-title"><h2>${proj ? escapeHtml(proj.name) : "NeillPlanner"}</h2><p>${proj ? `<span class="inline-folder" style="--folder:${folderColor}">${escapeHtml(folderName)}</span> / ${escapeHtml(proj.address || "No address")}` : "Welcome"}</p></div><div class="topbar-actions">${renderToSortChip()}<button class="nd-sync-chip" data-sync-chip data-sync="${_syncStatus}" data-action="sync-chip" title="Sync status — tap to sync now">${window.NDUI ? NDUI.syncChipLabel(_syncStatus, _pendingSummary.length) : _syncStatus}</button><button class="user-pill" data-action="${isAdmin() ? "go-settings" : "google-sign-out"}" title="${escapeHtml(isAdmin() ? "Settings" : "Sign out")}"><span class="avatar">${initials(auth.profile?.name || auth.profile?.email || "?")}</span><span class="hide-mobile">${escapeHtml(auth.profile?.name || auth.profile?.email || "Signed in")}${isPrimaryOwner() ? " (owner)" : ""}</span></button></div></header>`;
 }
 
 function renderBottomNav() { return `<nav class="bottom-nav" aria-label="Primary">${navItems().map((i) => `<button class="${state.activeView === i.id ? "is-active" : ""}" data-view="${i.id}">${icon(i.icon)}<span>${i.label}</span></button>`).join("")}</nav>`; }
@@ -1724,12 +2040,26 @@ function renderView() {
   }
 }
 
+function projectSearchTexts(p) {
+  const nodes = state.nodes.filter((n) => n.projectId === p.id);
+  return [p.name, p.address, ...nodes.map((n) => nodeDisplayTitle(n)), ...state.rooms.filter((r) => r.projectId === p.id).map((r) => r.name)];
+}
+
 function renderProjectsView() {
-  const visible = folderProjects();
+  let visible = folderProjects();
+  if ((state.projectsQuery || "").trim() && window.NDMatch) {
+    visible = NDMatch.fuzzyFilter(state.projectsQuery, visible, projectSearchTexts);   // §2.5
+  }
   const activeName = state.selectedFolderId === "all" ? "All Projects" : state.selectedFolderId === "unfiled" ? DRIVE_UNFILED_FOLDER : (state.projectFolders.find((f) => f.id === state.selectedFolderId)?.name || "All Projects");
   return `
     <section class="view-panel">
       <div class="panel-header"><h3 class="section-title">Project Dashboard</h3><div class="button-row"><button class="ghost-button" data-action="new-folder">${icon("folder")}Folder</button><button class="primary-button" data-action="new-project">${icon("plus")}New project</button></div></div>
+      ${renderInboxBanners()}
+      ${(() => {
+        const recent = state.projects.filter((p2) => p2.lastOpenedAt).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 4);
+        return recent.length ? `<div class="recent-projects"><span class="recents-label">Recent</span>${recent.map((p2) => `<button class="recent-project-chip" data-project-open="${p2.id}">${escapeHtml(p2.name)}</button>`).join("")}</div>` : "";
+      })()}
+      <div class="search-wrap projects-search">${icon("search")}<input data-projects-search value="${escapeHtml(state.projectsQuery || "")}" placeholder="Search projects: name, address, node, room" aria-label="Search projects" /></div>
       <div class="folder-strip">${renderFolderButton({ id: "all", name: "All Projects", color: "#94a3b8" }, true)}${state.projectFolders.map((f) => renderFolderButton(f)).join("")}${renderFolderButton({ id: "unfiled", name: "Unfiled", color: "#64748b" })}</div>
       ${state.projectFolders.length ? `<div class="folder-manager"><div><h3 class="section-title">Folder Colours</h3><p>Folders are for towers, apartment blocks, stages, or buildings inside one large job.</p></div><div class="folder-color-grid">${state.projectFolders.map(renderFolderColourRow).join("")}</div></div>` : ""}
       <div class="projects-grid">${visible.length ? visible.map(renderProjectCard).join("") : `<div class="empty-state" style="grid-column:1/-1;padding:36px;text-align:center"><p style="margin-bottom:12px">No projects in <strong>${escapeHtml(activeName)}</strong>.</p><button class="primary-button" data-action="new-project">${icon("plus")}Create your first project</button></div>`}</div>
@@ -1937,7 +2267,20 @@ function renderSettingsView() {
           <div class="integration-row"><span><strong>Token expires</strong><span>${auth.expiresAt ? new Date(auth.expiresAt).toLocaleTimeString() : "-"}</span></span>${statusPill(isTokenValid() ? "Complete" : "Issue")}</div>
           <div class="integration-row"><span><strong>Data owner</strong><span>${escapeHtml(PRIMARY_OWNER_EMAIL)}</span></span>${statusPill(owner ? "You" : "Shared")}</div>
         </div>
-        <div class="button-row" style="margin-top:14px"><button class="ghost-button" data-action="google-sign-out">${icon("signOut")}Sign out</button><button class="ghost-button" data-action="google-bootstrap">${icon("refresh")}Re-sync Drive</button><button class="ghost-button" data-action="sync-all-folders">${icon("folder")}Sync all folders</button><button class="ghost-button" data-action="sync-master-sheet">${icon("refresh")}Sync master sheet</button><button class="ghost-button" data-action="refresh-categories">${icon("refresh")}Refresh categories</button><button class="ghost-button" data-action="hydrate-cloud">${icon("download")}Reload from cloud</button><button class="ghost-button" data-action="import-master-photos">${icon("download")}Import photos</button><button class="ghost-button" data-action="refresh-users">${icon("refresh")}Refresh users</button><button class="danger-button" data-action="format-planner">${icon("trash")}Format data</button></div>
+        <div class="settings-actions" style="margin-top:14px">
+          <h4 class="settings-actions-title">Routine</h4>
+          <div class="settings-action-row"><span><strong>Sync now</strong><span>Write pending changes to the master sheet</span></span><button class="ghost-button" data-action="sync-master-sheet">${icon("refresh")}Sync</button></div>
+          <div class="settings-action-row"><span><strong>Import photos</strong><span>Pull newly filed photos onto their nodes</span></span><button class="ghost-button" data-action="import-master-photos">${icon("download")}Import</button></div>
+          <div class="settings-action-row"><span><strong>Reload from cloud</strong><span>Replace this device's copy with the sheet's</span></span><button class="ghost-button" data-action="hydrate-cloud">${icon("download")}Reload</button></div>
+          <div class="settings-action-row"><span><strong>Drive</strong><span>Re-sync Drive connection and folder tree</span></span><span class="button-row"><button class="ghost-button" data-action="google-bootstrap">${icon("refresh")}Re-sync</button><button class="ghost-button" data-action="sync-all-folders">${icon("folder")}Folders</button></span></div>
+          <div class="settings-action-row"><span><strong>Reference data</strong><span>Categories and team access</span></span><span class="button-row"><button class="ghost-button" data-action="refresh-categories">${icon("refresh")}Categories</button><button class="ghost-button" data-action="refresh-users">${icon("refresh")}Users</button></span></div>
+          <div class="settings-action-row"><span><strong>Account</strong><span>Sign out of Google on this device</span></span><button class="ghost-button" data-action="google-sign-out">${icon("signOut")}Sign out</button></div>
+          <h4 class="settings-actions-title is-danger">Danger zone</h4>
+          <div class="settings-danger-zone">
+            <div class="settings-action-row"><span><strong>Rebuild master sheet</strong><span>Wipe + rewrite all tabs from this device (never touches Inbox)</span></span><button class="danger-button" data-action="rebuild-master-sheet">${icon("refresh")}Rebuild</button></div>
+            <div class="settings-action-row"><span><strong>Format data</strong><span>Trash unprotected projects, bulk photos and matching rows</span></span><button class="danger-button" data-action="format-planner">${icon("trash")}Format</button></div>
+          </div>
+        </div>
       </div>
       <div class="view-panel">
         <div class="panel-header"><h3 class="section-title">Team Access</h3>${owner ? `<button class="ghost-button" data-action="refresh-team">${icon("refresh")}Refresh</button>` : ""}</div>
@@ -2274,7 +2617,7 @@ async function repairMovedSearchImages() {
     } while (pageToken);
     if (added) {
       persist({ skipSync: true });
-      await syncMasterSheet({ silent: true });
+      await flushMasterDeltas({ silent: true });
       render();
     }
     toast(added ? `Recovered ${added} moved image${added === 1 ? "" : "s"}` : "No missing Search images found");
@@ -2317,6 +2660,7 @@ function renderDrawer(node) {
 function renderModal() {
   const m = state.modal;
   if (m.mode === "new-folder" || m.mode === "rename-folder") return renderFolderModal(m.folderId);
+  if (m.mode === "sort-tray") return renderSortTrayModal(m);
   if (m.mode === "new-project" || m.mode === "edit-project") return renderProjectModal(m.mode === "edit-project");
   if (m.mode === "create" || m.mode === "edit") return renderNodeModal();
   if (m.mode === "mass-pick") return renderMassPickModal();
@@ -2491,7 +2835,12 @@ function renderBulkPhotoPickerModal() {
 function bindEvents() {
   document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { state.activeView = b.dataset.view; state.drawerOpen = state.activeView === "map" && Boolean(selectedNode()); persist(); render(); }));
   document.querySelectorAll("[data-project]").forEach((b) => b.addEventListener("click", () => selectProject(b.dataset.project)));
-  document.querySelectorAll("[data-project-open]").forEach((b) => b.addEventListener("click", () => { selectProject(b.dataset.projectOpen); state.activeView = "map"; render(); }));
+  document.querySelectorAll("[data-project-open]").forEach((b) => b.addEventListener("click", () => {
+    const proj = projectById(b.dataset.projectOpen);
+    if (proj) { proj.lastOpenedAt = Date.now(); }
+    selectProject(b.dataset.projectOpen); state.activeView = "map"; render();
+    if (proj && window.NDUI?.recordVisit) NDUI.recordVisit("planner", proj.id, proj.name, "/planner/#project=" + encodeURIComponent(proj.id));
+  }));
   document.querySelectorAll("[data-project-delete]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); deleteProject(b.dataset.projectDelete); }));
   document.querySelectorAll("[data-folder]").forEach((b) => b.addEventListener("click", () => { state.selectedFolderId = b.dataset.folder; state.activeView = "projects"; state.drawerOpen = false; persist(); render(); }));
   document.querySelectorAll("[data-room]").forEach((b) => b.addEventListener("click", () => { state.selectedRoomId = b.dataset.room || "all"; state.selectedNodeId = null; state.drawerOpen = false; persist(); render(); }));
@@ -2700,7 +3049,9 @@ function handleAction(event) {
     case "google-bootstrap": return bootstrapDrive();
     case "sync-all-folders": return syncAllDriveFolders();
     case "refresh-all": return refreshAllPlannerData();
-    case "sync-master-sheet": return syncMasterSheet();
+    case "sync-master-sheet": return flushMasterDeltas({ manual: true });
+    case "rebuild-master-sheet": return confirmRebuildMasterSheet();
+    case "sync-chip": return flushMasterDeltas({ manual: true });
     case "hydrate-cloud": return hydrateFromMasterSheet();
     case "import-master-photos": return importMasterPhotos();
     case "repair-search-images": return repairMovedSearchImages();
@@ -2763,9 +3114,7 @@ function handleAction(event) {
     case "print-now": return window.print();
     case "bulk-delete": return bulkDelete();
     case "bulk-clear": state.bulkSelection = []; return render();
-    case "wipe-local":
-      if (!confirm("Wipe all local cache? Files in Drive are not touched, just the browser copy.")) return;
-      localStorage.removeItem(STORAGE_KEY); location.reload(); return;
+    case "wipe-local": return confirmWipeLocal();
     case "format-planner": return formatPlannerData();
   }
 }
@@ -2920,7 +3269,7 @@ function selectProject(projectId) {
 function maybeFetchPlanForCurrentFloor() {
   const fl = currentFloor(); if (!fl) return;
   if (!state.floorPlans[fl.id] && fl.planDriveFileId && isTokenValid()) {
-    fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { state.floorPlans[fl.id] = url; fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(url) || null; persist(); render(); } }).catch((e) => console.warn(e));
+    fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); } }).catch((e) => console.warn(e));
   }
 }
 
@@ -2966,7 +3315,7 @@ function bulkSetCategory(category) {
 }
 async function bulkDelete() {
   if (!state.bulkSelection.length) return;
-  if (!confirm(`Delete ${state.bulkSelection.length} node(s)?`)) return;
+  if (!(await ndConfirm({ title: "Delete nodes", message: `Delete ${state.bulkSelection.length} node(s)? Their Drive folders move to Trash.`, confirmLabel: "Delete", danger: true }))) return;
   const ids = state.bulkSelection.slice();
   const driveIds = [];
   ids.forEach((id) => {
@@ -3206,7 +3555,8 @@ function handleRoomForm(event) {
 function deleteSelectedRoom() {
   if (state.selectedRoomId === "all") return;
   const room = roomById(state.selectedRoomId); if (!room) return;
-  if (!confirm(`Delete room "${room.name}"? Nodes stay on the floor and become "No room".`)) return;
+  const roomNodeIds = state.nodes.filter((n) => n.roomId === room.id).map((n) => n.id);
+  const linkedNodeIds = state.nodes.filter((n) => n.linkedRoomId === room.id).map((n) => n.id);
   state.nodes.forEach((n) => {
     if (n.roomId === room.id) n.roomId = null;
     if (n.linkedRoomId === room.id) n.linkedRoomId = null;
@@ -3214,20 +3564,35 @@ function deleteSelectedRoom() {
   state.rooms = state.rooms.filter((r) => r.id !== room.id);
   state.selectedRoomId = "all";
   persist(); render();
-  logAudit("Room Deleted", { projectId: room.projectId, floorId: room.floorId, details: room.name });
+  undoableDelete(`Room "${room.name}" deleted`, {
+    undo: () => {
+      state.rooms.push(room);
+      state.nodes.forEach((n) => {
+        if (roomNodeIds.includes(n.id)) n.roomId = room.id;
+        if (linkedNodeIds.includes(n.id)) n.linkedRoomId = room.id;
+      });
+      state.selectedRoomId = room.id;
+    },
+    commit: () => logAudit("Room Deleted", { projectId: room.projectId, floorId: room.floorId, details: room.name })
+  });
 }
 
 async function deleteCurrentFloor() {
   const proj = project(); if (!proj) return;
   const fl = currentFloor(); if (!fl) return;
   if (proj.floors.length === 1) { toast("Cannot delete the only floor"); return; }
-  if (!confirm(`Delete floor "${fl.name}" and all its nodes? The Drive folder will be moved to Trash.`)) return;
+  const floorIndex = proj.floors.findIndex((f) => f.id === fl.id);
+  const removedNodes = state.nodes.filter((n) => n.floorId === fl.id);
+  const removedRooms = state.rooms.filter((r) => r.floorId === fl.id);
+  const savedPlan = state.floorPlans[fl.id] || null;
+  const savedFloorFolderId = state.drive.floorFolderMap[fl.id];
+  const savedNodeFolderEntries = removedNodes.map((n) => [n.id, state.drive.nodeFolderMap[n.id]]).filter(([, v]) => v);
   const driveId_Fl = state.drive.floorFolderMap[fl.id];
   const nodeDriveIds = state.nodes.filter((n) => n.floorId === fl.id).map((n) => state.drive.nodeFolderMap[n.id]).filter(Boolean);
   proj.floors = proj.floors.filter((f) => f.id !== fl.id);
   state.nodes = state.nodes.filter((n) => n.floorId !== fl.id);
   state.rooms = state.rooms.filter((r) => r.floorId !== fl.id);
-  delete state.floorPlans[fl.id];
+  evictFloorPlan(fl.id);
   delete state.drive.floorFolderMap[fl.id];
   nodeDriveIds.forEach((id) => {
     const entry = Object.entries(state.drive.nodeFolderMap).find(([, folderId]) => folderId === id);
@@ -3236,9 +3601,21 @@ async function deleteCurrentFloor() {
   state.selectedFloorId = proj.floors[0]?.id || null;
   state.selectedRoomId = "all";
   persist(); render();
-  const trashed = driveId_Fl ? await trashDriveFolder(driveId_Fl) : await trashDriveFolders(nodeDriveIds);
-  logAudit("Floor Deleted", { projectId: proj.id, details: `${fl.name}; Drive trashed: ${trashed ? "yes" : "no"}` });
-  toast(`Floor "${fl.name}" deleted`);
+  undoableDelete(`Floor "${fl.name}" deleted`, {
+    undo: () => {
+      proj.floors.splice(Math.max(0, floorIndex), 0, fl);
+      state.nodes.push(...removedNodes);
+      state.rooms.push(...removedRooms);
+      if (savedFloorFolderId) state.drive.floorFolderMap[fl.id] = savedFloorFolderId;
+      savedNodeFolderEntries.forEach(([nodeId, folderId]) => { state.drive.nodeFolderMap[nodeId] = folderId; });
+      if (savedPlan) cacheFloorPlan(fl.id, savedPlan).catch(() => {});
+      state.selectedFloorId = fl.id;
+    },
+    commit: async () => {
+      const trashed = driveId_Fl ? await trashDriveFolder(driveId_Fl) : await trashDriveFolders(nodeDriveIds);
+      logAudit("Floor Deleted", { projectId: proj.id, details: `${fl.name}; Drive trashed: ${trashed ? "yes" : "no"}` });
+    }
+  });
 }
 
 function handlePortalForm(event) {
@@ -3307,7 +3684,7 @@ function followPortal() {
 
 async function deleteFolder(folderId) {
   const folder = state.projectFolders.find((f) => f.id === folderId); if (!folder) return;
-  if (!confirm(`Delete folder "${folder.name}"? Projects inside move to ${DRIVE_UNFILED_FOLDER}. The Drive folder group will be moved to Trash.`)) return;
+  if (!(await ndConfirm({ title: "Delete folder", message: `Delete folder "${folder.name}"? Projects inside move to ${DRIVE_UNFILED_FOLDER}. The Drive folder group will be moved to Trash.`, confirmLabel: "Delete", danger: true }))) return;
   const driveId_F = folder.driveFolderId;
   const movedProjects = state.projects.filter((p) => p.folderId === folderId);
   let moveErrors = 0;
@@ -3331,7 +3708,7 @@ async function deleteFolder(folderId) {
 
 async function deleteProject(projectId) {
   const proj = projectById(projectId); if (!proj) return;
-  if (!confirm(`Delete project "${proj.name}" and all its nodes? The Drive folder (and everything inside) will be moved to Trash.`)) return;
+  if (!(await ndConfirm({ title: "Delete project", message: `Delete project "${proj.name}" and all its nodes? The Drive folder (and everything inside) will be moved to Trash.`, confirmLabel: "Delete project", danger: true }))) return;
   const driveId_P = state.drive.projectFolderMap[projectId];
   const nodeDriveIds = state.nodes.filter((n) => n.projectId === projectId).map((n) => state.drive.nodeFolderMap[n.id]).filter(Boolean);
   const linkedReturns = state.nodes.filter((n) => n.type === "portal" && n.linkedProjectId === projectId);
@@ -3339,7 +3716,7 @@ async function deleteProject(projectId) {
   state.projects = state.projects.filter((p) => p.id !== projectId);
   state.nodes = state.nodes.filter((n) => n.projectId !== projectId);
   state.rooms = state.rooms.filter((r) => r.projectId !== projectId);
-  (proj.floors || []).forEach((f) => { delete state.floorPlans[f.id]; delete state.drive.floorFolderMap[f.id]; });
+  (proj.floors || []).forEach((f) => { evictFloorPlan(f.id); delete state.drive.floorFolderMap[f.id]; });
   Object.keys(state.drive.nodeFolderMap).forEach((nodeId) => { if (!state.nodes.some((n) => n.id === nodeId)) delete state.drive.nodeFolderMap[nodeId]; });
   delete state.drive.projectFolderMap[projectId];
   if (state.selectedProjectId === projectId) { state.selectedProjectId = state.projects[0]?.id || null; state.selectedFloorId = project()?.floors?.[0]?.id || null; }
@@ -3356,8 +3733,12 @@ async function formatPlannerData() {
   const protectedProjectIds = new Set(protectedProjects.map((p) => p.id));
   const protectedFloorIds = new Set(protectedProjects.flatMap((p) => (p.floors || []).map((f) => f.id)));
   const protectedNodeIds = new Set(state.nodes.filter((n) => protectedProjectIds.has(n.projectId)).map((n) => n.id));
-  if (!confirm(`Format NeillPlanner data? This trashes unprotected project data, Bulk Photos, and Sorted Photos, clears matching master/photo allocation rows, and keeps Admin Files + Audit.${protectedProjects.length ? ` ${protectedProjects.length} protected job(s) will be kept.` : ""}`)) return;
-  if (!confirm("Last check: this is destructive. Continue?")) return;
+  const goFormat = await ndConfirm({
+    title: "Format planner data",
+    message: `Trashes unprotected project data, Bulk Photos, and Sorted Photos, clears matching master/photo allocation rows, and keeps Admin Files + Audit.${protectedProjects.length ? ` ${protectedProjects.length} protected job(s) will be kept.` : ""}`,
+    confirmLabel: "Format", danger: true, typeToConfirm: "FORMAT"
+  });
+  if (!goFormat) return;
   try {
     toast("Formatting planner data...");
     if (protectedProjects.length) {
@@ -3403,7 +3784,7 @@ async function formatPlannerData() {
     state.projects = protectedProjects;
     state.rooms = state.rooms.filter((room) => protectedProjectIds.has(room.projectId));
     state.nodes = state.nodes.filter((node) => protectedProjectIds.has(node.projectId));
-    state.floorPlans = Object.fromEntries(Object.entries(state.floorPlans || {}).filter(([floorId]) => protectedFloorIds.has(floorId)));
+    Object.keys(state.floorPlans || {}).forEach((floorId) => { if (!protectedFloorIds.has(floorId)) evictFloorPlan(floorId); });
     state.bulkPhotos = [];
     state.selectedProjectId = state.projects[0]?.id || null;
     state.selectedFloorId = state.projects[0]?.floors?.[0]?.id || null;
@@ -3411,7 +3792,7 @@ async function formatPlannerData() {
     state.selectedNodeId = null;
     state.drawerOpen = false;
     persist({ skipSync: true });
-    if (state.projects.length && state.drive.masterSheetId) await syncMasterSheet({ silent: true });
+    if (state.projects.length && state.drive.masterSheetId) await rebuildMasterSheet({ silent: true });
     await logAudit("Planner Formatted", { details: protectedProjects.length ? `Unprotected data cleared; ${protectedProjects.length} protected job(s) kept` : "Projects, folders, rooms, nodes, photos cleared; Audit/Admin kept" });
     render();
     toast(protectedProjects.length ? "Planner formatted. Protected jobs kept." : "Planner data formatted. Audit and Admin Files kept.");
@@ -3423,21 +3804,30 @@ async function formatPlannerData() {
 
 async function deleteSelectedNode() {
   const node = selectedNode(); if (!node) return;
-  if (!confirm(`Delete node "${nodeDisplayTitle(node)}"? Drive folder will be moved to Trash.`)) return;
   const driveId_N = state.drive.nodeFolderMap[node.id];
   const linkedDriveId = node.linkedNodeId ? state.drive.nodeFolderMap[node.linkedNodeId] : null;
-  if (node.type === "portal" && node.linkedNodeId) {
-    state.nodes = state.nodes.filter((n) => n.id !== node.linkedNodeId);
-    delete state.drive.nodeFolderMap[node.linkedNodeId];
+  const linkedNode = (node.type === "portal" && node.linkedNodeId) ? state.nodes.find((n) => n.id === node.linkedNodeId) : null;
+  if (linkedNode) {
+    state.nodes = state.nodes.filter((n) => n.id !== linkedNode.id);
+    delete state.drive.nodeFolderMap[linkedNode.id];
   }
   state.nodes = state.nodes.filter((n) => n.id !== node.id);
   delete state.drive.nodeFolderMap[node.id];
-  const trashed = await trashDriveFolders([driveId_N, linkedDriveId]);
-  logAudit("Node Deleted", { nodeId: node.id, nodeTitle: nodeDisplayTitle(node), details: `${trashed} Drive folder(s) trashed` });
   state.selectedNodeId = floorNodes()[0]?.id || null;
   state.drawerOpen = Boolean(state.selectedNodeId);
   state.modal = null; persist(); render();
-  toast("Node deleted");
+  undoableDelete(`Node "${nodeDisplayTitle(node)}" deleted`, {
+    undo: () => {
+      state.nodes.push(node);
+      if (driveId_N) state.drive.nodeFolderMap[node.id] = driveId_N;
+      if (linkedNode) { state.nodes.push(linkedNode); if (linkedDriveId) state.drive.nodeFolderMap[linkedNode.id] = linkedDriveId; }
+      state.selectedNodeId = node.id;
+    },
+    commit: async () => {
+      const trashed = await trashDriveFolders([driveId_N, linkedDriveId]);
+      logAudit("Node Deleted", { nodeId: node.id, nodeTitle: nodeDisplayTitle(node), details: `${trashed} Drive folder(s) trashed` });
+    }
+  });
 }
 
 function cloneSelectedNode() {
@@ -3505,9 +3895,9 @@ function uploadFloorPlan() {
     const file = input.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      state.floorPlans[floor.id] = reader.result;
+      await cacheFloorPlan(floor.id, reader.result, { planFileName: file.name });   // §2.3
       floor.planFileName = file.name;
-      floor.planAspectRatio = await readImageAspectRatio(reader.result) || floor.planAspectRatio || 1.6;
+      floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || floor.planAspectRatio || 1.6;
       persist(); render();
       toast(`Plan uploaded for ${floor.name}`);
       logAudit("Plan Uploaded", { projectId: proj.id, floorId: floor.id, details: `${floor.name}: ${file.name}` });
@@ -3566,6 +3956,11 @@ function toast(message) {
 /* BOOT */
 
 function hydrateFromHash() {
+  const projMatch = location.hash.match(/project=([^&]+)/);
+  if (projMatch) {
+    const proj = projectById(decodeURIComponent(projMatch[1]));
+    if (proj) { state.selectedProjectId = proj.id; state.selectedFloorId = proj.floors?.[0]?.id || null; state.activeView = "map"; }
+  }
   const match = location.hash.match(/node=([^&]+)/); if (!match) return;
   const node = state.nodes.find((n) => n.id === decodeURIComponent(match[1])); if (!node) return;
   state.selectedProjectId = node.projectId;
@@ -3587,5 +3982,331 @@ document.addEventListener("keydown", e => {
 });
 
 hydrateFromHash();
+
+/* ============================================================ UNIFIED INBOX
+ * Slice 2 #16 + #17 — "Create job from upload" banner (v1.0 §4.3) and the
+ * "To be sorted" tray (v1.0 §4.4) with auto-create-node tidy stack (§2.1.3).
+ * Reads/writes the master Inbox tab via nd-inbox; all writes keyed (§0.4).
+ * ======================================================================= */
+
+let _inboxRecords = [];
+let _inboxLoading = false;
+let _plannerInboxApi = null;
+const _bannerNotNow = {};                       // session-only dismissals
+const INBOX_NEVER_KEY = "np-inbox-never-v1";    // "Never for this address"
+
+function getPlannerInboxApi() {
+  if (_plannerInboxApi) return _plannerInboxApi;
+  if (!window.NDInbox || !window.ND?.sheetsKit || !state.drive.masterSheetId) return null;
+  const sheets = ND.sheetsKit.create({ gateway: ND.sheetsKit.gapiGateway() });
+  _plannerInboxApi = NDInbox.createInboxApi({ sheets, spreadsheetId: state.drive.masterSheetId });
+  return _plannerInboxApi;
+}
+
+function inboxNeverList() {
+  try { return JSON.parse(localStorage.getItem(INBOX_NEVER_KEY)) || {}; } catch (e) { return {}; }
+}
+function addInboxNeverAddress(key) {
+  const list = inboxNeverList(); list[key] = true;
+  try { localStorage.setItem(INBOX_NEVER_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+async function refreshInbox(opts = {}) {
+  const api = getPlannerInboxApi();
+  if (!api || _inboxLoading || !isTokenValid()) return;
+  _inboxLoading = true;
+  try {
+    _inboxRecords = await api.list();
+    if (state.activeView === "projects" || state.modal?.mode === "sort-tray") render();
+  } catch (e) {
+    if (!opts.silent) toast("Inbox refresh failed: " + describeError(e));
+    else console.warn("Inbox refresh failed", e);
+  } finally { _inboxLoading = false; }
+}
+
+function unfiledInboxGroups() {
+  if (!window.NDInbox || !window.NDMatch) return [];
+  const never = inboxNeverList();
+  const projectKeys = new Set(state.projects.map((p) => NDMatch.addressKey(p.address || "")).filter(Boolean));
+  return NDInbox.groupUnfiled(_inboxRecords).filter((g) =>
+    g.addressKey !== "(no address)" && !projectKeys.has(g.addressKey) && !never[g.addressKey] && !_bannerNotNow[g.addressKey]);
+}
+
+function renderInboxBanners() {
+  const groups = unfiledInboxGroups().slice(0, 3);
+  if (!groups.length) return "";
+  return groups.map((g) => `
+    <div class="inbox-banner" data-inbox-group="${escapeHtml(g.addressKey)}">
+      <div class="inbox-banner-text">
+        <strong>\u{1F4E5} ${escapeHtml(g.label)}</strong>
+        <span>${g.count} photo${g.count === 1 ? "" : "s"} uploaded, no job yet.${g.floorPlan ? " Floor plan tagged." : ""}</span>
+      </div>
+      <div class="inbox-banner-actions">
+        <button class="primary-button" data-inbox-create="${escapeHtml(g.addressKey)}">${icon("plus")}Create job</button>
+        <button class="ghost-button" data-inbox-later="${escapeHtml(g.addressKey)}">Not now</button>
+        <button class="ghost-button" data-inbox-never="${escapeHtml(g.addressKey)}" title="Stop suggesting this address">Never</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderToSortChip() {
+  const proj = project();
+  if (!proj) return "";
+  const n = _inboxRecords.filter((r) => r.status === NDInbox?.STATUS?.FILED_TO_PROJECT && r.projectId === proj.id).length;
+  if (!n) return "";
+  return `<button class="to-sort-chip" data-inbox-tray="${proj.id}" title="Photos waiting to be sorted onto nodes">To sort (${n})</button>`;
+}
+
+function suggestProjectName(address) {
+  const street = String(address || "").split(",")[0].trim();
+  return street || "New job";
+}
+
+async function ensureBatchFolderId() {
+  if (state.drive.batchFolderId) return state.drive.batchFolderId;
+  if (!state.drive.rootFolderId) return null;
+  const id = await findOrCreateChildFolder(BATCH_FOLDER_NAME_ND, state.drive.rootFolderId);
+  state.drive.batchFolderId = id;
+  persist({ skipSync: true });
+  return id;
+}
+const BATCH_FOLDER_NAME_ND = "Batch";
+
+/* v1.0 §4.3 — pre-seed everything we already know. */
+async function createJobFromInboxGroup(addressKey) {
+  const group = unfiledInboxGroups().find((g) => g.addressKey === addressKey);
+  const api = getPlannerInboxApi();
+  if (!group || !api) return;
+  toast(`Creating job for ${group.label}...`);
+  const floor = { id: uid("floor"), name: "Ground floor", order: 0, createdAt: nowStamp() };
+  const proj = {
+    id: uid("prj"), name: suggestProjectName(group.address), address: group.address,
+    description: `Created from ${group.count} uploaded photo${group.count === 1 ? "" : "s"}`,
+    folderId: null, floors: [floor], team: [],
+    createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "owner",
+    createdAt: nowStamp(), updatedAt: nowStamp()
+  };
+  state.projects.push(proj);
+  state.selectedProjectId = proj.id;
+  state.selectedFloorId = floor.id;
+  persist(); render();
+  try {
+    const projFolderId = await ensureProjectDriveFolder(proj);
+    await ensureFloorDriveFolder(proj, floor);
+    const batchId = await ensureBatchFolderId();
+    // §4.3.3: tagged plan goes straight onto the ground floor — no re-upload
+    if (group.floorPlan) {
+      floor.planDriveFileId = group.floorPlan.driveFileId;
+      floor.planFileName = group.floorPlan.name || "";
+      try {
+        const url = await fetchDriveFileAsDataUrl(group.floorPlan.driveFileId);
+        if (url) {
+          await cacheFloorPlan(floor.id, url, { planDriveFileId: group.floorPlan.driveFileId });
+          floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || 1.6;
+        }
+      } catch (e) { console.warn("Plan fetch failed (still linked)", e); }
+    }
+    // §4.3.4: photos move into the project's inbox (Drive folder + status)
+    for (const rec of group.records) {
+      try {
+        if (projFolderId) await moveDriveFileToFolder(rec.driveFileId, projFolderId, batchId || "");
+        const updated = await api.setStatus(rec, NDInbox.STATUS.FILED_TO_PROJECT, { projectId: proj.id, floorId: floor.id });
+        const local = _inboxRecords.find((r) => r.driveFileId === rec.driveFileId);
+        if (local) Object.assign(local, updated);
+      } catch (e) { console.warn("Inbox file move failed", rec.driveFileId, e); }
+    }
+    persist(); 
+    logAudit("Job Created From Upload", { projectId: proj.id, details: `${group.label}: ${group.count} photo(s)${group.floorPlan ? " + plan" : ""}` });
+    toast(`Job created: ${proj.name}`);
+    state.modal = { mode: "sort-tray", projectId: proj.id };   // §4.3.5
+    render();
+  } catch (e) {
+    toast("Job created locally; Drive setup incomplete: " + describeError(e));
+    render();
+  }
+}
+
+function trayRecords(projectId) {
+  return _inboxRecords.filter((r) => r.status === NDInbox.STATUS.FILED_TO_PROJECT && r.projectId === projectId && !r.isFloorPlan);
+}
+
+function renderSortTrayModal(m) {
+  const proj = state.projects.find((p) => p.id === m.projectId);
+  if (!proj) { state.modal = null; return ""; }
+  const recs = trayRecords(proj.id);
+  const nodes = state.nodes.filter((n) => n.projectId === proj.id && n.type !== "portal");
+  const labelled = recs.filter((r) => (r.room || r.location));
+  const nodeOptions = nodes.map((n) => `<option value="${n.id}">${escapeHtml(nodeDisplayTitle(n))}</option>`).join("");
+  return `
+    <div class="modal-backdrop" data-tray-close></div>
+    <section class="nd-tray" role="dialog" aria-modal="true" aria-label="To be sorted">
+      <div class="nd-tray-head">
+        <div><h3>To be sorted \u00b7 ${escapeHtml(proj.name)}</h3><p>${recs.length} photo${recs.length === 1 ? "" : "s"} waiting</p></div>
+        <div class="button-row">
+          ${labelled.length ? `<button class="ghost-button" data-tray-autoall="${proj.id}">Auto-create nodes for ${labelled.length} labelled</button>` : ""}
+          <button class="icon-button" data-tray-close aria-label="Close">${icon("close")}</button>
+        </div>
+      </div>
+      <div class="nd-tray-grid">
+        ${recs.length ? recs.map((r) => `
+          <div class="nd-tray-card">
+            ${r.thumbnailLink ? `<img src="${escapeHtml(r.thumbnailLink)}" alt="" loading="lazy" />` : `<div class="nd-tray-noimg">${icon("map")}</div>`}
+            <div class="nd-tray-meta">
+              <strong title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</strong>
+              ${(r.room || r.location) ? `<span class="mini-chip">${escapeHtml(r.room || r.location)}</span>` : ""}
+            </div>
+            ${(r.room || r.location) ? `<button class="ghost-button nd-tray-btn" data-tray-autonode="${escapeHtml(r.driveFileId)}">${icon("plus")}Auto-create "${escapeHtml(r.room || r.location)}"</button>` : ""}
+            <div class="nd-tray-sortrow">
+              <select data-tray-select="${escapeHtml(r.driveFileId)}" aria-label="Choose node"><option value="">Choose node\u2026</option>${nodeOptions}</select>
+              <button class="primary-button nd-tray-btn" data-tray-sort="${escapeHtml(r.driveFileId)}">Sort</button>
+            </div>
+            <button class="ghost-button nd-tray-btn" data-tray-dismiss="${escapeHtml(r.driveFileId)}">Back to batch</button>
+          </div>`).join("") : `<div class="empty-state" style="padding:28px;text-align:center">All sorted \u2705</div>`}
+      </div>
+    </section>`;
+}
+
+/* §2.1.3 — tidy stack: {x:50,y:8}, +6% x, wrap past 80% to the next row. */
+function nextAutoNodePosition(floorId) {
+  const i = state.nodes.filter((n) => n.floorId === floorId && n.autoPlaced).length;
+  const col = i % 6, row = Math.floor(i / 6);
+  return { x: 50 + col * 6, y: 8 + row * 6 };
+}
+
+async function fileInboxToNode(driveFileId, nodeId) {
+  const api = getPlannerInboxApi();
+  const rec = _inboxRecords.find((r) => r.driveFileId === driveFileId);
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!api || !rec || !node) { toast("Pick a node first"); return; }
+  try {
+    const nodeFolderId = await ensureNodeDriveFolder(node);
+    if (nodeFolderId) {
+      const projFolderId = state.drive.projectFolderMap[node.projectId] || "";
+      await moveDriveFileToFolder(rec.driveFileId, nodeFolderId, projFolderId);
+    }
+    node.imageRefs = node.imageRefs || [];
+    if (!node.imageRefs.some((img) => img.driveFileId === rec.driveFileId)) {
+      node.imageRefs.push({
+        id: rec.photoId || rec.driveFileId, driveFileId: rec.driveFileId, name: rec.name,
+        webViewLink: rec.webViewLink, thumbnailLink: rec.thumbnailLink, mimeType: rec.mimeType,
+        uploader: rec.uploader || "", uploadedAt: rec.uploadedAt || nowStamp()
+      });
+    }
+    const updated = await api.setStatus(rec, NDInbox.STATUS.FILED_TO_NODE, { nodeId: node.id, floorId: node.floorId });
+    Object.assign(rec, updated);
+    persist();   // delta sync writes the Photos/Nodes rows
+    logAudit("Photo Sorted", { nodeId: node.id, details: rec.name });
+    render();
+  } catch (e) { toast("Sort failed: " + describeError(e)); }
+}
+
+async function autoCreateNodeFromRecord(driveFileId) {
+  const rec = _inboxRecords.find((r) => r.driveFileId === driveFileId);
+  if (!rec) return;
+  const proj = state.projects.find((p) => p.id === rec.projectId);
+  const floorId = rec.floorId || proj?.floors?.[0]?.id;
+  if (!proj || !floorId) { toast("No floor to place the node on"); return; }
+  const label = rec.room || rec.location;
+  const node = {
+    id: uid("node"), projectId: proj.id, floorId, type: "marker",
+    customTitle: label, category: "", lineItem: "", status: "Not Started",
+    assignedTo: "", tags: [], description: `Auto-created from photo "${rec.name}"`,
+    position: nextAutoNodePosition(floorId), autoPlaced: true,
+    createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "owner",
+    createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: [],
+    roomId: null, linkedRoomId: null
+  };
+  state.nodes.push(node);
+  persist();
+  logAudit("Node Auto-Created", { nodeId: node.id, details: label });
+  await fileInboxToNode(driveFileId, node.id);
+}
+
+async function dismissInboxToBatch(driveFileId) {
+  const api = getPlannerInboxApi();
+  const rec = _inboxRecords.find((r) => r.driveFileId === driveFileId);
+  if (!api || !rec) return;
+  try {
+    const batchId = await ensureBatchFolderId();
+    const projFolderId = state.drive.projectFolderMap[rec.projectId] || "";
+    if (batchId) await moveDriveFileToFolder(rec.driveFileId, batchId, projFolderId);
+    const updated = await api.setStatus(rec, NDInbox.STATUS.UNFILED);   // clears project fields
+    Object.assign(rec, updated);
+    toast("Sent back to batch");
+    render();
+  } catch (e) { toast("Dismiss failed: " + describeError(e)); }
+}
+
+/* v1.0 §5.3 — one-time migration: unallocated legacy Bulk Photos move to
+ * Batch + the Inbox tab. Photo-Allocation + Bulk Photos become READ-ONLY
+ * (nothing writes them any more); hard-delete comes one release later. */
+async function migrateLegacyBulkPhotos() {
+  const FLAG = "np-legacy-bulk-migrated-v1";
+  if (localStorage.getItem(FLAG)) return;
+  const api = getPlannerInboxApi();
+  if (!api || !isTokenValid()) return;
+  const pending = (state.bulkPhotos || []).filter((p) => (p.status || "Inbox") !== "Allocated" && p.driveFileId);
+  if (!pending.length) { localStorage.setItem(FLAG, "yes"); return; }
+  let moved = 0;
+  const batchId = await ensureBatchFolderId().catch(() => null);
+  for (const photo of pending) {
+    try {
+      if (batchId && state.drive.bulkPhotosFolderId) {
+        await moveDriveFileToFolder(photo.driveFileId, batchId, state.drive.bulkPhotosFolderId);
+      }
+      await api.upsert({
+        driveFileId: photo.driveFileId, name: photo.name || "", status: NDInbox.STATUS.UNFILED,
+        address: "", addressSource: "manual",
+        uploader: photo.uploader || "", uploadedAt: photo.uploadedAt || "",
+        mimeType: photo.mimeType || "", webViewLink: photo.webViewLink || "",
+        thumbnailLink: photo.thumbnailLink || "", notes: "migrated from Bulk Photos"
+      });
+      moved++;
+    } catch (e) { console.warn("Legacy migration failed for", photo.name, e); return; } // retry next boot
+  }
+  localStorage.setItem(FLAG, "yes");
+  if (moved) {
+    logAudit("Legacy Bulk Photos Migrated", { details: `${moved} photo(s) -> unified Inbox` });
+    toast(`Migrated ${moved} old bulk photo${moved === 1 ? "" : "s"} to the new inbox`);
+    refreshInbox({ silent: true });
+  }
+}
+
+/* §2.5 — projects quick-search (debounced, focus-preserving) */
+let _projectsSearchTimer = null;
+document.addEventListener("input", (ev) => {
+  const input = ev.target.closest("[data-projects-search]");
+  if (!input) return;
+  state.projectsQuery = input.value;
+  clearTimeout(_projectsSearchTimer);
+  _projectsSearchTimer = setTimeout(() => {
+    render();
+    const fresh = document.querySelector("[data-projects-search]");
+    if (fresh) { fresh.focus(); fresh.setSelectionRange(fresh.value.length, fresh.value.length); }
+  }, 250);
+});
+
+/* Delegated events — survives every render() */
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-inbox-create],[data-inbox-later],[data-inbox-never],[data-inbox-tray],[data-tray-close],[data-tray-sort],[data-tray-autonode],[data-tray-dismiss],[data-tray-autoall]");
+  if (!t) return;
+  if (t.dataset.inboxCreate) return void createJobFromInboxGroup(t.dataset.inboxCreate);
+  if (t.dataset.inboxLater) { _bannerNotNow[t.dataset.inboxLater] = true; return void render(); }
+  if (t.dataset.inboxNever) { addInboxNeverAddress(t.dataset.inboxNever); toast("Won't suggest that address again"); return void render(); }
+  if (t.dataset.inboxTray) { state.modal = { mode: "sort-tray", projectId: t.dataset.inboxTray }; return void render(); }
+  if (t.hasAttribute("data-tray-close")) { state.modal = null; return void render(); }
+  if (t.dataset.traySort) {
+    const sel = document.querySelector(`[data-tray-select="${CSS.escape(t.dataset.traySort)}"]`);
+    return void fileInboxToNode(t.dataset.traySort, sel?.value);
+  }
+  if (t.dataset.trayAutonode) return void autoCreateNodeFromRecord(t.dataset.trayAutonode);
+  if (t.dataset.trayDismiss) return void dismissInboxToBatch(t.dataset.trayDismiss);
+  if (t.dataset.trayAutoall) {
+    const recs = trayRecords(t.dataset.trayAutoall).filter((r) => r.room || r.location);
+    (async () => { for (const r of recs) await autoCreateNodeFromRecord(r.driveFileId); })();
+  }
+});
+
 render();
+hydrateFloorPlansFromCache().catch((e) => console.warn("plan hydration failed", e));
 bootGoogle();

@@ -232,7 +232,6 @@ function freshState() {
 }
 
 let state = freshState();
-let _tokenClient = null;
 let _savingTimer = null;
 
 /* ── Persistence ─────────────────────────────────────────────────────────── */
@@ -306,98 +305,68 @@ async function bootGoogle() {
   } catch(e) { toast("Google API failed to load — check your connection"); return; }
   try {
     await waitFor("google");
-    _tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: googleConfig.googleClientId,
-      scope: googleScopes,
-      callback: handleTokenResponse,
-      error_callback: (err) => {
-        state.googleAuth.bootstrapping = false;
-        state.googleAuth.authFailed = true;
-        toast("Sign-in error: " + (err?.message || err?.type || "Unknown"));
-        render();
-      }
-    });
+    NDAuth.onAuthChange(handleAuthEvent);
+    NDAuth.init({ clientId: googleConfig.googleClientId, scopes: googleConfig.scopes || googleScopes.split(" ") });
   } catch(e) { toast("Google Sign-In failed to load"); return; }
   state.googleAuth.librariesReady = true;
-  // Auto-reconnect silently if user previously signed in — no tap required
-  if (state.googleAuth.bootstrapped) {
-    _tokenClient.requestAccessToken({ prompt: "" });
-  } else {
+  // Silent resume via the shared suite token — no popup without a tap (§1.1)
+  if (!NDAuth.isSignedIn()) {
+    NDAuth.ensureToken().catch(() => { state.googleAuth.bootstrapping = false; render(); });
+  }
+  render();
+}
+
+function handleAuthEvent(ev) {
+  if (ev.type === "signin" || ev.type === "refresh" || ev.type === "external") {
+    state.googleAuth.bootstrapping = false;
+    state.googleAuth.authFailed = false;
+    state.googleAuth.accessToken = NDAuth.getToken();
+    state.googleAuth.expiresAt = NDAuth.getExpiry();
+    state.googleAuth.signedIn = true;
+    if (ev.profile) state.googleAuth.profile = ev.profile;
+    if (window.gapi?.client) gapi.client.setToken({ access_token: state.googleAuth.accessToken });
+    if (ev.type !== "signin") { render(); return; }   // silent renewals never re-bootstrap
+    if (!state.googleAuth.bootstrapped) {
+      state.googleAuth.bootstrapped = true;
+      bootstrapDrive().then(() => { applyDeepLink(); persist(); render(); });
+    } else if (!state.projects.length && state.drive.rootFolderId) {
+      loadProjectsFromDrive().finally(() => { applyDeepLink(); persist(); render(); });
+    } else {
+      applyDeepLink(); persist(); render();
+    }
+  } else if (ev.type === "signout") {
+    if (window.gapi?.client) gapi.client.setToken(null);
+    state.googleAuth.accessToken = null; state.googleAuth.expiresAt = null;
+    state.googleAuth.signedIn = false; state.googleAuth.profile = null;
+    state.googleAuth.bootstrapped = false; state.googleAuth.authFailed = false;
+    state.projects = []; state.selectedProjectId = null; state.activeView = "projects";
+    localStorage.removeItem(STORAGE_KEY);
+    render();
+  } else if (ev.type === "error") {
+    state.googleAuth.bootstrapping = false;
+    state.googleAuth.authFailed = true;
+    toast("Sign-in error: " + (ev.error || "Unknown"));
     render();
   }
 }
 
-function handleTokenResponse(resp) {
-  state.googleAuth.bootstrapping = false;
-  state.googleAuth.authFailed    = false;
-  if (resp.error) { toast("Sign-in failed: " + (resp.error_description || resp.error)); render(); return; }
-  state.googleAuth.accessToken = resp.access_token;
-  state.googleAuth.expiresAt   = Date.now() + ((resp.expires_in || 3600) * 1000);
-  state.googleAuth.signedIn    = true;
-  gapi.client.setToken({ access_token: resp.access_token });
-  // Schedule silent re-auth 5 min before expiry
-  const msUntilRefresh = ((resp.expires_in || 3600) - 300) * 1000;
-  setTimeout(() => { if (_tokenClient && state.googleAuth.signedIn) _tokenClient.requestAccessToken({ prompt: "" }); }, msUntilRefresh);
-  if (!state.googleAuth.bootstrapped) {
-    state.googleAuth.bootstrapped = true;
-    bootstrapDrive().then(() => { applyDeepLink(); persist(); render(); });
-  } else {
-    // Silent re-auth on return visit — reload from Drive if we have no projects in memory
-    fetchUserInfo().then(() => {
-      if (!state.projects.length && state.drive.rootFolderId) {
-        loadProjectsFromDrive().finally(() => { applyDeepLink(); persist(); render(); });
-      } else {
-        applyDeepLink(); persist(); render();
-      }
-    });
-  }
-}
-
 function signIn() {
-  if (!_tokenClient) { toast("Google libraries still loading…"); return; }
+  if (!window.NDAuth || !state.googleAuth.librariesReady) { toast("Google libraries still loading…"); return; }
   state.googleAuth.bootstrapping = true; state.googleAuth.authFailed = false; render();
-  _tokenClient.requestAccessToken({ prompt: state.googleAuth.bootstrapped ? "" : "consent" });
+  NDAuth.ensureToken({ interactive: true }).catch((e) => { state.googleAuth.bootstrapping = false; state.googleAuth.authFailed = true; toast("Sign-in failed: " + (e?.message || e)); render(); });
 }
 
-function signOut() {
-  if (state.googleAuth.accessToken && window.google?.accounts?.oauth2) {
-    try { google.accounts.oauth2.revoke(state.googleAuth.accessToken, ()=>{}); } catch(e) {}
-  }
-  if (window.gapi?.client) gapi.client.setToken(null);
-  state.googleAuth.accessToken = null; state.googleAuth.expiresAt = null;
-  state.googleAuth.signedIn = false; state.googleAuth.profile = null;
-  state.googleAuth.bootstrapped = false; state.googleAuth.authFailed = false;
-  state.projects = []; state.selectedProjectId = null; state.activeView = "projects";
-  localStorage.removeItem(STORAGE_KEY);
-  render();
-}
-
-async function fetchUserInfo() {
-  if (!state.googleAuth.accessToken) return;
-  try {
-    const r = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: "Bearer " + state.googleAuth.accessToken } });
-    if (r.ok) state.googleAuth.profile = await r.json();
-  } catch(e) {}
-}
+function signOut() { NDAuth.signOut(); }
 
 /* ── Drive helpers ───────────────────────────────────────────────────────── */
 async function googleCall(fn) {
   if (!isTokenValid() && state.googleAuth.bootstrapped) {
-    // Token expired — silently refresh before making the call
-    await new Promise((res, rej) => {
-      if (!_tokenClient) return rej(new Error("tokenClient not ready"));
-      const prev = _tokenClient.callback;
-      _tokenClient.callback = r => {
-        _tokenClient.callback = prev;
-        if (r.error) return rej(r.error);
-        state.googleAuth.accessToken = r.access_token;
-        state.googleAuth.expiresAt   = Date.now() + ((r.expires_in || 3600) - 60) * 1000;
-        state.googleAuth.signedIn    = true;
-        gapi.client.setToken({ access_token: r.access_token });
-        res();
-      };
-      _tokenClient.requestAccessToken({ prompt: "" });
-    });
+    // Token expired — nd-auth renews silently (shared suite token)
+    const tok = await NDAuth.ensureToken();
+    state.googleAuth.accessToken = tok;
+    state.googleAuth.expiresAt = NDAuth.getExpiry();
+    state.googleAuth.signedIn = true;
+    gapi.client.setToken({ access_token: tok });
   }
   return fn();
 }
@@ -1743,6 +1712,7 @@ function renderCircuitModal(m) {
           <hr class="field-separator" />
           <div class="form-section"><div class="form-section-title">Connected devices</div></div>
           ${(()=>{ const r=c?.breakerRating||20; const sug=(r<=10)?["Light Point","Exhaust Fan","Down Light"]:(r<=20)?["10A GPO","Double GPO"]:(r>=20)?["Oven","Cooktop","Air Con","Hot Water System"]:[];  const sugDevs=devs.filter(d=>sug.some(s=>d.name.toLowerCase().includes(s.toLowerCase()))); return sugDevs.length?`<div class="field full" style="margin-bottom:0"><div class="form-section-title" style="margin-bottom:6px">Suggested for ${r}A breaker</div><div style="display:flex;flex-wrap:wrap;gap:6px">${sugDevs.map(d=>`<button type="button" class="btn btn-ghost btn-sm" data-qty-inc="${d.id}" style="font-size:12px">${I.plus}${escHtml(d.name)}</button>`).join("")}</div></div>`:""})()}
+          ${(()=>{ const others=(proj?.circuits||[]).filter(x=>(!isEdit||x.id!==m.circuitId)&&(x.devices||[]).length); return others.length?`<div class="field full" style="margin-bottom:8px"><label>Batch fill — copy devices from another circuit</label><select id="copyDevicesFrom"><option value="">Choose a circuit…</option>${others.map(x=>`<option value="${x.id}">${escHtml(x.name)} · ${(x.devices||[]).reduce((s,d)=>s+(d.qty||0),0)} device(s)</option>`).join("")}</select></div>`:"" })()}
           <div class="device-picker field full">
             <div class="device-search-wrap">${I.search}<input id="deviceSearch" placeholder="Search devices…" value="${escHtml(state.deviceSearch||"")}" /></div>
             <div class="device-picker-list">
@@ -1898,6 +1868,14 @@ function bindEvents() {
   });
 
   // Qty controls in circuit modal
+  const copySel = document.getElementById("copyDevicesFrom");
+  if (copySel) copySel.addEventListener("change", ()=>{
+    const src = (project()?.circuits||[]).find(x=>x.id===copySel.value);
+    if (!src) return;
+    _modalDevices = window.NDUI?.batchFill ? NDUI.batchFill(src.devices||[]) : (src.devices||[]).map(d=>({ ...d }));
+    render();
+    toast(`Copied ${_modalDevices.length} device type(s) from ${src.name}`);
+  });
   document.querySelectorAll("[data-qty-inc]").forEach(b=>b.addEventListener("click",()=>{
     const devId=b.dataset.qtyInc;
     const entry=_modalDevices.find(d=>d.id===devId);

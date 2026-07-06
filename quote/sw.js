@@ -11,14 +11,19 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'quote-v2';
+const CACHE_VERSION = 'quote-v3';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "/quote/favicon.svg"
+  "/quote/favicon.svg",
+  "../shared/nd-core.css",
+  "../shared/nd-cache.js",
+  "../shared/nd-queue.js",
+  "../shared/nd-ui.js",
+  "../shared/nd-pwa.js"
 ];
 
 const IS_API_HOST = (url) =>

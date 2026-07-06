@@ -1,0 +1,11 @@
+{
+  "apps": [
+    { "id": "planner",   "name": "Planner",   "path": "/planner/",   "icon": "/planner/favicon.svg",   "color": "#ff5252", "order": 1, "hidden": false },
+    { "id": "upload",    "name": "Upload",    "path": "/upload/",    "icon": "/upload/favicon.svg",    "color": "#a855f7", "order": 2, "hidden": false },
+    { "id": "search",    "name": "Search",    "path": "/search/",    "icon": "/search/favicon.svg",    "color": "#facc15", "order": 3, "hidden": false },
+    { "id": "quote",     "name": "Quote",     "path": "/quote/",     "icon": "/quote/favicon.svg",     "color": "#94a3b8", "order": 4, "hidden": false },
+    { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false },
+    { "id": "swb",       "name": "SWB",       "path": "/swb/",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6, "hidden": false },
+    { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 7, "hidden": true }
+  ]
+}

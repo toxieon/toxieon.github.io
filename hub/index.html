@@ -8,7 +8,11 @@
     <link rel="icon" href="favicon.svg?v=0.4.1" type="image/svg+xml">
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#0f1117" />
-    <link rel="stylesheet" href="styles.css?v=0.4.1">
+    <link rel="stylesheet" href="../shared/nd-core.css">
+    <link rel="stylesheet" href="styles.css?v=0.5.0">
+    <script src="../shared/nd-match.js"></script>
+    <script src="../shared/nd-cache.js"></script>
+    <script src="../shared/nd-ui.js"></script>
       <script src="../shared/nd-pwa.js" defer></script>
   </head>
   <body>
@@ -28,13 +32,6 @@
               <span class="grid-glyph" aria-hidden="true"></span>
               <span>Apps</span>
             </button>
-            <button class="tab" type="button" data-view="settings" aria-label="Settings" title="Settings">
-              <span class="settings-glyph" aria-hidden="true"></span>
-              <span>Settings</span>
-            </button>
-            <button id="refreshBtn" class="icon-button" type="button" title="Refresh" aria-label="Refresh">
-              <span aria-hidden="true">R</span>
-            </button>
           </div>
         </header>
 
@@ -44,68 +41,29 @@
               <div class="panel-header">
                 <div class="panel-title">
                   <h1 id="appsHeading">Apps</h1>
-                  <p id="status" class="status">Loading Hub...</p>
+                  <p id="status" class="status">Neill Data suite</p>
                 </div>
                 <div class="summary" aria-live="polite">
                   <span id="visibleCount">0</span>
-                  <small>visible</small>
+                  <small>apps</small>
                 </div>
               </div>
 
               <div class="filter-panel">
-                <div class="target-row">
-                  <label class="field-label" for="targetInput">Source</label>
-                  <input id="targetInput" type="url" value="https://neilldata.com" autocomplete="url" spellcheck="false">
-                </div>
                 <div class="controls">
                   <label class="search-box" for="searchInput">
                     <span class="search-glyph" aria-hidden="true"></span>
                     <input id="searchInput" type="search" placeholder="Search apps" autocomplete="off">
                   </label>
-                  <select id="branchFilter" aria-label="Filter by branch">
-                    <option value="all">All branches</option>
-                  </select>
                 </div>
               </div>
 
-              <div class="bulk-bar">
-                <button id="bulkModeBtn" class="ghost-button" type="button">Bulk blacklist</button>
-                <button id="applyBulkBlacklistBtn" class="primary-button" type="button" disabled>Blacklist selected</button>
-                <button id="cancelBulkBtn" class="ghost-button" type="button" hidden>Cancel</button>
-                <span id="selectedCount" class="selected-count">0 selected</span>
+              <div id="recentsRow" class="recents-row" hidden>
+                <h2 class="recents-title">Continue where you left off</h2>
+                <div id="recentsList" class="recents-list"></div>
               </div>
 
-              <div id="grid" class="app-grid" aria-label="Discovered branches"></div>
-            </div>
-          </section>
-
-          <section id="settingsView" class="view" aria-labelledby="settingsHeading">
-            <div class="settings-layout">
-              <section class="settings-panel">
-                <div class="panel-title">
-                  <h1 id="settingsHeading">Settings</h1>
-                  <p>Blacklist</p>
-                </div>
-                <form id="blacklistForm" class="blacklist-form">
-                  <input id="blacklistInput" type="text" placeholder="neilldata.com/suburbs*" autocomplete="off" spellcheck="false">
-                  <button class="primary-button" type="submit">Add</button>
-                </form>
-                <div class="preset-row" aria-label="Common blacklist presets">
-                  <button class="chip-button" type="button" data-pattern="neilldata.com/suburbs*">suburbs*</button>
-                  <button class="chip-button" type="button" data-pattern="neilldata.com/postcode*">postcode*</button>
-                  <button class="chip-button" type="button" data-pattern="neilldata.com/seo*">seo*</button>
-                </div>
-              </section>
-
-              <section class="settings-panel">
-                <div class="settings-heading-row">
-                  <div class="panel-title">
-                    <h2>Active rules</h2>
-                  </div>
-                  <button id="clearBlacklistBtn" class="ghost-button" type="button">Clear</button>
-                </div>
-                <div id="blacklistList" class="blacklist-list" aria-live="polite"></div>
-              </section>
+              <div id="grid" class="app-grid" aria-label="Apps"></div>
             </div>
           </section>
         </main>
@@ -125,6 +83,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=0.4.1" type="module"></script>
+    <script src="app.js?v=0.5.0" type="module"></script>
   </body>
 </html>

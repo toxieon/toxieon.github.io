@@ -238,3 +238,19 @@
   font-family: var(--nd-sans); font-weight: 600; font-size: 13px;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
+
+/* ── §3.6 shared settings accordion ──────────────────────────────────── */
+.nd-acc { border: 1px solid var(--nd-border); border-radius: var(--nd-radius); background: var(--nd-surface); margin-bottom: var(--nd-space-3); overflow: hidden; }
+.nd-acc-summary {
+  list-style: none; cursor: pointer; user-select: none;
+  min-height: var(--nd-tap); display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; font-weight: 600; font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+.nd-acc-summary::-webkit-details-marker { display: none; }
+.nd-acc-summary::after { content: '▾'; color: var(--nd-muted); transition: transform 0.2s; }
+.nd-acc:not([open]) > .nd-acc-summary::after { transform: rotate(-90deg); }
+.nd-acc-body { padding: 0 12px 12px; }
+.nd-acc-body input, .nd-acc-body select, .nd-acc-body textarea { width: 100%; min-height: var(--nd-tap); box-sizing: border-box; }
+.nd-acc-danger { border-color: rgba(229, 62, 62, 0.5); background: var(--nd-red-bg); }
+.nd-acc-danger > .nd-acc-summary { color: var(--nd-red); }

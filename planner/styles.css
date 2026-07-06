@@ -2805,10 +2805,6 @@ button[disabled],
   .plan-stage {
     width: 98%;
   }
-  .node-marker {
-    width: 34px;
-    height: 34px;
-  }
   .node-list {
     max-height: none;
   }
@@ -2929,3 +2925,88 @@ button[disabled],
     padding: 0 12px 12px;
   }
 }
+
+/* ── Node marker sizing fix (v1.0 §4.6) ──────────────────────────────────
+ * Markers were fixed px (28px, 34px mobile) on a .plan-stage that shrinks
+ * to ~360px on a phone — markers dominated the plan. Size them relative
+ * to the plan instead. 2cqw ≈ today's 28px on a 1440px desktop plan, so
+ * desktop look is unchanged; on a phone the marker keeps the same
+ * PROPORTION of the plan. --size (the per-node user resize multiplier)
+ * still applies via transform scale, exactly as before.
+ * @supports-gated: browsers without container queries keep the old 28px. */
+@supports (width: 1cqw) {
+  .plan-stage {
+    container-type: size;
+  }
+  .node-marker {
+    --marker-base: clamp(14px, 2cqw, 40px);
+    width: var(--marker-base);
+    height: var(--marker-base);
+  }
+  .node-marker.is-portal {
+    width: calc(var(--marker-base) * 1.07);   /* was 30px vs 28px */
+    height: calc(var(--marker-base) * 1.07);
+  }
+}
+
+/* ── Slice 2 #16/#17: inbox banner + to-be-sorted tray ──────────────────── */
+.inbox-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; margin-bottom: 14px; padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(20, 184, 166, 0.08));
+  border: 1px solid rgba(37, 99, 235, 0.35); border-radius: 12px;
+}
+.inbox-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
+.inbox-banner-text span { color: var(--muted); font-size: 0.85rem; }
+.inbox-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.inbox-banner-actions button { min-height: 44px; }
+.to-sort-chip {
+  min-height: 34px; padding: 4px 14px; border-radius: 999px; border: 1px solid rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.12); color: #fbbf24; font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.nd-tray {
+  position: fixed; inset: auto 0 0 0; z-index: 60; max-height: 86vh;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column; box-shadow: var(--shadow);
+}
+@media (min-width: 760px) {
+  .nd-tray { inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(880px, 94vw); border-radius: 16px; }
+}
+.nd-tray-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.nd-tray-head p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+.nd-tray-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px; padding: 16px 18px calc(18px + env(safe-area-inset-bottom)); overflow-y: auto;
+}
+.nd-tray-card { display: flex; flex-direction: column; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.nd-tray-card img, .nd-tray-noimg { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; background: var(--panel-3); display: grid; place-items: center; }
+.nd-tray-meta strong { display: block; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-tray-sortrow { display: flex; gap: 6px; }
+.nd-tray-sortrow select { flex: 1; min-height: 44px; min-width: 0; }
+.nd-tray-btn { min-height: 44px; font-size: 0.78rem; }
+
+/* ── Slice 2 #20: settings restructure + danger zone + projects search ──── */
+.settings-actions-title { margin: 18px 0 8px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.settings-actions-title.is-danger { color: var(--red); }
+.settings-action-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px;
+  background: var(--panel-2);
+}
+.settings-action-row > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.settings-action-row > span:first-child > span { color: var(--muted); font-size: 0.78rem; }
+.settings-action-row button { min-height: 44px; flex: none; }
+.settings-danger-zone { border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 12px; padding: 10px; background: rgba(239, 68, 68, 0.05); }
+.settings-danger-zone .settings-action-row { border-color: rgba(239, 68, 68, 0.25); background: transparent; }
+.projects-search { margin-bottom: 12px; }
+.projects-search input { min-height: 44px; width: 100%; }
+
+/* ── Slice 5 #32: recent projects row ── */
+.recent-projects { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.recents-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.recent-project-chip {
+  min-height: 38px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--text);
+  font-size: 0.82rem; cursor: pointer;
+}
+.recent-project-chip:hover { border-color: var(--blue); }

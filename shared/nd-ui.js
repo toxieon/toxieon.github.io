@@ -242,10 +242,105 @@
     return { refresh: refresh, el: chip };
   }
 
+  /* §3.6 — the shared mobile settings pattern: turns flat section blocks
+   * into collapsible accordions. All collapsed by default, open state
+   * remembered per storageKey. Sections named in opts.danger get
+   * red danger styling. Built for Timesheet, reused by Quote (§4). */
+  function accordion(rootEl, opts) {
+    opts = opts || {};
+    const sectionSel = opts.sectionSelector || ".settings-section";
+    const titleSel = opts.titleSelector || "h3";
+    const storageKey = opts.storageKey || "nd-accordion";
+    const dangerTitles = (opts.danger || []).map(function (s) { return s.toLowerCase(); });
+    let openSet;
+    try { openSet = new Set(JSON.parse(localStorage.getItem(storageKey)) || []); } catch (e) { openSet = new Set(); }
+    function saveOpen() {
+      try { localStorage.setItem(storageKey, JSON.stringify(Array.from(openSet))); } catch (e) {}
+    }
+    Array.prototype.forEach.call(rootEl.querySelectorAll(sectionSel), function (section) {
+      if (section.dataset.ndAcc) return;
+      section.dataset.ndAcc = "1";
+      const title = section.querySelector(titleSel);
+      if (!title) return;
+      const name = title.textContent.trim();
+      const isDanger = dangerTitles.indexOf(name.toLowerCase()) !== -1;
+      const details = document.createElement("details");
+      details.className = "nd-acc" + (isDanger ? " nd-acc-danger" : "");
+      if (openSet.has(name)) details.open = true;
+      const summary = document.createElement("summary");
+      summary.className = "nd-acc-summary";
+      summary.textContent = name;
+      details.appendChild(summary);
+      const body = document.createElement("div");
+      body.className = "nd-acc-body";
+      const kids = Array.prototype.slice.call(section.children).filter(function (el) { return el !== title; });
+      kids.forEach(function (el) { body.appendChild(el); });
+      details.appendChild(body);
+      title.remove();
+      section.appendChild(details);
+      details.addEventListener("toggle", function () {
+        if (details.open) openSet.add(name); else openSet.delete(name);
+        saveOpen();
+      });
+    });
+  }
+
+  /* §5.1 — continue-where-you-left-off. Apps record meaningful navigation;
+   * Hub renders the most recent few as one-tap deep links. Stored in
+   * nd-cache when available (spec) with a localStorage mirror so apps that
+   * don't load nd-cache still participate. */
+  /* §5.3 — batch-fill: Upload's copy-to-all / first-to-all pattern as a
+   * generic helper. Copies `fields` from source onto every target (or a
+   * full deep list copy when fields is omitted and source is an array). */
+  function batchFill(source, targets, fields) {
+    if (Array.isArray(source) && targets === undefined) {
+      return source.map(function (row) { return JSON.parse(JSON.stringify(row)); });   // deep list copy
+    }
+    (targets || []).forEach(function (t) {
+      (fields || Object.keys(source)).forEach(function (f) {
+        if (source[f] !== undefined) t[f] = source[f];
+      });
+    });
+    return targets;
+  }
+
+  const RECENT_KEY = "nd:recent:v1";
+  const RECENT_MAX = 12;
+
+  function readRecentLocal() {
+    try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch (e) { return []; }
+  }
+
+  function recordVisit(app, context, label, url) {
+    const entry = { app: app, context: context || "", label: label || app, url: url || "", ts: Date.now() };
+    let list = readRecentLocal().filter(function (e) { return !(e.app === entry.app && e.context === entry.context); });
+    list.unshift(entry);
+    list = list.slice(0, RECENT_MAX);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {}
+    if (root.NDCache) { try { root.NDCache.put(RECENT_KEY, list); } catch (e) {} }
+    return entry;
+  }
+
+  function recentVisits(limit) {
+    const local = readRecentLocal();
+    const finish = function (cacheList) {
+      const merged = {};
+      (cacheList || []).concat(local).forEach(function (e) {
+        const k = e.app + "|" + e.context;
+        if (!merged[k] || merged[k].ts < e.ts) merged[k] = e;
+      });
+      return Object.values(merged).sort(function (a, b) { return b.ts - a.ts; }).slice(0, limit || 5);
+    };
+    if (root.NDCache) {
+      return root.NDCache.get(RECENT_KEY).then(finish).catch(function () { return finish([]); });
+    }
+    return Promise.resolve(finish([]));
+  }
+
   const API = {
     SKELETON_VARIANTS,
     escapeHtml, highResUrl, skeletonMarkup, syncChipLabel,
-    skeleton, skeletonOverlay, toast, confirm: confirmDialog, lightbox, syncChip
+    skeleton, skeletonOverlay, toast, confirm: confirmDialog, lightbox, syncChip, accordion, recordVisit, recentVisits, batchFill
   };
 
   if (typeof module !== "undefined" && module.exports) {
