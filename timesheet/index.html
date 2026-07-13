@@ -1162,7 +1162,7 @@ const TsExport = (() => {
         body: JSON.stringify({ action: 'sendTimesheet', to: email.to, cc: email.cc, subject: email.subject, body: email.body })
       });
       const out = await resp.json().catch(() => ({}));
-      if (!resp.ok || out.ok === false) throw new Error(out.error || ('HTTP ' + resp.status));
+      if (!resp.ok || out.ok !== true) throw new Error(out.error || ('HTTP ' + resp.status));
       const start = isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek));
       if (email.messageId) {
         const m = st.settings.messages.find(m => m.id === email.messageId);
