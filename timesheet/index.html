@@ -176,6 +176,53 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .day-chip.sel { background: var(--text-primary); color: #111; border-color: var(--text-primary); }
 .icon-btn { color: var(--text-muted); font-size: 16px; padding: 4px 8px; }
 .icon-btn.pinned { color: var(--off-accent); }
+
+/* Sync-state water fill on the "More" section. The whole panel is red at its
+ * base and fills green as the water rises to full when synced; it drops back to
+ * red when unsynced, failed, or stale (hasn't synced in a while). Same palette
+ * and wave crest as the sync tube. Level is set by a fill-* class from JS. */
+#view-settings .nd-acc-danger {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--nd-radius, 14px);
+  background: var(--surface);
+  transition: box-shadow 900ms ease;
+}
+#view-settings .nd-acc-danger::before {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0; height: 14%;
+  background: linear-gradient(to top, #e0473f 0%, #e07b2a 34%, #f5c542 64%, #3ab87a 100%);
+  opacity: 0.5;
+  transition: height 950ms cubic-bezier(0.4,0,0.2,1);
+  z-index: 0; pointer-events: none;
+}
+#view-settings .nd-acc-danger::after {
+  content: '';
+  position: absolute; left: 50%; bottom: 14%;
+  width: 280%; padding-bottom: 280%; margin-left: -140%;
+  border-radius: 44% 46% 43% 47%;
+  background: rgba(255,255,255,0.06);
+  animation: acc-waterspin 10s linear infinite;
+  transition: bottom 950ms cubic-bezier(0.4,0,0.2,1);
+  z-index: 0; pointer-events: none;
+}
+@keyframes acc-waterspin { to { transform: rotate(360deg); } }
+#view-settings .nd-acc-danger > .nd-acc-summary,
+#view-settings .nd-acc-danger > .nd-acc-body { position: relative; z-index: 1; }
+#view-settings .nd-acc-danger > .nd-acc-summary { color: var(--text-primary); }
+#view-settings .nd-acc-danger .card { background: rgba(26,26,26,0.42); }
+#view-settings .nd-acc-danger.fill-full::before  { height: 100%; }
+#view-settings .nd-acc-danger.fill-full::after   { bottom: 100%; }
+#view-settings .nd-acc-danger.fill-full          { box-shadow: 0 0 18px rgba(58,184,122,0.28); }
+#view-settings .nd-acc-danger.fill-low::before   { height: 44%; }
+#view-settings .nd-acc-danger.fill-low::after    { bottom: 44%; }
+#view-settings .nd-acc-danger.fill-low           { box-shadow: 0 0 16px rgba(224,123,42,0.24); }
+#view-settings .nd-acc-danger.fill-empty::before { height: 14%; }
+#view-settings .nd-acc-danger.fill-empty::after  { bottom: 14%; }
+#view-settings .nd-acc-danger.fill-empty         { box-shadow: 0 0 18px rgba(224,71,63,0.26); }
+#view-settings .nd-acc-danger.fill-filling::before { animation: acc-fillbob 1.6s ease-in-out infinite alternate; }
+@keyframes acc-fillbob { from { height: 26%; } to { height: 100%; } }
 </style>
 </head>
 <body>
@@ -579,6 +626,8 @@ function ensureSyncIndicator() {
   const label = document.createElement('div');
   label.id = 'sync-label'; label.className = 'sync-label';
   document.body.appendChild(label);
+  // Re-check staleness every minute so the panel drains back to red on its own.
+  if (!window._ts_fill_loop) window._ts_fill_loop = setInterval(renderDangerFill, 60000);
   renderSyncIndicator();
 }
 function setSyncStatus(status, label) { syncStatus = status; renderSyncIndicator(label); }
@@ -588,6 +637,7 @@ function renderSyncIndicator(label) {
     tube.className = 'sync-tube state-' + syncStatus;
     tube.title = { synced: 'Up to date — tap to sync', pending: 'Waiting to sync — tap to sync now', syncing: 'Syncing…', failed: 'Sync problem — tap to retry' }[syncStatus] || 'Sync';
   }
+  renderDangerFill();
   const el = document.getElementById('sync-label');
   if (!el) return;
   if (label) {
@@ -610,6 +660,25 @@ function markSynced() { localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
 function renderLastSynced() {
   const el = document.getElementById('last-synced-line');
   if (el) el.textContent = 'Last synced: ' + fmtRelative(getLastSynced());
+}
+// "hasn't synced in a while" → the More panel reverts to red past this age.
+const STALE_SYNC_MS = 12 * 60 * 60 * 1000;
+function dangerFillState() {
+  if (syncStatus === 'syncing') return 'filling';
+  if (syncStatus === 'failed') return 'empty';
+  if (syncStatus === 'pending') return 'low';
+  const ls = getLastSynced();                 // synced
+  if (!ls || (Date.now() - ls) > STALE_SYNC_MS) return 'empty';  // stale → red
+  return 'full';                              // fresh sync → full green
+}
+function renderDangerFill() {
+  const card = document.querySelector('#view-settings .nd-acc-danger');
+  if (!card) return;
+  const cls = 'fill-' + dangerFillState();
+  if (card._fillCls === cls) return;
+  card._fillCls = cls;
+  card.classList.remove('fill-full', 'fill-low', 'fill-empty', 'fill-filling');
+  card.classList.add(cls);
 }
 
 function scheduleSync() {
@@ -1795,6 +1864,7 @@ window.Views = {};
         danger: ['More']   // Clear cache / disconnects live here
       });
     }
+    renderDangerFill();   // paint the water level once the danger panel exists
   }
   window.Views.settings = { init, render: renderAll };
 })();
