@@ -45,11 +45,28 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .btn-primary { background: var(--text-primary); color: #111; }
 .btn-ghost { background: rgba(255,255,255,0.08); color: var(--text-primary); }
 .btn-block { width: 100%; padding: 16px; font-size: 15px; }
-.sync-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; position: fixed; top: 14px; right: 14px; z-index: 60; }
-.sync-synced { background: var(--on-primary); }
-.sync-pending { background: var(--off-accent); animation: pulse 1.4s infinite; }
-.sync-failed { background: #e0473f; }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+/* ── Water-fill sync indicator ──
+ * A little tube fixed top-right. The fill rises bottom→top and, because the
+ * fill is a fixed red→orange→yellow→green gradient, its crest travels through
+ * those colours as the water level climbs — so a rising level literally goes
+ * red → orange → yellow → green. Tap it to sync now. */
+.sync-tube { position: fixed; top: 12px; right: 14px; width: 18px; height: 46px; border-radius: 999px; overflow: hidden; z-index: 60; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid var(--border); box-shadow: inset 0 2px 6px rgba(0,0,0,0.55); -webkit-tap-highlight-color: transparent; }
+.sync-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: linear-gradient(to top, #e0473f 0%, #e07b2a 32%, #f5c542 62%, #3ab87a 100%); transition: height 550ms cubic-bezier(0.4,0,0.2,1); }
+/* two translucent rotating blobs at the surface = shifting water crest */
+.sync-fill::before, .sync-fill::after { content: ''; position: absolute; left: 50%; top: -14px; width: 200%; padding-bottom: 200%; margin-left: -100%; border-radius: 43% 47% 44% 46%; background: rgba(255,255,255,0.16); animation: waterSpin 6s linear infinite; }
+.sync-fill::after { border-radius: 47% 43% 46% 44%; background: rgba(255,255,255,0.09); animation-duration: 9s; animation-direction: reverse; }
+@keyframes waterSpin { to { transform: rotate(360deg); } }
+.sync-tube.state-synced  .sync-fill { height: 100%; }
+.sync-tube.state-pending .sync-fill { height: 46%; }
+.sync-tube.state-failed  .sync-fill { height: 26%; }
+.sync-tube.state-syncing .sync-fill { animation: fillBob 1.5s ease-in-out infinite alternate; }
+.sync-tube.state-syncing .sync-fill::before { animation-duration: 2.4s; }
+.sync-tube.state-syncing .sync-fill::after  { animation-duration: 3.4s; }
+@keyframes fillBob { from { height: 24%; } to { height: 100%; } }
+.sync-tube.state-failed { animation: tubeShake 0.4s ease; }
+@keyframes tubeShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+.sync-label { position: fixed; top: 15px; right: 40px; max-width: 62vw; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); font-size: 11px; padding: 5px 11px; border-radius: 999px; z-index: 60; opacity: 0; transform: translateX(6px); transition: opacity 220ms, transform 220ms; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-label.show { opacity: 1; transform: translateX(0); }
 .ts-toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(10px); background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 100; max-width: 86%; text-align: center; }
 .ts-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .field { margin-bottom: 14px; }
@@ -139,7 +156,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .nudge-card { border-color:var(--on-glow); background:linear-gradient(135deg, rgba(58,184,122,0.14), var(--surface)); margin:14px 0 0; width:100%; max-width:420px; }
 .icon-x { background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; min-width:44px; min-height:44px; }
 
-@media print { .tabbar, .sync-dot, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
+@media print { .tabbar, .sync-tube, .sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
 .settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
 .msg-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
@@ -327,6 +344,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
           <button class="btn btn-ghost" id="btn-backup">Force sync now</button>
           <button class="btn btn-ghost" id="btn-clear-cache">Clear local cache</button>
         </div>
+        <div class="muted" id="last-synced-line" style="font-size:12px; margin-top:12px;">Last synced: never</div>
       </div>
     </div>
 
@@ -527,15 +545,19 @@ async function copyText(text) {
   }
 }
 
-/* ----- OFFLINE QUEUE ----- */
+/* ----- OFFLINE QUEUE + SYNC ----- */
 const QUEUE_KEY = 'ts_offline_queue_v1';
+const LAST_SYNC_KEY = 'ts_last_synced_v1';
+const DAILY_SYNC_KEY = 'ts_daily_sync_date';
+const DAILY_SYNC_AFTER = '15:25';   // force one full sync per day after this time
 let syncStatus = 'synced';
 let syncTimer = null;
+let labelTimer = null;
 function loadQueue() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; } }
 function saveQueue(q) { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
 function queueSheetWrite(sheetName, row, isUpdate = false) {
   const q = loadQueue(); q.push({ id: uid(), sheetName, row, isUpdate, ts: Date.now() }); saveQueue(q);
-  setSyncStatus('pending'); renderSyncDot(); scheduleSync();
+  setSyncStatus('pending', 'Saved — will sync'); scheduleSync();
 }
 function queueSheetDelete(sheetName, idValue) {
   let q = loadQueue();
@@ -543,35 +565,123 @@ function queueSheetDelete(sheetName, idValue) {
   // can't recreate the row we're deleting.
   q = q.filter(it => !(it.sheetName === sheetName && !it.op && it.row && (it.row.session_id === idValue || it.row.id === idValue || it.row.job_id === idValue)));
   q.push({ id: uid(), sheetName, op: 'delete', idValue, ts: Date.now() });
-  saveQueue(q); setSyncStatus('pending'); renderSyncDot(); scheduleSync();
+  saveQueue(q); setSyncStatus('pending', 'Saved — will sync'); scheduleSync();
 }
-function setSyncStatus(s) { syncStatus = s; renderSyncDot(); }
-function renderSyncDot() {
-  const dot = document.getElementById('sync-dot'); if (!dot) return;
-  dot.className = 'sync-dot sync-' + syncStatus;
-  dot.title = { synced: 'Synced', pending: 'Pending sync', failed: 'Sync failed — will retry' }[syncStatus];
+
+/* ── sync indicator (water tube + status label) ── */
+function ensureSyncIndicator() {
+  if (document.getElementById('sync-tube')) return;
+  const tube = document.createElement('div');
+  tube.id = 'sync-tube'; tube.className = 'sync-tube state-synced';
+  tube.innerHTML = '<div class="sync-fill"></div>';
+  tube.addEventListener('click', () => runForceSync());
+  document.body.appendChild(tube);
+  const label = document.createElement('div');
+  label.id = 'sync-label'; label.className = 'sync-label';
+  document.body.appendChild(label);
+  renderSyncIndicator();
 }
+function setSyncStatus(status, label) { syncStatus = status; renderSyncIndicator(label); }
+function renderSyncIndicator(label) {
+  const tube = document.getElementById('sync-tube');
+  if (tube) {
+    tube.className = 'sync-tube state-' + syncStatus;
+    tube.title = { synced: 'Up to date — tap to sync', pending: 'Waiting to sync — tap to sync now', syncing: 'Syncing…', failed: 'Sync problem — tap to retry' }[syncStatus] || 'Sync';
+  }
+  const el = document.getElementById('sync-label');
+  if (!el) return;
+  if (label) {
+    el.textContent = label; el.classList.add('show'); clearTimeout(labelTimer);
+    if (syncStatus !== 'syncing') labelTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  } else if (syncStatus === 'synced') {
+    clearTimeout(labelTimer); labelTimer = setTimeout(() => el.classList.remove('show'), 1200);
+  }
+}
+function fmtRelative(ts) {
+  if (!ts) return 'never';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + (m === 1 ? ' min ago' : ' mins ago');
+  const h = Math.floor(m / 60); if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+  const d = new Date(ts); return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hhmm(d);
+}
+function getLastSynced() { return Number(localStorage.getItem(LAST_SYNC_KEY)) || 0; }
+function markSynced() { localStorage.setItem(LAST_SYNC_KEY, String(Date.now())); renderLastSynced(); }
+function renderLastSynced() {
+  const el = document.getElementById('last-synced-line');
+  if (el) el.textContent = 'Last synced: ' + fmtRelative(getLastSynced());
+}
+
 function scheduleSync() {
-  clearTimeout(syncTimer); syncTimer = setTimeout(flushQueue, 1000);
-  if (!window._ts_sync_loop) { window._ts_sync_loop = setInterval(flushQueue, 30000); }
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => flushQueue(), 1200);
+  if (!window._ts_sync_loop) { window._ts_sync_loop = setInterval(() => { if (loadQueue().length) flushQueue(); }, 30000); }
 }
+// Push queued writes only. Silent (indicator-only, no toast). Attempts a silent
+// token refresh so a lapsed token (common on mobile) recovers without a popup.
 async function flushQueue() {
-  if (!navigator.onLine) { setSyncStatus('pending'); return; }
-  if (!window.TsSheets || !window.TsSheets.isReady()) { setSyncStatus('pending'); return; }
-  let q = loadQueue(); if (!q.length) { setSyncStatus('synced'); return; }
+  const q = loadQueue();
+  if (!q.length) { if (navigator.onLine && window.TsSheets && TsSheets.isReady()) setSyncStatus('synced'); return true; }
+  if (!navigator.onLine) { setSyncStatus('pending', 'Offline — will sync later'); return false; }
+  if (!window.TsSheets) { setSyncStatus('pending'); return false; }
+  setSyncStatus('syncing', 'Pushing ' + q.length + ' change' + (q.length === 1 ? '' : 's') + '…');
+  const ready = await TsSheets.ensureToken(false);
+  if (!ready) { setSyncStatus('pending', 'Sign in to Google to sync'); return false; }
   const remaining = [];
   for (const item of q) {
     try {
-      if (item.op === 'delete') await window.TsSheets.deleteRow(item.sheetName, item.idValue);
-      else await window.TsSheets.writeRow(item.sheetName, item.row, item.isUpdate);
-    }
-    catch (e) { console.warn('sync failed for', item, e); remaining.push(item); }
+      if (item.op === 'delete') await TsSheets.deleteRow(item.sheetName, item.idValue);
+      else await TsSheets.writeRow(item.sheetName, item.row, item.isUpdate);
+    } catch (e) { console.warn('sync failed for', item, e); remaining.push(item); }
   }
-  saveQueue(remaining); setSyncStatus(remaining.length ? 'failed' : 'synced');
+  saveQueue(remaining);
+  if (remaining.length) { setSyncStatus('failed', remaining.length + ' change' + (remaining.length === 1 ? '' : 's') + ' still pending'); return false; }
+  markSynced(); setSyncStatus('synced', 'Up to date'); return true;
 }
 function flushQueueOnNextOpen() { return flushQueue(); }
-window.addEventListener('online', flushQueue);
-window.addEventListener('offline', () => setSyncStatus('pending'));
+// Push + pull, silent. Used by the daily auto-sync and post-clock-off trigger.
+async function backgroundSync() {
+  if (!navigator.onLine) { setSyncStatus('pending', 'Offline — will sync later'); return false; }
+  const pushed = await flushQueue();
+  if (!pushed) return false;
+  setSyncStatus('syncing', 'Pulling latest…');
+  const pulled = await pullFromSheet();
+  if (pulled) { markSynced(); setSyncStatus('synced', 'Up to date'); refreshAllViews(); }
+  return pulled;
+}
+// Explicit, user-initiated sync (tap the tube or Force sync button). May prompt
+// an interactive sign-in; shows a toast on completion.
+async function runForceSync() {
+  if (!navigator.onLine) { toast('Offline — will sync later'); setSyncStatus('pending', 'Offline'); return; }
+  setSyncStatus('syncing', 'Connecting to Google…');
+  if (!(window.TsSheets && TsSheets.isReady())) {
+    let ready = false;
+    try { ready = await TsSheets.ensureToken(true); } catch (e) {}
+    if (!ready) { setSyncStatus('failed', 'Sign-in needed'); toast('Sign in to Google to sync (Settings → Google Account)', 4000); return; }
+  }
+  try {
+    setSyncStatus('syncing', 'Pushing changes…');
+    await flushQueue();
+    setSyncStatus('syncing', 'Pulling latest…');
+    const pulled = await pullFromSheet();
+    markSynced(); setSyncStatus('synced', 'Up to date'); refreshAllViews();
+    toast(pulled ? 'Synced ✓' : 'Synced — nothing new to pull');
+  } catch (e) {
+    console.warn('Force sync failed', e);
+    setSyncStatus('failed', 'Sync failed');
+    toast('Sync failed — ' + (e && e.message || 'check connection'), 4200);
+  }
+}
+// Once per day, after the last shift of the day (>= 15:25), do a full sync.
+async function maybeDailyForceSync() {
+  const now = new Date();
+  if (hhmm(now) < DAILY_SYNC_AFTER) return;
+  if (localStorage.getItem(DAILY_SYNC_KEY) === isoDate(now)) return;
+  if (!navigator.onLine) return;
+  const ok = await backgroundSync();
+  if (ok) localStorage.setItem(DAILY_SYNC_KEY, isoDate(now));
+}
+window.addEventListener('online', () => flushQueue());
+window.addEventListener('offline', () => setSyncStatus('pending', 'Offline'));
 
 /* ----- STATE / SESSIONS ----- */
 const STATE_KEY = 'ts_state_v1';
@@ -684,6 +794,8 @@ function clockOff({ lat, lng, breakMinutes, notes, manualTime, departedOffsite, 
   state.sessions.unshift(session); state.lastClosedSession = session; state.currentSession = null;
   bumpJobVisit(session.job_id); saveState(); upsertSession(session); vibrate([40, 60, 40]);
   if (window.NDUI?.recordVisit) NDUI.recordVisit('timesheet', session.job_id || 'shift', 'Shift: ' + (session.job_name || 'job'), '/timesheet/');
+  // Clocking off after 15:25 counts as the last entry of the day → full sync.
+  maybeDailyForceSync();
   return session;
 }
 function updateSession(sessionId, patch) {
@@ -789,7 +901,8 @@ function mergeById(remote, local, idKey, pendingIds, coerce) {
   return Array.from(map.values());
 }
 async function pullFromSheet() {
-  if (!window.TsSheets || !TsSheets.isReady()) return false;
+  if (!window.TsSheets) return false;
+  if (!TsSheets.isReady()) { const ok = await TsSheets.ensureToken(false); if (!ok) return false; }
   try {
     const [remoteSessions, remoteJobs, remoteStatic] = await Promise.all([
       TsSheets.readAll('sessions'),
@@ -923,10 +1036,11 @@ const TsSheets = (() => {
   const spreadsheetId = cfg.timesheetSpreadsheetId || null;
   let profile = null, gapiReady = false, onStatusChange = () => {};
   // Base tab headers. Actual tab titles are resolved per-user via tabName().
-  // `user` column added to sessions + jobs (handoff §2 / §7).
+  // `user` is appended at the END of sessions + jobs so existing sheet rows stay
+  // positionally aligned (they simply get a blank trailing user until re-saved).
   const HEADERS = {
-    sessions: ['session_id','user','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','break_minutes','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period','entry_method'],
-    jobs: ['job_id','user','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count','last_visit'],
+    sessions: ['session_id','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','break_minutes','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period','entry_method','user'],
+    jobs: ['job_id','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count','last_visit','user'],
     pay_periods: ['week_start','label'],
     static_days: ['id','name','type','days','clock_on','clock_off','location','active'],
     account_link: ['google_email','neill_quote_connected','device_fingerprint','linked_at']
@@ -989,6 +1103,14 @@ const TsSheets = (() => {
     return NDAuth.ensureToken({ interactive: true }).catch((e) => { onStatusChange('error', { error: e?.message }); throw e; });
   }
   function signOut() { NDAuth.signOut(); }
+  // Silent (or interactive) token top-up used by the sync layer. Returns whether
+  // we ended up with a live token + resolved sheet id.
+  async function ensureToken(interactive) {
+    if (isReady()) return true;
+    if (!window.NDAuth || !gapiReady) return false;
+    try { await NDAuth.ensureToken({ interactive: !!interactive }); } catch (e) { return false; }
+    return isReady();
+  }
   // Ensure the current user's tab-set (plus shared tabs) exists with headers.
   // Only adds missing tabs — never clobbers an existing user's data.
   async function ensureTabs() {
@@ -1057,7 +1179,7 @@ const TsSheets = (() => {
     return (r.result.values || []).map(row => { const obj = {}; headers.forEach((h, i) => obj[h] = row[i] ?? ''); return obj; });
   }
   return {
-    boot, signIn, signOut, isReady, isSignedIn, getProfile, ensureSpreadsheet, writeRow, deleteRow, readAll,
+    boot, signIn, signOut, ensureToken, isReady, isSignedIn, getProfile, ensureSpreadsheet, writeRow, deleteRow, readAll,
     get spreadsheetId() { return spreadsheetId; }, set onStatusChange(fn) { onStatusChange = fn; }
   };
 })();
@@ -1571,7 +1693,7 @@ window.Views = {};
     bindToggle('s-notif-weekly', () => s.notifications.weeklySummary, v => saveSettings({ notifications: Object.assign({}, s.notifications, { weeklySummary: v }) }));
     bindText('s-defaultJobNote', 'defaultJobNote', s); bindSelect('s-firstDayOfWeek', 'firstDayOfWeek', s);
     bindToggle('s-use24hr', () => s.use24hr, v => saveSettings({ use24hr: v }));
-    renderTemplates(); renderAccountStatus();
+    renderTemplates(); renderAccountStatus(); renderLastSynced();
   }
   function renderTemplates() {
     const st = getState(); const list = $('tpl-list');
@@ -1636,27 +1758,7 @@ window.Views = {};
     });
     $('btn-nq-disconnect').addEventListener('click', () => { TsNeillQuote.disconnect(); renderNeillQuoteStatus(); });
     $('btn-notif-perm').addEventListener('click', async () => { const perm = await TsNotifications.requestPermission(); toast(perm === 'granted' ? 'Notifications enabled' : 'Notifications ' + perm); });
-    $('btn-backup').addEventListener('click', async () => {
-      if (!navigator.onLine) { toast('Offline — will sync later'); return; }
-      // §6: ensure a live token before flush/pull, prompting an interactive
-      // sign-in if needed. No more silent "sign in to Google" no-op on desktop.
-      if (!(window.TsSheets && TsSheets.isReady())) {
-        toast('Connecting to Google…');
-        try { await TsSheets.signIn(); } catch (e) { toast('Sign-in needed to sync — ' + (e && e.message || 'try again'), 4000); return; }
-      }
-      if (!(window.TsSheets && TsSheets.isReady())) { toast('Sign in to Google to sync (Settings → Google Account)', 4000); return; }
-      toast('Syncing…');
-      try {
-        await flushQueue();
-        const pulled = await pullFromSheet();
-        renderAll();
-        if (window.Views.history && window.Views.history.render) window.Views.history.render();
-        toast(pulled ? 'Synced ✓' : 'Synced — nothing new to pull');
-      } catch (e) {
-        console.warn('Force sync failed', e);
-        toast('Sync failed — ' + (e && e.message || 'check connection'), 4200);
-      }
-    });
+    $('btn-backup').addEventListener('click', () => runForceSync());
     $('btn-clear-cache').addEventListener('click', () => {
       if (!confirm('Clear local sync queue and device cache? Your sessions and settings are kept — this only clears the offline write queue and device fingerprint.')) return;
       localStorage.removeItem('ts_offline_queue_v1'); localStorage.removeItem('ts_device_fp_v1'); toast('Local cache cleared');
@@ -1720,21 +1822,16 @@ function showView(name) {
 function refreshAllViews() {
   ['clock', 'history', 'settings'].forEach(n => { if (window.Views[n] && window.Views[n].render) window.Views[n].render(); });
 }
-function ensureSyncDot() {
-  if (document.getElementById('sync-dot')) return;
-  const dot = document.createElement('div'); dot.id = 'sync-dot'; dot.className = 'sync-dot sync-synced';
-  document.body.appendChild(dot); renderSyncDot();
-}
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
 }
 async function bootApp() {
-  registerServiceWorker(); ensureSyncDot(); renderTabbar();
+  registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
   window.Views.clock.init(); window.Views.history.init(); window.Views.settings.init();
   showView('clock');
   await flushQueueOnNextOpen();
-  TsSheets.boot().catch(() => {});
+  TsSheets.boot().then(() => maybeDailyForceSync()).catch(() => {});
   TsSheets.onStatusChange = (status) => {
     if (status === 'signed-in') {
       const email = TsSheets.getProfile()?.email;
@@ -1742,12 +1839,15 @@ async function bootApp() {
       // which per-user tab-set this device syncs to.
       if (email && (getState().settings.googleEmail !== email || getState().settings.currentUser !== email)) saveSettings({ googleEmail: email, currentUser: email });
       linkAccount();
-      // Push local changes up, then pull this user's rows down and refresh.
-      flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) refreshAllViews(); });
+      // Push local changes up, pull this user's rows down, refresh, then run the
+      // once-a-day full sync check.
+      flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) { markSynced(); refreshAllViews(); } }).then(() => maybeDailyForceSync());
     }
     document.dispatchEvent(new CustomEvent('ts:auth-changed', { detail: status }));
   };
   if (getState().currentSession) TsGeo.startWatching();
+  // Returning to a backgrounded PWA re-checks the daily sync.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeDailyForceSync(); });
 }
 document.addEventListener('DOMContentLoaded', bootApp);
 </script>
