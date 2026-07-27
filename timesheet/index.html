@@ -10,6 +10,7 @@
 <script src="../shared/nd-config.js"></script>
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
+<script src="../assets/here.js"></script>
 <link rel="icon" href="assets/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -46,27 +47,9 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .btn-ghost { background: rgba(255,255,255,0.08); color: var(--text-primary); }
 .btn-block { width: 100%; padding: 16px; font-size: 15px; }
 /* ── Water-fill sync indicator ──
- * A little tube fixed top-right. The fill rises bottom→top and, because the
- * fill is a fixed red→orange→yellow→green gradient, its crest travels through
- * those colours as the water level climbs — so a rising level literally goes
- * red → orange → yellow → green. Tap it to sync now. */
-.sync-tube { position: fixed; top: 12px; right: 14px; width: 18px; height: 46px; border-radius: 999px; overflow: hidden; z-index: 60; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid var(--border); box-shadow: inset 0 2px 6px rgba(0,0,0,0.55); -webkit-tap-highlight-color: transparent; }
-.sync-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: linear-gradient(to top, #e0473f 0%, #e07b2a 32%, #f5c542 62%, #3ab87a 100%); transition: height 550ms cubic-bezier(0.4,0,0.2,1); }
-/* two translucent rotating blobs at the surface = shifting water crest */
-.sync-fill::before, .sync-fill::after { content: ''; position: absolute; left: 50%; top: -14px; width: 200%; padding-bottom: 200%; margin-left: -100%; border-radius: 43% 47% 44% 46%; background: rgba(255,255,255,0.16); animation: waterSpin 6s linear infinite; }
-.sync-fill::after { border-radius: 47% 43% 46% 44%; background: rgba(255,255,255,0.09); animation-duration: 9s; animation-direction: reverse; }
-@keyframes waterSpin { to { transform: rotate(360deg); } }
-.sync-tube.state-synced  .sync-fill { height: 100%; }
-.sync-tube.state-pending .sync-fill { height: 46%; }
-.sync-tube.state-failed  .sync-fill { height: 26%; }
-.sync-tube.state-syncing .sync-fill { animation: fillBob 1.5s ease-in-out infinite alternate; }
-.sync-tube.state-syncing .sync-fill::before { animation-duration: 2.4s; }
-.sync-tube.state-syncing .sync-fill::after  { animation-duration: 3.4s; }
-@keyframes fillBob { from { height: 24%; } to { height: 100%; } }
-.sync-tube.state-failed { animation: tubeShake 0.4s ease; }
-@keyframes tubeShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
-.sync-label { position: fixed; top: 15px; right: 40px; max-width: 62vw; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); font-size: 11px; padding: 5px 11px; border-radius: 999px; z-index: 60; opacity: 0; transform: translateX(6px); transition: opacity 220ms, transform 220ms; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sync-label.show { opacity: 1; transform: translateX(0); }
+ * Now the shared component: styles live in nd-core.css (.nd-sync-tube /
+ * .nd-sync-fill / .nd-sync-label) and the behaviour in NDUI.syncTube.
+ * Timesheet was the original home of this design; it's now suite-wide. */
 .ts-toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(10px); background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 100; max-width: 86%; text-align: center; }
 .ts-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .field { margin-bottom: 14px; }
@@ -110,6 +93,11 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .modal-actions .btn { flex: 1; }
 .picker-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .picker-item { padding: 12px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; display: flex; flex-direction: column; gap: 2px; }
+.countdown-wrap { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: hidden; margin: 12px 0 8px; }
+.countdown-bar { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--on-primary), var(--on-accent)); }
+.field-with-here { display: flex; gap: 8px; align-items: stretch; }
+.field-with-here input { flex: 1; min-width: 0; }
+.field-with-here .here-btn { flex: 0 0 auto; padding: 10px 16px; }
 .picker-item .pname { font-weight: 500; }
 .picker-item .paddr { font-size: 12px; color: var(--text-muted); }
 .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
@@ -156,7 +144,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .nudge-card { border-color:var(--on-glow); background:linear-gradient(135deg, rgba(58,184,122,0.14), var(--surface)); margin:14px 0 0; width:100%; max-width:420px; }
 .icon-x { background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; min-width:44px; min-height:44px; }
 
-@media print { .tabbar, .sync-tube, .sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
+@media print { .tabbar, .nd-sync-tube, .nd-sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
 .settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
 .msg-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
@@ -353,7 +341,8 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       <h3>Geolocation</h3>
       <div class="card">
         <div class="field"><label>Default site radius: <span id="radius-val"></span> m</label>
-          <input type="range" class="slider" min="50" max="500" step="10" id="s-radiusM">
+          <input type="range" class="slider" min="50" max="1000" step="10" id="s-radiusM">
+          <p class="muted" style="font-size:12px; margin:6px 0 0;">Inside this you're clocked on for sure. Up to 3× further we'll assume it's the same site and clock you on after a 4-second countdown you can cancel.</p>
         </div>
         <div class="field"><label>Missed clock-off detection delay (min)</label><input type="number" id="s-missedClockOffDelayMin"></div>
       </div>
@@ -499,7 +488,7 @@ window.TIMESHEET_CONFIG = {
   // signed-in Google account gets its own suffixed tab-set in the same sheet.
   primaryUserEmail: "brandon.j.neill@gmail.com",
   defaults: {
-    radiusM: 150, missedClockOffDelayMin: 30, missedClockOffDistanceM: 300,
+    radiusM: 200, missedClockOffDelayMin: 30, missedClockOffDistanceM: 300,
     standardClockOn: "07:00", standardClockOff: "15:30",
     otThresholdDay: 8, otThresholdWeek: 38, otMultiplier: 1.5, roundingMin: 30,
     payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
@@ -615,37 +604,28 @@ function queueSheetDelete(sheetName, idValue) {
   saveQueue(q); setSyncStatus('pending', 'Saved — will sync'); scheduleSync();
 }
 
-/* ── sync indicator (water tube + status label) ── */
+/* ── sync indicator (water tube + status label) ──
+ * Now the shared NDUI.syncTube (styles in nd-core.css). Timesheet keeps
+ * driving it directly via renderSyncIndicator so its custom label copy and
+ * tap-to-force-sync behaviour are preserved. The settings "danger fill"
+ * still rides along on every status change. */
+let syncTubeHandle = null;
 function ensureSyncIndicator() {
-  if (document.getElementById('sync-tube')) return;
-  const tube = document.createElement('div');
-  tube.id = 'sync-tube'; tube.className = 'sync-tube state-synced';
-  tube.innerHTML = '<div class="sync-fill"></div>';
-  tube.addEventListener('click', () => runForceSync());
-  document.body.appendChild(tube);
-  const label = document.createElement('div');
-  label.id = 'sync-label'; label.className = 'sync-label';
-  document.body.appendChild(label);
-  // Re-check staleness every minute so the panel drains back to red on its own.
+  if (syncTubeHandle) return;
+  if (window.NDUI && NDUI.syncTube) {
+    syncTubeHandle = NDUI.syncTube(
+      { status: () => syncStatus, onStatus: () => (() => {}) },
+      { onTap: () => runForceSync() }
+    );
+  }
+  // Re-check staleness every minute so the More panel drains back to red on its own.
   if (!window._ts_fill_loop) window._ts_fill_loop = setInterval(renderDangerFill, 60000);
   renderSyncIndicator();
 }
 function setSyncStatus(status, label) { syncStatus = status; renderSyncIndicator(label); }
 function renderSyncIndicator(label) {
-  const tube = document.getElementById('sync-tube');
-  if (tube) {
-    tube.className = 'sync-tube state-' + syncStatus;
-    tube.title = { synced: 'Up to date — tap to sync', pending: 'Waiting to sync — tap to sync now', syncing: 'Syncing…', failed: 'Sync problem — tap to retry' }[syncStatus] || 'Sync';
-  }
+  if (syncTubeHandle) syncTubeHandle.render(syncStatus, label);
   renderDangerFill();
-  const el = document.getElementById('sync-label');
-  if (!el) return;
-  if (label) {
-    el.textContent = label; el.classList.add('show'); clearTimeout(labelTimer);
-    if (syncStatus !== 'syncing') labelTimer = setTimeout(() => el.classList.remove('show'), 2600);
-  } else if (syncStatus === 'synced') {
-    clearTimeout(labelTimer); labelTimer = setTimeout(() => el.classList.remove('show'), 1200);
-  }
 }
 function fmtRelative(ts) {
   if (!ts) return 'never';
@@ -793,6 +773,19 @@ function findJobByLocation(lat, lng) {
     if (d <= radius && d < bestDist) { best = job; bestDist = d; }
   }
   return best;
+}
+// How far past the confirmed radius we'll still ASSUME it's the same job (then
+// ask, with a countdown). 3× the site radius comfortably covers "a bit away".
+const NEAR_RADIUS_MULT = 3;
+// Closest job that actually has coordinates, plus its distance in metres.
+function nearestJob(lat, lng) {
+  let job = null, dist = Infinity;
+  for (const j of state.jobs) {
+    if (j.lat == null || j.lng == null) continue;
+    const d = distanceMetres(lat, lng, j.lat, j.lng);
+    if (d < dist) { job = j; dist = d; }
+  }
+  return { job, dist };
 }
 function createJob({ job_name, address, lat, lng, job_type, neill_quote_id, neill_quote_status }) {
   const job = {
@@ -1079,7 +1072,16 @@ const TsGeo = (() => {
     } catch (e) { console.warn('reverseGeocode failed', e); toast('Address lookup failed — check connection'); return null; }
   }
   async function resolveClockOnTarget(lat, lng) {
-    const known = findJobByLocation(lat, lng); if (known) return { type: 'known', job: known };
+    // Tiered by distance to the nearest known job:
+    //   within radius        -> 'known'  (certain — quick confirm)
+    //   within radius × MULT  -> 'near'   (assume it's this job, ask w/ countdown)
+    //   further / no job      -> quote match, else 'unknown'
+    const near = nearestJob(lat, lng);
+    if (near.job) {
+      const confirmR = near.job.radius_m || getState().settings.radiusM;
+      if (near.dist <= confirmR) return { type: 'known', job: near.job, dist: near.dist };
+      if (near.dist <= confirmR * NEAR_RADIUS_MULT) return { type: 'near', job: near.job, dist: near.dist };
+    }
     if (window.TsNeillQuote) { const quoteJob = await window.TsNeillQuote.matchLocation(lat, lng); if (quoteJob) return { type: 'neill_quote', quoteJob }; }
     const address = await reverseGeocode(lat, lng); return { type: 'unknown', address };
   }
@@ -1463,6 +1465,7 @@ window.Views = {};
     const { latitude: lat, longitude: lng } = pos.coords;
     const result = await TsGeo.resolveClockOnTarget(lat, lng);
     if (result.type === 'known') showConfirmKnown(result.job, lat, lng);
+    else if (result.type === 'near') showAssumeNear(result.job, lat, lng);
     else if (result.type === 'neill_quote') showNeillQuotePrompt(result.quoteJob, lat, lng);
     else showUnknownSiteFlow(result.address, lat, lng);
   }
@@ -1472,6 +1475,24 @@ window.Views = {};
     openPicker(`You're at ${escapeHtml(job.job_name)}`, `<p class="muted">Clocking on?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-cancel">Cancel</button><button class="btn btn-primary" id="pk-confirm">Clock On</button></div>`);
     $('pk-cancel').onclick = closePicker;
     $('pk-confirm').onclick = () => { closePicker(); doClockOn(job, lat, lng); };
+  }
+  // "Near" tier: we're a bit outside the site radius but the nearest job is
+  // almost certainly it. Assume it and clock on after a short countdown, but
+  // give the user a window to pick a different job first.
+  function showAssumeNear(job, lat, lng) {
+    const SECS = 4;
+    openPicker(`Near ${escapeHtml(job.job_name)}`,
+      `<p class="muted">Assuming you're at <strong>${escapeHtml(job.address || job.job_name)}</strong>.</p>
+       <div class="countdown-wrap"><div class="countdown-bar" id="pk-countdown"></div></div>
+       <p class="muted" style="font-size:12px;">Clocking on automatically — tap Change to pick a different job.</p>
+       <div class="modal-actions"><button class="btn btn-ghost" id="pk-change">Change</button><button class="btn btn-primary" id="pk-now">Clock On now</button></div>`);
+    let settled = false;
+    const bar = $('pk-countdown');
+    requestAnimationFrame(() => { bar.style.transition = `width ${SECS}s linear`; bar.style.width = '0%'; });
+    const timer = setTimeout(() => { if (!settled) { settled = true; closePicker(); doClockOn(job, lat, lng); } }, SECS * 1000);
+    const stop = () => { settled = true; clearTimeout(timer); };
+    $('pk-now').onclick = () => { stop(); closePicker(); doClockOn(job, lat, lng); };
+    $('pk-change').onclick = () => { stop(); closePicker(); showManualPicker(); };
   }
   function showNeillQuotePrompt(quoteJob, lat, lng) {
     openPicker('Neill Data job site detected', `<p class="muted">First time here — are you quoting or working?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-quoting">Quoting</button><button class="btn btn-primary" id="pk-working">Working</button></div>`);
@@ -1633,11 +1654,18 @@ window.Views = {};
   function renderExportPreview() {
     $('preview').textContent = TsExport.formatWeekPreview(weekCursor) || 'No sessions this week.';
   }
+  // Wire the "Here" button in a detail/add-shift modal to fill #d-addr.
+  // Timesheet has no Maps JS, so NDHere uses the REST fallback via mapsKey.
+  function wireDetailHere() {
+    const btn = $('d-here'), input = $('d-addr');
+    if (window.NDHere && btn && input) NDHere.attachButton(btn, input, { region: 'au', busyLabel: 'Locating…', mapsKey: (window.TIMESHEET_CONFIG || {}).mapsKey });
+  }
   function openDetail(sessionId) {
     const s = getState().sessions.find(s => s.session_id === sessionId); if (!s) return;
-    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${sessionBreakMinutes(s)}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${sessionBreakMinutes(s)}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
     $('detail-backdrop').style.display = 'flex';
     document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
+    wireDetailHere();
     $('d-delete').onclick = () => {
       if (!confirm('Delete this session? It will be removed from your timesheet and the Google Sheet.')) return;
       removeSession(sessionId);
@@ -1654,9 +1682,10 @@ window.Views = {};
   function openAddShift(dateIso) {
     const st = getState();
     const date = dateIso || isoDate(weekCursor <= new Date() ? new Date() : weekCursor);
-    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><input id="d-addr" value="" placeholder="Optional"></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="" placeholder="Optional"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
     $('detail-backdrop').style.display = 'flex';
     document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
+    wireDetailHere();
     $('d-delete') && ($('d-delete').style.display = 'none');
     $('detail-save').onclick = async () => {
       const jobName = $('d-job').value.trim();
@@ -1752,8 +1781,8 @@ window.Views = {};
     if (!$('s-roundingMin')._tsBound) { $('s-roundingMin')._tsBound = true; $('s-roundingMin').addEventListener('change', e => saveSettings({ roundingMin: parseInt(e.target.value, 10) })); }
     bindText('s-recipientName', 'recipientName', s); bindText('s-recipientEmail', 'recipientEmail', s);
     bindSelect('s-preferredMailApp', 'preferredMailApp', s);
-    $('radius-val').textContent = s.radiusM ?? 150;
-    const radiusEl = $('s-radiusM'); radiusEl.value = s.radiusM ?? 150;
+    $('radius-val').textContent = s.radiusM ?? 200;
+    const radiusEl = $('s-radiusM'); radiusEl.value = s.radiusM ?? 200;
     if (!radiusEl._tsBound) { radiusEl._tsBound = true; radiusEl.addEventListener('input', () => { $('radius-val').textContent = radiusEl.value; }); radiusEl.addEventListener('change', () => saveSettings({ radiusM: parseInt(radiusEl.value, 10) })); }
     bindNumber('s-missedClockOffDelayMin', 'missedClockOffDelayMin', s);
     renderNeillQuoteStatus();

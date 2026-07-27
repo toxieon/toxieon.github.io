@@ -77,6 +77,7 @@ const iconPaths = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   upload: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M20 16v4H4v-4"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/>',
   download: '<path d="M12 4v12"/><path d="m17 11-5 5-5-5"/><path d="M20 20H4"/>',
   zoomIn: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6"/><path d="M8 11h6"/>',
   zoomOut: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M8 11h6"/>',
@@ -406,7 +407,8 @@ function stats(nodes) {
   const complete = list.filter((n) => n.status === "Complete").length;
   const progress = list.filter((n) => n.status === "In Progress").length;
   const issue = list.filter((n) => n.status === "Issue").length;
-  return { total, complete, progress, issue, notStarted: list.length - complete - progress - issue, completePercent: total ? Math.round((complete / total) * 100) : 0 };
+  const missingPhotos = list.filter(nodeMissingPhoto).length;
+  return { total, complete, progress, issue, missingPhotos, notStarted: list.length - complete - progress - issue, completePercent: total ? Math.round((complete / total) * 100) : 0 };
 }
 function folderStats(folderId) {
   const projects = folderProjects(folderId);
@@ -2000,7 +2002,7 @@ function renderProjectButton(item) {
   const folder = projectFolder(item);
   const color = folder?.color || "#64748b";
   const linkedCount = nodes.filter((n) => n.type === "portal").length;
-  return `<button class="project-button ${item.id === state.selectedProjectId ? "is-active" : ""}" data-project="${item.id}" style="--folder:${color}"><span class="status-dot" style="--status:${s.issue ? "var(--red)" : "var(--teal)"}"></span><span><strong>${escapeHtml(item.name)}</strong><span class="project-meta"><span>${s.total} nodes</span><span>${s.completePercent}%</span><span title="Floors">${icon("layers")}${item.floors?.length || 1}</span>${linkedCount ? `<span title="Linked">${icon("link")}${linkedCount}</span>` : ""}</span></span></button>`;
+  return `<button class="project-button ${item.id === state.selectedProjectId ? "is-active" : ""}" data-project="${item.id}" style="--folder:${color}"><span class="status-dot" style="--status:${s.issue ? "var(--red)" : "var(--teal)"}"></span><span><strong>${escapeHtml(item.name)}</strong><span class="project-meta"><span>${s.total} nodes</span><span>${s.completePercent}%</span><span title="Floors">${icon("layers")}${item.floors?.length || 1}</span>${linkedCount ? `<span title="Linked">${icon("link")}${linkedCount}</span>` : ""}${s.missingPhotos ? `<span class="missing-photos-badge" title="${s.missingPhotos} node${s.missingPhotos === 1 ? "" : "s"} missing a photo">${icon("camera")}${s.missingPhotos}</span>` : ""}</span></span></button>`;
 }
 
 function renderTopbar() {
@@ -2009,7 +2011,7 @@ function renderTopbar() {
   const folderName = folder?.name || (proj && !proj.folderId ? DRIVE_UNFILED_FOLDER : "");
   const folderColor = folder?.color || "#64748b";
   const auth = state.googleAuth;
-  return `<header class="topbar"><div class="topbar-title"><h2>${proj ? escapeHtml(proj.name) : "NeillPlanner"}</h2><p>${proj ? `<span class="inline-folder" style="--folder:${folderColor}">${escapeHtml(folderName)}</span> / ${escapeHtml(proj.address || "No address")}` : "Welcome"}</p></div><div class="topbar-actions">${renderToSortChip()}<button class="nd-sync-chip" data-sync-chip data-sync="${_syncStatus}" data-action="sync-chip" title="Sync status — tap to sync now">${window.NDUI ? NDUI.syncChipLabel(_syncStatus, _pendingSummary.length) : _syncStatus}</button><button class="user-pill" data-action="${isAdmin() ? "go-settings" : "google-sign-out"}" title="${escapeHtml(isAdmin() ? "Settings" : "Sign out")}"><span class="avatar">${initials(auth.profile?.name || auth.profile?.email || "?")}</span><span class="hide-mobile">${escapeHtml(auth.profile?.name || auth.profile?.email || "Signed in")}${isPrimaryOwner() ? " (owner)" : ""}</span></button></div></header>`;
+  return `<header class="topbar"><div class="topbar-title"><h2>${proj ? escapeHtml(proj.name) : "NeillPlanner"}</h2><p>${proj ? `<span class="inline-folder" style="--folder:${folderColor}">${escapeHtml(folderName)}</span> / ${escapeHtml(proj.address || "No address")}` : "Welcome"}</p></div><div class="topbar-actions">${renderToSortChip()}<button class="user-pill" data-action="${isAdmin() ? "go-settings" : "google-sign-out"}" title="${escapeHtml(isAdmin() ? "Settings" : "Sign out")}"><span class="avatar">${initials(auth.profile?.name || auth.profile?.email || "?")}</span><span class="hide-mobile">${escapeHtml(auth.profile?.name || auth.profile?.email || "Signed in")}${isPrimaryOwner() ? " (owner)" : ""}</span></button></div></header>`;
 }
 
 function renderBottomNav() { return `<nav class="bottom-nav" aria-label="Primary">${navItems().map((i) => `<button class="${state.activeView === i.id ? "is-active" : ""}" data-view="${i.id}">${icon(i.icon)}<span>${i.label}</span></button>`).join("")}</nav>`; }
@@ -2148,6 +2150,12 @@ function renderEmptyPlanArea() {
 
 function renderSelect(name, options, value) { return `<select data-filter="${name}" aria-label="${name}">${options.map((o) => `<option value="${escapeHtml(o)}" ${o === value ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select>`; }
 
+/* A node "pings" red when it has no photo, overriding its status colour.
+ * Portals are wayfinding links that carry no photos, so they're exempt. */
+function nodeMissingPhoto(node) {
+  return node.type !== "portal" && (node.imageRefs || []).length === 0;
+}
+
 function renderMarker(node) {
   const isSelected = node.id === state.selectedNodeId;
   const isBulk = state.bulkSelection.includes(node.id);
@@ -2160,7 +2168,7 @@ function renderMarker(node) {
   const innerIcon = isPortal ? icon("portal") : isSwitchboard ? icon("switchboard") : isSubboard ? icon("subboard") : "";
   const swbBadge = (isSwitchboard || isSubboard) && node.swbProjectId
     ? `<span class="swb-linked-dot" title="Linked to SWB project"></span>` : "";
-  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}">${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
+  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}">${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
 }
 
 function renderNodeSummary(node) {
@@ -2168,7 +2176,7 @@ function renderNodeSummary(node) {
   const catColor = nodeColor(node);
   const linkedTarget = isPortal ? projectById(node.linkedProjectId)?.name : null;
   const isBulk = state.bulkSelection.includes(node.id);
-  return `<button class="node-summary ${node.id === state.selectedNodeId ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""}" data-node="${node.id}"><span class="status-dot" style="${statusStyle(node.status)}"></span><span class="category-dot" style="--cat:${catColor}"></span><span><strong>${escapeHtml(nodeDisplayTitle(node))}</strong><span>${isPortal ? `${icon("portal")} -> ${escapeHtml(linkedTarget || roomLabel(node.linkedRoomId) || "(unlinked)")}` : `${escapeHtml(node.category || "-")} / ${escapeHtml(roomLabel(node.roomId))} / ${escapeHtml(node.assignedTo || "Unassigned")}`}</span></span></button>`;
+  return `<button class="node-summary ${node.id === state.selectedNodeId ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" data-node="${node.id}"><span class="status-dot" style="${statusStyle(node.status)}"></span><span class="category-dot" style="--cat:${catColor}"></span><span><strong>${escapeHtml(nodeDisplayTitle(node))}</strong><span>${isPortal ? `${icon("portal")} -> ${escapeHtml(linkedTarget || roomLabel(node.linkedRoomId) || "(unlinked)")}` : `${escapeHtml(node.category || "-")} / ${escapeHtml(roomLabel(node.roomId))} / ${escapeHtml(node.assignedTo || "Unassigned")}`}</span></span></button>`;
 }
 
 function renderProgressView() {
@@ -2681,7 +2689,7 @@ function renderFolderModal(folderId = null) {
 
 function renderProjectModal(isEdit) {
   const existing = isEdit ? project() : null;
-  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="projectForm" role="dialog"><div class="modal-header"><div><h3>${isEdit ? "Edit project" : "New project"}</h3><p>Drive folder will be created at /${DRIVE_ROOT_NAME}/${DRIVE_PROJECTS_FOLDER}/&lt;folder&gt;/&lt;project&gt;/</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="projectName">Name</label><input id="projectName" name="name" required value="${escapeHtml(existing?.name || "")}" placeholder="Tower A Stage 1" /></div><div class="field"><label for="projectFolder">Folder</label><select id="projectFolder" name="folderId"><option value="">${DRIVE_UNFILED_FOLDER}</option>${state.projectFolders.map((f) => `<option value="${f.id}" ${f.id === existing?.folderId ? "selected" : ""}>${escapeHtml(f.name)}</option>`).join("")}</select></div><div class="field"><label for="projectFirstFloor">First floor name</label><input id="projectFirstFloor" name="firstFloor" value="${escapeHtml(existing?.floors?.[0]?.name || "Ground floor")}" placeholder="Ground floor" /></div><div class="field full"><label for="projectAddress">Address</label><input id="projectAddress" name="address" value="${escapeHtml(existing?.address || "")}" placeholder="25 Watts Parade, Mount Eliza VIC" autocomplete="off" data-project-address /></div><label class="check-row full"><input type="checkbox" name="protected" ${existing?.protected ? "checked" : ""} /><span><strong>Protect this job from format</strong><small>Keeps this project when Format data is run.</small></span></label><div class="field full"><label for="projectDescription">Description</label><textarea id="projectDescription" name="description">${escapeHtml(existing?.description || "")}</textarea></div></div></div><div class="modal-actions">${isEdit ? `<button type="button" class="danger-button" data-action="delete-project">${icon("trash")}Delete project</button>` : ""}<button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("check")}Save</button></div></form>`;
+  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="projectForm" role="dialog"><div class="modal-header"><div><h3>${isEdit ? "Edit project" : "New project"}</h3><p>Drive folder will be created at /${DRIVE_ROOT_NAME}/${DRIVE_PROJECTS_FOLDER}/&lt;folder&gt;/&lt;project&gt;/</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="projectName">Name</label><input id="projectName" name="name" required value="${escapeHtml(existing?.name || "")}" placeholder="Tower A Stage 1" /></div><div class="field"><label for="projectFolder">Folder</label><select id="projectFolder" name="folderId"><option value="">${DRIVE_UNFILED_FOLDER}</option>${state.projectFolders.map((f) => `<option value="${f.id}" ${f.id === existing?.folderId ? "selected" : ""}>${escapeHtml(f.name)}</option>`).join("")}</select></div><div class="field"><label for="projectFirstFloor">First floor name</label><input id="projectFirstFloor" name="firstFloor" value="${escapeHtml(existing?.floors?.[0]?.name || "Ground floor")}" placeholder="Ground floor" /></div><div class="field full"><label for="projectAddress">Address</label><div class="field-with-here"><input id="projectAddress" name="address" value="${escapeHtml(existing?.address || "")}" placeholder="25 Watts Parade, Mount Eliza VIC" autocomplete="off" data-project-address /><button type="button" class="here-btn" data-here-project title="Use my current location">${icon("target")}Here</button></div></div><label class="check-row full"><input type="checkbox" name="protected" ${existing?.protected ? "checked" : ""} /><span><strong>Protect this job from format</strong><small>Keeps this project when Format data is run.</small></span></label><div class="field full"><label for="projectDescription">Description</label><textarea id="projectDescription" name="description">${escapeHtml(existing?.description || "")}</textarea></div></div></div><div class="modal-actions">${isEdit ? `<button type="button" class="danger-button" data-action="delete-project">${icon("trash")}Delete project</button>` : ""}<button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("check")}Save</button></div></form>`;
 }
 
 function renderFloorModal() {
@@ -2933,7 +2941,14 @@ function bindEvents() {
   if (bulkCategory) bulkCategory.addEventListener("change", (e) => { if (e.target.value) bulkSetCategory(e.target.value); });
   const nodeForm = document.getElementById("nodeForm"); if (nodeForm) nodeForm.addEventListener("submit", handleNodeForm);
   const folderForm = document.getElementById("folderForm"); if (folderForm) folderForm.addEventListener("submit", handleFolderForm);
-  const projectForm = document.getElementById("projectForm"); if (projectForm) { projectForm.addEventListener("submit", handleProjectForm); initProjectAddressAutocomplete(); }
+  const projectForm = document.getElementById("projectForm");
+  if (projectForm) {
+    projectForm.addEventListener("submit", handleProjectForm);
+    initProjectAddressAutocomplete();
+    const hereBtn = projectForm.querySelector("[data-here-project]");
+    const addrInput = projectForm.querySelector("[data-project-address]");
+    if (window.NDHere && hereBtn && addrInput) NDHere.attachButton(hereBtn, addrInput, { region: ADDRESS_COUNTRY, busyLabel: "Locating…", mapsKey: googleConfig.googleApiKey, onResult: () => addrInput.setCustomValidity("") });
+  }
   const massForm = document.getElementById("massForm"); if (massForm) massForm.addEventListener("submit", handleMassForm);
   const portalForm = document.getElementById("portalForm"); if (portalForm) portalForm.addEventListener("submit", handlePortalForm);
   const floorForm = document.getElementById("floorForm"); if (floorForm) floorForm.addEventListener("submit", handleFloorForm);
@@ -4308,5 +4323,11 @@ document.addEventListener("click", (ev) => {
 });
 
 render();
+// §1.6 suite-wide water-fill sync tube (shared). Binds to the NDQueue facade.
+if (window.NDUI && NDUI.syncTube) {
+  NDUI.syncTube(window.NDQueue, {
+    labels: { pending: "Saved — will sync", flushing: "Syncing…", failed: "Sync failed — tap to retry", synced: "Up to date" }
+  });
+}
 hydrateFloorPlansFromCache().catch((e) => console.warn("plan hydration failed", e));
 bootGoogle();

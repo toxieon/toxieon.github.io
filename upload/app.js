@@ -7,6 +7,45 @@ const ADDRESS_COUNTRY = CONFIG.addressCountry || "au";
 const VICTORIA_ADDRESS_BOUNDS = { south: -39.25, west: 140.85, north: -33.85, east: 150.1 };
 const GOOGLE_SCOPES = (CONFIG.scopes || ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]).join(" ");
 const SHEET_TAB_NAME = "Uploads";
+/* Photo watermark toggles (assets/watermark.js). Persisted; stamped on each
+ * photo as it uploads. Uploader has no separate apartment/business field, so
+ * those stay off; room already carries "Apt 4 / Room 2". */
+const WM_TOGGLE_KEY = "nd-upload-watermark-v1";
+const WM_DEFAULTS = { address: true, room: true, location: true, datetime: true, initials: true };
+function loadWmToggles() { try { return Object.assign({}, WM_DEFAULTS, JSON.parse(localStorage.getItem(WM_TOGGLE_KEY) || "{}")); } catch (e) { return Object.assign({}, WM_DEFAULTS); } }
+let wmToggles = loadWmToggles();
+function saveWmToggles() { try { localStorage.setItem(WM_TOGGLE_KEY, JSON.stringify(wmToggles)); } catch (e) {} }
+function uploaderInitials() {
+  const p = state.googleAuth.profile || {};
+  const name = (p.name || p.email || "").trim();
+  if (!name) return "";
+  const parts = name.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
+}
+/* Bake the watermark into a photo just before upload. Skips floor plans,
+ * non-images and HEIC (canvas can't reliably decode HEIC). Falls back to the
+ * original file on any error so an upload never fails because of the stamp. */
+async function watermarkFileFor(item) {
+  try {
+    if (!window.NDWatermark || item.isFloorPlan) return item.file;
+    const f = item.file;
+    if (!f.type.startsWith("image/") || isHeicFile(f)) return item.file;
+    const data = {
+      address: (item.address || "").trim(),
+      room: (item.room || "").trim(),
+      location: (item.location || "").trim(),
+      initials: uploaderInitials(),
+      datetime: item.capturedAt ? new Date(item.capturedAt) : true
+    };
+    const lines = NDWatermark.buildLines(data, Object.assign({ business: false, apartment: false, clientName: false, ref: false, gps: false }, wmToggles));
+    if (!lines.length) return item.file;
+    const bitmap = await createImageBitmap(f);
+    const dataUrl = NDWatermark.stamp(bitmap, { lines, maxDim: 2400, jpegQ: 0.85 });
+    if (bitmap.close) bitmap.close();
+    const blob = await (await fetch(dataUrl)).blob();
+    return new File([blob], f.name, { type: "image/jpeg", lastModified: Date.now() });
+  } catch (e) { console.warn("watermark skipped (uploading original):", e); return item.file; }
+}
 const TERMS_TAB_NAME = "Terms Acceptance";
 const TERMS_VERSION = "2026-05-30-v2";
 const TERMS_STORAGE_PREFIX = "upload-terms-accepted:";
@@ -44,6 +83,7 @@ const iconPaths = {
   google: '<path d="M21.35 11.1H12v3.2h5.35c-.49 2.3-2.43 3.78-5.35 3.78-3.2 0-5.78-2.6-5.78-5.78s2.58-5.78 5.78-5.78c1.46 0 2.77.53 3.78 1.4l2.42-2.4A8.85 8.85 0 0 0 12 3.2a8.8 8.8 0 1 0 0 17.6c5.1 0 8.45-3.55 8.45-8.55 0-.6-.05-1.15-.1-1.15Z"/>',
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   check: '<path d="m20 6-11 11-5-5"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m13 5 7 7-7 7"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
@@ -261,6 +301,7 @@ function renderDetails() {
       </div>
       ${renderStickyHeader()}
       ${renderBatchTools()}
+      ${renderWatermarkPanel()}
       <div class="details-table">
         <div class="details-head">
           <div>File</div>
@@ -300,10 +341,29 @@ function renderStickyHeader() {
                 <span></span>${h.apply[field] ? "All" : "Each"}
               </button>
             </div>
-            <input id="hdr-${field}" data-header-field="${field}" ${field === "address" ? 'data-address-field="true"' : ""}
-              value="${escapeHtml(h.values[field])}" placeholder="${escapeHtml(ph)}" ${field === "address" ? 'autocomplete="off"' : ""} />
+            <div class="field-with-here">
+              <input id="hdr-${field}" data-header-field="${field}" ${field === "address" ? 'data-address-field="true"' : ""}
+                value="${escapeHtml(h.values[field])}" placeholder="${escapeHtml(ph)}" ${field === "address" ? 'autocomplete="off"' : ""} />
+              ${field === "address" ? `<button type="button" class="here-btn" data-here="hdr-address" title="Use my current location">${icon("pin")}Here</button>` : ""}
+            </div>
             ${field === "address" && h.detectedAddress && h.values.address ? `<span class="detected-chip">📍 Detected from photos — tap to correct</span>` : ""}
           </div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderWatermarkPanel() {
+  const fields = [["address", "Address"], ["room", "Room"], ["location", "Location"], ["datetime", "Date & time"], ["initials", "Initials"]];
+  const inits = uploaderInitials();
+  return `
+    <div class="watermark-panel">
+      <div class="batch-tools-title">
+        <strong>${icon("pin")}Photo watermark</strong>
+        <span>Stamped on each photo as it uploads${inits ? ` · signed ${escapeHtml(inits)}` : ""}</span>
+      </div>
+      <div class="watermark-toggles">
+        ${fields.map(([k, label]) => `<label class="wm-chk"><input type="checkbox" data-wm-toggle="${k}" ${wmToggles[k] ? "checked" : ""} /><span>${label}</span></label>`).join("")}
       </div>
     </div>
   `;
@@ -518,6 +578,15 @@ function bindEvents() {
   document.querySelectorAll("[data-header-field]").forEach((input) => input.addEventListener("input", () => {
     state.header.values[input.dataset.headerField] = input.value;
     if (input.dataset.headerField === "address") state.header.detectedAddress = false;
+  }));
+  // "Here" one-tap geolocation (assets/here.js). Filling the input fires an
+  // 'input' event, so the header-field listener above captures the address.
+  if (window.NDHere) document.querySelectorAll("[data-here]").forEach((btn) => {
+    const input = document.getElementById(btn.dataset.here);
+    if (input) NDHere.attachButton(btn, input, { region: "au", busyLabel: "Locating…", mapsKey: CONFIG.googleApiKey });
+  });
+  document.querySelectorAll("[data-wm-toggle]").forEach((cb) => cb.addEventListener("change", () => {
+    wmToggles[cb.dataset.wmToggle] = cb.checked; saveWmToggles();
   }));
   document.querySelectorAll("[data-header-toggle]").forEach((button) => button.addEventListener("click", () => {
     const field = button.dataset.headerToggle;
@@ -1402,7 +1471,8 @@ async function uploadBatch() {
         )
       };
 
-      const result = await uploadFileToDrive(item.file, batchRootId, driveMetadata);
+      const fileToUpload = await watermarkFileFor(item);
+      const result = await uploadFileToDrive(fileToUpload, batchRootId, driveMetadata);
       item.result = result;
       item.status = "Done";
       item.progress = 100;
@@ -1526,3 +1596,9 @@ function isVictorianPlace(place) {
 
 render();
 bootGoogle();
+
+/* §1.6 suite-wide water-fill sync tube (shared). No offline write queue here,
+ * so the tube reflects connection state to stay visually consistent. */
+if (window.NDUI && NDUI.syncTube) {
+  NDUI.syncTube(null, { labels: { synced: "Online", pending: "Offline" } });
+}

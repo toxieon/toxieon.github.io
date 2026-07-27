@@ -2222,3 +2222,9 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && state.modal) { state.modal = null; state.deviceSearch = ""; _modalDevices = []; render(); }
 });
+
+/* §1.6 suite-wide water-fill sync tube (shared). No offline write queue here,
+ * so the tube reflects connection state to stay visually consistent. */
+if (window.NDUI && NDUI.syncTube) {
+  NDUI.syncTube(null, { labels: { synced: "Online", pending: "Offline" } });
+}

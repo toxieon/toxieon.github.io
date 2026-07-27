@@ -15,7 +15,9 @@
  *    NDUI.lightbox({src, thumb, title})           shared photo viewer with the
  *                                                 v1.0 §1.2 regex fix baked in
  *    NDUI.highResUrl(url)                         /=s\d+$/ -> =s1600 (the fix)
- *    NDUI.syncChip(mountEl, queue)                §1.6 suite-wide status chip
+ *    NDUI.syncChip(mountEl, queue)                §1.6 legacy text status chip
+ *    NDUI.syncTube(queue, opts)                   §1.6 canonical water-fill
+ *                                                 sync tube (suite-wide)
  *
  *  Pure string/URL helpers are Node-testable: node shared/nd-ui.test.js
  * ========================================================================= */
@@ -242,6 +244,112 @@
     return { refresh: refresh, el: chip };
   }
 
+  /* ── §1.6 water-fill sync tube ──────────────────────────────────────
+   * The canonical suite-wide sync indicator (ported from Timesheet). A
+   * self-mounting fixed tube pinned top-right that fills red→green as
+   * changes flush, plus a transient status label. Tap to sync now.
+   *
+   *   NDUI.syncTube(queue, opts)
+   *
+   * `queue` is any nd-queue-shaped object: { status(), onStatus(cb),
+   * flush?() }. Statuses map: synced→full green · pending→low ·
+   * flushing/syncing→bobbing · failed→empty + shake. Omit `queue` to fall
+   * back to a built-in online/offline monitor (for apps with no write
+   * queue — the tube then reflects connection state honestly).
+   *
+   * opts: { onTap, labels, onRender }
+   *   onTap()          override the tap handler (default: queue.flush())
+   *   labels           map of {status: labelText} for the transient pill
+   *   onRender(state)  hook fired on every state change (Timesheet uses it
+   *                    to drive its settings danger-fill)
+   * Returns { el, label, render(status, message), destroy() }. */
+  const TUBE_STATE = { synced: "synced", pending: "pending", flushing: "syncing", syncing: "syncing", failed: "failed" };
+  const TUBE_TITLE = {
+    synced: "Up to date — tap to sync",
+    pending: "Waiting to sync — tap to sync now",
+    syncing: "Syncing…",
+    failed: "Sync problem — tap to retry"
+  };
+
+  function onlineMonitor() {
+    let listeners = [];
+    const cur = function () { return navigator.onLine ? "synced" : "pending"; };
+    function emit() { const s = cur(); listeners.forEach(function (cb) { try { cb(s); } catch (e) {} }); }
+    window.addEventListener("online", emit);
+    window.addEventListener("offline", emit);
+    return {
+      status: cur,
+      onStatus: function (cb) { listeners.push(cb); return function () { listeners = listeners.filter(function (l) { return l !== cb; }); }; },
+      flush: function () {}
+    };
+  }
+
+  function syncTube(queue, opts) {
+    opts = opts || {};
+    if (typeof document === "undefined") return null;
+    queue = queue || onlineMonitor();
+    const labels = opts.labels || {};
+
+    let tube = document.getElementById("nd-sync-tube");
+    let label = document.getElementById("nd-sync-label");
+    if (!tube) {
+      tube = document.createElement("div");
+      tube.id = "nd-sync-tube";
+      tube.className = "nd-sync-tube state-synced";
+      tube.setAttribute("role", "button");
+      tube.setAttribute("aria-label", "Sync status — tap to sync now");
+      tube.innerHTML = '<div class="nd-sync-fill"></div>';
+      document.body.appendChild(tube);
+    }
+    if (!label) {
+      label = document.createElement("div");
+      label.id = "nd-sync-label";
+      label.className = "nd-sync-label";
+      document.body.appendChild(label);
+    }
+
+    let labelTimer = null;
+    function render(status, message) {
+      const state = TUBE_STATE[status] || "synced";
+      tube.className = "nd-sync-tube state-" + state;
+      tube.title = TUBE_TITLE[state] || "Sync";
+      const text = message || labels[status] || labels[state] || "";
+      if (text) {
+        label.textContent = text;
+        label.classList.add("show");
+        clearTimeout(labelTimer);
+        if (state !== "syncing") labelTimer = setTimeout(function () { label.classList.remove("show"); }, 2600);
+      } else if (state === "synced") {
+        clearTimeout(labelTimer);
+        labelTimer = setTimeout(function () { label.classList.remove("show"); }, 1200);
+      }
+      if (opts.onRender) { try { opts.onRender(state, status); } catch (e) {} }
+    }
+
+    function onTap() {
+      if (opts.onTap) { try { opts.onTap(); } catch (e) {} return; }
+      if (queue && typeof queue.flush === "function") { try { queue.flush(); } catch (e) {} }
+    }
+    tube.addEventListener("click", onTap);
+
+    let off = function () {};
+    if (queue && typeof queue.onStatus === "function") {
+      off = queue.onStatus(function (s) { render(s); });
+    }
+    render(queue && queue.status ? queue.status() : "synced");
+
+    return {
+      el: tube,
+      label: label,
+      render: render,
+      destroy: function () {
+        try { off(); } catch (e) {}
+        tube.removeEventListener("click", onTap);
+        tube.remove(); label.remove();
+      }
+    };
+  }
+
   /* §3.6 — the shared mobile settings pattern: turns flat section blocks
    * into collapsible accordions. All collapsed by default, open state
    * remembered per storageKey. Sections named in opts.danger get
@@ -340,7 +448,7 @@
   const API = {
     SKELETON_VARIANTS,
     escapeHtml, highResUrl, skeletonMarkup, syncChipLabel,
-    skeleton, skeletonOverlay, toast, confirm: confirmDialog, lightbox, syncChip, accordion, recordVisit, recentVisits, batchFill
+    skeleton, skeletonOverlay, toast, confirm: confirmDialog, lightbox, syncChip, syncTube, accordion, recordVisit, recentVisits, batchFill
   };
 
   if (typeof module !== "undefined" && module.exports) {

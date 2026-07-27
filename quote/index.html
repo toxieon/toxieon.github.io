@@ -10,6 +10,8 @@
 <script src="../shared/nd-cache.js"></script>
 <script src="../shared/nd-queue.js"></script>
 <script src="../shared/nd-ui.js"></script>
+<script src="../assets/here.js"></script>
+<script src="../assets/watermark.js"></script>
     <meta name="theme-color" content="#07111f" />
 <title>ND • On-site Quote Tool</title>
 <style>
@@ -2111,37 +2113,13 @@ document.getElementById('client-name').addEventListener('input', e => { currentQ
 document.getElementById('client-phone').addEventListener('input', e => { currentQuote.client.phone = e.target.value; scheduleDraftSave(); });
 document.getElementById('client-address').addEventListener('input', e => { currentQuote.client.address = e.target.value; scheduleDraftSave(); });
 document.getElementById('proposed-date').addEventListener('change', e => { currentQuote.proposedDate = e.target.value; scheduleDraftSave(); });
-document.getElementById('use-location-btn').onclick = () => {
-  if (!navigator.geolocation) { alert('Geolocation not supported by this browser.'); return; }
-  if (!window.google || !window.google.maps) { alert('Maps not loaded yet. Try again in a second.'); return; }
-  const btn = document.getElementById('use-location-btn');
-  const original = btn.textContent;
-  btn.textContent = 'Locating...';
-  btn.disabled = true;
-  navigator.geolocation.getCurrentPosition((pos) => {
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude }, region: 'au' }, (results, status) => {
-      btn.textContent = original; btn.disabled = false;
-      if (status === 'OK' && results && results[0]) {
-        const addr = results[0].formatted_address;
-        document.getElementById('client-address').value = addr;
-        currentQuote.client.address = addr;
-        computeRoute();
-      } else if (status === 'REQUEST_DENIED') {
-        alert('Geocoding API isn\'t enabled on your Maps key.\n\nFix:\n1. Google Cloud Console → APIs & Services → Library → search "Geocoding API" → Enable\n2. Credentials → click your Maps Platform API Key → API restrictions → tick "Geocoding API" → Save\n\nGive it ~1 minute to propagate, then try again.');
-      } else if (status === 'OVER_QUERY_LIMIT') {
-        alert('Too many location lookups. Try again in a moment.');
-      } else if (status === 'ZERO_RESULTS') {
-        alert('Could not find any address near your current location. Try typing the address manually.');
-      } else {
-        alert('Could not resolve address from your location (' + status + ')');
-      }
-    });
-  }, (err) => {
-    btn.textContent = original; btn.disabled = false;
-    alert('Location error: ' + err.message + '. Make sure you allowed location access for this site.');
-  }, { enableHighAccuracy: true, timeout: 10000 });
-};
+/* "Here" is now the shared asset (assets/here.js → NDHere). Filling the
+ * address input fires an 'input' event, so the existing #client-address
+ * listener updates currentQuote.client.address; we just recompute the route. */
+NDHere.attachButton(document.getElementById('use-location-btn'), document.getElementById('client-address'), {
+  region: 'au', busyLabel: 'Locating...',
+  onResult: () => { computeRoute(); }
+});
 document.getElementById('clear-quote').onclick = () => { if (confirm('Clear this quote? Anything not saved will be lost.')) { currentQuote = blankQuote(); resetQuoteUI(); } };
 
 function resetQuoteUI() {
@@ -4242,48 +4220,24 @@ async function snapPhoto() {
   status.textContent = 'Saved. Tap shutter for another, or ✕ to close.';
   shutter.disabled = false;
 }
+/* Watermark is now the shared asset (assets/watermark.js → NDWatermark).
+ * Quote maps its settings.watermark toggles onto the shared field model. */
 async function drawWatermark(ctx, w, h) {
   const wm = settings.watermark || {};
-  const lines = [];
-  if (wm.business) lines.push((getBizName() || 'Neill Data & Security'));
-  if (wm.clientName && currentQuote.client.name) lines.push('Client: ' + currentQuote.client.name);
-  if (wm.address && currentQuote.client.address) lines.push(currentQuote.client.address);
-  if (wm.quoteId && currentQuote.id) lines.push('Ref: ' + currentQuote.id);
-  if (wm.datetime) {
-    const now = new Date();
-    lines.push(now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' +
-               now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }));
-  }
-  if (wm.gps) {
-    const gps = await new Promise(resolve => {
-      if (!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        pos => resolve(pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5)),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 4000 }
-      );
-    });
-    if (gps) lines.push('GPS ' + gps);
-  }
-  if (!lines.length) return;
-  const pad = Math.max(8, Math.round(h * 0.012));
-  const fontSize = Math.max(14, Math.round(h * 0.025));
-  const lineGap = Math.round(fontSize * 1.25);
-  const stripH = lineGap * lines.length + pad * 2;
-  ctx.save();
-  const grad = ctx.createLinearGradient(0, h - stripH * 1.4, 0, h);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.6)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, h - stripH * 1.4, w, stripH * 1.4);
-  ctx.font = '600 ' + fontSize + 'px -apple-system, system-ui, sans-serif';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = '#fff';
-  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-  ctx.shadowBlur = 3; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
-  let y = h - stripH + pad;
-  lines.forEach(line => { ctx.fillText(line, pad, y); y += lineGap; });
-  ctx.restore();
+  const data = {
+    business: getBizName() || 'Neill Data & Security',
+    clientName: currentQuote.client.name,
+    address: currentQuote.client.address,
+    ref: currentQuote.id,
+    datetime: true
+  };
+  const toggles = {
+    business: !!wm.business, clientName: !!wm.clientName, address: !!wm.address,
+    ref: !!wm.quoteId, datetime: !!wm.datetime, gps: false,
+    room: false, apartment: false, location: false, initials: false
+  };
+  if (wm.gps) { const gps = await NDWatermark.getGps(); if (gps) { data.gps = gps; toggles.gps = true; } }
+  NDWatermark.draw(ctx, w, h, { lines: NDWatermark.buildLines(data, toggles) });
 }
 document.getElementById('photo-take-btn').onclick = openCamera;
 document.getElementById('photo-upload-btn').onclick = () => document.getElementById('photo-input').click();
@@ -5329,6 +5283,14 @@ function init() {
       }
     }
   } catch (e) { /* ignore corrupt draft */ }
+}
+
+/* §1.6 suite-wide water-fill sync tube (shared). Binds to the quote write
+ * queue when present, otherwise reflects online/offline. */
+if (window.NDUI && NDUI.syncTube) {
+  NDUI.syncTube(window.NDQueue, {
+    labels: { pending: "Saved — will sync", flushing: "Syncing…", failed: "Sync failed — tap to retry", synced: "Up to date" }
+  });
 }
 
 /* §4 boot: restore today's unlock (no passcode prompt mid-day) */
