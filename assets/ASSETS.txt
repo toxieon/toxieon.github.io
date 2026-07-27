@@ -79,6 +79,19 @@ HOW THIS RELATES TO /shared
     Used by:  available (uploader's inline flow can migrate onto it)
     Status:   BUILT
 
+[5] job-locator.js  —  match / create a job by location
+    Global:   NDJobLocator
+    Origin:   Timesheet (distanceMetres / nearestJob / resolveOrCreateJob)
+    Needs:    nothing (pure)
+    API:      NDJobLocator.distanceMetres(la1,ln1,la2,ln2)          (pure)
+              NDJobLocator.nearest(jobs, lat, lng) -> { job, dist }
+              NDJobLocator.match(jobs, lat, lng, { defaultRadius, nearMult })
+                -> { tier: "here"|"near"|"none", job, dist }
+              NDJobLocator.resolveOrCreate(jobs, spec, make)
+    Used by:  available (timesheet can migrate; feeds log-book merge +
+              uploader↔planner jobs)
+    Status:   BUILT
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -88,9 +101,6 @@ HOW THIS RELATES TO /shared
   • camera-capture         — Quote's in-app camera modal (live preview,
         flip camera, shutter, downscale). Uploader would benefit directly,
         and it already calls watermark.js on capture.
-  • job-locator            — Timesheet's findJobByLocation / resolveOrCreateJob:
-        match "am I at a known job?" by lat/lng + radius, or create one.
-        Useful for the uploader↔planner jobs work.
   • sync-tube              — the water-fill sync indicator now in
         shared/nd-ui.js (NDUI.syncTube) + nd-core.css. Listed here for
         discoverability; already suite-wide.

@@ -2179,6 +2179,81 @@ function renderNodeSummary(node) {
   return `<button class="node-summary ${node.id === state.selectedNodeId ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" data-node="${node.id}"><span class="status-dot" style="${statusStyle(node.status)}"></span><span class="category-dot" style="--cat:${catColor}"></span><span><strong>${escapeHtml(nodeDisplayTitle(node))}</strong><span>${isPortal ? `${icon("portal")} -> ${escapeHtml(linkedTarget || roomLabel(node.linkedRoomId) || "(unlinked)")}` : `${escapeHtml(node.category || "-")} / ${escapeHtml(roomLabel(node.roomId))} / ${escapeHtml(node.assignedTo || "Unassigned")}`}</span></span></button>`;
 }
 
+/* ── §20 Hours on site — reads timesheet's shared sheet (per-user tabs),
+ * matches jobs to this project by address, aggregates hours per employee.
+ * Live confirm (include/exclude chips); nothing is persisted. */
+const TIMESHEET_SHEET_ID = googleConfig.timesheetSpreadsheetId || "1VG2Pejfd0ZGRpAEs65YAkVf1082O1CUeYjitZSidDl4";
+const TS_SESSION_COLS = ["session_id","date","day_of_week","job_id","job_name","address_confirmed","lat_on","lng_on","lat_off","lng_off","time_on","time_off","time_on_rounded","time_off_rounded","break_taken","break_minutes","total_hours","overtime_hours","job_type","notes","departed_offsite","manual_departure_time","missed_clockoff","pay_period","entry_method","user"];
+const TS_JOB_COLS = ["job_id","job_name","address","lat","lng","radius_m","job_type","neill_quote_id","neill_quote_status","first_visit","visit_count","last_visit","user"];
+let _hoursData = { loaded: false, loading: false, error: "", sessions: [], jobs: [] };
+let _hoursUI = { excluded: new Set(), range: "all" };
+function tsAddrKey(addr) { return window.NDMatch ? NDMatch.addressKey(addr || "") : (addr || "").trim().toLowerCase().replace(/[.,]/g, "").replace(/\s+/g, " "); }
+function isoDay(d) { return d.toISOString().slice(0, 10); }
+function hoursRangeBounds(range) {
+  if (range === "all") return null;
+  const now = new Date();
+  if (range === "4w") { const from = new Date(now); from.setDate(now.getDate() - 27); return { from: isoDay(from), to: isoDay(now) }; }
+  const day = (now.getDay() + 6) % 7; const from = new Date(now); from.setDate(now.getDate() - day); return { from: isoDay(from), to: isoDay(now) };
+}
+async function fetchTimesheetHours() {
+  if (!requireAuth("view hours on site")) return;
+  _hoursData.loading = true; _hoursData.error = ""; render();
+  try {
+    const meta = await gapi.client.sheets.spreadsheets.get({ spreadsheetId: TIMESHEET_SHEET_ID, fields: "sheets.properties.title" });
+    const titles = (meta.result.sheets || []).map((s) => s.properties.title);
+    const readTab = async (t, cols) => {
+      const r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: TIMESHEET_SHEET_ID, range: `${t}!A2:AZ` });
+      return (r.result.values || []).filter((row) => row[0]).map((row) => { const o = {}; cols.forEach((c, i) => (o[c] = row[i] ?? "")); return o; });
+    };
+    const sessions = [], jobs = [];
+    for (const t of titles.filter((t) => t === "sessions" || t.startsWith("sessions_"))) sessions.push(...await readTab(t, TS_SESSION_COLS));
+    for (const t of titles.filter((t) => t === "jobs" || t.startsWith("jobs_"))) jobs.push(...await readTab(t, TS_JOB_COLS));
+    _hoursData = { loaded: true, loading: false, error: "", sessions, jobs };
+  } catch (e) { _hoursData.loading = false; _hoursData.error = describeError(e); toast("Hours fetch failed: " + describeError(e)); }
+  render();
+}
+function hoursBreakdown(proj) {
+  const key = tsAddrKey(proj.address);
+  const matchedJobs = key ? _hoursData.jobs.filter((j) => tsAddrKey(j.address) === key) : [];
+  const matchedIds = new Set(matchedJobs.map((j) => j.job_id));
+  const range = hoursRangeBounds(_hoursUI.range);
+  const perUser = {}; let total = 0;
+  _hoursData.sessions.forEach((s) => {
+    const byId = s.job_id && matchedIds.has(s.job_id);
+    const byAddr = key && s.address_confirmed && tsAddrKey(s.address_confirmed) === key;
+    if (!byId && !byAddr) return;
+    if (_hoursUI.excluded.has(s.job_id)) return;
+    if (range && s.date && (s.date < range.from || s.date > range.to)) return;
+    const h = parseFloat(s.total_hours) || 0;
+    const u = s.user || "Unknown";
+    perUser[u] = (perUser[u] || 0) + h; total += h;
+  });
+  return { perUser, total, matchedJobs };
+}
+function renderHoursPanel(proj) {
+  if (!proj) return "";
+  const d = _hoursData;
+  const ranges = [["all", "All"], ["4w", "4 wks"], ["week", "This wk"]];
+  let body;
+  if (d.loading) body = `<div class="empty-state">Loading hours…</div>`;
+  else if (!d.loaded) body = `<div class="empty-state">Load timesheet data to see hours logged on this job’s address.</div>`;
+  else {
+    const { perUser, total, matchedJobs } = hoursBreakdown(proj);
+    const chips = matchedJobs.length
+      ? matchedJobs.map((j) => `<button class="hours-chip ${_hoursUI.excluded.has(j.job_id) ? "is-off" : "is-on"}" data-action="hours-toggle" data-hours-job="${escapeHtml(j.job_id)}">${escapeHtml(j.job_name || "Job")}</button>`).join("")
+      : `<span class="empty-state" style="padding:6px 0">No timesheet jobs matched this address.</span>`;
+    const rows = Object.entries(perUser).sort((a, b) => b[1] - a[1]);
+    body = `<div class="hours-matched"><span class="hours-label">Matched jobs — tap to include/exclude</span><div class="hours-chips">${chips}</div></div>
+      <div class="metrics-grid" style="margin:12px 0"><div class="metric"><span>Total on site</span><strong>${total.toFixed(1)} hrs</strong></div><div class="metric"><span>People</span><strong>${rows.length}</strong></div></div>
+      ${rows.length ? `<div class="hours-table">${rows.map(([u, h]) => `<div class="hours-row"><span>${escapeHtml(u)}</span><span class="mono">${h.toFixed(1)} hrs</span></div>`).join("")}</div>` : `<div class="empty-state">No hours in this range.</div>`}`;
+  }
+  return `<section class="view-panel">
+      <div class="panel-header"><h3 class="section-title">Hours on site</h3><div class="button-row"><div class="seg-inline">${ranges.map(([r, l]) => `<button class="ghost-button ${_hoursUI.range === r ? "is-active" : ""}" data-action="hours-range" data-range="${r}">${l}</button>`).join("")}</div><button class="ghost-button" data-action="hours-load">${icon("refresh")}${d.loading ? "Loading…" : d.loaded ? "Refresh" : "Load"}</button></div></div>
+      ${d.error ? `<div class="empty-state" style="color:var(--red)">${escapeHtml(d.error)}</div>` : ""}
+      ${body}
+    </section>`;
+}
+
 function renderProgressView() {
   const proj = project();
   if (!proj) return `<section class="view-panel"><div class="empty-state" style="padding:36px">No project selected.</div></section>`;
@@ -2204,7 +2279,8 @@ function renderProgressView() {
     <section class="view-panel">
       <h3 class="section-title">By Floor</h3>
       <div class="bar-list">${floorRows.length ? floorRows.map((f) => `<div class="bar-row"><span>${escapeHtml(f.name)}</span><span class="bar-track"><span class="bar-fill" style="--value:${f.percent}%"></span></span><span>${f.percent}% &middot; ${f.total} nodes &middot; ${f.issues} issues</span></div>`).join("") : `<div class="empty-state">No floors</div>`}</div>
-    </section>`;
+    </section>
+    ${renderHoursPanel(proj)}`;
 }
 
 function renderAuditView() {
@@ -3123,6 +3199,9 @@ function handleAction(event) {
     case "prev-image": return stepImage(-1);
     case "next-image": return stepImage(1);
     case "audit-load": return fetchAuditRows();
+    case "hours-load": return fetchTimesheetHours();
+    case "hours-toggle": { const id = event.currentTarget.dataset.hoursJob; if (_hoursUI.excluded.has(id)) _hoursUI.excluded.delete(id); else _hoursUI.excluded.add(id); return render(); }
+    case "hours-range": { _hoursUI.range = event.currentTarget.dataset.range || "all"; return render(); }
     case "audit-download": return downloadAuditCsv(filteredAuditRows());
     case "audit-clear-filters": state.auditView.filters = freshState().auditView.filters; persist(); return render();
     case "print-report": state.modal = { mode: "print-preview" }; return render();

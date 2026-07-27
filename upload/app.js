@@ -295,6 +295,7 @@ function renderDetails() {
           <p>${state.items.length} file${state.items.length === 1 ? "" : "s"} selected. ${missing ? `${missing} required field${missing === 1 ? "" : "s"} still missing.` : "Ready to upload."}</p>
         </div>
         <div class="topbar-actions">
+          <button type="button" class="ghost-button" data-action="pick-job">${icon("folder")}Pick job</button>
           <button type="button" class="ghost-button" data-action="pick-files">${icon("plus")}Add files</button>
           <input class="hidden-input" type="file" multiple data-file-input />
         </div>
@@ -614,6 +615,7 @@ function handleAction(action) {
     return;
   }
   if (action === "pick-files") return fileInput?.click();
+  if (action === "pick-job") return openJobPicker();
   if (action === "next") return goToDetails();
   if (action === "back") { state.step = "welcome"; render(); return; }
   if (action === "copy-first-row") return copyItemToAll(state.items[0]?.id);
@@ -1100,6 +1102,56 @@ async function findSheetInFolder(name, parentId) {
   const q = `name='${escapeDriveQuery(name)}' and mimeType='application/vnd.google-apps.spreadsheet' and '${parentId}' in parents and trashed=false`;
   const list = await gapi.client.drive.files.list({ q, fields: "files(id,name)", pageSize: 5 });
   return list.result.files?.[0]?.id || null;
+}
+
+/* Read planner's job list (its master-sheet Projects tab) so uploads can be
+ * tagged to an existing job. Read-only — creating jobs stays in planner's
+ * hands via the shared Inbox that uploaded photos already feed. */
+const PLANNER_MASTER_SHEET_NAME = "NeillPlanner-Master";
+const PLANNER_ADMIN_FOLDER = "Admin Files";
+let _plannerProjectsCache = null;
+async function loadPlannerProjects() {
+  try {
+    const rootId = state.drive.rootFolderId;
+    if (!rootId || typeof gapi === "undefined" || !gapi.client?.sheets) return [];
+    const adminId = await findDestinationChildFolder(PLANNER_ADMIN_FOLDER, rootId);
+    if (!adminId) return [];
+    const masterId = await findSheetInFolder(PLANNER_MASTER_SHEET_NAME, adminId);
+    if (!masterId) return [];
+    const r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: masterId, range: "Projects!A2:D10000" });
+    // Projects columns: Project ID, Name, Folder Group, Address
+    return (r.result.values || []).filter((row) => row[0]).map((row) => ({ id: row[0], name: row[1] || "", address: row[3] || "" }));
+  } catch (e) { console.warn("loadPlannerProjects failed", e); return []; }
+}
+
+async function openJobPicker() {
+  const overlay = document.createElement("div");
+  overlay.className = "job-picker-overlay";
+  overlay.innerHTML = `<div class="job-picker"><div class="jp-head"><strong>Pick a job</strong><button type="button" class="jp-close" aria-label="Close">✕</button></div><input class="jp-search" type="search" placeholder="Search jobs by name or address" /><div class="jp-list"><div class="jp-empty">Loading jobs…</div></div></div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector(".jp-close").addEventListener("click", close);
+  const listEl = overlay.querySelector(".jp-list");
+  const searchEl = overlay.querySelector(".jp-search");
+  if (!isTokenValid()) { listEl.innerHTML = `<div class="jp-empty">Sign in to load jobs from planner.</div>`; return; }
+  let projects = _plannerProjectsCache;
+  if (!projects) { projects = await loadPlannerProjects(); _plannerProjectsCache = projects; }
+  function paint(q) {
+    const ql = (q || "").trim().toLowerCase();
+    if (!projects.length) { listEl.innerHTML = `<div class="jp-empty">No planner jobs found for this account.</div>`; return; }
+    const filtered = projects.filter((p) => !ql || `${p.name} ${p.address}`.toLowerCase().includes(ql));
+    if (!filtered.length) { listEl.innerHTML = `<div class="jp-empty">No jobs match.</div>`; return; }
+    listEl.innerHTML = filtered.map((p) => `<button type="button" class="jp-item" data-addr="${escapeHtml(p.address)}"><span class="jp-name">${escapeHtml(p.name || "Untitled job")}</span><span class="jp-addr">${escapeHtml(p.address || "No address")}</span></button>`).join("");
+    listEl.querySelectorAll(".jp-item").forEach((b) => b.addEventListener("click", () => {
+      const addr = b.dataset.addr;
+      if (addr) { state.header.values.address = addr; state.header.detectedAddress = false; }
+      close(); render();
+    }));
+  }
+  searchEl.addEventListener("input", () => paint(searchEl.value));
+  paint("");
+  searchEl.focus();
 }
 
 async function ensureUploadSheet(parentId) {

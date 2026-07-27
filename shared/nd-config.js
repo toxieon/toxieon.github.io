@@ -48,6 +48,7 @@
     masterSpreadsheetName: "NeillPlanner-Master",
     quoteSheetId:          "1uxaEppfmUoC0l1nZXS3rvsvKsysDxH5m1AyBK2biUeE",
     timesheetFileName:     "Timesheet-Data",   // created per-account in Drive
+    timesheetSpreadsheetId:"1VG2Pejfd0ZGRpAEs65YAkVf1082O1CUeYjitZSidDl4",  // one shared sheet, per-user tabs
     uploadSheetName:       "Upload Log"        // terms acceptance + raw receipts only (v1.0 §3.1)
   };
 
@@ -117,6 +118,7 @@
       masterSpreadsheetName: sheets.masterSpreadsheetName,
       quoteSheetId: sheets.quoteSheetId,
       timesheetFileName: sheets.timesheetFileName,
+      timesheetSpreadsheetId: sheets.timesheetSpreadsheetId,
       uploadSheetName: sheets.uploadSheetName,
       driveRootFolderName: drive.rootFolderName,
       batchFolderName: drive.batchFolderName,

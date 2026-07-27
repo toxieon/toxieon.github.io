@@ -98,6 +98,36 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .field-with-here { display: flex; gap: 8px; align-items: stretch; }
 .field-with-here input { flex: 1; min-width: 0; }
 .field-with-here .here-btn { flex: 0 0 auto; padding: 10px 16px; }
+/* Log book (jobs) */
+#view-jobs .page { padding-bottom: 90px; }
+.job-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.job-card-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font-family: inherit; }
+.job-card-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.job-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-addr { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-meta { display: flex; align-items: center; gap: 12px; flex: none; }
+.job-stat { font-size: 12px; color: var(--text-muted); }
+.job-stat strong { color: var(--text-primary); font-size: 14px; }
+.job-type-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.type-employer { color: #6ddba3; border-color: rgba(58,184,122,0.4); }
+.type-neill_data { color: #f5a05a; border-color: rgba(224,123,42,0.4); }
+.type-unclassified { color: var(--text-muted); }
+.job-card-body { border-top: 1px solid var(--border); padding: 4px 16px 12px; }
+.job-shift-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12.5px; }
+.job-shift-row:last-child { border-bottom: 0; }
+.job-shift-empty { color: var(--text-muted); font-size: 13px; padding: 14px 0; text-align: center; }
+.seg { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
+.seg button { flex: 1; min-height: 34px; border: 0; border-radius: 999px; background: none; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg button.active { background: var(--surface); color: var(--text-primary); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+.seg-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--off-primary); color: #1a0c00; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.merge-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+.merge-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--off-accent); margin-bottom: 10px; }
+.merge-opt { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+.merge-opt input { flex: none; accent-color: var(--on-primary); width: 18px; height: 18px; }
+.merge-opt-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.merge-hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 12px; }
+.merge-actions { display: flex; gap: 10px; }
+.merge-actions .btn { flex: 1; }
 .picker-item .pname { font-weight: 500; }
 .picker-item .paddr { font-size: 12px; color: var(--text-muted); }
 .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
@@ -266,6 +296,19 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       </div>
     </details>
     <button class="fab" id="btn-add-shift" aria-label="Add shift">+</button>
+  </div>
+</section>
+
+<section class="view" id="view-jobs">
+  <div class="page">
+    <div class="page-title">Log book</div>
+    <div class="seg" id="jobs-mode">
+      <button type="button" data-mode="jobs" class="active">Jobs</button>
+      <button type="button" data-mode="merge">Merge <span class="seg-badge" id="merge-count" hidden></span></button>
+    </div>
+    <div class="muted" id="jobs-summary" style="font-size:12px; margin-bottom:12px;"></div>
+    <input type="search" id="jobs-search" placeholder="Search jobs: name, address, type" style="width:100%; margin-bottom:14px;" />
+    <div id="jobs-list"></div>
   </div>
 </section>
 
@@ -1898,10 +1941,153 @@ window.Views = {};
   window.Views.settings = { init, render: renderAll };
 })();
 
+/* ===== LOG BOOK (jobs) VIEW ===== */
+(function () {
+  let jobsQuery = '';
+  let logMode = 'jobs';
+  const expanded = {};
+  const mergeDismissed = new Set();
+  const TYPE_LABEL = { employer: 'Employer', neill_data: 'Neill Data', unclassified: 'Unclassified' };
+  function normName(s) { return (s || '').trim().toLowerCase(); }
+  function addrKey(job) {
+    if (window.NDMatch && NDMatch.addressKey) return NDMatch.addressKey(job.address || '');
+    return (job.address || '').trim().toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ');
+  }
+  // Cluster likely-duplicate jobs: same address, within ~60m, or same name.
+  function duplicateGroups() {
+    const jobs = getState().jobs;
+    const used = new Set();
+    const groups = [];
+    for (let i = 0; i < jobs.length; i++) {
+      if (used.has(jobs[i].job_id)) continue;
+      const a = jobs[i], keyA = addrKey(a), nameA = normName(a.job_name);
+      const group = [a];
+      for (let k = i + 1; k < jobs.length; k++) {
+        const b = jobs[k];
+        if (used.has(b.job_id)) continue;
+        const sameAddr = keyA && addrKey(b) === keyA;
+        const sameSpot = a.lat != null && a.lng != null && b.lat != null && b.lng != null && distanceMetres(a.lat, a.lng, b.lat, b.lng) <= 60;
+        const sameName = nameA && normName(b.job_name) === nameA;
+        if (sameAddr || sameSpot || sameName) { group.push(b); used.add(b.job_id); }
+      }
+      if (group.length > 1) { used.add(a.job_id); groups.push(group); }
+    }
+    // Strongest candidate first within each group (most visits, then most hours).
+    groups.forEach(g => g.sort((x, y) => (y.visit_count || 0) - (x.visit_count || 0) || jobStats(y.job_id).hours - jobStats(x.job_id).hours));
+    return groups;
+  }
+  function groupKey(g) { return g.map(j => j.job_id).slice().sort().join('|'); }
+  // Merge losers into the chosen canonical job: repoint sessions, combine
+  // stats, drop losers, and push it all to the Google Sheet via the queue.
+  function mergeJobs(canonicalId, allIds) {
+    const st = getState();
+    const canonical = st.jobs.find(j => j.job_id === canonicalId);
+    if (!canonical) return;
+    allIds.filter(id => id !== canonicalId).forEach(lid => {
+      const loser = st.jobs.find(j => j.job_id === lid);
+      if (!loser) return;
+      st.sessions.forEach(s => {
+        if (s.job_id === lid) { s.job_id = canonical.job_id; s.job_name = canonical.job_name; upsertSession(s); }
+      });
+      if (st.currentSession && st.currentSession.job_id === lid) { st.currentSession.job_id = canonical.job_id; st.currentSession.job_name = canonical.job_name; }
+      canonical.visit_count = (canonical.visit_count || 0) + (loser.visit_count || 0);
+      if (loser.first_visit && (!canonical.first_visit || loser.first_visit < canonical.first_visit)) canonical.first_visit = loser.first_visit;
+      if (loser.last_visit && (!canonical.last_visit || loser.last_visit > canonical.last_visit)) canonical.last_visit = loser.last_visit;
+      if (!canonical.address && loser.address) canonical.address = loser.address;
+      st.jobs = st.jobs.filter(j => j.job_id !== lid);
+      queueSheetDelete('jobs', lid);
+    });
+    queueSheetWrite('jobs', canonical, true);
+    saveState();
+    refreshAllViews();
+    toast('Jobs merged');
+  }
+  function renderMerge(wrap) {
+    const groups = duplicateGroups().filter(g => !mergeDismissed.has(groupKey(g)));
+    const summary = document.getElementById('jobs-summary');
+    if (summary) summary.textContent = groups.length ? `${groups.length} possible duplicate${groups.length === 1 ? '' : 's'} — review and merge` : 'No duplicates to review.';
+    if (!groups.length) { wrap.innerHTML = `<div class="job-shift-empty">No duplicate jobs detected.</div>`; return; }
+    wrap.innerHTML = groups.map((g, gi) => `<div class="merge-card">
+        <div class="merge-title">Possible duplicate · ${g.length} jobs</div>
+        ${g.map((j, ji) => { const s = jobStats(j.job_id); return `<label class="merge-opt"><input type="radio" name="canon-${gi}" value="${j.job_id}" ${ji === 0 ? 'checked' : ''}/><span class="merge-opt-main"><span class="job-name">${escapeHtml(j.job_name || 'Job')}</span><span class="job-addr">${escapeHtml(j.address || 'No address')}</span></span><span class="job-stat">${s.hours.toFixed(1)}h · ${s.shifts}</span></label>`; }).join('')}
+        <div class="merge-hint">Keep the selected job; the others merge into it.</div>
+        <div class="merge-actions"><button type="button" class="btn btn-ghost" data-merge-dismiss="${gi}">Not duplicates</button><button type="button" class="btn btn-primary" data-merge-go="${gi}">Merge ${g.length} jobs</button></div>
+      </div>`).join('');
+    wrap.querySelectorAll('[data-merge-go]').forEach(btn => btn.addEventListener('click', () => {
+      const gi = +btn.dataset.mergeGo, g = groups[gi];
+      const sel = wrap.querySelector(`input[name="canon-${gi}"]:checked`);
+      const canonicalId = sel ? sel.value : g[0].job_id;
+      const canonical = g.find(j => j.job_id === canonicalId) || g[0];
+      if (!confirm(`Merge ${g.length} jobs into "${canonical.job_name || 'Job'}"? Their shifts will move onto it and the others will be removed.`)) return;
+      mergeJobs(canonicalId, g.map(j => j.job_id));
+    }));
+    wrap.querySelectorAll('[data-merge-dismiss]').forEach(btn => btn.addEventListener('click', () => { mergeDismissed.add(groupKey(groups[+btn.dataset.mergeDismiss])); render(); }));
+  }
+  function updateModeUI() {
+    const badge = document.getElementById('merge-count');
+    const n = duplicateGroups().filter(g => !mergeDismissed.has(groupKey(g))).length;
+    if (badge) { badge.textContent = n; badge.hidden = !n; }
+    document.querySelectorAll('#jobs-mode [data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === logMode));
+    const search = document.getElementById('jobs-search');
+    if (search) search.style.display = logMode === 'jobs' ? '' : 'none';
+  }
+  function jobStats(jobId) {
+    const ss = getState().sessions.filter(s => s.job_id === jobId);
+    let hours = 0;
+    ss.forEach(s => { hours += parseFloat(s.total_hours) || 0; });
+    const dates = ss.map(s => s.date).filter(Boolean).sort();
+    return { shifts: ss.length, hours, first: dates[0] || '', last: dates[dates.length - 1] || '', sessions: ss };
+  }
+  function jobShiftRows(jobId) {
+    const st = getState();
+    const ss = jobStats(jobId).sessions.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (!ss.length) return '<div class="job-shift-empty">No shifts logged against this job yet.</div>';
+    return ss.map(s => `<div class="job-shift-row"><span>${escapeHtml(fmtDateHeader(new Date(s.date)))}</span><span class="mono">${fmtTime(s.time_on_rounded, st.settings.use24hr)} → ${fmtTime(s.time_off_rounded, st.settings.use24hr) || '—'}</span><span class="mono">${(parseFloat(s.total_hours) || 0).toFixed(2)} hrs</span></div>`).join('');
+  }
+  function render() {
+    const wrap = document.getElementById('jobs-list'); if (!wrap) return;
+    updateModeUI();
+    if (logMode === 'merge') return renderMerge(wrap);
+    const st = getState();
+    const q = jobsQuery.trim().toLowerCase();
+    let rows = st.jobs.map(j => ({ j, s: jobStats(j.job_id) }));
+    const totalHours = rows.reduce((t, r) => t + r.s.hours, 0);
+    const summary = document.getElementById('jobs-summary');
+    if (summary) summary.textContent = `${st.jobs.length} job${st.jobs.length === 1 ? '' : 's'} · ${totalHours.toFixed(1)} hrs logged`;
+    if (q) rows = rows.filter(r => `${r.j.job_name} ${r.j.address || ''} ${TYPE_LABEL[r.j.job_type] || r.j.job_type || ''}`.toLowerCase().includes(q));
+    rows.sort((a, b) => (b.s.last || '').localeCompare(a.s.last || '') || (b.j.visit_count || 0) - (a.j.visit_count || 0));
+    if (!rows.length) { wrap.innerHTML = `<div class="job-shift-empty">${q ? 'No jobs match your search.' : 'No jobs yet — clock on to create your first.'}</div>`; return; }
+    wrap.innerHTML = rows.map(({ j, s }) => {
+      const type = j.job_type || 'unclassified';
+      const open = !!expanded[j.job_id];
+      return `<div class="job-card ${open ? 'is-open' : ''}">
+        <button class="job-card-head" data-job-toggle="${j.job_id}">
+          <span class="job-card-main"><span class="job-name">${escapeHtml(j.job_name || 'Job')}</span><span class="job-addr">${escapeHtml(j.address || 'No address')}</span></span>
+          <span class="job-meta"><span class="job-type-badge type-${type}">${escapeHtml(TYPE_LABEL[type] || type)}</span><span class="job-stat"><strong>${s.hours.toFixed(1)}</strong> hrs</span><span class="job-stat"><strong>${s.shifts}</strong></span></span>
+        </button>
+        ${open ? `<div class="job-card-body"><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
+      </div>`;
+    }).join('');
+    wrap.querySelectorAll('[data-job-toggle]').forEach(el => el.addEventListener('click', () => { const id = el.dataset.jobToggle; expanded[id] = !expanded[id]; render(); }));
+  }
+  function init() {
+    const search = document.getElementById('jobs-search');
+    if (search && !search._tsBound) { search._tsBound = true; search.addEventListener('input', () => { jobsQuery = search.value; render(); }); }
+    const modeBar = document.getElementById('jobs-mode');
+    if (modeBar && !modeBar._tsBound) {
+      modeBar._tsBound = true;
+      modeBar.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { logMode = b.dataset.mode; render(); }));
+    }
+    render();
+  }
+  window.Views.jobs = { init, render };
+})();
+
 /* ===== APP SHELL ===== */
-const NAV_ITEMS = [ // §3.3: Clock · History · Settings (Export merged into History)
+const NAV_ITEMS = [ // §3.3: Clock · History · Log book · Settings (Export merged into History)
   { view: 'clock', label: 'Clock', icon: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 7a5 5 0 100 10 5 5 0 000-10z' },
   { view: 'history', label: 'History', icon: 'M3 5h18M3 12h18M3 19h18' },
+  { view: 'jobs', label: 'Log book', icon: 'M4 4h11a3 3 0 013 3v13a2 2 0 00-2-2H4zM4 4v14M8 8h6M8 11h6' },
   { view: 'settings', label: 'Settings', icon: 'M10.3 2.6a2 2 0 013.4 0l.4.7a2 2 0 002.3 1l.8-.2a2 2 0 012.4 1.4l.2.8a2 2 0 001 1.4l.7.4a2 2 0 010 3.4l-.7.4a2 2 0 00-1 1.4l-.2.8a2 2 0 01-2.4 1.4l-.8-.2a2 2 0 00-2.3 1l-.4.7a2 2 0 01-3.4 0l-.4-.7a2 2 0 00-2.3-1l-.8.2a2 2 0 01-2.4-1.4l-.2-.8a2 2 0 00-1-1.4l-.7-.4a2 2 0 010-3.4l.7-.4a2 2 0 001-1.4l.2-.8a2 2 0 012.4-1.4l.8.2a2 2 0 002.3-1l.4-.7zM12 9a3 3 0 100 6 3 3 0 000-6z' }
 ];
 let currentView = 'clock';
@@ -1919,7 +2105,7 @@ function showView(name) {
   window.scrollTo(0, 0);
 }
 function refreshAllViews() {
-  ['clock', 'history', 'settings'].forEach(n => { if (window.Views[n] && window.Views[n].render) window.Views[n].render(); });
+  ['clock', 'history', 'jobs', 'settings'].forEach(n => { if (window.Views[n] && window.Views[n].render) window.Views[n].render(); });
 }
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -1927,7 +2113,7 @@ function registerServiceWorker() {
 }
 async function bootApp() {
   registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
-  window.Views.clock.init(); window.Views.history.init(); window.Views.settings.init();
+  window.Views.clock.init(); window.Views.history.init(); window.Views.jobs.init(); window.Views.settings.init();
   showView('clock');
   await flushQueueOnNextOpen();
   TsSheets.boot().then(() => maybeDailyForceSync()).catch(() => {});

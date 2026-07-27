@@ -694,6 +694,20 @@ textarea:focus {
 .here-btn:hover { background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.6); }
 .here-btn svg { width: 16px; height: 16px; }
 
+/* §20 Hours on site panel */
+.seg-inline { display: inline-flex; gap: 4px; }
+.seg-inline .ghost-button.is-active { background: rgba(255,255,255,0.1); color: var(--text); }
+.hours-matched { margin-bottom: 6px; }
+.hours-label { font-size: 12px; color: var(--muted); }
+.hours-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hours-chip { border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); }
+.hours-chip.is-on { color: var(--teal); border-color: rgba(20,184,166,0.5); background: rgba(20,184,166,0.12); }
+.hours-chip.is-off { opacity: 0.5; text-decoration: line-through; }
+.hours-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.hours-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.hours-row:last-child { border-bottom: 0; }
+.hours-row .mono { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+
 .canvas-tools {
   position: absolute;
   right: 14px;
