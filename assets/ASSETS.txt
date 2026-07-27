@@ -1,0 +1,104 @@
+========================================================================
+ NEILL DATA SUITE — REUSABLE ASSETS
+ A growing library of drop-in feature components shared across the apps
+ (uploader, quote, planner, timesheet, swb, hub).
+ Update this file whenever an asset is added, changed, or wired into an app.
+ Last updated: 2026-07-27
+========================================================================
+
+HOW THIS RELATES TO /shared
+  /shared  = low-level runtime modules the apps already depend on
+             (nd-auth, nd-sheets, nd-queue, nd-cache, nd-ui, nd-core.css, …).
+  /assets  = higher-level, self-contained FEATURE components you can lift
+             into any app with a single <script> tag. This is the library
+             we grow as we pull the "best of" each app into one place.
+
+  Load an asset by adding, before your app script:
+      <script src="../assets/here.js"></script>
+
+------------------------------------------------------------------------
+ ASSETS PRESENT
+------------------------------------------------------------------------
+
+[1] here.js  —  "Here" one-tap geolocation → address
+    Global:   NDHere
+    Origin:   Quote (#use-location-btn)
+    Needs:    navigator.geolocation + google.maps.Geocoder (host loads Maps)
+    API:      NDHere.locate(opts) -> Promise<{address, lat, lng}>
+              NDHere.fill(inputEl, opts)      (writes address into a field)
+              NDHere.attachButton(btn, inputEl, opts)   (one-call wiring)
+    Options:  region ("au"), highAccuracy, timeout, busyLabel, mapsKey,
+              onResult(addr,coords), onError(err), notify(msg)
+    Used by:  quote, uploader, planner, timesheet  (WIRED)
+    Status:   WIRED into all four apps
+    Notes:    Uses google.maps.Geocoder when the Maps JS library is loaded;
+              falls back to REST geocoding via opts.mapsKey when it isn't
+              (that's how Timesheet uses it). Errors surface via NDUI.toast
+              when available, else alert().
+
+[2] watermark.js  —  photo watermark info strip
+    Global:   NDWatermark
+    Origin:   Quote (drawWatermark)
+    Needs:    Canvas 2D only (GPS lookup optional, uses geolocation)
+    API:      NDWatermark.buildLines(data, toggles) -> string[]   (pure)
+              NDWatermark.draw(ctx, w, h, {lines})                (sync)
+              NDWatermark.stamp(source, {lines, maxDim, jpegQ}) -> dataURL
+              NDWatermark.getGps(opts) -> Promise<"lat, lng"|null>
+    Fields:   business, clientName, address, room, apartment, location,
+              ref, datetime, initials, gps  (each individually toggleable;
+              room/apt/location merge to one line; datetime + initials share
+              a line, e.g. "27 Jul 2026 3:45 pm · BN")
+    Toggles:  NDWatermark.DEFAULT_TOGGLES (clone + override per app)
+    Used by:  uploader (baked on upload, per-field toggle panel + initials),
+              quote (in-app camera capture)  — both WIRED
+    Status:   WIRED. Uploader skips floor plans + HEIC; falls back to the
+              original file on any error so an upload never fails.
+
+[3] countdown-confirm.js  —  auto-confirming prompt with a depleting bar
+    Global:   NDCountdownConfirm
+    Origin:   Timesheet ("near" clock-on prompt)
+    Needs:    nothing (self-contained; injects its own styles + DOM)
+    API:      NDCountdownConfirm.open({ title, message, seconds=4,
+                confirmLabel, secondaryLabel, accent,
+                onConfirm, onSecondary, onCancel }) -> { close(fireCancel) }
+    Behaviour: bar drains over `seconds`, then auto-fires onConfirm unless a
+              button is tapped. Secondary = "change my mind" action; backdrop
+              tap / Esc = cancel. "Assume yes, but give a moment to change."
+    Used by:  Timesheet clock-on (pattern); available suite-wide
+    Status:   BUILT
+
+[4] exif-geo-detect.js  —  read a photo's GPS + capture time → address
+    Global:   NDExifGeo
+    Origin:   Uploader (EXIF auto-location)
+    Needs:    exifr (window.exifr) + google.maps.Geocoder OR opts.mapsKey
+    API:      NDExifGeo.readExif(file) -> { lat, lng, capturedAt }
+              NDExifGeo.coordKey(lat, lng)                       (pure)
+              NDExifGeo.reverseGeocode(lat, lng, { region, mapsKey })
+              NDExifGeo.geocodeClusters(points, { cache, mapsKey })
+                — one geocode per unique 5dp coordinate (40 photos = 1 call)
+    Used by:  available (uploader's inline flow can migrate onto it)
+    Status:   BUILT
+
+------------------------------------------------------------------------
+ CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
+------------------------------------------------------------------------
+  • address-autocomplete  — Google Places autocomplete on an address field.
+        Both Quote and Uploader implement this; one shared version would
+        keep behaviour identical. Pairs naturally with here.js.
+  • camera-capture         — Quote's in-app camera modal (live preview,
+        flip camera, shutter, downscale). Uploader would benefit directly,
+        and it already calls watermark.js on capture.
+  • job-locator            — Timesheet's findJobByLocation / resolveOrCreateJob:
+        match "am I at a known job?" by lat/lng + radius, or create one.
+        Useful for the uploader↔planner jobs work.
+  • sync-tube              — the water-fill sync indicator now in
+        shared/nd-ui.js (NDUI.syncTube) + nd-core.css. Listed here for
+        discoverability; already suite-wide.
+
+------------------------------------------------------------------------
+ CHANGELOG
+------------------------------------------------------------------------
+  2026-07-27  Created /assets library. Added here.js and watermark.js
+              (extracted from Quote). Seeded candidate list.
+  2026-07-27  Added countdown-confirm.js (from Timesheet's near clock-on).
+              Added the /1234567890 showroom (listed in Hub as "assets").

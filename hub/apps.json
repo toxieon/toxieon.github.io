@@ -6,6 +6,7 @@
     { "id": "quote",     "name": "Quote",     "path": "/quote/",     "icon": "/quote/favicon.svg",     "color": "#94a3b8", "order": 4, "hidden": false },
     { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false },
     { "id": "swb",       "name": "SWB",       "path": "/swb/",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6, "hidden": false },
-    { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 7, "hidden": true }
+    { "id": "assets",    "name": "Assets",    "path": "/1234567890/", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 7, "hidden": false },
+    { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 8, "hidden": true }
   ]
 }

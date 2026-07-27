@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Assets · Neill Data Suite</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-ui.js"></script>
+<script src="../assets/here.js"></script>
+<script src="../assets/watermark.js"></script>
+<script src="../assets/countdown-confirm.js"></script>
+<style>
+  body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
+    font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 80px; }
+  header.page { margin-bottom: 24px; }
+  header.page h1 { font-size: 26px; font-weight: 600; margin: 0 0 6px; }
+  header.page p { color: var(--nd-muted, #888); margin: 0; font-size: 14px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 4px; }
+  .count-pill { font-family: var(--nd-mono, monospace); font-size: 12px; color: var(--nd-muted, #888);
+    border: 1px solid var(--nd-border, #2a2a2a); border-radius: 999px; padding: 4px 12px; }
+  .btn-link { text-decoration: none; font-size: 13px; font-weight: 500; color: var(--nd-text, #f0f0f0);
+    border: 1px solid var(--nd-border-strong, #3a3a3a); border-radius: 999px; padding: 7px 14px; background: var(--nd-surface, #1a1a1a); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 18px; }
+  .card { background: var(--nd-surface, #1a1a1a); border: 1px solid var(--nd-border, #2a2a2a); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; }
+  .card h2 { font-size: 16px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .tag { font-family: var(--nd-mono, monospace); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--nd-amber-soft, #f5a05a); border: 1px solid var(--nd-amber-glow, #7a3a0d); border-radius: 999px; padding: 2px 8px; }
+  .card .desc { color: var(--nd-muted, #888); font-size: 13px; line-height: 1.55; margin: 8px 0 12px; }
+  .demo { background: rgba(255,255,255,0.03); border: 1px solid var(--nd-border, #2a2a2a); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .demo button { min-height: 38px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--nd-border-strong, #3a3a3a);
+    background: var(--nd-surface-2, #242424); color: var(--nd-text, #f0f0f0); font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .demo button.primary { background: var(--nd-green, #3ab87a); color: #022014; border: 0; }
+  .demo input[type=text] { flex: 1; min-width: 120px; min-height: 38px; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid var(--nd-border, #2a2a2a); background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0); font-size: 13px; font-family: inherit; }
+  .demo label.chk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--nd-muted, #aaa); }
+  .status { font-family: var(--nd-mono, monospace); font-size: 12px; color: var(--nd-green-soft, #6ddba3); min-height: 16px; margin-top: 8px; word-break: break-word; }
+  code.use { display: block; font-family: var(--nd-mono, monospace); font-size: 11.5px; color: var(--nd-muted, #9aa0a8);
+    background: var(--nd-bg, #0d0d0d); border: 1px solid var(--nd-border, #2a2a2a); border-radius: 8px; padding: 9px 11px; overflow-x: auto; white-space: pre; }
+  canvas { width: 100%; height: auto; border-radius: 8px; display: block; }
+  /* No-photo ping demo (mirrors planner) */
+  .np-plan { position: relative; height: 120px; border-radius: 10px; background: #14181f; overflow: hidden; }
+  .np-nm { position: absolute; top: 50%; width: 26px; height: 26px; transform: translate(-50%,-50%); }
+  .np-nm::before, .np-nm::after { content:""; position:absolute; inset:0; border-radius:50%; }
+  .np-nm::before { border: 3px solid rgba(255,255,255,0.88); box-shadow: 0 0 0 4px rgba(14,165,233,0.14), 0 0 22px var(--c); background: var(--c); }
+  .np-nm::after { border: 1px solid var(--c); animation: nppulse 1.8s ease-out infinite; }
+  .np-nm.red::before { background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,0.24), 0 0 26px #ef4444; }
+  .np-nm.red::after { border:2px solid #ef4444; animation: nppulse 1.15s ease-out infinite; }
+  @keyframes nppulse { 0%{transform:scale(0.88);opacity:0.78;} 100%{transform:scale(2.55);opacity:0;} }
+  .foot { margin-top: 30px; color: var(--nd-muted, #666); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>Assets showroom</h1>
+    <p>A live library of the reusable components shared across the Neill Data Suite. Extracted from the apps, dropped in with a single &lt;script&gt; tag.</p>
+    <div class="toolbar">
+      <span class="count-pill" id="count">— assets</span>
+      <a class="btn-link" href="../assets/ASSETS.txt" target="_blank" rel="noopener">View manifest (ASSETS.txt)</a>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- Sync tube -->
+    <div class="card">
+      <h2>Sync tube <span class="tag">shared/nd-ui</span></h2>
+      <p class="desc">The water-fill sync indicator. Fills red→green as changes flush; taps to sync. Mounted top-right of this page — cycle its state:</p>
+      <div class="demo">
+        <div class="demo-row">
+          <button data-tube="synced">Synced</button>
+          <button data-tube="pending">Pending</button>
+          <button data-tube="flushing">Syncing</button>
+          <button data-tube="failed">Failed</button>
+        </div>
+      </div>
+      <code class="use">NDUI.syncTube(window.NDQueue)</code>
+    </div>
+
+    <!-- Countdown confirm -->
+    <div class="card">
+      <h2>Countdown confirm <span class="tag">assets</span></h2>
+      <p class="desc">"Assume yes, but give a moment to change your mind." A prompt whose bar drains over N seconds, then auto-confirms.</p>
+      <div class="demo">
+        <div class="demo-row"><button class="primary" id="cc-go">Launch prompt</button></div>
+        <div class="status" id="cc-status"></div>
+      </div>
+      <code class="use">NDCountdownConfirm.open({ title, message,
+  seconds: 4, secondaryLabel: "Change",
+  onConfirm, onSecondary })</code>
+    </div>
+
+    <!-- Watermark -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <h2>Watermark <span class="tag">assets</span></h2>
+      <p class="desc">Paints an info strip on a photo: address, room/apartment/location, date-time, and uploader initials. Every field toggles. Edit below — it redraws live.</p>
+      <div class="demo">
+        <div class="demo-row" style="margin-bottom:10px;">
+          <input type="text" id="wm-address" placeholder="Address" value="14 Wilson St, Frankston VIC" />
+          <input type="text" id="wm-room" placeholder="Room" value="Room 2" />
+          <input type="text" id="wm-apt" placeholder="Apartment" value="Apt 4" />
+          <input type="text" id="wm-initials" placeholder="Initials" value="BN" style="max-width:80px;flex:0 0 80px;" />
+        </div>
+        <div class="demo-row" style="margin-bottom:12px;">
+          <label class="chk"><input type="checkbox" id="t-address" checked /> address</label>
+          <label class="chk"><input type="checkbox" id="t-room" checked /> room</label>
+          <label class="chk"><input type="checkbox" id="t-apartment" checked /> apt</label>
+          <label class="chk"><input type="checkbox" id="t-datetime" checked /> date-time</label>
+          <label class="chk"><input type="checkbox" id="t-initials" checked /> initials</label>
+        </div>
+        <canvas id="wm-canvas" width="720" height="440"></canvas>
+      </div>
+      <code class="use">NDWatermark.draw(ctx, w, h, { lines: NDWatermark.buildLines(data, toggles) })</code>
+    </div>
+
+    <!-- Here -->
+    <div class="card">
+      <h2>Here <span class="tag">assets</span></h2>
+      <p class="desc">One-tap geolocation → address. Fills a field from your GPS via reverse-geocode. (Needs the host app's Google Maps key — here it shows the graceful error path.)</p>
+      <div class="demo">
+        <div class="demo-row">
+          <input type="text" id="here-input" placeholder="Address will drop in here" />
+          <button id="here-btn">Here</button>
+        </div>
+        <div class="status" id="here-status"></div>
+      </div>
+      <code class="use">NDHere.attachButton(btn, input, { region: "au" })</code>
+    </div>
+
+    <!-- No-photo ping -->
+    <div class="card">
+      <h2>No-photo ping <span class="tag">planner</span></h2>
+      <p class="desc">A planner node with no photo "pings" red, overriding its status colour, so gaps are obvious at a glance.</p>
+      <div class="demo">
+        <div class="np-plan">
+          <div class="np-nm" style="--c:#22c55e; left:34%;"></div>
+          <div class="np-nm red" style="left:66%;"></div>
+        </div>
+        <div class="status" style="color:var(--nd-muted,#888);">left: has photo · right: missing (pings red)</div>
+      </div>
+      <code class="use">.node-marker.no-photo { --status: var(--red) !important; }</code>
+    </div>
+
+  </div>
+
+  <p class="foot">Neill Data Suite · internal assets library · update <code style="color:inherit;">assets/ASSETS.txt</code> as this grows.</p>
+</div>
+
+<script>
+  document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Sync tube: bind to a fake queue we can drive ---- */
+  (function () {
+    if (!window.NDUI || !NDUI.syncTube) return;
+    var listeners = [], status = "synced";
+    var fakeQueue = {
+      status: function () { return status; },
+      size: function () { return status === "synced" ? 0 : 3; },
+      onStatus: function (cb) { listeners.push(cb); return function () {}; },
+      flush: function () { setStatus("flushing"); setTimeout(function () { setStatus("synced"); }, 1400); }
+    };
+    function setStatus(s) { status = s; listeners.forEach(function (cb) { try { cb(s); } catch (e) {} }); }
+    NDUI.syncTube(fakeQueue, { labels: { pending: "Saved — will sync", flushing: "Syncing…", failed: "Sync failed — tap to retry", synced: "Up to date" } });
+    document.querySelectorAll("[data-tube]").forEach(function (b) {
+      b.addEventListener("click", function () { setStatus(b.getAttribute("data-tube")); });
+    });
+  })();
+
+  /* ---- Countdown confirm ---- */
+  document.getElementById("cc-go").addEventListener("click", function () {
+    var out = document.getElementById("cc-status");
+    out.textContent = "";
+    NDCountdownConfirm.open({
+      title: "Near Wilson St job",
+      message: "Assuming you're at <strong>14 Wilson St, Frankston</strong>.",
+      seconds: 4,
+      confirmLabel: "Clock On now",
+      secondaryLabel: "Change",
+      onConfirm: function () { out.style.color = "var(--nd-green-soft,#6ddba3)"; out.textContent = "✓ Confirmed (auto or tapped)"; },
+      onSecondary: function () { out.style.color = "var(--nd-muted,#888)"; out.textContent = "Secondary action — countdown cancelled"; },
+      onCancel: function () { out.style.color = "var(--nd-muted,#888)"; out.textContent = "Dismissed"; }
+    });
+  });
+
+  /* ---- Watermark: synthetic photo + live redraw ---- */
+  (function () {
+    var canvas = document.getElementById("wm-canvas");
+    var ctx = canvas.getContext("2d");
+    function drawPhoto() {
+      var w = canvas.width, h = canvas.height;
+      var g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, "#3b4a63"); g.addColorStop(1, "#20262f");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillRect(w * 0.12, h * 0.18, w * 0.34, h * 0.5);
+      ctx.fillRect(w * 0.56, h * 0.30, w * 0.30, h * 0.42);
+      ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 2;
+      ctx.strokeRect(w * 0.12, h * 0.18, w * 0.34, h * 0.5);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.font = "600 15px system-ui, sans-serif";
+      ctx.fillText("sample photo", 16, 26);
+    }
+    function redraw() {
+      drawPhoto();
+      var data = {
+        business: "Neill Data & Security",
+        address: document.getElementById("wm-address").value,
+        room: document.getElementById("wm-room").value,
+        apartment: document.getElementById("wm-apt").value,
+        initials: document.getElementById("wm-initials").value,
+        datetime: true
+      };
+      var toggles = {
+        business: true,
+        address: document.getElementById("t-address").checked,
+        room: document.getElementById("t-room").checked,
+        apartment: document.getElementById("t-apartment").checked,
+        location: false,
+        datetime: document.getElementById("t-datetime").checked,
+        initials: document.getElementById("t-initials").checked,
+        gps: false, clientName: false, ref: false
+      };
+      NDWatermark.draw(ctx, canvas.width, canvas.height, { lines: NDWatermark.buildLines(data, toggles) });
+    }
+    ["wm-address","wm-room","wm-apt","wm-initials","t-address","t-room","t-apartment","t-datetime","t-initials"].forEach(function (id) {
+      var el = document.getElementById(id);
+      el.addEventListener(el.type === "checkbox" ? "change" : "input", redraw);
+    });
+    redraw();
+  })();
+
+  /* ---- Here ---- */
+  (function () {
+    var out = document.getElementById("here-status");
+    NDHere.attachButton(document.getElementById("here-btn"), document.getElementById("here-input"), {
+      region: "au",
+      onResult: function (addr) { out.style.color = "var(--nd-green-soft,#6ddba3)"; out.textContent = "✓ " + addr; },
+      notify: function (msg) { out.style.color = "var(--nd-amber-soft,#f5a05a)"; out.textContent = msg; }
+    });
+  })();
+</script>
+</body>
+</html>

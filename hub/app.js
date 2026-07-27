@@ -84,3 +84,9 @@ function timeAgo(ts) {
 searchInput.addEventListener("input", renderGrid);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) renderRecents(); });
 loadHub();
+
+/* §1.6 suite-wide water-fill sync tube (shared). The hub is a launcher with no
+ * write queue, so the tube reflects connection state to stay visually consistent. */
+if (window.NDUI && NDUI.syncTube) {
+  NDUI.syncTube(null, { labels: { synced: "Online", pending: "Offline" } });
+}
