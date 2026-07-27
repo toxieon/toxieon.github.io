@@ -11,6 +11,8 @@
 <script src="../assets/here.js"></script>
 <script src="../assets/watermark.js"></script>
 <script src="../assets/countdown-confirm.js"></script>
+<script src="../assets/sync-fill.js"></script>
+<script src="../assets/camera-capture.js"></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
     font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; }
@@ -79,6 +81,34 @@
         </div>
       </div>
       <code class="use">NDUI.syncTube(window.NDQueue)</code>
+    </div>
+
+    <!-- Sync fill (bubble) -->
+    <div class="card">
+      <h2>Sync fill <span class="tag">assets</span></h2>
+      <p class="desc">The second sync animation: the whole element fills with water — red at the base, green when synced. For buttons, chips, or text bubbles.</p>
+      <div class="demo">
+        <button id="sfill-demo" style="width:100%;min-height:52px;border-radius:12px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-size:14px;font-weight:600;cursor:default;">Master sheet · synced</button>
+        <div class="demo-row" style="margin-top:12px;">
+          <button data-sfill="synced">Synced</button>
+          <button data-sfill="pending">Pending</button>
+          <button data-sfill="flushing">Syncing</button>
+          <button data-sfill="failed">Failed</button>
+        </div>
+      </div>
+      <code class="use">NDSyncFill.bind(el, window.NDQueue)</code>
+    </div>
+
+    <!-- Camera capture -->
+    <div class="card">
+      <h2>Camera capture <span class="tag">assets</span></h2>
+      <p class="desc">In-app camera: live preview, flip front/back, shutter that downscales and (optionally) stamps the watermark, returning a JPEG. Prompts for camera permission.</p>
+      <div class="demo">
+        <div class="demo-row"><button class="primary" id="cam-go">Launch camera</button></div>
+        <div id="cam-shots" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+        <div class="status" id="cam-status"></div>
+      </div>
+      <code class="use">NDCamera.open({ watermarkLines, onCapture })</code>
     </div>
 
     <!-- Countdown confirm -->
@@ -167,6 +197,40 @@
     NDUI.syncTube(fakeQueue, { labels: { pending: "Saved — will sync", flushing: "Syncing…", failed: "Sync failed — tap to retry", synced: "Up to date" } });
     document.querySelectorAll("[data-tube]").forEach(function (b) {
       b.addEventListener("click", function () { setStatus(b.getAttribute("data-tube")); });
+    });
+  })();
+
+  /* ---- Sync fill (bubble) ---- */
+  (function () {
+    if (!window.NDSyncFill) return;
+    var el = document.getElementById("sfill-demo");
+    NDSyncFill.apply(el, "synced");
+    var labels = { synced: "synced", pending: "saved — will sync", flushing: "syncing…", failed: "sync failed" };
+    document.querySelectorAll("[data-sfill]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var s = b.getAttribute("data-sfill");
+        NDSyncFill.apply(el, s);
+        var content = el.querySelector(".nd-sfill-content") || el;
+        content.textContent = "Master sheet · " + (labels[s] || s);
+      });
+    });
+  })();
+
+  /* ---- Camera capture ---- */
+  (function () {
+    var go = document.getElementById("cam-go");
+    if (!go) return;
+    go.addEventListener("click", function () {
+      if (!window.NDCamera || !NDCamera.isSupported()) { document.getElementById("cam-status").textContent = "Camera not supported here."; return; }
+      NDCamera.open({
+        infoText: "Showroom demo — watermark: address · date · initials",
+        watermarkLines: function () { return window.NDWatermark ? NDWatermark.buildLines({ business: "Neill Data", address: "14 Wilson St, Frankston", initials: "BN", datetime: true }, NDWatermark.DEFAULT_TOGGLES) : []; },
+        onCapture: function (url) {
+          var img = document.createElement("img");
+          img.src = url; img.style.cssText = "width:64px;height:64px;object-fit:cover;border-radius:8px;border:0.5px solid var(--nd-border,#2a2a2a)";
+          document.getElementById("cam-shots").appendChild(img);
+        }
+      });
     });
   })();
 

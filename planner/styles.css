@@ -681,6 +681,11 @@ textarea:focus {
   display: inline-flex; align-items: center; gap: 3px;
   color: var(--red); font-weight: 900;
 }
+.missing-photos-badge svg { width: 13px; height: 13px; }
+
+/* §UI: sync tube moved to the top-left, just right of the sidebar logo. */
+.nd-sync-tube { top: 14px; left: 74px; right: auto; }
+.nd-sync-label { top: 17px; left: 100px; right: auto; }
 
 /* "Here" one-tap geolocation button beside the project address input. */
 .field-with-here { display: flex; gap: 8px; align-items: stretch; }
@@ -707,6 +712,26 @@ textarea:focus {
 .hours-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .hours-row:last-child { border-bottom: 0; }
 .hours-row .mono { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+
+/* §22 Floor-plan settings (right panel Plan tab) */
+.right-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
+.right-tab { flex: 1; min-height: 34px; border: 0; border-radius: 999px; background: none; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; }
+.right-tab svg { width: 15px; height: 15px; }
+.right-tab.is-active { background: var(--surface); color: var(--text); }
+.plan-settings { display: flex; flex-direction: column; gap: 15px; padding: 4px 2px; }
+.ps-field { display: flex; flex-direction: column; gap: 7px; }
+.ps-field label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+.ps-val { color: var(--text); font-weight: 700; }
+.ps-field input[type=range] { width: 100%; }
+.ps-toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
+.ps-toggle input { width: 18px; height: 18px; accent-color: var(--teal); }
+.ps-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 0; word-break: break-all; }
+.ps-meta svg { width: 14px; height: 14px; flex: none; }
+.ps-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-actions button { flex: 1 1 auto; }
+.plan-grid { position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.16) 1px, transparent 1px);
+  background-size: 5% 5%; }
 
 .canvas-tools {
   position: absolute;

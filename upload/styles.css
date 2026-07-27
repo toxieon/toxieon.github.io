@@ -186,6 +186,7 @@ button {
 
 /* Photo watermark toggle panel (details step). */
 .watermark-panel { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line, #2a2a2a); border-radius: var(--radius); background: rgba(255,255,255,0.02); }
+.batch-tools-title svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 5px; flex: none; }
 .watermark-toggles { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 10px; }
 .wm-chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2, #b9c2cf); cursor: pointer; }
 .wm-chk input { width: 16px; height: 16px; accent-color: #3ab87a; }

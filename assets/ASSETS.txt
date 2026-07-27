@@ -92,15 +92,49 @@ HOW THIS RELATES TO /shared
               uploader↔planner jobs)
     Status:   BUILT
 
+[6] sync-fill.js  —  the "bubble fills up" sync indicator
+    Global:   NDSyncFill
+    Origin:   Timesheet (settings danger-fill panel)
+    Needs:    nothing (self-contained; injects its own CSS)
+    API:      NDSyncFill.apply(el, status)   — fill any element by status
+              NDSyncFill.bind(el, queue)     — apply + follow queue.onStatus
+    States:   synced (full green) · pending (low) · flushing/syncing (bobbing)
+              · failed (near-empty red)
+    Sibling of NDUI.syncTube: the tube is a small gauge; this fills the whole
+    container (button / chip / text bubble). Wraps the element's content once
+    so it stays legible above the water.
+    Used by:  planner (sync buttons)
+    Status:   BUILT
+
+[7] address-autocomplete.js  —  Google Places autocomplete on a field
+    Global:   NDAutocomplete
+    Origin:   Quote + Uploader (inline Places autocomplete)
+    Needs:    Maps JS API with libraries=places (host-loaded). Pairs w/ here.js
+    API:      NDAutocomplete.attach(input, { country, types, fields, bounds,
+                strictBounds, onSelect })  -> autocomplete | null
+              NDAutocomplete.attachAll(selector, opts)
+              NDAutocomplete.victoriaBounds()
+    Used by:  available (quote/uploader can migrate onto it)
+    Status:   BUILT
+
+[8] camera-capture.js  —  in-app camera modal
+    Global:   NDCamera
+    Origin:   Quote (in-app camera)
+    Needs:    getUserMedia (all modern browsers). Optional: watermark.js
+    API:      NDCamera.open({ facingMode, maxDim, jpegQ, watermarkLines,
+                infoText, closeAfterCapture, onCapture(dataUrl,{w,h}),
+                onClose, onError }) -> { close }
+              NDCamera.isSupported()
+    Notes:    Full-screen preview, flip front/back, shutter downscales the
+              frame and (optionally) stamps it via NDWatermark, returns a
+              JPEG data URL. Self-contained (injects its own CSS + DOM).
+    Used by:  available (quote can migrate; uploader can add capture)
+    Status:   BUILT
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
-  • address-autocomplete  — Google Places autocomplete on an address field.
-        Both Quote and Uploader implement this; one shared version would
-        keep behaviour identical. Pairs naturally with here.js.
-  • camera-capture         — Quote's in-app camera modal (live preview,
-        flip camera, shutter, downscale). Uploader would benefit directly,
-        and it already calls watermark.js on capture.
+  (library complete — all identified best-of components extracted)
   • sync-tube              — the water-fill sync indicator now in
         shared/nd-ui.js (NDUI.syncTube) + nd-core.css. Listed here for
         discoverability; already suite-wide.
@@ -112,3 +146,10 @@ HOW THIS RELATES TO /shared
               (extracted from Quote). Seeded candidate list.
   2026-07-27  Added countdown-confirm.js (from Timesheet's near clock-on).
               Added the /1234567890 showroom (listed in Hub as "assets").
+  2026-07-27  Wired here.js into all four apps; watermark into uploader +
+              quote; built exif-geo-detect and job-locator.
+  2026-07-28  Added sync-fill.js (the "bubble fills up" indicator, from
+              Timesheet settings) + showroom demo; wired planner "Sync master"
+              buttons onto it. Added address-autocomplete.js. Added planner
+              PDF floor-plan support. Added camera-capture.js + showroom demo.
+              Library now covers all identified best-of components.

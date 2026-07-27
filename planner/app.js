@@ -128,7 +128,7 @@ function freshState() {
     myRole: null,
     categoriesData: {}, categoriesLoadedAt: null,
     teamAccess: { permissions: [], loadedAt: null },
-    ui: { nodesCollapsed: null, settingsSections: {}, categoryEditorTab: "", imageRepairRunning: false },
+    ui: { nodesCollapsed: null, settingsSections: {}, categoryEditorTab: "", imageRepairRunning: false, rightTab: "nodes" },
     auditQueue: [],
     auditView: { loaded: false, loading: false, rows: [], lastFetchedAt: null,
       filters: { from: "", to: "", user: "All", action: "All", projectId: "All", nodeQuery: "", detailsQuery: "", query: "" } },
@@ -245,7 +245,49 @@ function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   });
 }
 
+/* ── PDF floor plans ────────────────────────────────────────────────────
+ * <img> can't render a PDF, so we rasterise page 1 to a PNG via pdf.js the
+ * moment a plan URL is set (upload, cache hydration, or Drive fetch — all
+ * funnel through cacheFloorPlan). The original PDF still lives in Drive. */
+let _pdfjsPromise = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (_pdfjsPromise) return _pdfjsPromise;
+  _pdfjsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => {
+      try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(window.pdfjsLib); }
+      catch (e) { reject(e); }
+    };
+    s.onerror = () => reject(new Error("pdf.js failed to load"));
+    document.head.appendChild(s);
+  });
+  return _pdfjsPromise;
+}
+async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
+  const pdfjsLib = await loadPdfJs();
+  const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const page = await pdf.getPage(1);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.max(1, Math.min(maxEdge / base.width, maxEdge / base.height));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas.toDataURL("image/png");
+}
+async function planDisplayUrl(dataUrl) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:application/pdf")) return dataUrl;
+  try { return await pdfFirstPageToPng(dataUrl); } catch (e) { console.warn("PDF render failed", e); return dataUrl; }
+}
+
 async function cacheFloorPlan(floorId, dataUrl, meta) {
+  dataUrl = await planDisplayUrl(dataUrl);   // PDF → PNG so <img> can show it
   const working = await downscaleDataUrl(dataUrl);
   state.floorPlans[floorId] = working;
   if (window.NDCache) NDCache.put(PLAN_CACHE_PREFIX + floorId, working, meta || null).catch((e) => console.warn("plan cache put failed", e));
@@ -273,7 +315,11 @@ async function hydrateFloorPlansFromCache() {
     if (state.floorPlans[id]) continue;
     try {
       const cached = await NDCache.get(PLAN_CACHE_PREFIX + id);
-      if (cached) { state.floorPlans[id] = cached; hydrated++; }
+      if (cached) {
+        if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { await cacheFloorPlan(id, cached); }
+        else { state.floorPlans[id] = cached; }
+        hydrated++;
+      }
     } catch (e) {}
   }
   if (hydrated) render();
@@ -309,6 +355,9 @@ async function ndConfirm(opts) {
 
 function uid(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`; }
 function icon(name) { return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`; }
+/* Drive's own thumbnail endpoint — far more reliable than the cached
+ * lh3.googleusercontent.com thumbnailLink, which goes stale and shows blank. */
+function driveThumb(id, size) { return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size || 400}` : ""; }
 function escapeHtml(value) { return String(value ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 function statusStyle(status) { return `--status:${statusMeta[status]?.color || "#2563eb"}`; }
 function statusPill(status) { return `<span class="status-pill" style="${statusStyle(status)}">${escapeHtml(status)}</span>`; }
@@ -2097,6 +2146,7 @@ function renderMapView() {
   const catsLoaded = Object.keys(state.categoriesData).length > 0;
   const planAspect = Number(floor.planAspectRatio) || 1.6;
   const nodesCollapsed = state.ui.nodesCollapsed ?? isPhoneLayout();
+  const rightTab = state.ui.rightTab || "nodes";
   return `
     <section class="map-layout">
       <div class="map-panel">
@@ -2126,7 +2176,7 @@ function renderMapView() {
         <div class="canvas-shell">
           <div class="canvas-viewport ${state.massMode.active ? "is-placing" : ""}" id="canvasViewport">
             <div class="plan-stage" id="planStage" style="--plan-ar:${planAspect}">
-              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" />` : renderEmptyPlanArea()}
+              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
@@ -2137,15 +2187,58 @@ function renderMapView() {
       </div>
       <aside class="summary-panel ${nodesCollapsed ? "is-collapsed" : ""}">
         <div class="summary-grid"><div class="metric"><span>${state.selectedRoomId === "all" ? "Floor nodes" : "Room nodes"}</span><strong>${nodes.length}</strong></div><div class="metric"><span>Shown</span><strong>${matched.length}</strong></div><div class="metric"><span>Complete</span><strong>${stats(nodes).completePercent}%</strong></div><div class="metric"><span>Issues</span><strong>${stats(nodes).issue}</strong></div></div>
+        <div class="right-tabs">
+          <button class="right-tab ${rightTab === "nodes" ? "is-active" : ""}" data-right-tab="nodes">${icon("map")}Nodes</button>
+          <button class="right-tab ${rightTab === "plan" ? "is-active" : ""}" data-right-tab="plan">${icon("settings")}Plan</button>
+        </div>
+        ${rightTab === "plan" ? renderPlanSettings(floor) : `
         <div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
-        <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>
+        <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>`}
       </aside>
     </section>`;
 }
 
+function removePlan() {
+  const fl = currentFloor(); if (!fl) return;
+  const ask = window.NDUI && NDUI.confirm
+    ? NDUI.confirm({ title: "Remove plan?", message: "Unlinks the plan from this floor. The file stays in Drive.", confirmLabel: "Remove", danger: true })
+    : Promise.resolve(window.confirm("Remove the plan from this floor? (The file stays in Drive.)"));
+  Promise.resolve(ask).then((ok) => {
+    if (!ok) return;
+    evictFloorPlan(fl.id);
+    fl.planDriveFileId = null; fl.planFileName = null; fl.planMimeType = null; fl.planWebViewLink = null;
+    fl.planOpacity = 1; fl.planBrightness = 1; fl.planGrid = false;
+    persist(); render(); toast("Plan removed from this floor");
+  });
+}
+
 function renderEmptyPlanArea() {
-  return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan image (PNG, JPG, or SVG). It will sync to Drive automatically.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
+  return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan (PNG, JPG, SVG, or PDF). It will sync to Drive automatically.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
+}
+
+/* §22 Floor-plan settings (right panel "Plan" tab). Per-floor display prefs
+ * (opacity / brightness / grid) applied to the plan image, plus replace and
+ * unlink. Stored on the floor object and persisted locally. */
+function renderPlanSettings(floor) {
+  const hasPlan = Boolean(state.floorPlans[floor.id] || floor.planDriveFileId);
+  if (!hasPlan) {
+    return `<div class="plan-settings"><div class="empty-state" style="padding:24px 10px;text-align:center">No plan on <strong>${escapeHtml(floor.name)}</strong> yet.<br><button class="primary-button" data-action="upload-plan" style="margin-top:12px">${icon("upload")}Upload plan</button></div></div>`;
+  }
+  const op = Math.round((floor.planOpacity ?? 1) * 100);
+  const br = Math.round((floor.planBrightness ?? 1) * 100);
+  return `<div class="plan-settings">
+    <div class="ps-field"><label>Plan opacity <span class="ps-val">${op}%</span></label><input type="range" min="20" max="100" step="5" value="${op}" data-plan-set="opacity"></div>
+    <div class="ps-field"><label>Brightness <span class="ps-val">${br}%</span></label><input type="range" min="50" max="150" step="5" value="${br}" data-plan-set="brightness"></div>
+    <label class="ps-toggle"><input type="checkbox" data-plan-set="grid" ${floor.planGrid ? "checked" : ""}><span>Grid overlay</span></label>
+    ${floor.planFileName ? `<p class="ps-meta">${icon("map")}${escapeHtml(floor.planFileName)}</p>` : ""}
+    <a class="ghost-button" href="../fitoff/?project=${escapeHtml(state.selectedProjectId || "")}" target="_blank" rel="noopener" style="justify-content:center;text-decoration:none">${icon("map")}Open fit-off view</a>
+    <div class="ps-actions">
+      <button class="ghost-button" data-action="upload-plan">${icon("upload")}Replace</button>
+      <button class="ghost-button" data-action="reset-view">${icon("target")}Reset view</button>
+      <button class="danger-button" data-action="remove-plan">${icon("trash")}Remove</button>
+    </div>
+  </div>`;
 }
 
 function renderSelect(name, options, value) { return `<select data-filter="${name}" aria-label="${name}">${options.map((o) => `<option value="${escapeHtml(o)}" ${o === value ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select>`; }
@@ -2734,7 +2827,7 @@ function renderDrawer(node) {
         <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
-        <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${image.thumbnailLink ? `<img src="${escapeHtml(image.thumbnailLink)}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
+        <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => { const did = image.driveFileId || image.id || ""; const tsrc = image.thumbnailLink || driveThumb(did, 400); return `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${tsrc ? `<img src="${escapeHtml(tsrc)}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${driveThumb(did, 400)}'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`; }).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
         <div><h3 class="section-title">Comments</h3><div class="comments-list">${node.comments.length ? node.comments.map((c) => `<article class="comment"><span class="comment-meta">${escapeHtml(c.author)} / ${escapeHtml(c.time)}</span><p>${escapeHtml(c.text)}</p></article>`).join("") : `<div class="empty-state">No comments</div>`}</div><div class="comment-input" style="margin-top:10px"><input data-comment-input="${node.id}" placeholder="@mention or comment" aria-label="Add comment" /><button class="icon-button" data-action="send-comment" aria-label="Send">${icon("arrowRight")}</button></div></div>
         ` : `<div class="info-grid"><div class="info-box"><span>Linked destination</span><strong>${escapeHtml(linkedLabel || "(missing)")}</strong></div><div class="info-box"><span>Current room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div><p style="margin-top:14px;color:rgba(255,255,255,.7)">This is a door / stairs / link node. Walk through to the linked floor or room. Both sides have a matching portal that updates together.</p>`}
       </div>
@@ -2905,7 +2998,7 @@ function renderHelpModal() {
 function renderLightbox() {
   const node = selectedNode(); if (!node) return "";
   const image = node.imageRefs[state.lightbox.index]; if (!image) return "";
-  return `<div class="lightbox-backdrop" data-action="close-lightbox"></div><div class="lightbox" role="dialog"><div class="lightbox-header"><div><h3>${escapeHtml(image.name)}</h3><p>${escapeHtml(image.uploader || "")} / ${escapeHtml(image.uploadedAt || "")}</p></div><div class="lightbox-actions">${image.webViewLink ? `<a class="icon-button" href="${escapeHtml(image.webViewLink)}" target="_blank" rel="noopener" aria-label="Open in Drive">${icon("link")}</a>` : ""}<button class="icon-button" data-action="prev-image" aria-label="Previous">${icon("arrowLeft")}</button><button class="icon-button" data-action="next-image" aria-label="Next">${icon("arrowRight")}</button><button class="icon-button" data-action="close-lightbox" aria-label="Close">${icon("close")}</button></div></div><div class="lightbox-stage">${image.thumbnailLink ? `<img src="${escapeHtml(image.thumbnailLink.replace(/=s\d+(-c)?$/, "=s1600"))}" alt="${escapeHtml(image.name)}" referrerpolicy="no-referrer" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" />` : `<div class="lightbox-image" style="--thumb:linear-gradient(135deg,#1e293b,#334155)"></div>`}</div></div>`;
+  return `<div class="lightbox-backdrop" data-action="close-lightbox"></div><div class="lightbox" role="dialog"><div class="lightbox-header"><div><h3>${escapeHtml(image.name)}</h3><p>${escapeHtml(image.uploader || "")} / ${escapeHtml(image.uploadedAt || "")}</p></div><div class="lightbox-actions">${image.webViewLink ? `<a class="icon-button" href="${escapeHtml(image.webViewLink)}" target="_blank" rel="noopener" aria-label="Open in Drive">${icon("link")}</a>` : ""}<button class="icon-button" data-action="prev-image" aria-label="Previous">${icon("arrowLeft")}</button><button class="icon-button" data-action="next-image" aria-label="Next">${icon("arrowRight")}</button><button class="icon-button" data-action="close-lightbox" aria-label="Close">${icon("close")}</button></div></div><div class="lightbox-stage">${(image.thumbnailLink || image.driveFileId || image.id) ? `<img src="${escapeHtml(image.thumbnailLink ? image.thumbnailLink.replace(/=s\d+(-c)?$/, "=s1600") : driveThumb(image.driveFileId || image.id, 1600))}" alt="${escapeHtml(image.name)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${driveThumb(image.driveFileId || image.id, 1600)}'" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" />` : `<div class="lightbox-image" style="--thumb:linear-gradient(135deg,#1e293b,#334155)"></div>`}</div></div>`;
 }
 
 function renderBulkPhotoPickerModal() {
@@ -2953,6 +3046,27 @@ function bindEvents() {
   document.querySelectorAll("[data-filter]").forEach((input) => { const en = input.tagName === "INPUT" ? "input" : "change"; input.addEventListener(en, () => { state.filters[input.dataset.filter] = input.value; persist(); render(); }); });
   document.querySelectorAll("[data-audit-filter]").forEach((input) => { const en = input.tagName === "INPUT" ? "input" : "change"; input.addEventListener(en, () => { state.auditView.filters[input.dataset.auditFilter] = input.value; persist(); render(); }); });
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", handleAction));
+  // §UI: "Sync master" buttons use the shared water fill (assets/sync-fill.js),
+  // filling red→green with the master-sheet sync status.
+  if (window.NDSyncFill && window.NDQueue) {
+    const s = NDQueue.status();
+    document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, s));
+    if (!window._plannerSyncFillSub) {
+      window._plannerSyncFillSub = NDQueue.onStatus((st) => document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, st)));
+    }
+  }
+  document.querySelectorAll("[data-right-tab]").forEach((b) => b.addEventListener("click", () => { state.ui.rightTab = b.dataset.rightTab; persist(); render(); }));
+  document.querySelectorAll("[data-plan-set]").forEach((el) => {
+    const fl = currentFloor(); if (!fl) return;
+    function live() {
+      const img = document.querySelector(".floor-plan");
+      if (el.dataset.planSet === "opacity") { fl.planOpacity = Number(el.value) / 100; if (img) img.style.opacity = fl.planOpacity; }
+      else if (el.dataset.planSet === "brightness") { fl.planBrightness = Number(el.value) / 100; if (img) img.style.filter = `brightness(${fl.planBrightness})`; }
+      const v = el.closest(".ps-field") && el.closest(".ps-field").querySelector(".ps-val"); if (v) v.textContent = el.value + "%";
+    }
+    if (el.type === "checkbox") { el.addEventListener("change", () => { fl.planGrid = el.checked; persist(); render(); }); }
+    else { el.addEventListener("input", live); el.addEventListener("change", () => { live(); persist(); }); }
+  });
   const quickStatus = document.querySelector("[data-quick-status]");
   if (quickStatus) quickStatus.addEventListener("change", () => updateNodeStatus(quickStatus.value));
   document.querySelectorAll("[data-notes]").forEach((textarea) => textarea.addEventListener("change", () => {
@@ -3141,6 +3255,7 @@ function handleAction(event) {
     case "sync-all-folders": return syncAllDriveFolders();
     case "refresh-all": return refreshAllPlannerData();
     case "sync-master-sheet": return flushMasterDeltas({ manual: true });
+    case "remove-plan": return removePlan();
     case "rebuild-master-sheet": return confirmRebuildMasterSheet();
     case "sync-chip": return flushMasterDeltas({ manual: true });
     case "hydrate-cloud": return hydrateFromMasterSheet();
@@ -3984,7 +4099,7 @@ function uploadFloorPlan() {
   const floor = currentFloor(); if (!floor) { toast("Add a floor first"); return; }
   if (!requireAuth("upload a floor plan") || !requirePlannerDrive("upload floor plans")) return;
   const input = document.createElement("input");
-  input.type = "file"; input.accept = "image/png,image/jpeg,image/svg+xml,image/webp";
+  input.type = "file"; input.accept = "image/png,image/jpeg,image/svg+xml,image/webp,application/pdf,.pdf";
   input.onchange = async () => {
     const file = input.files?.[0]; if (!file) return;
     const reader = new FileReader();

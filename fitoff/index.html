@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Fit-off &middot; NeillPlanner</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
+<script src="../shared/nd-match.js"></script>
+<script src="../assets/here.js"></script>
+<style>
+  :root { --fg:#f0f0f0; --mut:#8b93a1; --line:#2a2a2a; --surf:#1a1a1a; --surf2:#242424; --bg:#0d0d0d; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  .bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 14px calc(10px); background: rgba(13,13,13,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .sub { display: block; font-size: 11px; color: var(--mut); font-weight: 400; }
+  .iconbtn { background: rgba(255,255,255,0.08); border: 0; color: var(--fg); width: 38px; height: 38px; border-radius: 10px; font-size: 18px; cursor: pointer; flex: none; }
+  .floors { display: flex; gap: 6px; overflow-x: auto; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  .floors button { flex: none; border: 1px solid var(--line); background: var(--surf); color: var(--mut); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .floors button.on { background: var(--surf2); color: var(--fg); border-color: #3a3a3a; }
+  .stage-wrap { position: relative; width: 100%; height: calc(100vh - 120px); overflow: hidden; background: #14181f; touch-action: none; }
+  .stage { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); transform-origin: center; }
+  .stage img { display: block; max-width: 88vw; max-height: calc(100vh - 150px); border-radius: 8px; }
+  .marker { position: absolute; width: 30px; height: 30px; transform: translate(-50%,-50%); left: calc(var(--x)*1%); top: calc(var(--y)*1%); cursor: pointer; }
+  .marker::before { content:""; position:absolute; inset:0; border-radius:50%; background: var(--c); border: 3px solid rgba(255,255,255,0.9); box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 16px var(--c); }
+  .marker.np::after { content:""; position:absolute; inset:0; border-radius:50%; border:2px solid #ef4444; animation: png 1.2s ease-out infinite; }
+  @keyframes png { 0%{transform:scale(0.9);opacity:0.8;} 100%{transform:scale(2.4);opacity:0;} }
+  .center { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 30px; text-align: center; }
+  .center p { color: var(--mut); margin: 0; font-size: 14px; max-width: 320px; line-height: 1.5; }
+  .btn { background: #3ab87a; color: #022014; border: 0; border-radius: 999px; padding: 13px 26px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn.ghost { background: rgba(255,255,255,0.08); color: var(--fg); }
+  .spinner { width: 34px; height: 34px; border: 3px solid rgba(255,255,255,0.15); border-top-color: #3ab87a; border-radius: 50%; animation: sp 0.8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .picker { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .picker .note { color: var(--mut); font-size: 13px; margin: 4px 0 6px; }
+  .pcard { text-align: left; background: var(--surf); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; }
+  .pcard strong { display: block; font-size: 15px; }
+  .pcard span { display: block; font-size: 12px; color: var(--mut); margin-top: 2px; }
+  .sheet-back { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--surf); border: 1px solid var(--line); border-bottom: 0; border-radius: 18px 18px 0 0; width: 100%; max-width: 560px; padding: 18px; max-height: 82vh; overflow-y: auto; }
+  .sheet h3 { margin: 0 0 4px; font-size: 17px; }
+  .sheet .meta { color: var(--mut); font-size: 12px; margin: 0 0 14px; }
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pgrid a { display: block; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #222; border: 1px solid var(--line); }
+  .pgrid img { width: 100%; height: 100%; object-fit: cover; }
+  .sheet .noimg { color: var(--mut); font-size: 13px; padding: 10px 0; }
+  .drivelink { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; text-decoration: none; background: rgba(55,120,221,0.14); color: #85b7eb; border: 1px solid rgba(55,120,221,0.4); border-radius: 12px; padding: 13px; font-weight: 600; font-size: 14px; }
+  .err { color: #f09595; }
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><div class="spinner"></div><p>Starting&hellip;</p></div></div>
+
+<script>
+(function () {
+  "use strict";
+  var cfg = (window.ND && ND.config) ? ND.config.forApp("planner") : {};
+  var MASTER_ID = cfg.masterSpreadsheetId || "1NmPyp5Ie0afzVS6VXDBSP1M1AX3EX3F7puufE5QaftQ";
+  var MAPS_KEY = cfg.mapsKey;
+  var STATUS = { "Not Started": "#2563eb", "In Progress": "#f59e0b", "Complete": "#22c55e", "Issue": "#ef4444" };
+  var app = document.getElementById("app");
+  var data = { projects: [], floors: [], nodes: [], photosByNode: {} };
+  var view = { projectId: null, floorId: null };
+  var pan = { x: 0, y: 0, scale: 1 };
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+  function driveThumb(id, w) { return id ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w" + (w || 400) : ""; }
+  function qParam(k) { return new URLSearchParams(location.search).get(k); }
+  var _maps = null;
+  function ensureMaps() {
+    if (window.google && google.maps && google.maps.Geocoder) return Promise.resolve();
+    if (_maps) return _maps;
+    if (!MAPS_KEY) return Promise.reject(new Error("no maps key"));
+    _maps = new Promise(function (resolve, reject) {
+      window.__fitMaps = function () { resolve(); };
+      var s = document.createElement("script");
+      s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(MAPS_KEY) + "&loading=async&callback=__fitMaps";
+      s.async = true; s.onerror = function () { reject(new Error("maps load failed")); };
+      document.head.appendChild(s);
+    });
+    return _maps;
+  }
+
+  function screenCenter(msg, btnHtml) {
+    app.innerHTML = '<div class="center">' + msg + (btnHtml || "") + "</div>";
+  }
+
+  /* ---- data ---- */
+  async function readTab(tab) {
+    var token = NDAuth.getToken();
+    var url = "https://sheets.googleapis.com/v4/spreadsheets/" + MASTER_ID + "/values/" + encodeURIComponent(tab + "!A2:AZ");
+    var r = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("Sheet read failed (" + r.status + ")");
+    var d = await r.json();
+    return d.values || [];
+  }
+  async function loadData() {
+    var res = await Promise.all([readTab("Projects"), readTab("Floors"), readTab("Nodes"), readTab("Photos")]);
+    var P = res[0], F = res[1], N = res[2], PH = res[3];
+    data.projects = P.filter(function (r) { return r[0]; }).map(function (r) { return { id: r[0], name: r[1] || "Untitled", address: r[3] || "" }; });
+    data.floors = F.filter(function (r) { return r[0]; }).map(function (r) { return { id: r[0], projectId: r[1], name: r[3] || "Floor", order: Number(r[4]) || 0, planId: r[5] || "" }; });
+    data.nodes = N.filter(function (r) { return r[0]; }).map(function (r) {
+      return { id: r[0], projectId: r[1], floorId: r[3], title: r[7] || r[6] || r[5] || "Node", category: r[8] || "", status: r[10] || "", x: Number(r[13]) || 50, y: Number(r[14]) || 50, driveFolderId: r[22] || "", imageCount: Number(r[17]) || 0 };
+    });
+    data.photosByNode = {};
+    PH.filter(function (r) { return r[1] && r[3]; }).forEach(function (r) {
+      (data.photosByNode[r[3]] = data.photosByNode[r[3]] || []).push({ fileId: r[1], name: r[2] || "", thumb: r[13] || "", view: r[12] || "" });
+    });
+  }
+
+  /* ---- geolocation auto-open ---- */
+  async function autoOpen() {
+    var qp = qParam("project");
+    if (qp && data.projects.some(function (p) { return p.id === qp; })) { openProject(qp); return; }
+    if (data.projects.length === 1) { openProject(data.projects[0].id); return; }
+    screenCenter('<div class="spinner"></div><p>Finding the job you&#39;re at&hellip;</p>');
+    try {
+      await ensureMaps();
+      var loc = await NDHere.locate({ region: "au", mapsKey: MAPS_KEY, timeout: 9000 });
+      var key = window.NDMatch ? NDMatch.addressKey(loc.address) : loc.address.toLowerCase();
+      var match = data.projects.filter(function (p) { return p.address && (window.NDMatch ? NDMatch.addressKey(p.address) : p.address.toLowerCase()) === key; });
+      if (match.length === 1) { openProject(match[0].id); return; }
+      renderPicker("You're near " + esc(loc.address) + ". Pick the job:");
+    } catch (e) {
+      renderPicker("Couldn't match your location &mdash; pick a job:");
+    }
+  }
+
+  /* ---- rendering ---- */
+  function renderPicker(note) {
+    if (!data.projects.length) { screenCenter('<p class="err">No projects found on this account.</p>'); return; }
+    var cards = data.projects.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (p) {
+      return '<button class="pcard" data-open="' + esc(p.id) + '"><strong>' + esc(p.name) + "</strong><span>" + esc(p.address || "No address") + "</span></button>";
+    }).join("");
+    app.innerHTML = '<div class="bar"><h1>Fit-off<span class="sub">choose a job</span></h1></div><div class="picker"><p class="note">' + (note || "Pick a job:") + "</p>" + cards + "</div>";
+    app.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { openProject(b.dataset.open); }); });
+  }
+
+  function openProject(pid) {
+    view.projectId = pid;
+    var floors = data.floors.filter(function (f) { return f.projectId === pid; }).sort(function (a, b) { return a.order - b.order; });
+    view.floorId = floors.length ? floors[0].id : null;
+    pan = { x: 0, y: 0, scale: 1 };
+    renderPlan();
+  }
+
+  function renderPlan() {
+    var proj = data.projects.find(function (p) { return p.id === view.projectId; });
+    var floors = data.floors.filter(function (f) { return f.projectId === view.projectId; }).sort(function (a, b) { return a.order - b.order; });
+    var floor = floors.find(function (f) { return f.id === view.floorId; }) || floors[0];
+    var nodes = data.nodes.filter(function (n) { return n.floorId === (floor && floor.id); });
+    var floorTabs = floors.length > 1 ? '<div class="floors">' + floors.map(function (f) {
+      return '<button class="' + (f.id === (floor && floor.id) ? "on" : "") + '" data-floor="' + esc(f.id) + '">' + esc(f.name) + "</button>";
+    }).join("") + "</div>" : "";
+    var planImg = floor && floor.planId
+      ? '<img src="' + driveThumb(floor.planId, 2000) + '" alt="Floor plan" referrerpolicy="no-referrer" />'
+      : '<p style="color:var(--mut);padding:40px">No plan for this floor.</p>';
+    var markers = nodes.map(function (n) {
+      var color = STATUS[n.status] || "#2563eb";
+      var np = n.imageCount === 0 ? " np" : "";
+      return '<button class="marker' + np + '" style="--x:' + n.x + ";--y:" + n.y + ";--c:" + color + '" data-node="' + esc(n.id) + '" aria-label="' + esc(n.title) + '"></button>';
+    }).join("");
+    app.innerHTML =
+      '<div class="bar"><button class="iconbtn" data-back aria-label="Back">&#8249;</button><h1>' + esc(proj ? proj.name : "Job") + '<span class="sub">' + esc(proj && proj.address || "") + "</span></h1></div>" +
+      floorTabs +
+      '<div class="stage-wrap" id="wrap"><div class="stage" id="stage">' + planImg + '<div class="nodes">' + markers + "</div></div></div>";
+    app.querySelector("[data-back]").addEventListener("click", function () { renderPicker("Pick a job:"); });
+    app.querySelectorAll("[data-floor]").forEach(function (b) { b.addEventListener("click", function () { view.floorId = b.dataset.floor; pan = { x: 0, y: 0, scale: 1 }; renderPlan(); }); });
+    app.querySelectorAll("[data-node]").forEach(function (b) { b.addEventListener("click", function (e) { e.stopPropagation(); openNode(b.dataset.node); }); });
+    bindPanZoom();
+  }
+
+  function openNode(nid) {
+    var n = data.nodes.find(function (x) { return x.id === nid; });
+    if (!n) return;
+    var photos = data.photosByNode[nid] || [];
+    var grid = photos.length
+      ? '<div class="pgrid">' + photos.map(function (p) {
+          var src = p.thumb || driveThumb(p.fileId, 400);
+          var href = p.view || ("https://drive.google.com/file/d/" + p.fileId + "/view");
+          return '<a href="' + esc(href) + '" target="_blank" rel="noopener"><img src="' + esc(src) + '" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\'' + driveThumb(p.fileId, 400) + '\'" alt="' + esc(p.name) + '" /></a>';
+        }).join("") + "</div>"
+      : '<div class="noimg">No photos on this node yet.</div>';
+    var folderLink = n.driveFolderId
+      ? '<a class="drivelink" href="https://drive.google.com/drive/folders/' + esc(n.driveFolderId) + '" target="_blank" rel="noopener">&#128193; Open Drive folder</a>'
+      : "";
+    var back = document.createElement("div");
+    back.className = "sheet-back";
+    back.innerHTML = '<div class="sheet"><h3>' + esc(n.title) + '</h3><p class="meta">' + esc(n.category || "") + (n.status ? " &middot; " + esc(n.status) : "") + "</p>" + grid + folderLink + "</div>";
+    back.addEventListener("click", function (e) { if (e.target === back) back.remove(); });
+    document.body.appendChild(back);
+  }
+
+  /* ---- pan + pinch zoom ---- */
+  function bindPanZoom() {
+    var wrap = document.getElementById("wrap"), stage = document.getElementById("stage");
+    if (!wrap || !stage) return;
+    var pts = new Map(), start = null, pinch = null;
+    function apply() { stage.style.transform = "translate(calc(-50% + " + pan.x + "px), calc(-50% + " + pan.y + "px)) scale(" + pan.scale + ")"; }
+    apply();
+    wrap.addEventListener("pointerdown", function (e) { pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pts.size === 1) start = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y, moved: false }; if (pts.size === 2) { var a = [].concat(Array.from(pts.values())); pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y), s: pan.scale }; } });
+    wrap.addEventListener("pointermove", function (e) {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2 && pinch) { var a = Array.from(pts.values()); var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); pan.scale = Math.max(0.5, Math.min(4, pinch.s * (d / pinch.d))); apply(); return; }
+      if (pts.size === 1 && start) { pan.x = start.px + (e.clientX - start.x); pan.y = start.py + (e.clientY - start.y); if (Math.abs(e.clientX - start.x) > 4 || Math.abs(e.clientY - start.y) > 4) start.moved = true; apply(); }
+    });
+    function up(e) { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (pts.size === 0) start = null; }
+    wrap.addEventListener("pointerup", up); wrap.addEventListener("pointercancel", up);
+    wrap.addEventListener("wheel", function (e) { e.preventDefault(); pan.scale = Math.max(0.5, Math.min(4, pan.scale * (e.deltaY < 0 ? 1.1 : 0.9))); apply(); }, { passive: false });
+  }
+
+  /* ---- boot ---- */
+  function startFlow() {
+    screenCenter('<div class="spinner"></div><p>Loading jobs&hellip;</p>');
+    loadData().then(autoOpen).catch(function (e) {
+      screenCenter('<p class="err">Could not load: ' + esc(e.message) + "</p>", '<button class="btn ghost" onclick="location.reload()">Retry</button>');
+    });
+  }
+  function showSignIn() {
+    screenCenter("<p>Sign in with your Neill account to load the fit-off view.</p>", '<button class="btn" id="signin">Sign in with Google</button>');
+    var b = document.getElementById("signin");
+    if (b) b.addEventListener("click", function () { NDAuth.ensureToken({ interactive: true }).catch(function (e) { screenCenter('<p class="err">Sign-in failed: ' + esc(e && e.message || e) + "</p>", '<button class="btn" onclick="location.reload()">Retry</button>'); }); });
+  }
+
+  if (!window.NDAuth) { screenCenter('<p class="err">Auth module failed to load.</p>'); return; }
+  NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
+  NDAuth.onAuthChange(function (evt) {
+    if (NDAuth.isSignedIn && NDAuth.isSignedIn()) startFlow();
+    else if (evt === "signed-out") showSignIn();
+  });
+  NDAuth.ensureToken().then(function () { startFlow(); }).catch(function () { showSignIn(); });
+})();
+</script>
+</body>
+</html>
