@@ -5633,8 +5633,10 @@ if (window.NDUI && NDUI.syncTube) {
   });
 }
 
-/* §4 boot: restore today's unlock (no passcode prompt mid-day) */
-tryRestoreSession();
+/* Boot: passcode required on every open — no remembered session.
+ * (Brandon's call: don't auto-unlock; wipe any saved session so the lock
+ * screen always shows.) */
+clearUnlockSession();
 </script>
 </body>
 </html>

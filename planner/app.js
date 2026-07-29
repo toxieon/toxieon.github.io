@@ -522,6 +522,7 @@ function handleAuthEvent(ev) {
     bootstrapDrive();
   } else if (ev.type === "signout") {
     if (window.gapi?.client) gapi.client.setToken(null);
+    if (window.NDDriveImage) NDDriveImage.clearCache();   // don't leak one account's photos to the next
     stopMasterPhotoImportLoop();
     state.googleAuth = { ...freshState().googleAuth, librariesReady: state.googleAuth.librariesReady };
     state.drive = freshState().drive;
@@ -1876,23 +1877,11 @@ async function fetchDriveFileAsDataUrl(fileId) {
 }
 
 // #37 — Drive thumbnail URLs need Google session cookies this app doesn't have,
-// so photo tiles 403 and never load. Instead fetch the bytes with our OAuth
-// token and swap them in. Cache per fileId so re-renders don't refetch.
-const driveImgCache = new Map();
-async function hydrateDriveImages() {
-  if (!isTokenValid()) return;
-  const imgs = document.querySelectorAll("img[data-fileid]:not([data-hydrated])");
-  for (const img of imgs) {
-    const id = img.getAttribute("data-fileid");
-    img.dataset.hydrated = "1";
-    if (!id) continue;
-    if (driveImgCache.has(id)) { img.src = driveImgCache.get(id); continue; }
-    try {
-      const url = await fetchDriveFileAsDataUrl(id);
-      if (url) { driveImgCache.set(id, url); if (img.isConnected) img.src = url; }
-      else img.classList.add("img-failed");
-    } catch (e) { img.classList.add("img-failed"); }
-  }
+// so photo tiles 403. Fetch the bytes with our OAuth token and swap them in.
+// Shared across the suite via assets/drive-image.js (#34).
+function hydrateDriveImages() {
+  if (!isTokenValid() || !window.NDDriveImage) return;
+  return NDDriveImage.hydrate({ getToken: () => state.googleAuth.accessToken });
 }
 
 function auditRowToValues(r) {

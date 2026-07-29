@@ -192,26 +192,10 @@ function render() {
   hydrateDriveImages();   // #37 — Drive thumbnails 403 without cookies; fetch bytes with our token
 }
 
-// #37 — fetch Drive image bytes with the OAuth token and swap them in, since
-// the cookie-based thumbnail URLs 403 in this app. Cached per fileId.
-const driveImgCache = new Map();
-async function hydrateDriveImages() {
-  if (!isTokenValid() || !window.NDAuth) return;
-  const token = NDAuth.getToken();
-  const imgs = document.querySelectorAll("img[data-fileid]:not([data-hydrated])");
-  for (const img of imgs) {
-    const id = img.getAttribute("data-fileid");
-    img.dataset.hydrated = "1";
-    if (!id) continue;
-    if (driveImgCache.has(id)) { img.src = driveImgCache.get(id); continue; }
-    try {
-      const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, { headers: { Authorization: "Bearer " + token } });
-      if (!r.ok) throw new Error("media " + r.status);
-      const url = URL.createObjectURL(await r.blob());
-      driveImgCache.set(id, url);
-      if (img.isConnected) img.src = url;
-    } catch (e) { img.classList.add("img-failed"); }
-  }
+// #37/#34 — shared authenticated Drive image loader (assets/drive-image.js).
+function hydrateDriveImages() {
+  if (!isTokenValid() || !window.NDDriveImage || !window.NDAuth) return;
+  return NDDriveImage.hydrate({ getToken: () => NDAuth.getToken() });
 }
 
 function renderTopbar() {
@@ -771,6 +755,7 @@ function handleAuthEvent(ev) {
     if (!state.accessDenied) refreshAll();
   } else if (ev.type === "signout") {
     if (window.gapi?.client) gapi.client.setToken(null);
+    if (window.NDDriveImage) NDDriveImage.clearCache();   // don't leak one account's photos to the next
     state.googleAuth = {
       librariesReady: state.googleAuth.librariesReady,
       signedIn: false,

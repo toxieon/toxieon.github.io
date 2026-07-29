@@ -3,7 +3,7 @@
  A growing library of drop-in feature components shared across the apps
  (uploader, quote, planner, timesheet, swb, hub).
  Update this file whenever an asset is added, changed, or wired into an app.
- Last updated: 2026-07-27
+ Last updated: 2026-07-29
 ========================================================================
 
 HOW THIS RELATES TO /shared
@@ -131,6 +131,22 @@ HOW THIS RELATES TO /shared
     Used by:  available (quote can migrate; uploader can add capture)
     Status:   BUILT
 
+[9] drive-image.js  —  authenticated Google Drive image loader
+    Global:   NDDriveImage
+    Origin:   the identical fetch-with-token pattern shipped in fit-off,
+              planner and search (Drive thumbnail URLs 403 without cookies).
+    Needs:    a valid OAuth access token (Drive scope); fetch/URL.
+    API:      NDDriveImage.url(fileId, token) -> Promise<objectURL>
+              NDDriveImage.hydrate({ getToken, root }) -> Promise
+                  (swaps every img[data-fileid] under root using getToken())
+              NDDriveImage.clearCache()
+    Used by:  planner, search  (WIRED). fit-off keeps its own loadDriveMedia
+              because it also rasterises PDF floor plans.
+    Status:   WIRED (planner + search)
+    Notes:    Per-fileId object-URL cache, so re-renders never refetch. Render
+              a tile as <img data-fileid="DRIVE_ID">, then call hydrate() after
+              paint. Replaced planner's 2-call dataURL path (1 call now).
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -153,3 +169,7 @@ HOW THIS RELATES TO /shared
               buttons onto it. Added address-autocomplete.js. Added planner
               PDF floor-plan support. Added camera-capture.js + showroom demo.
               Library now covers all identified best-of components.
+  2026-07-29  Added drive-image.js (NDDriveImage) — extracted the authenticated
+              Drive image loader that had been copy-pasted into fit-off, planner
+              and search. Wired planner + search onto it (planner now 1 API call
+              per image instead of 2). Part of the #34 reuse pass.
