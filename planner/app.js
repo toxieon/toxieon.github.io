@@ -78,6 +78,8 @@ const iconPaths = {
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   upload: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M20 16v4H4v-4"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
   download: '<path d="M12 4v12"/><path d="m17 11-5 5-5-5"/><path d="M20 20H4"/>',
   zoomIn: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6"/><path d="M8 11h6"/>',
   zoomOut: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M8 11h6"/>',
@@ -1983,6 +1985,9 @@ function render() {
     ${state.googleAuth.bootstrapping ? renderLoadingOverlay("Loading planner data...") : ""}
     ${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}
   `;
+  // Hide the fixed sync tube while a drawer/modal/lightbox is open so it
+  // isn't pinned in front of that content.
+  document.body.classList.toggle("np-overlay", !!((state.drawerOpen && selectedNode()) || state.modal || state.lightbox));
   bindEvents();
   applyCanvasTransform();
 }
@@ -2180,7 +2185,7 @@ function renderMapView() {
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
-          <div class="canvas-tools" aria-label="Canvas tools"><button class="icon-button" data-action="zoom-in" title="Zoom in">${icon("zoomIn")}</button><button class="icon-button" data-action="zoom-out" title="Zoom out">${icon("zoomOut")}</button><button class="icon-button" data-action="reset-view" title="Recenter">${icon("target")}</button></div>
+          <div class="canvas-tools" aria-label="Canvas tools"><button class="icon-button ${state.ui.planLocked ? "is-active" : ""}" data-action="toggle-plan-lock" title="${state.ui.planLocked ? "Plan locked — tap to allow panning" : "Lock plan (stops panning so you can place/move nodes)"}">${icon(state.ui.planLocked ? "lock" : "unlock")}</button><button class="icon-button" data-action="zoom-in" title="Zoom in">${icon("zoomIn")}</button><button class="icon-button" data-action="zoom-out" title="Zoom out">${icon("zoomOut")}</button><button class="icon-button" data-action="reset-view" title="Recenter">${icon("target")}</button></div>
           <div class="scale-readout"><span class="scale-bar"></span><span>${Math.round(state.canvas.zoom * 100)}%</span></div>
         </div>
         
@@ -2232,6 +2237,7 @@ function renderPlanSettings(floor) {
     <div class="ps-field"><label>Plan opacity <span class="ps-val">${op}%</span></label><input type="range" min="20" max="100" step="5" value="${op}" data-plan-set="opacity"></div>
     <div class="ps-field"><label>Brightness <span class="ps-val">${br}%</span></label><input type="range" min="50" max="150" step="5" value="${br}" data-plan-set="brightness"></div>
     <label class="ps-toggle"><input type="checkbox" data-plan-set="grid" ${floor.planGrid ? "checked" : ""}><span>Grid overlay</span></label>
+    <label class="ps-toggle"><input type="checkbox" data-plan-set="lock" ${state.ui.planLocked ? "checked" : ""}><span>Lock plan — place / move nodes without panning</span></label>
     ${floor.planFileName ? `<p class="ps-meta">${icon("map")}${escapeHtml(floor.planFileName)}</p>` : ""}
     <a class="ghost-button" href="../fitoff/?project=${escapeHtml(state.selectedProjectId || "")}" target="_blank" rel="noopener" style="justify-content:center;text-decoration:none">${icon("map")}Open fit-off view</a>
     <div class="ps-actions">
@@ -3070,7 +3076,7 @@ function bindEvents() {
       else if (el.dataset.planSet === "brightness") { fl.planBrightness = Number(el.value) / 100; if (img) img.style.filter = `brightness(${fl.planBrightness})`; }
       const v = el.closest(".ps-field") && el.closest(".ps-field").querySelector(".ps-val"); if (v) v.textContent = el.value + "%";
     }
-    if (el.type === "checkbox") { el.addEventListener("change", () => { fl.planGrid = el.checked; persist(); render(); }); }
+    if (el.type === "checkbox") { el.addEventListener("change", () => { if (el.dataset.planSet === "lock") state.ui.planLocked = el.checked; else fl.planGrid = el.checked; persist(); render(); }); }
     else { el.addEventListener("input", live); el.addEventListener("change", () => { live(); persist(); }); }
   });
   const quickStatus = document.querySelector("[data-quick-status]");
@@ -3287,6 +3293,7 @@ function handleAction(event) {
       persist();
       return render();
     }
+    case "toggle-plan-lock": state.ui.planLocked = !state.ui.planLocked; persist(); return render();
     case "toggle-batch": {
       const collapsedNow = state.ui.batchCollapsed != null ? state.ui.batchCollapsed : (batchNodeGroups(project()).length === 0);
       state.ui.batchCollapsed = !collapsedNow;
@@ -3378,9 +3385,11 @@ function bindCanvasEvents() {
     const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
     if (Math.abs(dx) + Math.abs(dy) > 5) {
       dragState.moved = true;
-      viewport.classList.add("is-dragging");
-      state.canvas.panX = dragState.panX + dx; state.canvas.panY = dragState.panY + dy;
-      applyCanvasTransform();
+      if (!state.ui.planLocked) {   // §38 locked plan doesn't pan
+        viewport.classList.add("is-dragging");
+        state.canvas.panX = dragState.panX + dx; state.canvas.panY = dragState.panY + dy;
+        applyCanvasTransform();
+      }
     }
   });
   viewport.addEventListener("pointerup", (e) => {

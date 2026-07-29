@@ -694,6 +694,8 @@ textarea:focus {
   .nd-sync-tube { top: 12px; right: 14px; left: auto; }
   .nd-sync-label { top: 15px; right: 40px; left: auto; }
 }
+/* Don't let the fixed sync tube sit in front of an open drawer/modal/lightbox. */
+body.np-overlay .nd-sync-tube, body.np-overlay .nd-sync-label { display: none !important; }
 
 /* "Here" one-tap geolocation button beside the project address input. */
 .field-with-here { display: flex; gap: 8px; align-items: stretch; }
@@ -756,6 +758,7 @@ textarea:focus {
 .batch-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .batch-chip svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
 .canvas-viewport.drop-hint { outline: 2px dashed var(--blue); outline-offset: -6px; }
+.canvas-tools .icon-button.is-active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 .canvas-tools {
   position: absolute;

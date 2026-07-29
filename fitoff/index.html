@@ -26,7 +26,8 @@
   .stage-wrap { position: relative; width: 100%; height: calc(100vh - 120px); overflow: hidden; background: #14181f; touch-action: none; }
   .stage { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); transform-origin: center; }
   .stage img { display: block; max-width: 88vw; max-height: calc(100vh - 150px); border-radius: 8px; }
-  .marker { position: absolute; width: 30px; height: 30px; transform: translate(-50%,-50%); left: calc(var(--x)*1%); top: calc(var(--y)*1%); cursor: pointer; }
+  .marker { position: absolute; width: 20px; height: 20px; transform: translate(-50%,-50%); left: calc(var(--x)*1%); top: calc(var(--y)*1%); cursor: pointer; }
+  .stage img.img-failed { min-width: 60vw; min-height: 40vh; background: repeating-linear-gradient(45deg,#1a1f28,#1a1f28 12px,#222833 12px,#222833 24px); }
   .marker::before { content:""; position:absolute; inset:0; border-radius:50%; background: var(--c); border: 3px solid rgba(255,255,255,0.9); box-shadow: 0 0 0 4px rgba(0,0,0,0.25), 0 0 16px var(--c); }
   .marker.np::after { content:""; position:absolute; inset:0; border-radius:50%; border:2px solid #ef4444; animation: png 1.2s ease-out infinite; }
   @keyframes png { 0%{transform:scale(0.9);opacity:0.8;} 100%{transform:scale(2.4);opacity:0;} }
@@ -70,6 +71,47 @@
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
   function driveThumb(id, w) { return id ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w" + (w || 400) : ""; }
+  // Load a Drive file (image or PDF) as an authenticated blob and put it in an
+  // <img>. The thumbnail endpoint needs Google cookies we don't have here, so
+  // we fetch the bytes with the signed-in token instead. PDFs render via pdf.js.
+  var _pdfjs = null;
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (_pdfjs) return _pdfjs;
+    _pdfjs = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = function () { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(window.pdfjsLib); } catch (e) { reject(e); } };
+      s.onerror = function () { reject(new Error("pdf.js failed")); };
+      document.head.appendChild(s);
+    });
+    return _pdfjs;
+  }
+  async function pdfBlobToPng(blob) {
+    var lib = await loadPdfJs();
+    var buf = await blob.arrayBuffer();
+    var pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+    var page = await pdf.getPage(1);
+    var base = page.getViewport({ scale: 1 });
+    var vp = page.getViewport({ scale: Math.max(1, Math.min(2600 / base.width, 2600 / base.height)) });
+    var canvas = document.createElement("canvas");
+    canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    return canvas.toDataURL("image/png");
+  }
+  async function loadDriveMedia(fileId, imgEl) {
+    if (!fileId || !imgEl) return;
+    try {
+      var token = NDAuth.getToken();
+      var r = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", { headers: { Authorization: "Bearer " + token } });
+      if (!r.ok) throw new Error("media " + r.status);
+      var blob = await r.blob();
+      imgEl.src = /pdf/i.test(blob.type) ? await pdfBlobToPng(blob) : URL.createObjectURL(blob);
+      imgEl.dataset.loaded = "1";
+    } catch (e) { console.warn("media load failed", fileId, e); imgEl.classList.add("img-failed"); }
+  }
   function qParam(k) { return new URLSearchParams(location.search).get(k); }
   var _maps = null;
   function ensureMaps() {
@@ -158,7 +200,7 @@
       return '<button class="' + (f.id === (floor && floor.id) ? "on" : "") + '" data-floor="' + esc(f.id) + '">' + esc(f.name) + "</button>";
     }).join("") + "</div>" : "";
     var planImg = floor && floor.planId
-      ? '<img src="' + driveThumb(floor.planId, 2000) + '" alt="Floor plan" referrerpolicy="no-referrer" />'
+      ? '<img id="plan-img" alt="Loading floor plan&hellip;" data-fileid="' + esc(floor.planId) + '" />'
       : '<p style="color:var(--mut);padding:40px">No plan for this floor.</p>';
     var markers = nodes.map(function (n) {
       var color = STATUS[n.status] || "#2563eb";
@@ -172,6 +214,8 @@
     app.querySelector("[data-back]").addEventListener("click", function () { renderPicker("Pick a job:"); });
     app.querySelectorAll("[data-floor]").forEach(function (b) { b.addEventListener("click", function () { view.floorId = b.dataset.floor; pan = { x: 0, y: 0, scale: 1 }; renderPlan(); }); });
     app.querySelectorAll("[data-node]").forEach(function (b) { b.addEventListener("click", function (e) { e.stopPropagation(); openNode(b.dataset.node); }); });
+    var pimg = document.getElementById("plan-img");
+    if (pimg) loadDriveMedia(pimg.dataset.fileid, pimg);
     bindPanZoom();
   }
 
@@ -181,9 +225,8 @@
     var photos = data.photosByNode[nid] || [];
     var grid = photos.length
       ? '<div class="pgrid">' + photos.map(function (p) {
-          var src = p.thumb || driveThumb(p.fileId, 400);
           var href = p.view || ("https://drive.google.com/file/d/" + p.fileId + "/view");
-          return '<a href="' + esc(href) + '" target="_blank" rel="noopener"><img src="' + esc(src) + '" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\'' + driveThumb(p.fileId, 400) + '\'" alt="' + esc(p.name) + '" /></a>';
+          return '<a href="' + esc(href) + '" target="_blank" rel="noopener"><img data-fileid="' + esc(p.fileId) + '" alt="' + esc(p.name) + '" /></a>';
         }).join("") + "</div>"
       : '<div class="noimg">No photos on this node yet.</div>';
     var folderLink = n.driveFolderId
@@ -194,6 +237,7 @@
     back.innerHTML = '<div class="sheet"><h3>' + esc(n.title) + '</h3><p class="meta">' + esc(n.category || "") + (n.status ? " &middot; " + esc(n.status) : "") + "</p>" + grid + folderLink + "</div>";
     back.addEventListener("click", function (e) { if (e.target === back) back.remove(); });
     document.body.appendChild(back);
+    back.querySelectorAll("img[data-fileid]").forEach(function (img) { loadDriveMedia(img.dataset.fileid, img); });
   }
 
   /* ---- pan + pinch zoom ---- */
@@ -207,12 +251,12 @@
     wrap.addEventListener("pointermove", function (e) {
       if (!pts.has(e.pointerId)) return;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size === 2 && pinch) { var a = Array.from(pts.values()); var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); pan.scale = Math.max(0.5, Math.min(4, pinch.s * (d / pinch.d))); apply(); return; }
+      if (pts.size === 2 && pinch) { var a = Array.from(pts.values()); var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); pan.scale = Math.max(0.5, Math.min(8, pinch.s * (d / pinch.d))); apply(); return; }
       if (pts.size === 1 && start) { pan.x = start.px + (e.clientX - start.x); pan.y = start.py + (e.clientY - start.y); if (Math.abs(e.clientX - start.x) > 4 || Math.abs(e.clientY - start.y) > 4) start.moved = true; apply(); }
     });
     function up(e) { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (pts.size === 0) start = null; }
     wrap.addEventListener("pointerup", up); wrap.addEventListener("pointercancel", up);
-    wrap.addEventListener("wheel", function (e) { e.preventDefault(); pan.scale = Math.max(0.5, Math.min(4, pan.scale * (e.deltaY < 0 ? 1.1 : 0.9))); apply(); }, { passive: false });
+    wrap.addEventListener("wheel", function (e) { e.preventDefault(); pan.scale = Math.max(0.5, Math.min(8, pan.scale * (e.deltaY < 0 ? 1.1 : 0.9))); apply(); }, { passive: false });
   }
 
   /* ---- boot ---- */
