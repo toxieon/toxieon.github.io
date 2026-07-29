@@ -11,6 +11,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-match.js"></script>
 <script src="../assets/here.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root { --fg:#f0f0f0; --mut:#8b93a1; --line:#2a2a2a; --surf:#1a1a1a; --surf2:#242424; --bg:#0d0d0d; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -227,13 +228,34 @@
     if (b) b.addEventListener("click", function () { NDAuth.ensureToken({ interactive: true }).catch(function (e) { screenCenter('<p class="err">Sign-in failed: ' + esc(e && e.message || e) + "</p>", '<button class="btn" onclick="location.reload()">Retry</button>'); }); });
   }
 
-  if (!window.NDAuth) { screenCenter('<p class="err">Auth module failed to load.</p>'); return; }
-  NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
-  NDAuth.onAuthChange(function (evt) {
-    if (NDAuth.isSignedIn && NDAuth.isSignedIn()) startFlow();
-    else if (evt === "signed-out") showSignIn();
-  });
-  NDAuth.ensureToken().then(function () { startFlow(); }).catch(function () { showSignIn(); });
+  var retryBtn = '<button class="btn ghost" onclick="location.reload()">Retry</button>';
+  function fail(msg) { screenCenter('<p class="err">' + esc(msg) + '</p>', retryBtn); }
+
+  // The Google Identity Services (GIS) library loads async — nd-auth needs it
+  // for the token client. Wait for it (with a cap) before initialising, so the
+  // page never sits on "Starting…" forever if it's slow or blocked.
+  function waitForGis(cb, tries) {
+    if (window.google && google.accounts && google.accounts.oauth2) return cb();
+    if ((tries || 0) > 120) return cb(new Error("Google sign-in library didn't load. Check your connection and retry."));
+    setTimeout(function () { waitForGis(cb, (tries || 0) + 1); }, 100);
+  }
+
+  function boot() {
+    if (!window.NDAuth) return fail("Auth module failed to load.");
+    try { NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes }); }
+    catch (e) { return fail("Auth init failed: " + (e && e.message || e)); }
+    NDAuth.onAuthChange(function (evt) {
+      if (NDAuth.isSignedIn && NDAuth.isSignedIn()) startFlow();
+      else if (evt === "signed-out") showSignIn();
+    });
+    var settled = false;
+    var safety = setTimeout(function () { if (!settled) showSignIn(); }, 12000);  // never hang
+    NDAuth.ensureToken()
+      .then(function () { settled = true; clearTimeout(safety); startFlow(); })
+      .catch(function () { settled = true; clearTimeout(safety); showSignIn(); });
+  }
+
+  waitForGis(function (err) { if (err) fail(err.message); else boot(); });
 })();
 </script>
 </body>

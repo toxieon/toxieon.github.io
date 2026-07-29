@@ -225,7 +225,7 @@ function persist(opts = {}) {
  * working image (long edge <= 2000px) lives in nd-cache. Drive keeps the
  * full-res original. */
 const PLAN_CACHE_PREFIX = "plan:";
-const PLAN_MAX_EDGE = 2000;
+const PLAN_MAX_EDGE = 3200;   // higher-res so PDF/plan detail stays legible when zoomed in
 
 function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   return new Promise((resolve) => {
@@ -2194,7 +2194,8 @@ function renderMapView() {
         ${rightTab === "plan" ? renderPlanSettings(floor) : `
         <div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
-        <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>`}
+        <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>
+        ${renderBatchNodesPanel(proj)}`}
       </aside>
     </section>`;
 }
@@ -2409,7 +2410,7 @@ function renderStaffSettingsView() {
   return `
     <section class="settings-grid">
       <div class="view-panel">
-        <div class="panel-header"><h3 class="section-title">Account</h3><span class="sync-chip"><span class="sync-dot"></span>${escapeHtml(state.myRole || "staff")}</span></div>
+        <div class="panel-header"><h3 class="section-title">Account</h3><span class="sync-chip" data-sfill="synced">${escapeHtml(state.myRole || "staff")}</span></div>
         <div class="integration-list">
           <div class="integration-row"><span><strong>Email</strong><span>${escapeHtml(auth.profile?.email || "")}</span></span>${statusPill("Complete")}</div>
           <div class="integration-row"><span><strong>Name</strong><span>${escapeHtml(auth.profile?.name || "")}</span></span>${statusPill("Complete")}</div>
@@ -2437,7 +2438,7 @@ function renderSettingsView() {
   return `
     <section class="settings-grid">
       <div class="view-panel">
-        <div class="panel-header"><h3 class="section-title">Account</h3><span class="sync-chip"><span class="sync-dot"></span>${owner ? "Signed in (owner)" : "Signed in"}</span></div>
+        <div class="panel-header"><h3 class="section-title">Account</h3><span class="sync-chip" data-sfill="synced">${owner ? "Signed in (owner)" : "Signed in"}</span></div>
         <div class="integration-list">
           <div class="integration-row"><span><strong>Email</strong><span>${escapeHtml(auth.profile?.email || "(unknown)")}</span></span>${statusPill("Complete")}</div>
           <div class="integration-row"><span><strong>Name</strong><span>${escapeHtml(auth.profile?.name || "(unknown)")}</span></span>${statusPill("Complete")}</div>
@@ -2478,7 +2479,7 @@ function renderSettingsView() {
         `}
       </div>
       <div class="view-panel">
-        <div class="panel-header"><h3 class="section-title">Google Services</h3><span class="sync-chip"><span class="sync-dot"></span>${hasGoogleApiKey && hasGoogleClientId ? "Configured" : "Config needed"}</span></div>
+        <div class="panel-header"><h3 class="section-title">Google Services</h3><span class="sync-chip" data-sfill="${hasGoogleApiKey && hasGoogleClientId ? "synced" : "failed"}">${hasGoogleApiKey && hasGoogleClientId ? "Configured" : "Config needed"}</span></div>
         <div class="integration-list">
           <div class="integration-row"><span><strong>Browser API Key</strong><span>${hasGoogleApiKey ? "Loaded from index.html" : "Missing"}</span></span>${statusPill(hasGoogleApiKey ? "Complete" : "Not Started")}</div>
           <div class="integration-row"><span><strong>OAuth Client ID</strong><span>${hasGoogleClientId ? "Loaded from index.html" : "Missing"}</span></span>${statusPill(hasGoogleClientId ? "Complete" : "Not Started")}</div>
@@ -3046,11 +3047,16 @@ function bindEvents() {
   document.querySelectorAll("[data-filter]").forEach((input) => { const en = input.tagName === "INPUT" ? "input" : "change"; input.addEventListener(en, () => { state.filters[input.dataset.filter] = input.value; persist(); render(); }); });
   document.querySelectorAll("[data-audit-filter]").forEach((input) => { const en = input.tagName === "INPUT" ? "input" : "change"; input.addEventListener(en, () => { state.auditView.filters[input.dataset.auditFilter] = input.value; persist(); render(); }); });
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", handleAction));
+  document.querySelectorAll("[data-batch-key]").forEach((el) => el.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", el.dataset.batchKey);
+    e.dataTransfer.effectAllowed = "copy";
+  }));
   // §UI: "Sync master" buttons use the shared water fill (assets/sync-fill.js),
   // filling red→green with the master-sheet sync status.
   if (window.NDSyncFill && window.NDQueue) {
     const s = NDQueue.status();
     document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, s));
+    document.querySelectorAll("[data-sfill]").forEach((el) => NDSyncFill.apply(el, el.dataset.sfill));
     if (!window._plannerSyncFillSub) {
       window._plannerSyncFillSub = NDQueue.onStatus((st) => document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, st)));
     }
@@ -3281,6 +3287,12 @@ function handleAction(event) {
       persist();
       return render();
     }
+    case "toggle-batch": {
+      const collapsedNow = state.ui.batchCollapsed != null ? state.ui.batchCollapsed : (batchNodeGroups(project()).length === 0);
+      state.ui.batchCollapsed = !collapsedNow;
+      persist();
+      return render();
+    }
     case "create-node": return openCreateModal({ x: 50, y: 50 });
     case "new-project": state.modal = { mode: "new-project" }; return render();
     case "edit-project": state.modal = { mode: "edit-project" }; return render();
@@ -3330,6 +3342,14 @@ function handleAction(event) {
 
 function bindCanvasEvents() {
   const viewport = document.getElementById("canvasViewport"); if (!viewport) return;
+  // Batch-node drop: drag a premade node from the panel onto the plan to place it.
+  viewport.addEventListener("dragover", (e) => { if (e.dataTransfer) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+  viewport.addEventListener("drop", (e) => {
+    const key = e.dataTransfer && e.dataTransfer.getData("text/plain"); if (!key || !_batchGroups[key]) return;
+    e.preventDefault();
+    const pos = pointerToPlanPosition(e) || { x: 50, y: 50 };
+    placeBatchNode(key, pos);
+  });
   viewport.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(state.canvas.zoom + (e.deltaY < 0 ? 0.08 : -0.08), false); }, { passive: false });
   viewport.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".node-marker")) return;
@@ -3456,7 +3476,7 @@ function pointerToPlanPosition(event) {
 }
 
 function applyCanvasTransform() { const stage = document.getElementById("planStage"); if (!stage) return; stage.style.transform = `translate(calc(-50% + ${state.canvas.panX}px), calc(-50% + ${state.canvas.panY}px)) scale(${state.canvas.zoom})`; }
-function setZoom(value, rerender = true) { state.canvas.zoom = Math.max(0.55, Math.min(2.4, Number(value.toFixed(2)))); persist(); if (rerender) render(); else applyCanvasTransform(); }
+function setZoom(value, rerender = true) { state.canvas.zoom = Math.max(0.55, Math.min(6, Number(value.toFixed(2)))); persist(); if (rerender) render(); else applyCanvasTransform(); }
 
 /* ============================================================ MUTATIONS */
 
@@ -4337,6 +4357,63 @@ async function createJobFromInboxGroup(addressKey) {
 
 function trayRecords(projectId) {
   return _inboxRecords.filter((r) => r.status === NDInbox.STATUS.FILED_TO_PROJECT && r.projectId === projectId && !r.isFloorPlan);
+}
+
+/* §26/§32 Batch nodes: premade nodes from the uploader (photos filed to this
+ * project but not yet placed), grouped by room per floor. Drag a chip onto the
+ * plan to create the node there and attach its photo(s). "Location" from the
+ * uploader is treated as the node's floor; blank = "Undefined floor". */
+let _batchGroups = {};
+function batchNodeGroups(proj) {
+  if (!proj) return [];
+  const recs = trayRecords(proj.id);
+  const groups = {};
+  recs.forEach((r) => {
+    const floorId = r.floorId || "";
+    const room = String(r.room || r.location || "Unsorted").trim() || "Unsorted";
+    const key = (floorId || "none") + "|" + room.toLowerCase();
+    if (!groups[key]) groups[key] = { key, floorId, room, records: [] };
+    groups[key].records.push(r);
+  });
+  return Object.values(groups);
+}
+function renderBatchNodesPanel(proj) {
+  if (!proj) return "";
+  _batchGroups = {};
+  const groups = batchNodeGroups(proj);
+  groups.forEach((g) => { _batchGroups[g.key] = g; });
+  const n = groups.length;
+  const collapsed = state.ui.batchCollapsed != null ? state.ui.batchCollapsed : (n === 0);
+  const floors = proj.floors || [];
+  const floorName = (id) => (id && floors.find((f) => f.id === id)?.name) || "Undefined floor";
+  const byFloor = {};
+  groups.forEach((g) => { const k = g.floorId || "__none"; (byFloor[k] = byFloor[k] || []).push(g); });
+  const body = n === 0
+    ? `<div class="empty-state" style="padding:14px;font-size:12px">No batch nodes waiting. Upload a batch and file it to this job.</div>`
+    : Object.keys(byFloor).map((fk) => {
+        const fname = fk === "__none" ? "Undefined floor" : floorName(fk);
+        return `<div class="batch-floor"><div class="batch-floor-name">${icon("layers")}${escapeHtml(fname)}</div>${byFloor[fk].map((g) => `<div class="batch-chip" draggable="true" data-batch-key="${escapeHtml(g.key)}" title="Drag onto the plan to place"><span class="batch-chip-main"><strong>${escapeHtml(g.room)}</strong><span class="batch-sub">${escapeHtml(fname)} &middot; ${g.records.length} photo${g.records.length === 1 ? "" : "s"}</span></span>${icon("map")}</div>`).join("")}</div>`;
+      }).join("");
+  return `<div class="batch-panel">
+    <button class="collapsible-heading batch-head" data-action="toggle-batch"><h3 class="section-title">Batch nodes${n ? ` (${n})` : ""}</h3><span class="compact-toggle">${collapsed ? "Show" : "Hide"}</span></button>
+    ${collapsed ? "" : `<p class="summary-hint">Drag a node onto the plan to place it.</p><div class="batch-list">${body}</div>`}
+  </div>`;
+}
+async function placeBatchNode(key, pos) {
+  const g = _batchGroups[key], proj = project(), fl = currentFloor();
+  if (!g || !proj || !fl) return;
+  const node = {
+    id: uid("node"), projectId: proj.id, floorId: fl.id, type: "marker",
+    customTitle: g.room, category: "", lineItem: "", status: "Not Started", assignedTo: "", tags: [],
+    description: `Placed from batch (${g.records.length} photo${g.records.length === 1 ? "" : "s"})`,
+    position: pos, createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "owner",
+    createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: [], roomId: null, linkedRoomId: null
+  };
+  state.nodes.push(node); persist(); render();
+  logAudit("Node Placed From Batch", { nodeId: node.id, details: g.room });
+  for (const rec of g.records) { try { await fileInboxToNode(rec.driveFileId, node.id); } catch (e) { console.warn("batch file failed", e); } }
+  render();
+  toast(`Placed ${g.room}`);
 }
 
 function renderSortTrayModal(m) {

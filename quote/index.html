@@ -182,6 +182,26 @@ textarea { resize: vertical; min-height: 70px; }
 .totals-card { background: linear-gradient(135deg, rgba(49,208,255,0.15), rgba(106,255,184,0.09)); border: 1px solid rgba(106,255,184,0.32); }
 .totals-card.cash-mode { background: linear-gradient(135deg, rgba(74,222,128,0.18), rgba(34,197,94,0.10)); border-color: rgba(74,222,128,0.4); }
 .total-row { display: flex; justify-content: space-between; padding: 6px 0; color: var(--muted); }
+.visit-count-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.visit-lines { display: flex; flex-direction: column; gap: 6px; }
+.visit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.88rem; }
+.visit-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visit-row select { flex: none; }
+.visit-summary { margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.visit-sum { display: flex; align-items: center; gap: 10px; }
+.visit-sum span { flex: 1; color: var(--muted); }
+.visit-sum b { font-size: 1rem; }
+.visit-pdf { border-top: 1px solid var(--card-border); margin-top: 12px; padding-top: 4px; }
+.visit-inc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.visit-inc { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; }
+.visit-total-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; cursor: pointer; color: var(--muted); }
+.merge-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
+.merge-row:last-child { border-bottom: 0; }
+.merge-row input { flex: none; width: 18px; height: 18px; }
+.merge-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.merge-main b { font-size: 0.9rem; }
+.merge-main span { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.merge-total { font-weight: 800; font-size: 0.9rem; }
 .total-row.grand { font-size: 1.4rem; padding-top: 14px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); color: var(--text); font-weight: 900; }
 .total-row.grand b { color: var(--brand-2); }
 .totals-card.cash-mode .total-row.grand b { color: var(--cash); }
@@ -715,6 +735,15 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
         <div class="total-row grand"><span>Total</span><b id="grand-total">$0.00</b></div>
       </div>
 
+      <!-- §30 Multiple visits — separate invoices -->
+      <div class="card hide-from-staff" id="visit-card">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+          <input id="multivisit-toggle" type="checkbox" />
+          <span><b>Multiple visits</b> — split into separate invoices</span>
+        </label>
+        <div id="visit-body" style="display:none;margin-top:12px;"></div>
+      </div>
+
       <!-- Extra materials (staff additions) -->
       <div class="card" id="extras-onsite-card">
         <h3>🔧 Extras used on site <span class="pill" style="background:rgba(149,128,255,0.18);color:#b8aaff;border-color:rgba(149,128,255,0.32);">Staff entry</span></h3>
@@ -1028,6 +1057,19 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
         </div>
       </details>
 
+      <details class="card" id="merge-card" style="display:none;">
+        <summary><h3>🧷 Merge quotes / invoices <span class="pill" style="background:rgba(255,209,102,0.15);color:var(--warning);border-color:rgba(255,209,102,0.3);">Master</span></h3></summary>
+        <div class="card-body">
+          <p class="panel-sub" style="margin:0 0 10px;">Tick two or more quotes to pool their line items, labour, materials and photos into one new quote (duplicate line items sum their quantities). The originals are left untouched.</p>
+          <input id="merge-search" type="search" placeholder="Search by client, address, or ID..." style="width:100%;margin-bottom:10px;" />
+          <div id="merge-list" style="max-height:52vh;overflow-y:auto;border:1px solid var(--card-border);border-radius:var(--radius-sm);background:rgba(0,0,0,0.18);"></div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary" id="merge-go" type="button" disabled>Merge selected</button>
+            <button class="btn btn-utility" id="merge-clear" type="button">Clear</button>
+          </div>
+        </div>
+      </details>
+
       <details class="card" id="activity-card" style="display:none;">
         <summary><h3>🪪 Activity log <span class="pill" style="background:rgba(255,209,102,0.15);color:var(--warning);border-color:rgba(255,209,102,0.3);">Master</span></h3></summary>
         <div class="card-body">
@@ -1249,7 +1291,9 @@ function blankQuote() {
     distanceKm: null, durationMin: null,
     clientLat: null, clientLng: null,
     quotedHours: 0, quotedDays: 0,
-    timingHonest: null, overrunHours: 0
+    timingHonest: null, overrunHours: 0,
+    multiVisit: false, visitCount: 2, lineVisit: {},   // §30 per-visit invoicing
+    visitInclude: null, visitTotalOnly: false          // which visits go in the PDF / running total
   };
 }
 
@@ -1508,7 +1552,7 @@ document.querySelectorAll('.tab').forEach(t => {
     t.classList.add('active');
     document.querySelector(`.panel[data-panel="${t.dataset.tab}"]`).classList.add('active');
     if (t.dataset.tab === 'history')  renderHistory();
-    if (t.dataset.tab === 'settings') renderSettings();
+    if (t.dataset.tab === 'settings') { renderSettings(); renderMergeList(); }
     if (t.dataset.tab === 'staff')    loadStaffList();
     if (t.dataset.tab === 'calendar') { renderCalendar(); if (settings.weatherEnabled !== false) scheduleCalendarWeatherFetch(); }
     if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showMasterCards(); renderGalleryFilters(); renderGalleryGrid(); }
@@ -1706,8 +1750,8 @@ function effectiveCap(section, item) {
   }
   return settings.discountCaps[section] !== undefined ? settings.discountCaps[section] : 100;
 }
-function calcQuote() {
-  const q = currentQuote;
+function calcQuote(source) {
+  const q = source || currentQuote;
   const d = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
 
   const sections = {};  // sectionName -> net total
@@ -2049,6 +2093,9 @@ document.getElementById('add-camera-line').onclick = () => {
    TOTALS
    ===================================================== */
 function renderTotals() {
+  const _full = currentQuote;
+  const _tf = currentQuote.multiVisit && currentQuote.visitTotalOnly && includedVisits().size < visitCountOf();
+  if (_tf) currentQuote = { ..._full, ...quoteForVisits(_full, includedVisits()) };
   const c = calcQuote();
   const d = c.d;
   const rows = [];
@@ -2087,6 +2134,116 @@ function renderTotals() {
   document.getElementById('totals-breakdown').innerHTML = html;
   document.getElementById('grand-total').textContent = fmt(c.grand);
   document.getElementById('totals-card').classList.toggle('cash-mode', !!currentQuote.cashMode);
+  if (_tf) currentQuote = _full;
+  renderVisitPanel();
+}
+
+/* §30 Multiple-visit invoicing — split one job into separate invoices.
+ * Every priced line (items, custom lines, labour, travel) can be assigned to
+ * an invoice number; each invoice applies the discount + GST to only its own
+ * lines. Additive: the normal single-invoice flow is untouched. */
+function visitLines() {
+  const lines = [];
+  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
+  sectionOrder.forEach(sec => {
+    Object.entries(currentQuote.itemQty || {}).forEach(([key, qty]) => {
+      if (key.split(':')[0] !== sec) return;
+      const item = findItem(key); if (!item || !qty) return;
+      lines.push({ key, label: `${key.split(':').slice(1).join(':')} × ${qty}` });
+    });
+  });
+  (currentQuote.customLines || []).forEach((line, i) => {
+    const ml = migrateCustomLine(line); if (!customLineTotal(ml)) return;
+    lines.push({ key: 'custom:' + i, label: `${ml.label || 'Custom'} × ${ml.qty}` });
+  });
+  const c = calcQuote();
+  if (c.labourRaw) lines.push({ key: 'labour', label: 'Labour' });
+  if (c.travelRaw) lines.push({ key: 'travel', label: 'Travel' });
+  return lines;
+}
+function visitOf(key) { return Number((currentQuote.lineVisit || {})[key]) || 1; }
+function visitCountOf() { return Math.max(2, Math.min(6, Number(currentQuote.visitCount) || 2)); }
+function includedVisits() {
+  const n = visitCountOf();
+  const all = Array.from({ length: n }, (_, i) => i + 1);
+  const inc = Array.isArray(currentQuote.visitInclude) ? currentQuote.visitInclude.filter(v => v >= 1 && v <= n) : all;
+  return new Set(inc.length ? inc : all);
+}
+function quoteForVisits(base, includeSet) {
+  const lv = base.lineVisit || {};
+  const on = (key) => includeSet.has(Number(lv[key]) || 1);
+  const itemQty = {};
+  Object.entries(base.itemQty || {}).forEach(([k, v]) => { if (on(k)) itemQty[k] = v; });
+  const customLines = (base.customLines || []).filter((_, i) => on('custom:' + i));
+  const labourOn = on('labour'), travelOn = on('travel');
+  return {
+    itemQty, customLines,
+    hours: labourOn ? base.hours : 0, days: labourOn ? base.days : 0,
+    travelOverride: travelOn ? base.travelOverride : null, bandPrice: travelOn ? base.bandPrice : 0,
+    discountPct: base.discountPct, gst: base.gst, cashMode: base.cashMode
+  };
+}
+function quoteForVisit(base, n) { return quoteForVisits(base, new Set([n])); }
+function renderVisitPanel() {
+  const toggle = document.getElementById('multivisit-toggle');
+  const body = document.getElementById('visit-body');
+  if (!toggle || !body) return;
+  if (!toggle._mvBound) { toggle._mvBound = true; toggle.addEventListener('change', () => { currentQuote.multiVisit = toggle.checked; renderVisitPanel(); scheduleDraftSave(); }); }
+  toggle.checked = !!currentQuote.multiVisit;
+  body.style.display = currentQuote.multiVisit ? '' : 'none';
+  if (!currentQuote.multiVisit) return;
+  const n = Math.max(2, Math.min(6, Number(currentQuote.visitCount) || 2));
+  currentQuote.visitCount = n;
+  if (!currentQuote.lineVisit) currentQuote.lineVisit = {};
+  const lines = visitLines();
+  const optsFor = (sel) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}" ${sel === i + 1 ? 'selected' : ''}>Invoice ${i + 1}</option>`).join('');
+  const lineRows = lines.length
+    ? lines.map(l => `<div class="visit-row"><span>${escapeHtml(l.label)}</span><select class="visit-assign" data-key="${escapeHtml(l.key)}">${optsFor(visitOf(l.key))}</select></div>`).join('')
+    : '<div class="panel-sub">Add some line items first.</div>';
+  let summary = '';
+  for (let i = 1; i <= n; i++) {
+    const t = calcQuote(quoteForVisit(currentQuote, i));
+    summary += `<div class="visit-sum"><span>Invoice ${i}</span><b>${fmt(t.grand)}</b><button type="button" class="btn btn-secondary" data-copy-visit="${i}" style="padding:4px 12px;font-size:0.8rem;">Copy</button></div>`;
+  }
+  const inc = includedVisits();
+  const incBoxes = Array.from({ length: n }, (_, i) => { const v = i + 1; return `<label class="visit-inc"><input type="checkbox" class="visit-include" data-v="${v}" ${inc.has(v) ? 'checked' : ''}> Invoice ${v}</label>`; }).join('');
+  body.innerHTML = `<div class="visit-count-row"><label style="margin:0;">Number of invoices</label><input id="visit-count" type="number" min="2" max="6" value="${n}" style="width:70px;" /></div>
+    <div class="visit-lines">${lineRows}</div>
+    <div class="visit-summary">${summary}</div>
+    <div class="visit-pdf">
+      <div class="panel-sub" style="margin:12px 0 6px;">Include in the PDF / export:</div>
+      <div class="visit-inc-row">${incBoxes}</div>
+      <label class="visit-total-toggle"><input type="checkbox" id="visit-total-only" ${currentQuote.visitTotalOnly ? 'checked' : ''}> Running total shows ticked invoices only</label>
+    </div>`;
+  const cnt = body.querySelector('#visit-count');
+  if (cnt) cnt.oninput = e => { currentQuote.visitCount = Math.max(2, Math.min(6, Number(e.target.value) || 2)); renderVisitPanel(); scheduleDraftSave(); };
+  body.querySelectorAll('.visit-assign').forEach(sel => sel.onchange = e => { currentQuote.lineVisit[e.target.dataset.key] = Number(e.target.value); renderVisitPanel(); scheduleDraftSave(); });
+  body.querySelectorAll('[data-copy-visit]').forEach(b => b.onclick = () => copyVisitInvoice(Number(b.dataset.copyVisit)));
+  body.querySelectorAll('.visit-include').forEach(cb => cb.onchange = () => {
+    const v = Number(cb.dataset.v);
+    let arr = Array.isArray(currentQuote.visitInclude) ? currentQuote.visitInclude.slice() : Array.from({ length: n }, (_, i) => i + 1);
+    if (cb.checked) { if (!arr.includes(v)) arr.push(v); } else { arr = arr.filter(x => x !== v); }
+    currentQuote.visitInclude = arr;
+    renderTotals(); scheduleDraftSave();
+  });
+  const tot = body.querySelector('#visit-total-only');
+  if (tot) tot.onchange = () => { currentQuote.visitTotalOnly = tot.checked; renderTotals(); scheduleDraftSave(); };
+}
+function copyVisitInvoice(n) {
+  const t = calcQuote(quoteForVisit(currentQuote, n));
+  const out = [];
+  out.push(`INVOICE ${n} of ${currentQuote.visitCount}${currentQuote.client.name ? ' — ' + currentQuote.client.name : ''}`);
+  if (currentQuote.client.address) out.push(currentQuote.client.address);
+  out.push('');
+  visitLines().filter(l => visitOf(l.key) === n).forEach(l => out.push('• ' + l.label));
+  out.push('');
+  out.push(`Subtotal: ${fmt(t.subtotal)}`);
+  if (currentQuote.gst && !currentQuote.cashMode) out.push(`GST (${settings.gstPct}%): ${fmt(t.gstAmt)}`);
+  out.push(`Total: ${fmt(t.grand)}`);
+  const text = out.join('\n');
+  const done = () => (window.NDUI && NDUI.toast) ? NDUI.toast(`Invoice ${n} copied`) : alert(`Invoice ${n} copied`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => alert(text));
+  else alert(text);
 }
 
 /* =====================================================
@@ -3474,6 +3631,11 @@ function customerDocRows(c, isCash) {
 }
 
 function buildQuoteImageData(style) {
+  // §30: when splitting visits, the PDF/image includes only the ticked visits.
+  const _full = currentQuote;
+  const _filter = currentQuote.multiVisit && includedVisits().size < visitCountOf();
+  if (_filter) currentQuote = { ..._full, ...quoteForVisits(_full, includedVisits()) };
+  try {
   const c = calcQuote();
   const isCash = style === 'cash';
   const isInvoice = !isCash && !!currentQuote.completed;
@@ -3532,6 +3694,7 @@ function buildQuoteImageData(style) {
     photos: visiblePhotos,
     filename: `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.jpg`
   };
+  } finally { if (_filter) currentQuote = _full; }
 }
 
 function setCanvasFont(ctx, weight, size) {
@@ -4302,12 +4465,66 @@ function saveWatermarkUI() {
    v12: ACTIVITY LOG + PASSCODE STRENGTH
    ===================================================== */
 function showMasterCards() {
-  const ids = ['gallery-card', 'activity-card'];
+  const ids = ['gallery-card', 'activity-card', 'merge-card'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.style.display = (currentUser && currentUser.role === 'master') ? '' : 'none';
   });
+}
+
+/* §31 Merge quotes/invoices — pool 2+ saved quotes into one new quote.
+ * Duplicate line items sum quantities; labour/materials/photos concat. The
+ * originals are untouched. */
+let mergeSel = new Set();
+function renderMergeList() {
+  const list = document.getElementById('merge-list'); if (!list) return;
+  const search = document.getElementById('merge-search');
+  if (search && !search._mBound) { search._mBound = true; search.addEventListener('input', renderMergeList); }
+  const go = document.getElementById('merge-go');
+  if (go && !go._mBound) { go._mBound = true; go.addEventListener('click', mergeQuotes); }
+  const clr = document.getElementById('merge-clear');
+  if (clr && !clr._mBound) { clr._mBound = true; clr.addEventListener('click', () => { mergeSel.clear(); renderMergeList(); }); }
+  const term = ((search || {}).value || '').trim().toLowerCase();
+  let quotes = (history || []).slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  if (term) quotes = quotes.filter(q => `${q.client?.name || ''} ${q.client?.address || ''} ${q.id || ''}`.toLowerCase().includes(term));
+  list.innerHTML = quotes.length
+    ? quotes.map(q => {
+        const total = calcQuote(q).grand;
+        const date = q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        return `<label class="merge-row"><input type="checkbox" data-merge-id="${escapeAttr(q.id)}" ${mergeSel.has(q.id) ? 'checked' : ''}><span class="merge-main"><b>${escapeHtml(q.client?.name || 'Unnamed')}</b><span>${escapeHtml(q.client?.address || 'No address')} &middot; ${escapeHtml(date)}</span></span><span class="merge-total">${fmt(total)}</span></label>`;
+      }).join('')
+    : '<div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">No quotes.</div>';
+  list.querySelectorAll('[data-merge-id]').forEach(cb => cb.onchange = e => {
+    const id = e.target.dataset.mergeId;
+    if (e.target.checked) mergeSel.add(id); else mergeSel.delete(id);
+    if (go) go.disabled = mergeSel.size < 2;
+  });
+  if (go) go.disabled = mergeSel.size < 2;
+}
+function mergeQuotes() {
+  const quotes = Array.from(mergeSel).map(id => (history || []).find(q => q.id === id)).filter(Boolean);
+  if (quotes.length < 2) return;
+  if (!confirm(`Merge ${quotes.length} quotes into one new quote? The originals stay as they are.`)) return;
+  const merged = blankQuote();
+  merged.client = { name: '', phone: '', address: '', ...(quotes[0].client || {}) };
+  merged.notes = quotes.map(q => q.notes).filter(Boolean).join('\n— — —\n');
+  merged.gst = !!quotes[0].gst;
+  quotes.forEach(q => {
+    Object.entries(q.itemQty || {}).forEach(([k, v]) => { merged.itemQty[k] = (Number(merged.itemQty[k]) || 0) + (Number(v) || 0); });
+    (q.customLines || []).forEach(c => merged.customLines.push(JSON.parse(JSON.stringify(c))));
+    merged.hours = (Number(merged.hours) || 0) + (Number(q.hours) || 0);
+    merged.days = (Number(merged.days) || 0) + (Number(q.days) || 0);
+    (q.extraMaterials || []).forEach(m => merged.extraMaterials.push(JSON.parse(JSON.stringify(m))));
+    (q.photos || []).forEach(p => merged.photos.push(JSON.parse(JSON.stringify(p))));
+  });
+  merged.pickerLines = { cameras: [] };
+  Object.keys(merged.itemQty).forEach(k => { const sec = k.split(':')[0]; (merged.pickerLines[sec] = merged.pickerLines[sec] || []).push(k); });
+  currentQuote = merged;
+  mergeSel.clear();
+  hydrateQuoteUI();
+  const qtab = document.querySelector('.tab[data-tab="quote"]'); if (qtab) qtab.click();
+  (window.NDUI && NDUI.toast) ? NDUI.toast(`Merged ${quotes.length} quotes`) : alert(`Merged ${quotes.length} quotes into a new quote`);
 }
 
 async function loadActivityLog() {

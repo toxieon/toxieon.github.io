@@ -683,9 +683,17 @@ textarea:focus {
 }
 .missing-photos-badge svg { width: 13px; height: 13px; }
 
-/* §UI: sync tube moved to the top-left, just right of the sidebar logo. */
-.nd-sync-tube { top: 14px; left: 74px; right: auto; }
-.nd-sync-label { top: 17px; left: 100px; right: auto; }
+/* §UI: sync tube — on desktop it sits in the sidebar gap to the RIGHT of the
+ * "NeillPlanner" wordmark (272px sidebar, 20px padding, wordmark ends ~205px).
+ * On mobile the sidebar is hidden, so keep it top-right. */
+@media (min-width: 1181px) {
+  .nd-sync-tube { top: 16px; left: 226px; right: auto; }
+  .nd-sync-label { top: 64px; left: 20px; right: auto; max-width: 232px; }
+}
+@media (max-width: 1180px) {
+  .nd-sync-tube { top: 12px; right: 14px; left: auto; }
+  .nd-sync-label { top: 15px; right: 40px; left: auto; }
+}
 
 /* "Here" one-tap geolocation button beside the project address input. */
 .field-with-here { display: flex; gap: 8px; align-items: stretch; }
@@ -732,6 +740,22 @@ textarea:focus {
 .plan-grid { position: absolute; inset: 0; pointer-events: none; z-index: 1;
   background-image: linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.16) 1px, transparent 1px);
   background-size: 5% 5%; }
+
+/* §26/§32 Batch nodes panel (drag onto plan to place) */
+.batch-panel { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.batch-head { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: 0; cursor: pointer; padding: 6px 0; color: inherit; }
+.batch-head .compact-toggle { color: var(--muted); font-size: 12px; }
+.batch-floor { margin-top: 8px; }
+.batch-floor-name { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 6px 0; }
+.batch-floor-name svg { width: 13px; height: 13px; }
+.batch-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 10px; background: rgba(56,189,248,0.06); cursor: grab; }
+.batch-chip:active { cursor: grabbing; }
+.batch-chip:hover { border-color: var(--blue); background: rgba(56,189,248,0.12); }
+.batch-chip-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.batch-chip-main strong { font-size: 14px; }
+.batch-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.batch-chip svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.canvas-viewport.drop-hint { outline: 2px dashed var(--blue); outline-offset: -6px; }
 
 .canvas-tools {
   position: absolute;
