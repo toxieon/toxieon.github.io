@@ -189,6 +189,29 @@ function render() {
     </main>
   `;
   bindEvents();
+  hydrateDriveImages();   // #37 — Drive thumbnails 403 without cookies; fetch bytes with our token
+}
+
+// #37 — fetch Drive image bytes with the OAuth token and swap them in, since
+// the cookie-based thumbnail URLs 403 in this app. Cached per fileId.
+const driveImgCache = new Map();
+async function hydrateDriveImages() {
+  if (!isTokenValid() || !window.NDAuth) return;
+  const token = NDAuth.getToken();
+  const imgs = document.querySelectorAll("img[data-fileid]:not([data-hydrated])");
+  for (const img of imgs) {
+    const id = img.getAttribute("data-fileid");
+    img.dataset.hydrated = "1";
+    if (!id) continue;
+    if (driveImgCache.has(id)) { img.src = driveImgCache.get(id); continue; }
+    try {
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, { headers: { Authorization: "Bearer " + token } });
+      if (!r.ok) throw new Error("media " + r.status);
+      const url = URL.createObjectURL(await r.blob());
+      driveImgCache.set(id, url);
+      if (img.isConnected) img.src = url;
+    } catch (e) { img.classList.add("img-failed"); }
+  }
 }
 
 function renderTopbar() {
@@ -348,7 +371,7 @@ function renderRepairIssue(issue) {
   return `
     <article class="repair-item ${issue.fixed ? "is-fixed" : ""}">
       <button type="button" class="repair-thumb" data-preview="${escapeHtml(file.id)}">
-        ${file.thumbnailLink ? `<img src="${escapeHtml(file.thumbnailLink)}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
+        ${(file.thumbnailLink || file.id) ? `<img ${file.id ? `data-fileid="${escapeHtml(file.id)}"` : ""} src="${escapeHtml(file.thumbnailLink || "")}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
       </button>
       <div class="repair-body">
         <div class="file-title">
@@ -408,7 +431,7 @@ function renderFileCard(file) {
   return `
     <article class="file-card ${isMoved ? "is-moved" : ""}" data-file="${escapeHtml(file.id)}">
       <button type="button" class="thumb-button" data-preview="${escapeHtml(file.id)}">
-        ${file.thumbnailLink ? `<img src="${escapeHtml(file.thumbnailLink)}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
+        ${(file.thumbnailLink || file.id) ? `<img ${file.id ? `data-fileid="${escapeHtml(file.id)}"` : ""} src="${escapeHtml(file.thumbnailLink || "")}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
       </button>
       <div class="file-body">
         <div class="file-title">
@@ -617,7 +640,7 @@ function renderLightbox() {
         <strong>${escapeHtml(file.name)}</strong>
         <button type="button" class="icon-button" data-action="close-lightbox" aria-label="Close">${icon("close")}</button>
       </div>
-      ${file.thumbnailLink ? `<img src="${escapeHtml(file.thumbnailLink.replace(/=s\\d+$/, "=s1600"))}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
+      ${(file.thumbnailLink || file.id) ? `<img ${file.id ? `data-fileid="${escapeHtml(file.id)}"` : ""} src="${escapeHtml((file.thumbnailLink || "").replace(/=s\\d+$/, "=s1600"))}" alt="" />` : `<div class="thumb-fallback">${icon("file")}</div>`}
     </section>
   `;
 }

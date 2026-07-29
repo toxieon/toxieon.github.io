@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Company &middot; Neill Data &amp; Security</title>
+<link rel="icon" href="../favicon.svg" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
+<style>
+  :root { --fg:#f0f0f0; --mut:#8b93a1; --line:#2a2a2a; --line2:#3a3a3a; --surf:#1a1a1a; --surf2:#242424; --bg:#0d0d0d; --amber:#e07b2a; --green:#3ab87a; --red:#e53e3e; --blue:#5b9ce6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); }
+  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: rgba(13,13,13,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .topbar h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .2px; }
+  .topbar h1 span { display: block; font-size: 11px; color: var(--mut); font-weight: 500; }
+  .topbar .who { margin-left: auto; font-size: 12px; color: var(--mut); text-align: right; }
+  .topbar .who strong { color: var(--fg); display: block; font-size: 13px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line2); }
+  .badge.super { color: #ffd479; border-color: #6b5220; background: rgba(224,123,42,0.14); }
+  .badge.owner { color: var(--amber); border-color: #6b4520; background: rgba(224,123,42,0.10); }
+  .badge.editor { color: var(--green); border-color: #1c5b3c; background: rgba(58,184,122,0.10); }
+  .badge.viewer { color: var(--mut); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 16px; }
+  .tabs button { flex: none; border: 1px solid var(--line); background: var(--surf); color: var(--mut); border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .tabs button.on { background: var(--surf2); color: var(--fg); border-color: var(--line2); }
+  .card { background: var(--surf); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 4px; font-size: 15px; }
+  .card p.note { color: var(--mut); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
+  label.fld { display: block; font-size: 12px; color: var(--mut); margin: 0 0 4px; font-weight: 600; }
+  input, select { width: 100%; background: var(--bg); border: 1px solid var(--line2); color: var(--fg); border-radius: 10px; padding: 11px 12px; font-size: 14px; font-family: inherit; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 180px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer; background: var(--amber); color: #1a1000; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { background: rgba(255,255,255,0.08); color: var(--fg); }
+  .btn.sm { padding: 7px 11px; font-size: 12px; }
+  .btn.danger { background: rgba(229,62,62,0.14); color: #f0a0a0; }
+  .member { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .member:first-child { border-top: 0; }
+  .member .av { width: 34px; height: 34px; border-radius: 50%; background: var(--surf2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--mut); flex: none; border: 1px solid var(--line2); }
+  .member .info { flex: 1; min-width: 0; }
+  .member .info strong { display: block; font-size: 14px; }
+  .member .info span { display: block; font-size: 12px; color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member .acts { display: flex; gap: 6px; align-items: center; flex: none; }
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 60vh; text-align: center; padding: 24px; }
+  .center p { color: var(--mut); max-width: 340px; line-height: 1.5; margin: 0; }
+  .spinner { width: 30px; height: 30px; border: 3px solid var(--line2); border-top-color: var(--amber); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: #f09595; }
+  .ok { color: var(--green); }
+  .invite-out { margin-top: 14px; background: var(--bg); border: 1px dashed var(--line2); border-radius: 10px; padding: 12px; font-size: 13px; }
+  .invite-out code { display: block; word-break: break-all; color: var(--blue); margin: 6px 0 10px; font-family: var(--nd-mono, monospace); font-size: 12px; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; font-size: 12px; }
+  .kv dt { color: var(--mut); }
+  .kv dd { margin: 0; font-family: var(--nd-mono, monospace); word-break: break-all; color: var(--fg); }
+  .hint { font-size: 11px; color: var(--mut); margin-top: 6px; }
+  .banner { border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+  .banner.warn { background: rgba(224,123,42,0.12); border: 1px solid #6b4520; color: #f3b57a; }
+  .banner.info { background: rgba(91,156,230,0.10); border: 1px solid #2f5580; color: #9fc4ee; }
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><div class="spinner"></div><p>Starting the company workspace&hellip;</p></div></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================= config */
+  var cfg = (window.ND && ND.config) ? ND.config.forApp("planner") : {};
+  var MASTER_ID = cfg.masterSpreadsheetId || "1NmPyp5Ie0afzVS6VXDBSP1M1AX3EX3F7puufE5QaftQ";
+  var ROOT_NAME = cfg.driveRootFolderName || "NeillPlanner";
+  var OWNER_EMAIL = (cfg.primaryOwnerEmail || "brandon.j.neill@gmail.com").toLowerCase();
+
+  // Hardcoded super-admin: always full control on any workspace, above Owner,
+  // even if a workspace owner tags them as an employee. Not editable in-app.
+  var SUPER_ADMIN = "brandon.j.neill@gmail.com";
+
+  var MEMBERS_TAB = "Company Users";
+  var MEMBERS_HEADER = ["email", "name", "role", "status", "invited_at", "invited_by"];
+  // role -> Drive permission role
+  var DRIVE_ROLE = { owner: "writer", editor: "writer", viewer: "reader" };
+  var ROLE_LABELS = { super: "Super-admin", owner: "Owner", editor: "Editor", viewer: "Viewer" };
+
+  /* ============================================================= state */
+  var app = document.getElementById("app");
+  var me = { email: null, name: null, role: null };          // role: super|owner|editor|viewer|null
+  var ws = { rootId: null, children: {} };                    // resolved Drive workspace
+  var members = [];                                            // [{email,name,role,status,invited_at,invited_by,_row}]
+  var perms = [];                                              // Drive permissions on root
+  var ui = { tab: "members", busy: false, msg: null, invite: null };
+
+  /* ============================================================= helpers */
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+  function lc(s) { return String(s || "").trim().toLowerCase(); }
+  function initials(s) { s = String(s || "?").trim(); var p = s.split(/[\s@.]+/).filter(Boolean); return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase(); }
+  function nowStamp() { return new Date().toISOString(); }
+  function isSuper() { return me.role === "super"; }
+  function canManage() { return me.role === "super" || me.role === "owner"; }
+  function escQ(v) { return String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+  function siteRoot() { return new URL("../", location.href).href; }
+
+  /* ============================================================= Drive / Sheets */
+  async function resolveWorkspace() {
+    // Find the NeillPlanner root folder owned by the workspace owner (or me, if
+    // I am the owner / super-admin). Everyone else opens it by being shared in.
+    var iOwn = isSuper() || me.email === OWNER_EMAIL;
+    var ownerClause = iOwn ? "'me' in owners" : ("'" + escQ(OWNER_EMAIL) + "' in owners");
+    var q = "name='" + escQ(ROOT_NAME) + "' and mimeType='application/vnd.google-apps.folder' and " + ownerClause + " and trashed=false";
+    var r = await gapi.client.drive.files.list({ q: q, fields: "files(id,name,owners)", pageSize: 5 });
+    var files = (r.result.files || []);
+    if (!files.length) {
+      if (iOwn) throw new Error("No '" + ROOT_NAME + "' workspace folder found in your Drive yet. Create a job in the planner first, then reload.");
+      throw new Error("The company workspace hasn't been shared with you yet. Ask " + OWNER_EMAIL + " to invite you.");
+    }
+    ws.rootId = files[0].id;
+    // Resolve the key child folders (best-effort; used for the Workspace panel).
+    var kids = await gapi.client.drive.files.list({
+      q: "'" + ws.rootId + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+      fields: "files(id,name)", pageSize: 50
+    });
+    ws.children = {};
+    (kids.result.files || []).forEach(function (f) { ws.children[f.name] = f.id; });
+  }
+
+  async function readMembers() {
+    members = [];
+    try {
+      var r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: MASTER_ID, range: MEMBERS_TAB + "!A2:F" });
+      var rows = r.result.values || [];
+      rows.forEach(function (row, i) {
+        if (!row[0]) return;
+        members.push({ email: lc(row[0]), name: row[1] || "", role: lc(row[2]) || "viewer", status: lc(row[3]) || "active", invited_at: row[4] || "", invited_by: row[5] || "", _row: i + 2 });
+      });
+    } catch (e) {
+      // Tab likely doesn't exist yet — that's fine, we offer to create it.
+      if (!/Unable to parse range|not found/i.test(String(e && (e.result && e.result.error && e.result.error.message || e.message)))) throw e;
+      members = null; // signal "no members tab"
+    }
+  }
+
+  async function ensureMembersTab() {
+    // Add the "Company Users" tab + header to the master sheet.
+    await gapi.client.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: MASTER_ID,
+      resource: { requests: [{ addSheet: { properties: { title: MEMBERS_TAB } } }] }
+    });
+    await gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: MASTER_ID, range: MEMBERS_TAB + "!A1", valueInputOption: "RAW",
+      resource: { values: [MEMBERS_HEADER, [OWNER_EMAIL, "Owner", "owner", "active", nowStamp(), "system"]] }
+    });
+  }
+
+  async function readPerms() {
+    perms = [];
+    try {
+      var r = await gapi.client.drive.permissions.list({ fileId: ws.rootId, fields: "permissions(id,emailAddress,role,type,displayName)" });
+      perms = (r.result.permissions || []).filter(function (p) { return p.type === "user"; });
+    } catch (e) { perms = []; }
+  }
+
+  async function inviteMember(email, role, name) {
+    email = lc(email);
+    var driveRole = DRIVE_ROLE[role] || "reader";
+    // 1. Share the workspace root folder (children inherit access).
+    await gapi.client.drive.permissions.create({
+      fileId: ws.rootId,
+      resource: { type: "user", role: driveRole, emailAddress: email },
+      sendNotificationEmail: false,          // links only, no auto-emails
+      fields: "id"
+    });
+    // 2. Share the master sheet so their tools can read/write project data.
+    try {
+      await gapi.client.drive.permissions.create({
+        fileId: MASTER_ID, resource: { type: "user", role: driveRole, emailAddress: email },
+        sendNotificationEmail: false, fields: "id"
+      });
+    } catch (e) { /* may already be shared or inherited */ }
+    // 3. Record them in the Members tab.
+    var existing = (members || []).find(function (m) { return m.email === email; });
+    if (existing) {
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: MASTER_ID, range: MEMBERS_TAB + "!A" + existing._row + ":F" + existing._row, valueInputOption: "RAW",
+        resource: { values: [[email, name || existing.name, role, "active", nowStamp(), me.email]] }
+      });
+    } else {
+      await gapi.client.sheets.spreadsheets.values.append({
+        spreadsheetId: MASTER_ID, range: MEMBERS_TAB + "!A:F", valueInputOption: "RAW", insertDataOption: "INSERT_ROWS",
+        resource: { values: [[email, name || "", role, "active", nowStamp(), me.email]] }
+      });
+    }
+  }
+
+  async function revokeMember(m) {
+    // Remove Drive access + mark row revoked (keep the audit trail).
+    var p = perms.find(function (x) { return lc(x.emailAddress) === m.email; });
+    if (p) { try { await gapi.client.drive.permissions.delete({ fileId: ws.rootId, permissionId: p.id }); } catch (e) {} }
+    var pm = perms.find(function (x) { return lc(x.emailAddress) === m.email; }); // sheet perm handled separately below
+    try {
+      var sr = await gapi.client.drive.permissions.list({ fileId: MASTER_ID, fields: "permissions(id,emailAddress,type)" });
+      var sp = (sr.result.permissions || []).find(function (x) { return lc(x.emailAddress) === m.email; });
+      if (sp) await gapi.client.drive.permissions.delete({ fileId: MASTER_ID, permissionId: sp.id });
+    } catch (e) {}
+    if (m._row) {
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: MASTER_ID, range: MEMBERS_TAB + "!D" + m._row, valueInputOption: "RAW",
+        resource: { values: [["revoked"]] }
+      });
+    }
+  }
+
+  /* ============================================================= role resolution */
+  function resolveMyRole() {
+    if (me.email === lc(SUPER_ADMIN)) { me.role = "super"; return; }
+    var rec = (members || []).find(function (m) { return m.email === me.email && m.status !== "revoked"; });
+    if (rec) { me.role = rec.role; me.name = me.name || rec.name; return; }
+    if (me.email === OWNER_EMAIL) { me.role = "owner"; return; }
+    me.role = null; // not a member
+  }
+
+  /* ============================================================= render */
+  function render() {
+    if (ui.busy) { /* keep current screen; overlay handled inline */ }
+    var head = topbar();
+    if (me.role === null) { app.innerHTML = head + notMember(); return; }
+    var body;
+    if (ui.tab === "members") body = viewMembers();
+    else if (ui.tab === "invite") body = viewInvite();
+    else body = viewWorkspace();
+    app.innerHTML = head + '<div class="wrap">' + tabsBar() + body + "</div>";
+    bind();
+  }
+
+  function topbar() {
+    var b = me.role ? '<span class="badge ' + me.role + '">' + esc(ROLE_LABELS[me.role] || me.role) + "</span>" : "";
+    return '<div class="topbar"><div><h1>Company<span>Neill Data &amp; Security workspace</span></h1></div>' +
+      '<div class="who"><strong>' + esc(me.name || me.email || "") + "</strong>" + b + "</div></div>";
+  }
+
+  function tabsBar() {
+    var t = [["members", "Members"], ["invite", "Invite"], ["workspace", "Workspace"]];
+    return '<div class="tabs">' + t.map(function (x) {
+      return '<button data-tab="' + x[0] + '"' + (ui.tab === x[0] ? ' class="on"' : "") + ">" + x[1] + "</button>";
+    }).join("") + "</div>";
+  }
+
+  function msgBanner() {
+    if (!ui.msg) return "";
+    return '<div class="banner ' + (ui.msg.kind || "info") + '">' + esc(ui.msg.text) + "</div>";
+  }
+
+  function notMember() {
+    return '<div class="center"><h2 style="margin:0">You\'re not on this workspace yet</h2>' +
+      "<p>Signed in as <strong>" + esc(me.email) + "</strong>. Ask " + esc(OWNER_EMAIL) +
+      " to invite this Google account from the Company page.</p>" +
+      '<button class="btn ghost" onclick="location.reload()">Reload</button></div>';
+  }
+
+  function viewMembers() {
+    if (members === null) {
+      return msgBanner() + '<div class="card"><h2>Set up the members list</h2>' +
+        '<p class="note">This workspace doesn\'t have a members list yet. Create one to start inviting your team. It adds a "' + MEMBERS_TAB + '" tab to your master sheet.</p>' +
+        (canManage() ? '<button class="btn" data-act="init-members">Create members list</button>' : '<p class="note">Ask ' + esc(OWNER_EMAIL) + " to set this up.</p>") + "</div>";
+    }
+    var active = members.filter(function (m) { return m.status !== "revoked"; });
+    var revoked = members.filter(function (m) { return m.status === "revoked"; });
+    var rows = active.map(memberRow).join("") || '<p class="note">No members yet.</p>';
+    var revBlock = revoked.length ? '<div class="card"><h2>Revoked</h2>' + revoked.map(memberRow).join("") + "</div>" : "";
+    return msgBanner() +
+      '<div class="card"><h2>Members &middot; ' + active.length + "</h2>" +
+      '<p class="note">People invited to work on this workspace. Their uploads and edits go to <strong>your</strong> Drive across planner, uploader, search and fit-off.</p>' +
+      rows + "</div>" + revBlock;
+  }
+
+  function memberRow(m) {
+    var isMe = m.email === me.email;
+    var roleTag = '<span class="badge ' + (m.role || "viewer") + '">' + esc(ROLE_LABELS[m.role] || m.role) + "</span>";
+    var acts = "";
+    if (canManage() && !isMe && m.email !== lc(SUPER_ADMIN) && m.status !== "revoked") {
+      acts = '<button class="btn ghost sm" data-remove="' + esc(m.email) + '">Revoke</button>';
+    }
+    if (m.status === "revoked") roleTag = '<span class="badge">revoked</span>';
+    return '<div class="member"><div class="av">' + esc(initials(m.name || m.email)) + "</div>" +
+      '<div class="info"><strong>' + esc(m.name || m.email) + (isMe ? " (you)" : "") + "</strong><span>" + esc(m.email) + "</span></div>" +
+      '<div class="acts">' + roleTag + acts + "</div></div>";
+  }
+
+  function viewInvite() {
+    if (!canManage()) return '<div class="card"><p class="note">Only the owner or super-admin can invite members.</p></div>';
+    var out = "";
+    if (ui.invite) {
+      out = '<div class="invite-out"><strong class="ok">Invited ' + esc(ui.invite.email) + "</strong>" +
+        "<p style=\"margin:6px 0 2px;color:var(--mut);font-size:12px\">Send them this link. They sign in with their own Google account and land straight on the workspace:</p>" +
+        "<code>" + esc(ui.invite.link) + "</code>" +
+        '<button class="btn sm" data-copy="' + esc(ui.invite.link) + '">Copy link</button></div>';
+    }
+    return msgBanner() + '<div class="card"><h2>Invite a Google account</h2>' +
+      '<p class="note">Shares the workspace with their email (no email sent — you send the link). Editors can upload &amp; edit; Viewers are read-only (fit-off).</p>' +
+      '<div class="row"><div><label class="fld">Google email</label><input id="inv-email" type="email" placeholder="name@gmail.com" autocomplete="off" /></div>' +
+      '<div style="flex:0 0 140px"><label class="fld">Role</label><select id="inv-role"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select></div></div>' +
+      '<div style="margin-top:10px"><label class="fld">Name (optional)</label><input id="inv-name" type="text" placeholder="e.g. Jordan" /></div>' +
+      '<div style="margin-top:14px"><button class="btn" data-act="send-invite">Invite &amp; get link</button></div>' + out + "</div>";
+  }
+
+  function viewWorkspace() {
+    var kids = Object.keys(ws.children).map(function (k) { return "<dt>" + esc(k) + "</dt><dd>" + esc(ws.children[k]) + "</dd>"; }).join("");
+    return '<div class="banner info">Every tool resolves this one workspace by ID, so invited members work on the same projects instead of copies in their own Drive.</div>' +
+      '<div class="card"><h2>Workspace</h2><p class="note">Resolved from ' + esc(OWNER_EMAIL) + "'s Drive.</p>" +
+      '<dl class="kv"><dt>Root folder</dt><dd>' + esc(ROOT_NAME) + " &middot; " + esc(ws.rootId || "—") + "</dd>" +
+      "<dt>Master sheet</dt><dd>" + esc(MASTER_ID) + "</dd>" + kids + "</dl></div>" +
+      '<div class="card"><h2>Your access</h2><dl class="kv"><dt>Signed in</dt><dd>' + esc(me.email) + "</dd>" +
+      "<dt>Role</dt><dd>" + esc(ROLE_LABELS[me.role] || me.role) + "</dd></dl>" +
+      (isSuper() ? '<p class="hint">You are the hardcoded super-admin — full control on every workspace, above Owner.</p>' : "") +
+      '<div style="margin-top:12px"><button class="btn ghost sm" data-act="signout">Sign out</button></div></div>';
+  }
+
+  /* ============================================================= events */
+  function bind() {
+    app.querySelectorAll("[data-tab]").forEach(function (b) { b.addEventListener("click", function () { ui.tab = b.dataset.tab; ui.msg = null; ui.invite = null; render(); }); });
+    app.querySelectorAll("[data-remove]").forEach(function (b) { b.addEventListener("click", function () { onRevoke(b.dataset.remove); }); });
+    app.querySelectorAll("[data-copy]").forEach(function (b) { b.addEventListener("click", function () { copy(b.dataset.copy, b); }); });
+    var send = app.querySelector('[data-act="send-invite"]'); if (send) send.addEventListener("click", onInvite);
+    var init = app.querySelector('[data-act="init-members"]'); if (init) init.addEventListener("click", onInitMembers);
+    var so = app.querySelector('[data-act="signout"]'); if (so) so.addEventListener("click", function () { NDAuth.signOut(); location.reload(); });
+  }
+
+  function copy(text, btn) {
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+      var t = btn.textContent; btn.textContent = "Copied!"; setTimeout(function () { btn.textContent = t; }, 1400);
+    }).catch(function () { window.prompt("Copy this link:", text); });
+  }
+
+  function busy(on) { ui.busy = on; }
+
+  async function onInitMembers() {
+    ui.msg = { kind: "info", text: "Creating members list…" }; render();
+    try { await ensureMembersTab(); await reloadMembers(); ui.msg = { kind: "info", text: "Members list ready." }; }
+    catch (e) { ui.msg = { kind: "warn", text: "Couldn't create it: " + errText(e) }; }
+    render();
+  }
+
+  async function onInvite() {
+    var email = lc((document.getElementById("inv-email") || {}).value);
+    var role = ((document.getElementById("inv-role") || {}).value) || "editor";
+    var name = ((document.getElementById("inv-name") || {}).value) || "";
+    ui.invite = null;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { ui.msg = { kind: "warn", text: "Enter a valid Google email." }; render(); return; }
+    ui.msg = { kind: "info", text: "Sharing workspace with " + email + "…" }; render();
+    try {
+      await inviteMember(email, role, name);
+      await reloadMembers();
+      ui.invite = { email: email, link: siteRoot() };
+      ui.msg = { kind: "info", text: email + " now has access as " + (ROLE_LABELS[role] || role) + "." };
+    } catch (e) { ui.msg = { kind: "warn", text: "Invite failed: " + errText(e) }; }
+    render();
+  }
+
+  async function onRevoke(email) {
+    var m = (members || []).find(function (x) { return x.email === lc(email); });
+    if (!m) return;
+    ui.msg = { kind: "info", text: "Revoking " + m.email + "…" }; render();
+    try { await revokeMember(m); await reloadMembers(); ui.msg = { kind: "info", text: m.email + " revoked." }; }
+    catch (e) { ui.msg = { kind: "warn", text: "Revoke failed: " + errText(e) }; }
+    render();
+  }
+
+  async function reloadMembers() { await readMembers(); await readPerms(); resolveMyRole(); }
+
+  function errText(e) { return (e && (e.result && e.result.error && e.result.error.message)) || (e && e.message) || String(e); }
+
+  /* ============================================================= boot */
+  function screen(msg, btn) { app.innerHTML = '<div class="center">' + msg + (btn || "") + "</div>"; }
+  var retry = '<button class="btn ghost" onclick="location.reload()">Retry</button>';
+  function fail(msg) { screen('<p class="err">' + esc(msg) + "</p>", retry); }
+
+  async function loadGapi() {
+    await new Promise(function (r, j) { gapi.load("client", { callback: r, onerror: j }); });
+    await gapi.client.init({
+      apiKey: cfg.googleApiKey,
+      discoveryDocs: [
+        "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
+        "https://sheets.googleapis.com/$discovery/rest?version=v4"
+      ]
+    });
+    gapi.client.setToken({ access_token: NDAuth.getToken() });
+  }
+
+  async function startFlow() {
+    screen('<div class="spinner"></div><p>Loading your workspace&hellip;</p>');
+    try {
+      me.email = lc(NDAuth.getEmail());
+      var pr = NDAuth.getProfile(); if (pr) me.name = pr.name || pr.given_name || null;
+      if (!me.email) throw new Error("Couldn't read your Google account email. Reload and sign in again.");
+      await loadGapi();
+      // provisional role so resolveWorkspace picks the right owner clause
+      me.role = (me.email === lc(SUPER_ADMIN)) ? "super" : (me.email === OWNER_EMAIL ? "owner" : "viewer");
+      await resolveWorkspace();
+      await readMembers();
+      await readPerms();
+      resolveMyRole();
+      render();
+    } catch (e) {
+      fail(errText(e));
+    }
+  }
+
+  function showSignIn() {
+    screen("<h2 style=\"margin:0\">Company workspace</h2><p>Sign in with your Neill Google account to manage or join the team.</p>",
+      '<button class="btn" id="signin">Sign in with Google</button>');
+    var b = document.getElementById("signin");
+    if (b) b.addEventListener("click", function () {
+      NDAuth.ensureToken({ interactive: true }).catch(function (e) { fail("Sign-in failed: " + errText(e)); });
+    });
+  }
+
+  function waitForGis(cb, tries) {
+    if (window.google && google.accounts && google.accounts.oauth2 && window.gapi) return cb();
+    if ((tries || 0) > 120) return cb(new Error("Google libraries didn't load. Check your connection and retry."));
+    setTimeout(function () { waitForGis(cb, (tries || 0) + 1); }, 100);
+  }
+
+  function boot() {
+    if (!window.NDAuth) return fail("Auth module failed to load.");
+    try { NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes }); }
+    catch (e) { return fail("Auth init failed: " + errText(e)); }
+    var settled = false;
+    NDAuth.onAuthChange(function () {
+      if (!settled && NDAuth.isSignedIn && NDAuth.isSignedIn()) { settled = true; startFlow(); }
+    });
+    var safety = setTimeout(function () { if (!settled) showSignIn(); }, 12000);
+    NDAuth.ensureToken()
+      .then(function () { if (!settled) { settled = true; clearTimeout(safety); startFlow(); } })
+      .catch(function () { if (!settled) { settled = true; clearTimeout(safety); showSignIn(); } });
+  }
+
+  waitForGis(function (err) { if (err) fail(err.message); else boot(); });
+})();
+</script>
+</body>
+</html>

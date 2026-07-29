@@ -1875,6 +1875,26 @@ async function fetchDriveFileAsDataUrl(fileId) {
   return `data:${mime};base64,${arrayBufferToBase64(arr.buffer)}`;
 }
 
+// #37 — Drive thumbnail URLs need Google session cookies this app doesn't have,
+// so photo tiles 403 and never load. Instead fetch the bytes with our OAuth
+// token and swap them in. Cache per fileId so re-renders don't refetch.
+const driveImgCache = new Map();
+async function hydrateDriveImages() {
+  if (!isTokenValid()) return;
+  const imgs = document.querySelectorAll("img[data-fileid]:not([data-hydrated])");
+  for (const img of imgs) {
+    const id = img.getAttribute("data-fileid");
+    img.dataset.hydrated = "1";
+    if (!id) continue;
+    if (driveImgCache.has(id)) { img.src = driveImgCache.get(id); continue; }
+    try {
+      const url = await fetchDriveFileAsDataUrl(id);
+      if (url) { driveImgCache.set(id, url); if (img.isConnected) img.src = url; }
+      else img.classList.add("img-failed");
+    } catch (e) { img.classList.add("img-failed"); }
+  }
+}
+
 function auditRowToValues(r) {
   return [r.timestamp || nowStamp(), r.user || "", r.action || "", r.projectId || "", r.projectName || "", r.folderName || "", r.floorName || "", r.nodeId || "", r.nodeTitle || "", r.category || "", r.status || "", r.details || "", r.device || detectDevice()];
 }
@@ -1990,6 +2010,7 @@ function render() {
   document.body.classList.toggle("np-overlay", !!((state.drawerOpen && selectedNode()) || state.modal || state.lightbox));
   bindEvents();
   applyCanvasTransform();
+  hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
 }
 
 function renderLoginGate() {
@@ -2834,7 +2855,7 @@ function renderDrawer(node) {
         <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
-        <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => { const did = image.driveFileId || image.id || ""; const tsrc = image.thumbnailLink || driveThumb(did, 400); return `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${tsrc ? `<img src="${escapeHtml(tsrc)}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${driveThumb(did, 400)}'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`; }).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
+        <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => { const did = image.driveFileId || image.id || ""; const tsrc = image.thumbnailLink || driveThumb(did, 400); return `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${(tsrc || did) ? `<img ${did ? `data-fileid="${escapeHtml(did)}"` : ""} src="${escapeHtml(tsrc || "")}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`; }).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
         <div><h3 class="section-title">Comments</h3><div class="comments-list">${node.comments.length ? node.comments.map((c) => `<article class="comment"><span class="comment-meta">${escapeHtml(c.author)} / ${escapeHtml(c.time)}</span><p>${escapeHtml(c.text)}</p></article>`).join("") : `<div class="empty-state">No comments</div>`}</div><div class="comment-input" style="margin-top:10px"><input data-comment-input="${node.id}" placeholder="@mention or comment" aria-label="Add comment" /><button class="icon-button" data-action="send-comment" aria-label="Send">${icon("arrowRight")}</button></div></div>
         ` : `<div class="info-grid"><div class="info-box"><span>Linked destination</span><strong>${escapeHtml(linkedLabel || "(missing)")}</strong></div><div class="info-box"><span>Current room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div><p style="margin-top:14px;color:rgba(255,255,255,.7)">This is a door / stairs / link node. Walk through to the linked floor or room. Both sides have a matching portal that updates together.</p>`}
       </div>
@@ -3005,13 +3026,13 @@ function renderHelpModal() {
 function renderLightbox() {
   const node = selectedNode(); if (!node) return "";
   const image = node.imageRefs[state.lightbox.index]; if (!image) return "";
-  return `<div class="lightbox-backdrop" data-action="close-lightbox"></div><div class="lightbox" role="dialog"><div class="lightbox-header"><div><h3>${escapeHtml(image.name)}</h3><p>${escapeHtml(image.uploader || "")} / ${escapeHtml(image.uploadedAt || "")}</p></div><div class="lightbox-actions">${image.webViewLink ? `<a class="icon-button" href="${escapeHtml(image.webViewLink)}" target="_blank" rel="noopener" aria-label="Open in Drive">${icon("link")}</a>` : ""}<button class="icon-button" data-action="prev-image" aria-label="Previous">${icon("arrowLeft")}</button><button class="icon-button" data-action="next-image" aria-label="Next">${icon("arrowRight")}</button><button class="icon-button" data-action="close-lightbox" aria-label="Close">${icon("close")}</button></div></div><div class="lightbox-stage">${(image.thumbnailLink || image.driveFileId || image.id) ? `<img src="${escapeHtml(image.thumbnailLink ? image.thumbnailLink.replace(/=s\d+(-c)?$/, "=s1600") : driveThumb(image.driveFileId || image.id, 1600))}" alt="${escapeHtml(image.name)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${driveThumb(image.driveFileId || image.id, 1600)}'" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" />` : `<div class="lightbox-image" style="--thumb:linear-gradient(135deg,#1e293b,#334155)"></div>`}</div></div>`;
+  return `<div class="lightbox-backdrop" data-action="close-lightbox"></div><div class="lightbox" role="dialog"><div class="lightbox-header"><div><h3>${escapeHtml(image.name)}</h3><p>${escapeHtml(image.uploader || "")} / ${escapeHtml(image.uploadedAt || "")}</p></div><div class="lightbox-actions">${image.webViewLink ? `<a class="icon-button" href="${escapeHtml(image.webViewLink)}" target="_blank" rel="noopener" aria-label="Open in Drive">${icon("link")}</a>` : ""}<button class="icon-button" data-action="prev-image" aria-label="Previous">${icon("arrowLeft")}</button><button class="icon-button" data-action="next-image" aria-label="Next">${icon("arrowRight")}</button><button class="icon-button" data-action="close-lightbox" aria-label="Close">${icon("close")}</button></div></div><div class="lightbox-stage">${(image.thumbnailLink || image.driveFileId || image.id) ? `<img ${(image.driveFileId || image.id) ? `data-fileid="${escapeHtml(image.driveFileId || image.id)}"` : ""} src="${escapeHtml(image.thumbnailLink ? image.thumbnailLink.replace(/=s\d+(-c)?$/, "=s1600") : "")}" alt="${escapeHtml(image.name)}" referrerpolicy="no-referrer" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" />` : `<div class="lightbox-image" style="--thumb:linear-gradient(135deg,#1e293b,#334155)"></div>`}</div></div>`;
 }
 
 function renderBulkPhotoPickerModal() {
   const node = selectedNode(); if (!node) return "";
   const available = state.bulkPhotos.filter((p) => (p.status || "Inbox") !== "Allocated");
-  return `<div class="modal-backdrop" data-action="close-modal"></div><div class="modal bulk-photo-modal" role="dialog"><div class="modal-header"><div><h3>Pick bulk photo</h3><p>Allocate an inbox photo to ${escapeHtml(nodeDisplayTitle(node))}</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body">${available.length ? `<div class="bulk-photo-grid">${available.map((p) => `<button class="bulk-photo-tile" data-bulk-photo-assign="${escapeHtml(p.id)}">${p.thumbnailLink ? `<img src="${escapeHtml(p.thumbnailLink)}" alt="${escapeHtml(p.name)}" referrerpolicy="no-referrer" loading="lazy" />` : `<span class="bulk-photo-empty">${icon("upload")}</span>`}<strong>${escapeHtml(p.name || p.driveFileId)}</strong><span>${escapeHtml(p.uploadedAt || "")}</span></button>`).join("")}</div>` : `<div class="empty-state">No unallocated bulk photos. Upload a batch from Settings.</div>`}</div><div class="modal-actions"><button type="button" class="ghost-button" data-action="refresh-bulk-photos">${icon("refresh")}Refresh</button><button type="button" class="ghost-button" data-action="close-modal">Close</button></div></div>`;
+  return `<div class="modal-backdrop" data-action="close-modal"></div><div class="modal bulk-photo-modal" role="dialog"><div class="modal-header"><div><h3>Pick bulk photo</h3><p>Allocate an inbox photo to ${escapeHtml(nodeDisplayTitle(node))}</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body">${available.length ? `<div class="bulk-photo-grid">${available.map((p) => `<button class="bulk-photo-tile" data-bulk-photo-assign="${escapeHtml(p.id)}">${(p.thumbnailLink || p.driveFileId || p.id) ? `<img ${(p.driveFileId || p.id) ? `data-fileid="${escapeHtml(p.driveFileId || p.id)}"` : ""} src="${escapeHtml(p.thumbnailLink || "")}" alt="${escapeHtml(p.name)}" referrerpolicy="no-referrer" loading="lazy" />` : `<span class="bulk-photo-empty">${icon("upload")}</span>`}<strong>${escapeHtml(p.name || p.driveFileId)}</strong><span>${escapeHtml(p.uploadedAt || "")}</span></button>`).join("")}</div>` : `<div class="empty-state">No unallocated bulk photos. Upload a batch from Settings.</div>`}</div><div class="modal-actions"><button type="button" class="ghost-button" data-action="refresh-bulk-photos">${icon("refresh")}Refresh</button><button type="button" class="ghost-button" data-action="close-modal">Close</button></div></div>`;
 }
 
 /* ============================================================ EVENTS */
@@ -4445,7 +4466,7 @@ function renderSortTrayModal(m) {
       <div class="nd-tray-grid">
         ${recs.length ? recs.map((r) => `
           <div class="nd-tray-card">
-            ${r.thumbnailLink ? `<img src="${escapeHtml(r.thumbnailLink)}" alt="" loading="lazy" />` : `<div class="nd-tray-noimg">${icon("map")}</div>`}
+            ${(r.thumbnailLink || r.driveFileId) ? `<img ${r.driveFileId ? `data-fileid="${escapeHtml(r.driveFileId)}"` : ""} src="${escapeHtml(r.thumbnailLink || "")}" alt="" loading="lazy" />` : `<div class="nd-tray-noimg">${icon("map")}</div>`}
             <div class="nd-tray-meta">
               <strong title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</strong>
               ${(r.room || r.location) ? `<span class="mini-chip">${escapeHtml(r.room || r.location)}</span>` : ""}

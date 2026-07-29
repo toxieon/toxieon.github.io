@@ -67,7 +67,8 @@
     isFloorPlan: "Is Floor Plan", projectId: "Project ID", floorId: "Floor ID",
     nodeId: "Node ID", uploader: "Uploader", uploadedAt: "Uploaded At",
     capturedAt: "Captured At", mimeType: "Mime Type", webViewLink: "Web View Link",
-    thumbnailLink: "Thumbnail Link", contentHash: "Content Hash", notes: "Notes"
+    thumbnailLink: "Thumbnail Link", contentHash: "Content Hash", notes: "Notes",
+    apartment: "Apartment"
   };
 
   function round5(n) {
@@ -112,7 +113,7 @@
   /* v1.0 §5.2 — Drive appProperties (source of truth if a sheet row is lost).
    * Drive limits appProperties values to short strings; keep them compact. */
   const APP_PROP_FIELDS = ["addressKey", "address", "addressSource", "type", "room",
-    "location", "isFloorPlan", "projectId", "floorId", "nodeId", "contentHash", "capturedAt"];
+    "location", "apartment", "isFloorPlan", "projectId", "floorId", "nodeId", "contentHash", "capturedAt"];
   function toAppProperties(rec, source) {
     const props = { source: source || "nd-upload" };
     APP_PROP_FIELDS.forEach(function (f) {

@@ -187,14 +187,19 @@ textarea { resize: vertical; min-height: 70px; }
 .visit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.88rem; }
 .visit-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visit-row select { flex: none; }
-.visit-summary { margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-.visit-sum { display: flex; align-items: center; gap: 10px; }
+.visit-summary { margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.visit-sum { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); background: rgba(0,0,0,0.15); transition: background 0.12s, border-color 0.12s; }
+.visit-sum.is-inc { background: rgba(106,255,184,0.08); border-color: rgba(106,255,184,0.32); }
 .visit-sum span { flex: 1; color: var(--muted); }
+.visit-sum.is-inc span { color: var(--text); }
 .visit-sum b { font-size: 1rem; }
-.visit-pdf { border-top: 1px solid var(--card-border); margin-top: 12px; padding-top: 4px; }
-.visit-inc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; }
-.visit-inc { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; }
+.visit-inc-chk { flex: none; display: inline-flex; margin: 0; }
+.visit-inc-chk input { width: 18px; height: 18px; }
+.visit-pdf { border-top: 1px solid var(--card-border); margin-top: 12px; padding-top: 10px; }
+.visit-pdf-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.86rem; color: var(--muted); padding: 3px 0; }
+.visit-pdf-line b { color: var(--text); font-size: 0.92rem; }
 .visit-total-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; cursor: pointer; color: var(--muted); }
+.visit-total-toggle input { width: auto; }
 .merge-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
 .merge-row:last-child { border-bottom: 0; }
 .merge-row input { flex: none; width: 18px; height: 18px; }
@@ -202,6 +207,10 @@ textarea { resize: vertical; min-height: 70px; }
 .merge-main b { font-size: 0.9rem; }
 .merge-main span { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .merge-total { font-weight: 800; font-size: 0.9rem; }
+.merge-suggest { border-bottom: 1px solid var(--card-border); }
+.merge-sugg-card { border: 1px solid rgba(255,209,102,0.3); background: rgba(255,209,102,0.06); border-radius: var(--radius-sm); padding: 10px 12px; margin: 8px; }
+.merge-sugg-title { font-size: 0.78rem; font-weight: 800; color: var(--warning); margin-bottom: 6px; }
+.merge-sugg-row { font-size: 0.82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .total-row.grand { font-size: 1.4rem; padding-top: 14px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); color: var(--text); font-weight: 900; }
 .total-row.grand b { color: var(--brand-2); }
 .totals-card.cash-mode .total-row.grand b { color: var(--cash); }
@@ -2200,19 +2209,28 @@ function renderVisitPanel() {
   const lineRows = lines.length
     ? lines.map(l => `<div class="visit-row"><span>${escapeHtml(l.label)}</span><select class="visit-assign" data-key="${escapeHtml(l.key)}">${optsFor(visitOf(l.key))}</select></div>`).join('')
     : '<div class="panel-sub">Add some line items first.</div>';
+  const inc = includedVisits();
   let summary = '';
   for (let i = 1; i <= n; i++) {
     const t = calcQuote(quoteForVisit(currentQuote, i));
-    summary += `<div class="visit-sum"><span>Invoice ${i}</span><b>${fmt(t.grand)}</b><button type="button" class="btn btn-secondary" data-copy-visit="${i}" style="padding:4px 12px;font-size:0.8rem;">Copy</button></div>`;
+    const on = inc.has(i);
+    summary += `<div class="visit-sum ${on ? 'is-inc' : ''}">
+      <label class="visit-inc-chk" title="Include in PDF"><input type="checkbox" class="visit-include" data-v="${i}" ${on ? 'checked' : ''}></label>
+      <span>Invoice ${i}</span>
+      <b>${fmt(t.grand)}</b>
+      <button type="button" class="btn btn-secondary" data-copy-visit="${i}" style="padding:4px 12px;font-size:0.8rem;">Copy</button>
+    </div>`;
   }
-  const inc = includedVisits();
-  const incBoxes = Array.from({ length: n }, (_, i) => { const v = i + 1; return `<label class="visit-inc"><input type="checkbox" class="visit-include" data-v="${v}" ${inc.has(v) ? 'checked' : ''}> Invoice ${v}</label>`; }).join('');
+  const incArr = [...inc].sort((a, b) => a - b);
+  const incTotal = calcQuote(quoteForVisits(currentQuote, inc)).grand;
+  const incLabel = incArr.length === 0 ? 'None ticked' : (incArr.length === n ? 'All invoices' : 'Invoice ' + incArr.join(', '));
   body.innerHTML = `<div class="visit-count-row"><label style="margin:0;">Number of invoices</label><input id="visit-count" type="number" min="2" max="6" value="${n}" style="width:70px;" /></div>
+    <div class="panel-sub" style="margin:2px 0 6px;">Assign each line to an invoice</div>
     <div class="visit-lines">${lineRows}</div>
-    <div class="visit-summary">${summary}</div>
+    <div class="visit-summary"><div class="panel-sub" style="margin:0 0 2px;">Tick which invoices go in the PDF / export</div>${summary}</div>
     <div class="visit-pdf">
-      <div class="panel-sub" style="margin:12px 0 6px;">Include in the PDF / export:</div>
-      <div class="visit-inc-row">${incBoxes}</div>
+      <div class="visit-pdf-line"><span>PDF includes</span><b>${escapeHtml(incLabel)}</b></div>
+      <div class="visit-pdf-line"><span>Ticked total</span><b>${fmt(incTotal)}</b></div>
       <label class="visit-total-toggle"><input type="checkbox" id="visit-total-only" ${currentQuote.visitTotalOnly ? 'checked' : ''}> Running total shows ticked invoices only</label>
     </div>`;
   const cnt = body.querySelector('#visit-count');
@@ -2224,7 +2242,7 @@ function renderVisitPanel() {
     let arr = Array.isArray(currentQuote.visitInclude) ? currentQuote.visitInclude.slice() : Array.from({ length: n }, (_, i) => i + 1);
     if (cb.checked) { if (!arr.includes(v)) arr.push(v); } else { arr = arr.filter(x => x !== v); }
     currentQuote.visitInclude = arr;
-    renderTotals(); scheduleDraftSave();
+    renderVisitPanel(); renderTotals(); scheduleDraftSave();
   });
   const tot = body.querySelector('#visit-total-only');
   if (tot) tot.onchange = () => { currentQuote.visitTotalOnly = tot.checked; renderTotals(); scheduleDraftSave(); };
@@ -4477,6 +4495,27 @@ function showMasterCards() {
  * Duplicate line items sum quantities; labour/materials/photos concat. The
  * originals are untouched. */
 let mergeSel = new Set();
+const mergeSuggestDismissed = new Set();
+
+/* Cluster likely-duplicate quotes by same client name or same address. */
+function mergeSuggestions() {
+  const qs = (history || []).slice();
+  const akey = q => (window.NDMatch && NDMatch.addressKey) ? NDMatch.addressKey(q.client?.address || '') : String(q.client?.address || '').trim().toLowerCase();
+  const nkey = q => String(q.client?.name || '').trim().toLowerCase();
+  const used = new Set(); const groups = [];
+  for (let i = 0; i < qs.length; i++) {
+    if (used.has(qs[i].id)) continue;
+    const a = qs[i], ak = akey(a), nk = nkey(a); const group = [a];
+    for (let k = i + 1; k < qs.length; k++) {
+      const b = qs[k]; if (used.has(b.id)) continue;
+      if ((ak && akey(b) === ak) || (nk && nkey(b) === nk)) { group.push(b); used.add(b.id); }
+    }
+    if (group.length > 1) { used.add(a.id); groups.push(group); }
+  }
+  return groups;
+}
+function suggestKey(g) { return g.map(x => x.id).slice().sort().join('|'); }
+
 function renderMergeList() {
   const list = document.getElementById('merge-list'); if (!list) return;
   const search = document.getElementById('merge-search');
@@ -4486,15 +4525,32 @@ function renderMergeList() {
   const clr = document.getElementById('merge-clear');
   if (clr && !clr._mBound) { clr._mBound = true; clr.addEventListener('click', () => { mergeSel.clear(); renderMergeList(); }); }
   const term = ((search || {}).value || '').trim().toLowerCase();
+  // Auto-suggested duplicate groups (hidden while searching).
+  const suggests = term ? [] : mergeSuggestions().filter(g => !mergeSuggestDismissed.has(suggestKey(g)));
+  const suggestHtml = suggests.length ? `<div class="merge-suggest">${suggests.map(g => `
+      <div class="merge-sugg-card">
+        <div class="merge-sugg-title">Possible duplicate &middot; ${g.length} quotes</div>
+        ${g.map(q => `<div class="merge-sugg-row">${escapeHtml(q.client?.name || 'Unnamed')} &middot; ${escapeHtml(q.client?.address || 'No address')}</div>`).join('')}
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-secondary" data-suggest-sel="${escapeAttr(g.map(x => x.id).join(','))}" style="padding:5px 12px;font-size:0.8rem;">Select these</button>
+          <button class="btn btn-utility" data-suggest-dismiss="${escapeAttr(suggestKey(g))}" style="padding:5px 12px;font-size:0.8rem;">Not duplicates</button>
+        </div>
+      </div>`).join('')}</div>` : '';
   let quotes = (history || []).slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   if (term) quotes = quotes.filter(q => `${q.client?.name || ''} ${q.client?.address || ''} ${q.id || ''}`.toLowerCase().includes(term));
-  list.innerHTML = quotes.length
+  list.innerHTML = suggestHtml + (quotes.length
     ? quotes.map(q => {
         const total = calcQuote(q).grand;
         const date = q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
         return `<label class="merge-row"><input type="checkbox" data-merge-id="${escapeAttr(q.id)}" ${mergeSel.has(q.id) ? 'checked' : ''}><span class="merge-main"><b>${escapeHtml(q.client?.name || 'Unnamed')}</b><span>${escapeHtml(q.client?.address || 'No address')} &middot; ${escapeHtml(date)}</span></span><span class="merge-total">${fmt(total)}</span></label>`;
       }).join('')
-    : '<div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">No quotes.</div>';
+    : '<div style="padding:14px;color:var(--muted);font-size:0.85rem;text-align:center;">No quotes.</div>');
+  list.querySelectorAll('[data-suggest-sel]').forEach(b => b.onclick = () => {
+    mergeSel = new Set(b.dataset.suggestSel.split(',').filter(Boolean));
+    renderMergeList();
+    if (go) go.disabled = mergeSel.size < 2;
+  });
+  list.querySelectorAll('[data-suggest-dismiss]').forEach(b => b.onclick = () => { mergeSuggestDismissed.add(b.dataset.suggestDismiss); renderMergeList(); });
   list.querySelectorAll('[data-merge-id]').forEach(cb => cb.onchange = e => {
     const id = e.target.dataset.mergeId;
     if (e.target.checked) mergeSel.add(id); else mergeSel.delete(id);
@@ -4502,14 +4558,81 @@ function renderMergeList() {
   });
   if (go) go.disabled = mergeSel.size < 2;
 }
+function quoteLabel(q) { return (q.client && q.client.name) || q.id || 'quote'; }
+function quoteDateStr(q) { return q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
+function firstNonEmptyClient(quotes, key) { for (const q of quotes) { const v = String((q.client || {})[key] || '').trim(); if (v) return v; } return ''; }
+
+/* Which client details (and GST) differ across the quotes being merged. */
+const QUOTE_CONFLICT_FIELDS = [['name', 'Client name'], ['phone', 'Phone'], ['address', 'Address']];
+function quoteConflicts(quotes) {
+  const out = [];
+  QUOTE_CONFLICT_FIELDS.forEach(([key, label]) => {
+    const vals = [...new Set(quotes.map(q => String((q.client || {})[key] || '').trim()).filter(Boolean))];
+    if (vals.length > 1) out.push({ key, label, values: vals });
+  });
+  const gstVals = [...new Set(quotes.map(q => !!q.gst))];
+  if (gstVals.length > 1) out.push({ key: 'gst', label: 'GST', gst: true, values: ['Include GST', 'No GST'] });
+  return out;
+}
+
 function mergeQuotes() {
   const quotes = Array.from(mergeSel).map(id => (history || []).find(q => q.id === id)).filter(Boolean);
   if (quotes.length < 2) return;
-  if (!confirm(`Merge ${quotes.length} quotes into one new quote? The originals stay as they are.`)) return;
+  const conflicts = quoteConflicts(quotes);
+  if (!conflicts.length) {
+    if (!confirm(`Merge ${quotes.length} quotes into one new quote? The originals stay as they are.`)) return;
+    performMerge(quotes, null, null);
+    return;
+  }
+  openMergeConflictModal(quotes, conflicts);
+}
+
+function openMergeConflictModal(quotes, conflicts) {
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const rows = conflicts.map((c, ci) => {
+    const cur = c.gst ? null : firstNonEmptyClient(quotes, c.key);
+    return `<div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:var(--muted);font-weight:800;margin-bottom:6px;">${escapeHtml(c.label)}</div>
+      ${c.values.map((v, vi) => `<label style="display:flex;gap:8px;align-items:center;margin-bottom:5px;font-size:0.9rem;cursor:pointer;"><input type="radio" name="qc-${ci}" value="${vi}" ${(!c.gst && v === cur) || vi === 0 ? 'checked' : ''} style="width:auto;"> ${escapeHtml(v)}</label>`).join('')}
+    </div>`;
+  }).join('');
+  back.innerHTML = `<div class="card" style="max-width:440px;width:100%;margin:0;max-height:86vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;">Confirm merged details</h3>
+    <p class="panel-sub" style="margin:0 0 14px;">These quotes have different details. Pick what the new merged quote should keep.</p>
+    ${rows}
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-primary" data-qc-go type="button">Merge ${quotes.length} quotes</button>
+      <button class="btn btn-utility" data-qc-cancel type="button">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  const close = () => back.remove();
+  back.addEventListener('click', e => { if (e.target === back) close(); });
+  back.querySelector('[data-qc-cancel]').addEventListener('click', close);
+  back.querySelector('[data-qc-go]').addEventListener('click', () => {
+    const client = {}; let gst = null;
+    conflicts.forEach((c, ci) => {
+      const sel = back.querySelector(`input[name="qc-${ci}"]:checked`);
+      const idx = sel ? +sel.value : 0;
+      if (c.gst) gst = idx === 0;            // index 0 = "Include GST"
+      else client[c.key] = c.values[idx];
+    });
+    ['name', 'phone', 'address'].forEach(k => { if (client[k] == null) client[k] = firstNonEmptyClient(quotes, k); });
+    close();
+    performMerge(quotes, client, gst);
+  });
+}
+
+function performMerge(quotes, client, gst) {
   const merged = blankQuote();
-  merged.client = { name: '', phone: '', address: '', ...(quotes[0].client || {}) };
-  merged.notes = quotes.map(q => q.notes).filter(Boolean).join('\n— — —\n');
-  merged.gst = !!quotes[0].gst;
+  merged.client = { name: '', phone: '', address: '', ...(client || quotes[0].client || {}) };
+  merged.gst = gst != null ? !!gst : !!quotes[0].gst;
+  // Stack each source quote's notes under a labelled header (§42).
+  merged.notes = quotes.map(q => {
+    const header = `— Imported from ${quoteLabel(q)}${quoteDateStr(q) ? ' (' + quoteDateStr(q) + ')' : ''} —`;
+    return (q.notes && String(q.notes).trim()) ? `${header}\n${String(q.notes).trim()}` : header;
+  }).join('\n\n');
   quotes.forEach(q => {
     Object.entries(q.itemQty || {}).forEach(([k, v]) => { merged.itemQty[k] = (Number(merged.itemQty[k]) || 0) + (Number(v) || 0); });
     (q.customLines || []).forEach(c => merged.customLines.push(JSON.parse(JSON.stringify(c))));

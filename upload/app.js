@@ -11,7 +11,7 @@ const SHEET_TAB_NAME = "Uploads";
  * photo as it uploads. Uploader has no separate apartment/business field, so
  * those stay off; room already carries "Apt 4 / Room 2". */
 const WM_TOGGLE_KEY = "nd-upload-watermark-v1";
-const WM_DEFAULTS = { address: true, room: true, location: true, datetime: true, initials: true };
+const WM_DEFAULTS = { address: true, room: true, location: true, apartment: true, datetime: true, initials: true };
 function loadWmToggles() { try { return Object.assign({}, WM_DEFAULTS, JSON.parse(localStorage.getItem(WM_TOGGLE_KEY) || "{}")); } catch (e) { return Object.assign({}, WM_DEFAULTS); } }
 let wmToggles = loadWmToggles();
 function saveWmToggles() { try { localStorage.setItem(WM_TOGGLE_KEY, JSON.stringify(wmToggles)); } catch (e) {} }
@@ -34,12 +34,15 @@ async function watermarkFileFor(item) {
       address: (item.address || "").trim(),
       room: (item.room || "").trim(),
       location: (item.location || "").trim(),
+      apartment: (item.apartment || "").trim(),
       initials: uploaderInitials(),
       datetime: item.capturedAt ? new Date(item.capturedAt) : true
     };
-    const lines = NDWatermark.buildLines(data, Object.assign({ business: false, apartment: false, clientName: false, ref: false, gps: false }, wmToggles));
+    const lines = NDWatermark.buildLines(data, Object.assign({ business: false, clientName: false, ref: false, gps: false }, wmToggles));
     if (!lines.length) return item.file;
-    const bitmap = await createImageBitmap(f);
+    // {imageOrientation:'from-image'} bakes EXIF rotation into the bitmap — without
+    // it, portrait phone photos come out sideways once we re-encode them (regression).
+    const bitmap = await createImageBitmap(f, { imageOrientation: "from-image" });
     const dataUrl = NDWatermark.stamp(bitmap, { lines, maxDim: 2400, jpegQ: 0.85 });
     if (bitmap.close) bitmap.close();
     const blob = await (await fetch(dataUrl)).blob();
@@ -67,7 +70,8 @@ const SHEET_HEADER = [
   "Status",
   "Duplicate Match File ID",
   "Duplicate Match Link",
-  "Content SHA-256"
+  "Content SHA-256",
+  "Apartment"
 ];
 const TERMS_HEADER = [
   "Timestamp",
@@ -100,8 +104,8 @@ const state = {
    * value is the batch default and rows inherit (greyed). Toggling OFF
    * makes that field per-image editable. */
   header: {
-    values: { type: "", address: "", room: "", location: "" },
-    apply: { type: true, address: true, room: true, location: true },
+    values: { type: "", address: "", room: "", location: "", apartment: "" },
+    apply: { type: true, address: true, room: true, location: true, apartment: true },
     detectedAddress: false
   },
   invalid: {},
@@ -308,8 +312,9 @@ function renderDetails() {
           <div>File</div>
           <div class="head-cell">Type <button type="button" class="copy-button" data-copy-field="type">${icon("copy")}Copy to all</button></div>
           <div class="head-cell">Address <button type="button" class="copy-button" data-copy-field="address">${icon("copy")}Copy to all</button></div>
+          <div class="head-cell">Floor <button type="button" class="copy-button" data-copy-field="location">${icon("copy")}Copy to all</button></div>
+          <div class="head-cell">Apartment <button type="button" class="copy-button" data-copy-field="apartment">${icon("copy")}Copy to all</button></div>
           <div class="head-cell">Room <button type="button" class="copy-button" data-copy-field="room">${icon("copy")}Copy to all</button></div>
-          <div class="head-cell">Location <button type="button" class="copy-button" data-copy-field="location">${icon("copy")}Copy to all</button></div>
         </div>
         <div class="file-list">
           ${state.items.map(renderFileRow).join("")}
@@ -325,7 +330,7 @@ function renderDetails() {
 
 function renderStickyHeader() {
   const h = state.header;
-  const fieldDefs = [["address", "Address", "12 Sample Street"], ["type", "Type", "Thermostat"], ["room", "Room", "Apt 4 / Room 2"], ["location", "Location", "Level 3 / North side"]];
+  const fieldDefs = [["address", "Address", "12 Sample Street"], ["type", "Type", "Thermostat"], ["location", "Floor", "Ground / Level 3"], ["apartment", "Apartment", "Apt 4 / Unit 2"], ["room", "Room", "Room 2 / Kitchen"]];
   return `
     <div class="sticky-header" data-sticky-header>
       <div class="sticky-header-title">
@@ -355,7 +360,7 @@ function renderStickyHeader() {
 }
 
 function renderWatermarkPanel() {
-  const fields = [["address", "Address"], ["room", "Room"], ["location", "Location"], ["datetime", "Date & time"], ["initials", "Initials"]];
+  const fields = [["address", "Address"], ["location", "Floor"], ["apartment", "Apartment"], ["room", "Room"], ["datetime", "Date & time"], ["initials", "Initials"]];
   const inits = uploaderInitials();
   return `
     <div class="watermark-panel">
@@ -375,13 +380,14 @@ function renderBatchTools() {
     <div class="batch-tools">
       <div class="batch-tools-title">
         <strong>Batch fill</strong>
-        <span>Type, address, room, location</span>
+        <span>Type, address, floor, apartment, room</span>
       </div>
       <div class="batch-actions">
         <button type="button" class="copy-button" data-copy-field="type">${icon("copy")}Type to all</button>
         <button type="button" class="copy-button" data-copy-field="address">${icon("copy")}Address to all</button>
+        <button type="button" class="copy-button" data-copy-field="location">${icon("copy")}Floor to all</button>
+        <button type="button" class="copy-button" data-copy-field="apartment">${icon("copy")}Apartment to all</button>
         <button type="button" class="copy-button" data-copy-field="room">${icon("copy")}Room to all</button>
-        <button type="button" class="copy-button" data-copy-field="location">${icon("copy")}Location to all</button>
         <button type="button" class="ghost-button copy-row-button" data-action="copy-first-row">${icon("copy")}First file to all</button>
       </div>
     </div>
@@ -406,8 +412,9 @@ function renderFileRow(item) {
       </div>
       ${renderField(item, "type", "Type", "Thermostat")}
       ${renderField(item, "address", "Address", "12 Sample Street")}
-      ${renderField(item, "room", "Room", "Apt 4 / Room 2")}
-      ${renderField(item, "location", "Location", "Level 3 / North side")}
+      ${renderField(item, "location", "Floor", "Ground / Level 3")}
+      ${renderField(item, "apartment", "Apartment", "Apt 4 / Unit 2")}
+      ${renderField(item, "room", "Room", "Room 2 / Kitchen")}
       <div class="mobile-file-actions">
         <button type="button" class="floorplan-toggle ${item.isFloorPlan ? "is-on" : ""}" data-floorplan="${escapeHtml(item.id)}" aria-pressed="${item.isFloorPlan}">
           ${item.isFloorPlan ? "✓ This is the floor plan" : "This is the floor plan"}
@@ -420,7 +427,7 @@ function renderFileRow(item) {
 
 function renderField(item, field, label, placeholder) {
   const key = `${item.id}:${field}`;
-  const requiredForItem = !(field === "room" || field === "location") && !(field === "type" && item.isFloorPlan);
+  const requiredForItem = !(field === "room" || field === "location" || field === "apartment") && !(field === "type" && item.isFloorPlan);
   const inherited = state.header.apply[field] && String(state.header.values[field]).trim();
   if (inherited) {
     return `
@@ -653,6 +660,7 @@ function handleFiles(fileList) {
     address: "",
     room: "",
     location: "",
+    apartment: "",
     hash: "",
     status: "Waiting",
     progress: 0,
@@ -1288,8 +1296,9 @@ function buildDriveFileName(item, index) {
     String(index + 1).padStart(2, "0"),
     safeNamePart(item.type),
     safeNamePart(item.address),
-    item.room ? safeNamePart(item.room) : "",
     item.location ? safeNamePart(item.location) : "",
+    item.apartment ? safeNamePart(item.apartment) : "",
+    item.room ? safeNamePart(item.room) : "",
     item.hash ? item.hash.slice(0, 8) : "",
     safeNamePart(baseName)
   ].filter(Boolean);
@@ -1340,8 +1349,9 @@ function itemDescription(item) {
   return [
     `Type: ${item.type.trim()}`,
     `Address: ${item.address.trim()}`,
+    `Floor: ${item.location.trim() || "Not provided"}`,
+    `Apartment: ${(item.apartment || "").trim() || "Not provided"}`,
     `Room: ${item.room.trim() || "Not provided"}`,
-    `Location: ${item.location.trim() || "Not provided"}`,
     `Original file: ${item.file.name}`,
     `Uploaded: ${new Date().toISOString()}`
   ].join("\n");
@@ -1366,7 +1376,8 @@ function uploadRow(item, status, result = null, duplicate = null) {
     status,
     duplicate?.id || "",
     duplicate?.webViewLink || "",
-    item.hash || ""
+    item.hash || "",
+    (item.apartment || "").trim()
   ];
 }
 
@@ -1449,6 +1460,7 @@ async function uploadBatch() {
       item.address = String(effectiveValue(item, "address")).trim();
       item.room = String(effectiveValue(item, "room")).trim();
       item.location = String(effectiveValue(item, "location")).trim();
+      item.apartment = String(effectiveValue(item, "apartment")).trim();
     });
 
     // v1.0 §7: dedup must check contentHash across the WHOLE Inbox/Photos
@@ -1511,6 +1523,7 @@ async function uploadBatch() {
             type: item.type,
             room: item.room,
             location: item.location,
+            apartment: item.apartment,
             isFloorPlan: item.isFloorPlan,
             contentHash: item.hash,
             capturedAt: item.capturedAt
@@ -1518,6 +1531,7 @@ async function uploadBatch() {
             address: appPropertyValue(item.address),
             room: appPropertyValue(item.room),
             location: appPropertyValue(item.location),
+            apartment: appPropertyValue(item.apartment),
             contentHash: appPropertyValue(item.hash)
           }
         )

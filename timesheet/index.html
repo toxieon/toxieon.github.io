@@ -1984,7 +1984,96 @@ window.Views = {};
   const expanded = {};
   const mergeDismissed = new Set();
   const manualSel = new Set();
+  let mapOpen = false;      // #44 — log book site map (collapsed by default)
   const TYPE_LABEL = { employer: 'Employer', neill_data: 'Neill Data', unclassified: 'Unclassified' };
+
+  /* ---- #44: map of all job sites ---- */
+  function jobsWithCoords() {
+    return getState().jobs.filter(j => j.lat != null && j.lat !== '' && j.lng != null && j.lng !== '' && !Number.isNaN(Number(j.lat)) && !Number.isNaN(Number(j.lng)));
+  }
+  function mapCardHtml() {
+    const n = jobsWithCoords().length;
+    if (!n) return '';
+    return `<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <button type="button" data-map-toggle style="width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:0;color:var(--text-primary);padding:12px 14px;font-size:13px;cursor:pointer;">
+        <span>🗺️ Site map · ${n} located</span><span class="muted">${mapOpen ? 'Hide' : 'Show'}</span>
+      </button>
+      ${mapOpen ? '<div id="jobs-map" style="height:230px;width:100%;background:#12141a;"></div>' : ''}
+    </div>`;
+  }
+  function initJobsMap() {
+    const el = document.getElementById('jobs-map'); if (!el || !window.TsGeo) return;
+    TsGeo.loadMapsJs().then(() => {
+      const jobs = jobsWithCoords();
+      if (!jobs.length) { el.innerHTML = '<div class="muted" style="padding:16px;font-size:13px;">No located jobs yet.</div>'; return; }
+      const map = new google.maps.Map(el, { mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoom: 11 });
+      const bounds = new google.maps.LatLngBounds();
+      jobs.forEach(j => {
+        const pos = { lat: Number(j.lat), lng: Number(j.lng) };
+        const mk = new google.maps.Marker({ map, position: pos, title: j.job_name || j.address || 'Job' });
+        const info = new google.maps.InfoWindow({ content: `<div style="color:#111;font-size:13px;max-width:200px"><strong>${escapeHtml(j.job_name || 'Job')}</strong><br>${escapeHtml(j.address || '')}</div>` });
+        mk.addListener('click', () => info.open(map, mk));
+        bounds.extend(pos);
+      });
+      if (jobs.length === 1) { map.setCenter(bounds.getCenter()); map.setZoom(14); }
+      else map.fitBounds(bounds, 40);
+    }).catch(e => { console.warn('jobs map failed', e); el.innerHTML = '<div class="muted" style="padding:16px;font-size:13px;">Map unavailable.</div>'; });
+  }
+
+  /* ---- #45: confirm conflicting details before a merge ---- */
+  const CONFLICT_FIELDS = [['job_name', 'Name'], ['address', 'Address'], ['job_type', 'Type'], ['notes', 'Notes']];
+  function fieldConflicts(jobs) {
+    const out = [];
+    CONFLICT_FIELDS.forEach(([key, label]) => {
+      const vals = [...new Set(jobs.map(j => String(j[key] || '').trim()).filter(Boolean))];
+      if (vals.length > 1) out.push({ key, label, values: vals });
+    });
+    return out;
+  }
+  function startMerge(canonical, ids, group) {
+    const jobs = group.filter(j => ids.includes(j.job_id));
+    const conflicts = fieldConflicts(jobs);
+    if (!conflicts.length) {
+      if (!confirm(`Merge ${ids.length} jobs into "${canonical.job_name || 'Job'}"? Their shifts move onto it and the others are removed.`)) return;
+      mergeJobs(canonical.job_id, ids);
+      return;
+    }
+    openConflictModal(canonical, ids, conflicts);
+  }
+  function openConflictModal(canonical, ids, conflicts) {
+    const back = document.createElement('div');
+    back.className = 'picker-modal-backdrop';
+    back.style.display = 'flex';
+    const rows = conflicts.map((c, ci) => {
+      const cur = String(canonical[c.key] || '').trim();
+      return `<div style="margin-bottom:14px;">
+        <div class="muted" style="font-size:12px;margin-bottom:6px;">${escapeHtml(c.label)}</div>
+        ${c.values.map((v, vi) => `<label class="merge-opt" style="display:flex;gap:8px;align-items:center;margin-bottom:4px;"><input type="radio" name="cf-${ci}" value="${vi}" ${(cur ? v === cur : vi === 0) ? 'checked' : ''}/><span>${escapeHtml(v)}</span></label>`).join('')}
+      </div>`;
+    }).join('');
+    back.innerHTML = `<div class="picker-modal">
+      <h3 style="margin-top:0;">Confirm merged details</h3>
+      <div class="muted" style="font-size:12px;margin-bottom:14px;">These jobs have different details. Pick what the merged job should keep.</div>
+      ${rows}
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-cf-cancel>Cancel</button>
+        <button class="btn btn-primary" data-cf-go>Merge ${ids.length} jobs</button>
+      </div>
+    </div>`;
+    document.body.appendChild(back);
+    const close = () => back.remove();
+    back.addEventListener('click', e => { if (e.target === back) close(); });
+    back.querySelector('[data-cf-cancel]').addEventListener('click', close);
+    back.querySelector('[data-cf-go]').addEventListener('click', () => {
+      const overrides = {};
+      conflicts.forEach((c, ci) => {
+        const sel = back.querySelector(`input[name="cf-${ci}"]:checked`);
+        if (sel) overrides[c.key] = c.values[+sel.value];
+      });
+      close();
+      mergeJobs(canonical.job_id, ids, overrides);
+    });
+  }
   function normName(s) { return (s || '').trim().toLowerCase(); }
   function addrKey(job) {
     if (window.NDMatch && NDMatch.addressKey) return NDMatch.addressKey(job.address || '');
@@ -2016,7 +2105,7 @@ window.Views = {};
   function groupKey(g) { return g.map(j => j.job_id).slice().sort().join('|'); }
   // Merge losers into the chosen canonical job: repoint sessions, combine
   // stats, drop losers, and push it all to the Google Sheet via the queue.
-  function mergeJobs(canonicalId, allIds) {
+  function mergeJobs(canonicalId, allIds, overrides) {
     const st = getState();
     const canonical = st.jobs.find(j => j.job_id === canonicalId);
     if (!canonical) return;
@@ -2034,6 +2123,7 @@ window.Views = {};
       st.jobs = st.jobs.filter(j => j.job_id !== lid);
       queueSheetDelete('jobs', lid);
     });
+    if (overrides) Object.assign(canonical, overrides);   // #45 — user-chosen details win
     queueSheetWrite('jobs', canonical, true);
     saveState();
     refreshAllViews();
@@ -2061,8 +2151,7 @@ window.Views = {};
       const sel = wrap.querySelector(`input[name="canon-${gi}"]:checked`);
       const canonicalId = sel ? sel.value : g[0].job_id;
       const canonical = g.find(j => j.job_id === canonicalId) || g[0];
-      if (!confirm(`Merge ${g.length} jobs into "${canonical.job_name || 'Job'}"? Their shifts will move onto it and the others will be removed.`)) return;
-      mergeJobs(canonicalId, g.map(j => j.job_id));
+      startMerge(canonical, g.map(j => j.job_id), g);
     }));
     wrap.querySelectorAll('[data-merge-dismiss]').forEach(btn => btn.addEventListener('click', () => { mergeDismissed.add(groupKey(groups[+btn.dataset.mergeDismiss])); render(); }));
     wrap.querySelectorAll('[data-manual-job]').forEach(cb => cb.addEventListener('change', () => { const id = cb.dataset.manualJob; if (cb.checked) manualSel.add(id); else manualSel.delete(id); render(); }));
@@ -2070,10 +2159,10 @@ window.Views = {};
     const mBtn = wrap.querySelector('[data-manual-merge]'); if (mBtn) mBtn.addEventListener('click', () => {
       const ids = [...manualSel].filter(id => st.jobs.some(j => j.job_id === id));
       if (ids.length < 2) return;
-      const canonical = ids.map(id => st.jobs.find(j => j.job_id === id)).sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0) || jobStats(b.job_id).hours - jobStats(a.job_id).hours)[0];
-      if (!confirm(`Merge ${ids.length} jobs into "${canonical.job_name || 'Job'}"? Their shifts move onto it and the others are removed.`)) return;
+      const group = ids.map(id => st.jobs.find(j => j.job_id === id));
+      const canonical = group.slice().sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0) || jobStats(b.job_id).hours - jobStats(a.job_id).hours)[0];
       manualSel.clear();
-      mergeJobs(canonical.job_id, ids);
+      startMerge(canonical, ids, group);
     });
   }
   function updateModeUI() {
@@ -2116,8 +2205,9 @@ window.Views = {};
     if (summary) summary.textContent = `${st.jobs.length} job${st.jobs.length === 1 ? '' : 's'} · ${totalHours.toFixed(1)} hrs logged`;
     if (q) rows = rows.filter(r => `${r.j.job_name} ${r.j.address || ''} ${TYPE_LABEL[r.j.job_type] || r.j.job_type || ''}`.toLowerCase().includes(q));
     rows.sort((a, b) => (b.s.last || '').localeCompare(a.s.last || '') || (b.j.visit_count || 0) - (a.j.visit_count || 0));
-    if (!rows.length) { wrap.innerHTML = `<div class="job-shift-empty">${q ? 'No jobs match your search.' : 'No jobs yet — clock on to create your first.'}</div>`; return; }
-    wrap.innerHTML = rows.map(({ j, s }) => {
+    const listHtml = !rows.length
+      ? `<div class="job-shift-empty">${q ? 'No jobs match your search.' : 'No jobs yet — clock on to create your first.'}</div>`
+      : rows.map(({ j, s }) => {
       const type = j.job_type || 'unclassified';
       const open = !!expanded[j.job_id];
       return `<div class="job-card ${open ? 'is-open' : ''}">
@@ -2128,6 +2218,10 @@ window.Views = {};
         ${open ? `<div class="job-card-body"><div class="job-actions"><a class="btn btn-ghost btn-sm" href="${mapUrlForJob(j)}" target="_blank" rel="noopener">Route to job</a></div><textarea class="job-note-input" data-note-job="${escapeHtml(j.job_id)}" placeholder="Add a note for this job…">${escapeHtml(j.notes || '')}</textarea><div class="job-note-row"><button type="button" class="btn btn-primary btn-sm" data-note-save="${escapeHtml(j.job_id)}">Save note</button></div><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
       </div>`;
     }).join('');
+    wrap.innerHTML = mapCardHtml() + listHtml;
+    const mapToggle = wrap.querySelector('[data-map-toggle]');
+    if (mapToggle) mapToggle.addEventListener('click', () => { mapOpen = !mapOpen; render(); });
+    if (mapOpen && document.getElementById('jobs-map')) initJobsMap();
     wrap.querySelectorAll('[data-job-toggle]').forEach(el => el.addEventListener('click', () => { const id = el.dataset.jobToggle; expanded[id] = !expanded[id]; render(); }));
     wrap.querySelectorAll('[data-note-save]').forEach(btn => btn.addEventListener('click', () => {
       const id = btn.dataset.noteSave;
