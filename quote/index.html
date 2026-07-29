@@ -421,6 +421,8 @@ body[data-role="staff"] .custom-row .custom-cost,
 body[data-role="staff"] .custom-row .custom-markup,
 body[data-role="staff"] .picker-line .item-sub,
 body[data-role="staff"] .picker-line .item-unit { display: none !important; }
+/* Staff don't see job dollar totals in the calendar */
+body[data-role="staff"] .cal-job-total { display: none !important; }
 
 /* responsive */
 @media (max-width: 640px) {
@@ -652,7 +654,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
       <!-- Client -->
       <div class="card">
         <h3>Client &amp; site <span class="status-badge" id="quote-status-badge" style="display:none;"></span></h3>
-        <div class="readonly-banner">🔒 You're viewing this job as Staff — client details are read-only. To request a change, ask your Master or Admin.</div>
+        <div class="readonly-banner">🔒 You're viewing this job as Staff — client details are read-only. To request a change, ask your Admin.</div>
         <div class="grid-2">
           <div class="field"><label for="client-name">Client name</label><input id="client-name" type="text" placeholder="e.g. John Smith" class="client-detail" /></div>
           <div class="field"><label for="client-phone">Client phone</label><input id="client-phone" type="tel" placeholder="04xx xxx xxx" class="client-detail" /></div>
@@ -975,6 +977,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
           <div class="field"><label>Notes (internal)</label><textarea id="sd-notes" rows="2"></textarea></div>
           <div class="btn-row">
             <button class="btn btn-primary" id="sd-save">Save changes</button>
+            <button class="btn btn-danger" id="sd-delete" style="margin-left:auto;">Delete user</button>
           </div>
         </div>
         <div class="card">
@@ -1257,6 +1260,15 @@ function isAdmin()  { return getRole() === 'admin'; }
 function isStaff()  { return getRole() === 'staff'; }
 function canEditClient()    { return !isStaff(); }
 function canSeePricing()    { return !isStaff(); }
+/* Job visibility: staff only see jobs they're rostered to (in assignees) or
+ * created. Master/admin see everything. */
+function canSeeQuote(q) {
+  if (!isStaff()) return true;
+  const me = String((currentUser && currentUser.username) || '').toLowerCase();
+  if (!me) return false;
+  const assignees = Array.isArray(q.assignees) ? q.assignees.map(a => String(a).toLowerCase()) : [];
+  return assignees.includes(me) || String(q.username || '').toLowerCase() === me;
+}
 function canUploadPhotos()  { return !isAdmin(); }
 function canDeletePhotos()  { return !isAdmin(); }
 function jobStatus(q) {
@@ -2539,7 +2551,7 @@ function renderUpcomingBrief() {
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
   const todayStr = today.toISOString().slice(0, 10);
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-  const upcoming = history.filter(q => {
+  const upcoming = history.filter(canSeeQuote).filter(q => {
     if (!q.proposedDate || q.completed) return false;
     const pd = String(q.proposedDate).includes('T') ? String(q.proposedDate).slice(0, 10) : String(q.proposedDate);
     return pd === todayStr || pd === tomorrowStr;
@@ -2618,7 +2630,7 @@ function renderHistory() {
     else filterHost.insertBefore(bar, document.getElementById('history-list'));
   }
   const list = document.getElementById('history-list'); list.innerHTML = '';
-  let filtered = history.slice();
+  let filtered = history.filter(canSeeQuote);
   if (jobsStatusFilter !== 'all') filtered = filtered.filter(q => jobStatus(q) === jobsStatusFilter);
   if (historyFilterInvoicesOnly) filtered = filtered.filter(q => jobStatus(q) === 'complete');
   if (historyFilterHideExpired) filtered = filtered.filter(q => {
@@ -2862,7 +2874,7 @@ let selectedCalDay = null;
 
 function getJobsForDate(date) {
   const dStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
-  return history.filter(q => {
+  return history.filter(canSeeQuote).filter(q => {
     if (q.multiDay && Array.isArray(q.schedule) && q.schedule.length) {
       return q.schedule.some(s => s.date === dStr);
     }
@@ -3195,7 +3207,7 @@ document.getElementById('cal-day-export').onclick = () => {
    ===================================================== */
 function buildPhoneBook() {
   const map = {}; // address(lower) -> client
-  history.forEach(q => {
+  history.filter(canSeeQuote).forEach(q => {
     const addr = ((q.client && q.client.address) || '').trim();
     if (!addr) return;
     const key = addr.toLowerCase();
@@ -3374,6 +3386,7 @@ function showStaffDetail(username) {
   const isMe = currentUser && currentUser.username && currentUser.username.toLowerCase() === u.username.toLowerCase();
   document.getElementById('sd-locked').disabled = !!isMe;
   document.getElementById('sd-role').disabled = !!isMe;
+  document.getElementById('sd-delete').disabled = !!isMe;   // can't delete yourself
   loadStaffQuotes(u.username);
 }
 
@@ -3439,6 +3452,24 @@ document.getElementById('sd-save').onclick = async () => {
     backToStaffList();
   } catch (e) {
     alert('Could not save: ' + e.message);
+  }
+};
+
+document.getElementById('sd-delete').onclick = async () => {
+  if (!selectedStaffUsername) return;
+  const isMe = currentUser && currentUser.username && currentUser.username.toLowerCase() === selectedStaffUsername.toLowerCase();
+  if (isMe) { alert("You can't delete your own account."); return; }
+  if (!confirm(`Delete user "${selectedStaffUsername}"?\n\nThis removes their login for good. Any quotes they created stay in the history. This can't be undone.`)) return;
+  const btn = document.getElementById('sd-delete');
+  const orig = btn.textContent;
+  btn.textContent = 'Deleting…'; btn.disabled = true;
+  try {
+    await backendCall('delete_user', { target: selectedStaffUsername });
+    alert('Deleted ' + selectedStaffUsername + '.');
+    backToStaffList();
+  } catch (e) {
+    btn.textContent = orig; btn.disabled = false;
+    alert('Could not delete: ' + e.message);
   }
 };
 
