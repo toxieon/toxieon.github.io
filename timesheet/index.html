@@ -8,9 +8,12 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="stylesheet" href="../shared/nd-core.css" />
 <script src="../shared/nd-config.js"></script>
+<script src="../assets/loading-bar.js"></script>
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../assets/here.js"></script>
+<script src="../assets/logo.js"></script>
+<script src="../assets/doc-invoice.js"></script>
 <link rel="icon" href="assets/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -436,6 +439,39 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
     </div>
 
     <div class="settings-section">
+      <h3>Payslip estimate</h3>
+      <div class="card">
+        <p class="muted" style="font-size:13px; margin-top:0;">A reference payslip built from your logged hours this pay period. Set your hourly rate — the rest is prefilled. This is an estimate, not an official payslip.</p>
+        <div class="row">
+          <div class="field" style="flex:2;"><label>Employer</label><input id="ps-employer"></div>
+          <div class="field" style="flex:1;"><label>ABN</label><input id="ps-abn"></div>
+        </div>
+        <div class="field"><label>Employee name</label><input id="ps-employee"></div>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>Hourly rate ($) *</label><input type="number" step="0.01" id="ps-hourlyRate" placeholder="required"></div>
+          <div class="field" style="flex:1;"><label>Super (%)</label><input type="number" step="0.1" id="ps-superPct"></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>PAYG tax this period ($)</label><input type="number" step="0.01" id="ps-taxEstimate" placeholder="optional"></div>
+          <div class="field" style="flex:1;"><label>Expected hours / period</label><input type="number" step="0.5" id="ps-expectedHours"></div>
+        </div>
+        <div class="field"><label>Allowances</label>
+          <div id="ps-allowances"></div>
+          <button class="btn btn-ghost btn-sm" id="ps-add-allowance" style="margin-top:8px;">+ Add allowance</button>
+        </div>
+        <div class="field"><label>Memo (optional)</label><input id="ps-memo" placeholder="e.g. a message on the payslip"></div>
+        <div class="field"><label>Business logo</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div id="ps-logo-frame" style="width:120px;height:56px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid rgba(0,0,0,0.15);flex:none;"><span id="ps-logo-empty" style="color:#999;font-size:11px;">No logo</span><img id="ps-logo-img" style="display:none;max-width:100%;max-height:100%;object-fit:contain;" alt="Logo"></div>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;">Upload logo<input id="ps-logo-input" type="file" accept="image/*" style="display:none;"></label>
+          </div>
+          <p class="muted" style="font-size:11px;margin:6px 0 0;">One logo, shared across the whole suite. Manage it in the Assets page.</p>
+        </div>
+        <button class="btn btn-primary btn-block" id="ps-generate" style="margin-top:14px;">Preview payslip</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h3>Import &amp; Organise</h3>
       <div class="card">
         <p class="muted" style="font-size:13px; margin-top:0;">Bring in hours you tracked before. Import a CSV directly, or use the prompt below to turn messy timesheets into a clean importable file.</p>
@@ -544,7 +580,18 @@ window.TIMESHEET_CONFIG = {
     otThresholdDay: 8, otThresholdWeek: 38, otMultiplier: 1.5, roundingMin: 30,
     payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
     preferredMailApp: "Gmail", mapApp: "google",
-    use24hr: true, exportFormats: ["Plain text email", "CSV"]
+    use24hr: true, exportFormats: ["Plain text email", "CSV"],
+    // Payslip estimate (§48). Default preset = Neill Data (rebranded from the
+    // Washington example). Hourly rate is the one thing the user must set.
+    payslip: {
+      employer: "Neill Data & Security", abn: "73 761 986 361", employee: "Neill, Brandon",
+      hourlyRate: null, superPct: 11.5, taxEstimate: null, expectedHours: 37.5,
+      allowances: [
+        { label: "Fare Allowance", hours: 1, rate: 24.70 },
+        { label: "Travel Allowance", hours: 1, rate: 36.80 }
+      ],
+      memo: ""
+    }
   }
 };
 /* §5.4: creds + scope union come from the shared config (one key swap, §6) */
@@ -911,6 +958,44 @@ function clockOff({ lat, lng, breakMinutes, notes, manualTime, departedOffsite, 
   maybeDailyForceSync();
   return session;
 }
+
+/* Fallback for missed clock-offs (§54). "Move to next site" occasionally doesn't
+ * register the clock-off, or the app is closed before clocking off. A PWA can't
+ * run a real midnight cron, so we reconcile whenever the app opens or is brought
+ * back to the foreground: any shift left without an end time gets snapped to the
+ * user's standard finish time. Overtime is recomputed (not capped) so long days
+ * still count. */
+function reconcileOpenSessions() {
+  const st = getState();
+  const std = st.settings.standardClockOff || '15:30';
+  const todayStr = isoDate(new Date());
+  let snapped = 0;
+  function closeAt(s, offHHMM) {
+    s.time_off = offHHMM;
+    s.time_off_rounded = roundToNearest(offHHMM, st.settings.roundingMin);
+    s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, sessionBreakMinutes(s));
+    s.overtime_hours = overtimeHours(s.total_hours, st.settings.otThresholdDay);
+    s.missed_clockoff = true;
+    s.entry_method = s.entry_method || 'auto';
+    s.notes = [s.notes, 'Auto clock-off (missed) — snapped to standard finish'].filter(Boolean).join(' / ');
+  }
+  // 1. Session left open from a previous day → close it at the standard finish.
+  const cs = st.currentSession;
+  if (cs && cs.date && cs.date < todayStr && !cs.time_off) {
+    closeAt(cs, std); delete cs._open;
+    st.sessions.unshift(cs); st.lastClosedSession = cs; st.currentSession = null;
+    bumpJobVisit(cs.job_id); upsertSession(cs); snapped++;
+  }
+  // 2. Any stored shift missing an end time (e.g. a "next site" that didn't
+  //    register) → snap it to the standard finish for that day.
+  st.sessions.forEach(s => { if (!s.time_off) { closeAt(s, std); upsertSession(s); snapped++; } });
+  if (snapped) {
+    saveState();
+    if (typeof refreshAllViews === 'function') refreshAllViews();
+    toast(snapped === 1 ? 'Snapped a missing clock-off to your standard finish' : `Snapped ${snapped} missing clock-offs to your standard finish`);
+  }
+}
+
 function updateSession(sessionId, patch) {
   const s = state.sessions.find(s => s.session_id === sessionId); if (!s) return null;
   Object.assign(s, patch);
@@ -1051,6 +1136,110 @@ function weekTotals(sessions, staticDays) {
   return { total: Math.round(total * 100) / 100, ot: Math.round(ot * 100) / 100 };
 }
 function saveSettings(patch) { Object.assign(state.settings, patch); saveState(); queueSheetWrite('settings', state.settings, true); }
+
+/* ===== PAYSLIP ESTIMATE (§48) — builds a reference payslip (NDDoc + NDLogo)
+ * from the user's logged hours for the current pay period. ===== */
+function psGet() {
+  const s = getState().settings;
+  if (!s.payslip) s.payslip = JSON.parse(JSON.stringify(window.TIMESHEET_CONFIG.defaults.payslip));
+  if (!Array.isArray(s.payslip.allowances)) s.payslip.allowances = [];
+  return s.payslip;
+}
+function psSave(patch) { const s = getState().settings; s.payslip = Object.assign({}, psGet(), patch || {}); saveState(); queueSheetWrite('settings', s, true); }
+function psMoney(n) { return '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function psPeriodRange() {
+  const s = getState().settings, type = s.payPeriodType || 'Weekly';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let start, end;
+  if (type === 'Monthly') { start = new Date(today.getFullYear(), today.getMonth(), 1); end = new Date(today.getFullYear(), today.getMonth() + 1, 1); }
+  else { start = startOfWeek(today, s.firstDayOfWeek); const weeks = type === 'Fortnightly' ? 2 : 1; end = new Date(start); end.setDate(end.getDate() + 7 * weeks); }
+  return { start, end };
+}
+function psSessions() {
+  const r = psPeriodRange(), a = isoDate(r.start), b = isoDate(r.end);
+  return getState().sessions.filter(x => x.date && x.date >= a && x.date < b);
+}
+function buildPayslipSpec() {
+  const p = psGet(), s = getState().settings;
+  const rate = Number(p.hourlyRate) || 0, otMult = Number(s.otMultiplier) || 1.5;
+  let totalHrs = 0, otHrs = 0;
+  psSessions().forEach(x => { totalHrs += Number(x.total_hours) || 0; otHrs += Number(x.overtime_hours) || 0; });
+  const baseHrs = Math.max(0, totalHrs - otHrs);
+  const baseAmt = baseHrs * rate, otRate = rate * otMult, otAmt = otHrs * otRate;
+  const rows = [['Base Hourly', baseHrs.toFixed(2), psMoney(rate), psMoney(baseAmt), 'Wages']];
+  if (otHrs > 0) rows.push([`Overtime (${otMult}x)`, otHrs.toFixed(2), psMoney(otRate), psMoney(otAmt), 'Wages']);
+  let allowTotal = 0;
+  (p.allowances || []).forEach(a => { const amt = (Number(a.hours) || 0) * (Number(a.rate) || 0); allowTotal += amt; rows.push([a.label || 'Allowance', (Number(a.hours) || 0).toFixed(2), psMoney(Number(a.rate) || 0), psMoney(amt), 'Wages']); });
+  const gross = baseAmt + otAmt + allowTotal;
+  const tax = Number(p.taxEstimate) || 0;
+  if (tax > 0) rows.push(['PAYG Withholding', '', '', '-' + psMoney(tax), 'Tax']);
+  const superAmt = gross * (Number(p.superPct) || 0) / 100;
+  if (superAmt > 0) rows.push(['Superannuation Guarantee', '', '', psMoney(superAmt), 'Super']);
+  const net = gross - tax;
+  const r = psPeriodRange(), endIncl = new Date(r.end); endIncl.setDate(endIncl.getDate() - 1);
+  const fmtD = d => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return {
+    logo: (window.NDLogo ? NDLogo.get(NDLogo.CURRENT_KEY) : null),
+    business: { name: p.employer, abn: p.abn },
+    title: 'Pay slip',
+    meta: [
+      { label: 'Pay slip for', value: p.employee || '' },
+      { label: 'Pay period', value: fmtD(r.start) + ' – ' + fmtD(endIncl) },
+      { label: 'Payment date', value: fmtD(new Date()) },
+      { label: 'Hourly rate', value: psMoney(rate) },
+      { label: 'Hours this period', value: totalHrs.toFixed(2) }
+    ],
+    highlights: [{ label: 'Gross pay', value: psMoney(gross) }, { label: 'Net pay', value: psMoney(net) }],
+    table: { columns: ['Description', 'Hours', { label: 'Rate', align: 'right' }, { label: 'Amount', align: 'right' }, 'Type'], rows: rows },
+    totals: [{ label: 'Gross', value: psMoney(gross) }, { label: 'PAYG tax', value: '-' + psMoney(tax) }, { label: 'Net pay', value: psMoney(net), strong: true }],
+    memo: p.memo || '',
+    note: 'Estimate only — not an official payslip. Based on your logged hours for this pay period.'
+  };
+}
+function renderPsAllowances() {
+  const host = document.getElementById('ps-allowances'); if (!host) return;
+  const p = psGet();
+  host.innerHTML = (p.allowances || []).map((a, i) => `
+    <div class="row" style="gap:6px;align-items:flex-end;margin-bottom:6px;">
+      <div class="field" style="flex:2;margin:0;"><input data-ps-al-label="${i}" placeholder="Label" value="${escapeHtml(a.label || '')}"></div>
+      <div class="field" style="flex:1;margin:0;"><input type="number" step="0.01" data-ps-al-hours="${i}" placeholder="Hrs" value="${a.hours == null ? '' : a.hours}"></div>
+      <div class="field" style="flex:1;margin:0;"><input type="number" step="0.01" data-ps-al-rate="${i}" placeholder="Rate" value="${a.rate == null ? '' : a.rate}"></div>
+      <button class="icon-btn" data-ps-al-del="${i}" style="flex:none;" title="Remove">✕</button>
+    </div>`).join('') || '<div class="muted" style="font-size:12px;">No allowances.</div>';
+  host.querySelectorAll('[data-ps-al-label]').forEach(el => el.addEventListener('change', e => { const p2 = psGet(); p2.allowances[+e.target.dataset.psAlLabel].label = e.target.value; psSave({ allowances: p2.allowances }); }));
+  host.querySelectorAll('[data-ps-al-hours]').forEach(el => el.addEventListener('change', e => { const p2 = psGet(); p2.allowances[+e.target.dataset.psAlHours].hours = parseFloat(e.target.value) || 0; psSave({ allowances: p2.allowances }); }));
+  host.querySelectorAll('[data-ps-al-rate]').forEach(el => el.addEventListener('change', e => { const p2 = psGet(); p2.allowances[+e.target.dataset.psAlRate].rate = parseFloat(e.target.value) || 0; psSave({ allowances: p2.allowances }); }));
+  host.querySelectorAll('[data-ps-al-del]').forEach(el => el.addEventListener('click', e => { const p2 = psGet(); p2.allowances.splice(+e.target.dataset.psAlDel, 1); psSave({ allowances: p2.allowances }); renderPsAllowances(); }));
+}
+function setupPayslip() {
+  const p = psGet();
+  const bind = (id, key, parse) => { const el = document.getElementById(id); if (!el || el._psBound) return; el._psBound = true; el.value = p[key] == null ? '' : p[key]; el.addEventListener('change', () => { const v = parse ? parse(el.value) : el.value; psSave({ [key]: v }); }); };
+  bind('ps-employer', 'employer'); bind('ps-abn', 'abn'); bind('ps-employee', 'employee');
+  bind('ps-hourlyRate', 'hourlyRate', v => v === '' ? null : parseFloat(v)); bind('ps-superPct', 'superPct', v => parseFloat(v) || 0);
+  bind('ps-taxEstimate', 'taxEstimate', v => v === '' ? null : parseFloat(v)); bind('ps-expectedHours', 'expectedHours', v => parseFloat(v) || 0);
+  bind('ps-memo', 'memo');
+  renderPsAllowances();
+  const add = document.getElementById('ps-add-allowance');
+  if (add && !add._psBound) { add._psBound = true; add.addEventListener('click', () => { const p2 = psGet(); p2.allowances.push({ label: '', hours: 1, rate: 0 }); psSave({ allowances: p2.allowances }); renderPsAllowances(); }); }
+  const img = document.getElementById('ps-logo-img'), emptyEl = document.getElementById('ps-logo-empty');
+  const paint = u => { if (!img) return; if (u) { img.src = u; img.style.display = 'block'; if (emptyEl) emptyEl.style.display = 'none'; } else { img.style.display = 'none'; if (emptyEl) emptyEl.style.display = 'block'; } };
+  if (window.NDLogo) paint(NDLogo.get(NDLogo.CURRENT_KEY));
+  const li = document.getElementById('ps-logo-input');
+  if (li && !li._psBound && window.NDLogo) {
+    li._psBound = true;
+    NDLogo.attachInput(li, { key: NDLogo.CURRENT_KEY, maxDim: 480, onChange: u => { paint(u); const tok = (window.NDAuth && NDAuth.isSignedIn && NDAuth.isSignedIn()) ? NDAuth.getToken() : null; if (tok) NDLogo.pushToDrive(u, { token: tok }).catch(() => {}); } });
+  }
+  const gen = document.getElementById('ps-generate');
+  if (gen && !gen._psBound) {
+    gen._psBound = true;
+    gen.addEventListener('click', () => {
+      const pp = psGet();
+      if (!(Number(pp.hourlyRate) > 0)) { toast('Set your hourly rate first'); const el = document.getElementById('ps-hourlyRate'); if (el) el.focus(); return; }
+      if (!window.NDDoc) { toast('Payslip module not loaded'); return; }
+      NDDoc.preview(buildPayslipSpec());
+    });
+  }
+}
 // Records the Google account <-> Neill Quote linkage in the shared sheet
 // (account_link tab). Only writes when signed in to Google.
 function linkAccount() {
@@ -1602,8 +1791,12 @@ window.Views = {};
   async function handleNextSite() {
     const st = getState();
     if (!st.currentSession) return;
-    const pos = await TsGeo.getPositionResilient();
-    clockOff({ lat: pos ? pos.coords.latitude : null, lng: pos ? pos.coords.longitude : null, breakMinutes: 0 });
+    let pos = null;
+    try { pos = await TsGeo.getPositionResilient(); } catch (e) {}
+    // Always clock off, even if the location lookup hiccups — a failed fix must
+    // never leave the previous shift open (§54 glitch).
+    try { clockOff({ lat: pos ? pos.coords.latitude : null, lng: pos ? pos.coords.longitude : null, breakMinutes: 0 }); }
+    catch (e) { console.warn('next-site clock-off failed', e); }
     TsGeo.stopWatching();
     render();
     toast('Clocked off — finding your next site…');
@@ -1964,6 +2157,7 @@ window.Views = {};
   }
   function init() {
     renderAll(); wireEvents();
+    if (typeof setupPayslip === 'function') setupPayslip();
     if (window.NDUI && NDUI.accordion) {
       NDUI.accordion(document.querySelector('#view-settings .page'), {
         sectionSelector: '.settings-section',
@@ -2215,7 +2409,7 @@ window.Views = {};
           <span class="job-card-main"><span class="job-name">${escapeHtml(j.job_name || 'Job')}</span><span class="job-addr">${escapeHtml(j.address || 'No address')}</span></span>
           <span class="job-meta"><span class="job-type-badge type-${type}">${escapeHtml(TYPE_LABEL[type] || type)}</span><span class="job-stat"><strong>${s.hours.toFixed(1)}</strong> hrs</span><span class="job-stat"><strong>${s.shifts}</strong></span></span>
         </button>
-        ${open ? `<div class="job-card-body"><div class="job-actions"><a class="btn btn-ghost btn-sm" href="${mapUrlForJob(j)}" target="_blank" rel="noopener">Route to job</a></div><textarea class="job-note-input" data-note-job="${escapeHtml(j.job_id)}" placeholder="Add a note for this job…">${escapeHtml(j.notes || '')}</textarea><div class="job-note-row"><button type="button" class="btn btn-primary btn-sm" data-note-save="${escapeHtml(j.job_id)}">Save note</button></div><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
+        ${open ? `<div class="job-card-body"><div class="job-actions"><a class="btn btn-ghost btn-sm" href="${mapUrlForJob(j)}" target="_blank" rel="noopener">Route to job</a><button type="button" class="btn btn-ghost btn-sm" data-job-delete="${escapeHtml(j.job_id)}" style="color:var(--danger,#e53e3e);">Delete location</button></div><textarea class="job-note-input" data-note-job="${escapeHtml(j.job_id)}" placeholder="Add a note for this job…">${escapeHtml(j.notes || '')}</textarea><div class="job-note-row"><button type="button" class="btn btn-primary btn-sm" data-note-save="${escapeHtml(j.job_id)}">Save note</button></div><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
       </div>`;
     }).join('');
     wrap.innerHTML = mapCardHtml() + listHtml;
@@ -2228,6 +2422,20 @@ window.Views = {};
       const ta = wrap.querySelector(`textarea[data-note-job="${id}"]`);
       const job = getState().jobs.find(j => j.job_id === id);
       if (job && ta) { job.notes = ta.value.trim(); saveState(); queueSheetWrite('jobs', job, true); toast('Note saved'); }
+    }));
+    wrap.querySelectorAll('[data-job-delete]').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.dataset.jobDelete;
+      const st = getState();
+      const job = st.jobs.find(j => j.job_id === id); if (!job) return;
+      const s = jobStats(id);
+      const warn = s.shifts ? `\n\nThis location has ${s.shifts} logged shift${s.shifts === 1 ? '' : 's'} (${s.hours.toFixed(1)} hrs). Those shifts stay in your history — only the saved location is removed.` : '';
+      if (!confirm(`Delete location "${job.job_name || 'Job'}"?${warn}`)) return;
+      st.jobs = st.jobs.filter(j => j.job_id !== id);
+      delete expanded[id];
+      saveState();
+      queueSheetDelete('jobs', id);
+      refreshAllViews ? refreshAllViews() : render();
+      toast('Location deleted');
     }));
   }
   function init() {
@@ -2274,6 +2482,7 @@ function registerServiceWorker() {
 async function bootApp() {
   registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
   TsGeo.loadMapsJs().catch(() => {});   // preload so NDHere + reverseGeocode use the JS geocoder (referrer-safe)
+  reconcileOpenSessions();   // §54 — snap any missed clock-offs before rendering
   window.Views.clock.init(); window.Views.history.init(); window.Views.jobs.init(); window.Views.settings.init();
   showView('clock');
   await flushQueueOnNextOpen();
@@ -2293,7 +2502,7 @@ async function bootApp() {
   };
   if (getState().currentSession) TsGeo.startWatching();
   // Returning to a backgrounded PWA re-checks the daily sync.
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeDailyForceSync(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { reconcileOpenSessions(); maybeDailyForceSync(); } });
 }
 document.addEventListener('DOMContentLoaded', bootApp);
 </script>

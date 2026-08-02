@@ -3,7 +3,7 @@
  A growing library of drop-in feature components shared across the apps
  (uploader, quote, planner, timesheet, swb, hub).
  Update this file whenever an asset is added, changed, or wired into an app.
- Last updated: 2026-07-29
+ Last updated: 2026-08-02
 ========================================================================
 
 HOW THIS RELATES TO /shared
@@ -147,6 +147,73 @@ HOW THIS RELATES TO /shared
               a tile as <img data-fileid="DRIVE_ID">, then call hydrate() after
               paint. Replaced planner's 2-call dataURL path (1 call now).
 
+[10] loading-bar.js  —  top-of-page loading indicator
+    Global:   NDLoading
+    Origin:   the request for a suite-wide "scan/loading" bar (Quote keeps its
+              own full-app shimmer).
+    Needs:    nothing. Include the <script> before your app code.
+    API:      auto — patches fetch() + XMLHttpRequest, so the slim amber bar
+              shows whenever a request is in flight (gapi, Drive, Sheets, etc.)
+              and hides when the last one settles. Manual too:
+              NDLoading.show() / NDLoading.hide() (ref-counted) ·
+              NDLoading.during(promise)
+    Used by:  planner, upload, search, timesheet, fitoff, company, hub  (WIRED)
+    Status:   WIRED (everywhere except quote)
+    Notes:    Self-injects CSS+DOM. 30s watchdog so a hung request never sticks
+              the bar. Zero per-app logic — the <script> tag is the whole wiring.
+
+[11] remember.js  —  "remember me" / stay-signed-in store
+    Global:   NDRemember
+    Origin:   Quote's persist-unlock-for-the-working-day pattern, generalised.
+    Needs:    localStorage.
+    API:      NDRemember.save(key, data, ttlHours) · load(key) -> data|null ·
+              isValid(key) · touch(key) (keep-alive) · clear(key)
+    Used by:  quote (14h passcode unlock)  (WIRED)
+    Status:   WIRED (quote)
+    Notes:    Records store their own expiry. Google apps already "remember" via
+              shared/nd-auth.js (persisted OAuth token) — this is for extra
+              app-level gates like Quote's passcode. Only reads its own records,
+              so it ignores unrelated localStorage keys.
+
+[12] logo.js  —  business logo: upload / store / render + Drive sync
+    Global:   NDLogo
+    Origin:   built for the timesheet payslip; Quote invoices next.
+    Needs:    canvas + localStorage. Drive functions need a Google token.
+    API:      NDLogo.fromFile(file, {maxDim,type,quality}) -> Promise<dataUrl>
+              NDLogo.attachInput(inputEl, { key, maxDim, token, ownerEmail, onChange })
+              NDLogo.get/set/clear(key)   ·   NDLogo.CURRENT_KEY ("current")
+              NDLogo.imgTag(dataUrlOrKey, { maxW, maxH, alt }) -> HTML
+              NDLogo.pushToDrive(dataUrl, {token,ownerEmail,folderName}) -> Promise
+              NDLogo.pullLatest({token,ownerEmail,folderName}) -> Promise<dataUrl|null>
+              NDLogo.current({token,onUpdate}) -> cached dataUrl now + bg refresh
+    Used by:  showroom hero (WIRED); to wire into timesheet payslip + quote.
+    Status:   WIRED (showroom) — one shared business logo suite-wide
+    Notes:    ONE logo for the whole business. A logo picked anywhere becomes the
+              "current" logo: cached in localStorage (shared across every app
+              same-origin, so it updates instantly) AND pushed to a "Logos"
+              folder in Drive as the durable, cross-device source of truth.
+              Anywhere that shows a logo reads the newest. Downscales on upload
+              (480px longest edge); PNG keeps transparency. The showroom shows
+              the current logo as a hero and lets you upload / sync it.
+
+[13] doc-invoice.js  —  invoice / payslip document generator
+    Global:   NDDoc
+    Origin:   Quote invoice + timesheet payslip are the same document shape.
+    Needs:    nothing (renders light/print HTML; prints via hidden iframe).
+    API:      NDDoc.html(spec) -> markup
+              NDDoc.preview(spec, { onClose }) -> on-screen modal + Print/Save
+              NDDoc.print(spec) -> straight to print / save-as-PDF
+    Spec:     { logo, business{name,abn,address,phone,email}, title, meta[],
+                highlights[], table{columns[],rows[]}, totals[], memo, note,
+                accent }
+    Used by:  timesheet payslip (WIRED). Quote invoice draws NDLogo on its
+              canvas header (see logo.js) rather than NDDoc, so it's not wired
+              there — available if Quote ever moves to NDDoc.
+    Status:   WIRED (timesheet payslip)
+    Notes:    Document renders black-on-white for print regardless of app theme.
+              Prints only the document (hidden iframe) — no popup blocker, the
+              app UI never appears in the PDF.
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -173,3 +240,18 @@ HOW THIS RELATES TO /shared
               Drive image loader that had been copy-pasted into fit-off, planner
               and search. Wired planner + search onto it (planner now 1 API call
               per image instead of 2). Part of the #34 reuse pass.
+  2026-08-02  Added loading-bar.js (NDLoading) — suite-wide top loading bar,
+              auto-instruments fetch+XHR, wired into every app except quote.
+              Added remember.js (NDRemember) — reusable stay-signed-in store;
+              wired Quote's 14h passcode unlock onto it.
+  2026-08-02  Added logo.js (NDLogo) + doc-invoice.js (NDDoc) — the two building
+              blocks for the timesheet payslip generator (and Quote logo later).
+              Built standalone; wiring into apps comes next push.
+  2026-08-02  logo.js gained a Drive-backed shared store: a logo uploaded
+              anywhere saves to a "Logos" Drive folder and becomes the one
+              current logo suite-wide (localStorage cache is shared same-origin).
+              Showroom now shows the current logo as a hero + upload/sync.
+  2026-08-02  Wired the assets in: Timesheet payslip generator (Settings →
+              Payslip estimate) uses NDDoc + NDLogo and pulls the pay period's
+              logged hours. Quote invoice/quote images now draw the shared
+              NDLogo in the header; logo upload added to Quote business settings.

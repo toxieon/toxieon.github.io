@@ -7,12 +7,17 @@
 <title>Assets · Neill Data Suite</title>
 <link rel="icon" href="favicon.svg" />
 <link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
+<script src="../assets/loading-bar.js"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/watermark.js"></script>
 <script src="../assets/countdown-confirm.js"></script>
 <script src="../assets/sync-fill.js"></script>
 <script src="../assets/camera-capture.js"></script>
+<script src="../assets/logo.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
     font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; }
@@ -65,6 +70,23 @@
       <a class="btn-link" href="../assets/ASSETS.txt" target="_blank" rel="noopener">View manifest (ASSETS.txt)</a>
     </div>
   </header>
+
+  <section id="logo-hero" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:linear-gradient(135deg,rgba(224,123,42,0.10),rgba(255,255,255,0.02));border:1px solid var(--nd-border,#2a2a2a);border-radius:16px;padding:20px 22px;margin-bottom:26px;">
+    <div id="logo-hero-frame" style="width:180px;height:100px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,0.1);">
+      <span id="logo-hero-empty" style="color:#999;font-size:12px;text-align:center;padding:0 10px;">No logo yet</span>
+      <img id="logo-hero-img" alt="Business logo" style="display:none;max-width:100%;max-height:100%;object-fit:contain;" />
+    </div>
+    <div style="flex:1;min-width:220px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--nd-amber,#e07b2a);font-weight:800;">Business logo</div>
+      <h2 style="margin:4px 0 4px;font-size:18px;">One logo, everywhere</h2>
+      <p style="margin:0 0 12px;color:var(--nd-muted,#888);font-size:13px;line-height:1.5;max-width:520px;">Upload once and it syncs to a <strong>Logos</strong> folder in Drive. Every app that shows a logo — payslips, invoices — picks up the newest one automatically.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <label style="background:linear-gradient(135deg,var(--nd-amber,#e07b2a),var(--nd-amber-soft,#f5a05a));color:#1a0f04;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Upload logo<input id="logo-hero-input" type="file" accept="image/*" style="display:none;" /></label>
+        <button id="logo-hero-sync" style="background:rgba(255,255,255,0.08);color:var(--nd-text,#f0f0f0);border:1px solid var(--nd-border,#2a2a2a);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;">Sign in to sync</button>
+        <span id="logo-hero-status" style="color:var(--nd-muted,#888);font-size:12px;"></span>
+      </div>
+    </div>
+  </section>
 
   <div class="grid">
 
@@ -182,6 +204,66 @@
 
 <script>
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Logo hero: show the current business logo; upload + Drive sync ---- */
+  (function () {
+    var img = document.getElementById("logo-hero-img");
+    var empty = document.getElementById("logo-hero-empty");
+    var input = document.getElementById("logo-hero-input");
+    var syncBtn = document.getElementById("logo-hero-sync");
+    var statusEl = document.getElementById("logo-hero-status");
+    if (!window.NDLogo || !img) return;
+    var cfg = (window.ND && ND.config) ? ND.config.forApp("hub") : {};
+
+    function paint(dataUrl) {
+      if (dataUrl) { img.src = dataUrl; img.style.display = "block"; empty.style.display = "none"; }
+      else { img.style.display = "none"; empty.style.display = "block"; }
+    }
+    function status(msg) { if (statusEl) statusEl.textContent = msg || ""; }
+    function signedIn() { return window.NDAuth && NDAuth.isSignedIn && NDAuth.isSignedIn(); }
+    function token() { return window.NDAuth ? NDAuth.getToken() : null; }
+
+    paint(NDLogo.get(NDLogo.CURRENT_KEY));   // instant, from the shared cache
+
+    NDLogo.attachInput(input, {
+      key: NDLogo.CURRENT_KEY, maxDim: 480,
+      onChange: function (dataUrl) {
+        paint(dataUrl);
+        if (signedIn()) { status("Saving to Drive…"); NDLogo.pushToDrive(dataUrl, { token: token() }).then(function () { status("Saved to Drive · syncs everywhere"); }).catch(function () { status("Saved locally (Drive sync failed)"); }); }
+        else status("Saved locally · sign in to sync to Drive");
+      }
+    });
+
+    function refreshFromDrive() {
+      if (!signedIn()) return;
+      status("Checking Drive…");
+      NDLogo.pullLatest({ token: token() }).then(function (d) { paint(d); status(d ? "Up to date" : "No logo in Drive yet"); }).catch(function () { status(""); });
+    }
+
+    function afterAuth() {
+      syncBtn.textContent = "Sync from Drive";
+      refreshFromDrive();
+    }
+
+    syncBtn.addEventListener("click", function () {
+      if (!window.NDAuth) { status("Auth unavailable"); return; }
+      if (signedIn()) { refreshFromDrive(); return; }
+      status("Signing in…");
+      NDAuth.ensureToken({ interactive: true }).then(afterAuth).catch(function () { status("Sign-in failed"); });
+    });
+
+    function boot() {
+      if (!window.NDAuth || !cfg.googleClientId) return;
+      try { NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes }); } catch (e) { return; }
+      NDAuth.onAuthChange(function () { if (signedIn()) { syncBtn.textContent = "Sync from Drive"; } });
+      NDAuth.ensureToken().then(afterAuth).catch(function () {});   // silent resume
+    }
+    (function wait(n) {
+      if (window.google && google.accounts && google.accounts.oauth2) return boot();
+      if ((n || 0) > 100) return;
+      setTimeout(function () { wait((n || 0) + 1); }, 100);
+    })();
+  })();
 
   /* ---- Sync tube: bind to a fake queue we can drive ---- */
   (function () {

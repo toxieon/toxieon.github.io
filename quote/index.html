@@ -12,6 +12,8 @@
 <script src="../shared/nd-ui.js"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/watermark.js"></script>
+<script src="../assets/remember.js"></script>
+<script src="../assets/logo.js"></script>
     <meta name="theme-color" content="#07111f" />
 <title>ND • On-site Quote Tool</title>
 <style>
@@ -1005,6 +1007,13 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
             <div class="field"><label>Email</label><input id="biz-email" type="email" /></div>
           </div>
           <div class="field"><label>Home base address (travel measured from)</label><input id="home-address" type="text" autocomplete="off" /></div>
+          <div class="field"><label>Business logo (on quotes &amp; invoices)</label>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div id="biz-logo-frame" style="width:130px;height:60px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid rgba(0,0,0,0.15);flex:none;"><span id="biz-logo-empty" style="color:#999;font-size:11px;">No logo</span><img id="biz-logo-img" style="display:none;max-width:100%;max-height:100%;object-fit:contain;" alt="Logo"></div>
+              <label class="btn btn-utility" style="cursor:pointer;">Upload logo<input id="biz-logo-input" type="file" accept="image/*" style="display:none;"></label>
+            </div>
+            <p class="panel-sub" style="margin:6px 0 0;font-size:0.76rem;">One logo shared across the whole suite. Syncs to Drive when you're online.</p>
+          </div>
         </div>
       </details>
 
@@ -1383,17 +1392,29 @@ passcodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnloc
  * for the working day (14h). Boot restores it silently and re-verifies with
  * the backend in the background; a locked/changed account wipes it. */
 const QUOTE_SESSION_KEY = 'nq_session_v1';
+const QUOTE_REMEMBER_HOURS = 14;   // stay unlocked for the working day
+// Remember-me now runs through the shared asset (assets/remember.js) so the
+// once-a-day unlock is reusable across apps. Falls back to plain localStorage
+// if the asset didn't load, so sign-in never breaks.
 function saveUnlockSession() {
+  if (window.NDRemember) { NDRemember.save(QUOTE_SESSION_KEY, { user: currentUser }, QUOTE_REMEMBER_HOURS); return; }
   try { localStorage.setItem(QUOTE_SESSION_KEY, JSON.stringify({ user: currentUser, at: Date.now() })); } catch (e) {}
 }
 function loadUnlockSession() {
+  if (window.NDRemember) {
+    const d = NDRemember.load(QUOTE_SESSION_KEY);
+    return (d && d.user && d.user.passwordHash) ? d : null;
+  }
   try {
     const s = JSON.parse(localStorage.getItem(QUOTE_SESSION_KEY));
-    if (s && s.user && s.user.passwordHash && Date.now() - s.at < 14 * 3600 * 1000) return s;
+    if (s && s.user && s.user.passwordHash && Date.now() - s.at < QUOTE_REMEMBER_HOURS * 3600 * 1000) return s;
   } catch (e) {}
   return null;
 }
-function clearUnlockSession() { try { localStorage.removeItem(QUOTE_SESSION_KEY); } catch (e) {} }
+function clearUnlockSession() {
+  if (window.NDRemember) { NDRemember.clear(QUOTE_SESSION_KEY); return; }
+  try { localStorage.removeItem(QUOTE_SESSION_KEY); } catch (e) {}
+}
 
 function tryRestoreSession() {
   const s = loadUnlockSession();
@@ -3565,6 +3586,7 @@ function renderSettings() {
   setVal('passcode-new', settings.passcode,             HARDCODED_PASSCODE || '1234');
   setVal('sheet-id',     settings.sheetId,              HARDCODED_SHEET_ID);
   loadWatermarkUI();
+  loadLogoUI();
   const status = document.getElementById('sheet-status');
   if (settings.sheetLastStatus) {
     status.style.display = 'block';
@@ -3741,6 +3763,7 @@ function buildQuoteImageData(style) {
       ? 'Tax invoice. Payment due upon receipt. Thank you for your business.'
       : 'Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.') : '',
     photos: visiblePhotos,
+    logo: (window.NDLogo ? NDLogo.get(NDLogo.CURRENT_KEY) : null),
     filename: `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.jpg`
   };
   } finally { if (_filter) currentQuote = _full; }
@@ -3841,6 +3864,17 @@ async function renderQuoteImageCanvas(data) {
     setCanvasFont(ctx, '400', 22);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(data.headerLine, margin, 118);
+  }
+  // §55 — business logo, top-right of the header on a white chip so it reads on
+  // the dark bar. Uses the shared suite logo (NDLogo current).
+  if (data.logo) {
+    try {
+      const logoImg = await loadQuoteCanvasImage(data.logo);
+      const chipW = 220, chipH = 118, chipX = width - margin - chipW, chipY = 26, pad = 12;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(chipX, chipY, chipW, chipH);
+      drawContainedImage(ctx, logoImg, chipX + pad, chipY + pad, chipW - pad * 2, chipH - pad * 2);
+    } catch (e) { /* no logo / failed to load — carry on without it */ }
   }
 
   let y = 230;
@@ -4486,6 +4520,23 @@ function openTimeQuestionnaire(q) {
     document.getElementById('timeq-skip').onclick = () => { q.timingHonest = null; q.overrunHours = 0; cleanup(); resolve(); };
     document.getElementById('timeq-save').onclick = () => { q.timingHonest = false; q.overrunHours = Number(extraInp.value) || 0; cleanup(); resolve(); };
   });
+}
+
+/* ---------- Business logo UI (shared NDLogo current) — §55 ---------- */
+function loadLogoUI() {
+  if (!window.NDLogo) return;
+  const img = document.getElementById('biz-logo-img'), empty = document.getElementById('biz-logo-empty');
+  const paint = u => { if (!img) return; if (u) { img.src = u; img.style.display = 'block'; if (empty) empty.style.display = 'none'; } else { img.style.display = 'none'; if (empty) empty.style.display = 'block'; } };
+  paint(NDLogo.get(NDLogo.CURRENT_KEY));
+  const input = document.getElementById('biz-logo-input');
+  if (input && !input._logoBound) {
+    input._logoBound = true;
+    NDLogo.attachInput(input, { key: NDLogo.CURRENT_KEY, maxDim: 480, onChange: u => {
+      paint(u);
+      const tok = (window.NDAuth && NDAuth.isSignedIn && NDAuth.isSignedIn()) ? NDAuth.getToken() : null;
+      if (tok) NDLogo.pushToDrive(u, { token: tok }).catch(() => {});
+    } });
+  }
 }
 
 /* ---------- Watermark settings UI load/save ---------- */
@@ -5664,10 +5715,8 @@ if (window.NDUI && NDUI.syncTube) {
   });
 }
 
-/* Boot: passcode required on every open — no remembered session.
- * (Brandon's call: don't auto-unlock; wipe any saved session so the lock
- * screen always shows.) */
-clearUnlockSession();
+/* §4 boot: restore today's unlock (no passcode prompt mid-day) */
+tryRestoreSession();
 </script>
 </body>
 </html>
