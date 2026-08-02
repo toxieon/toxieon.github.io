@@ -22,6 +22,15 @@
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
     font-family: var(--nd-sans, system-ui, -apple-system, "Segoe UI", sans-serif); -webkit-font-smoothing: antialiased; }
+  /* status-tint fallback (mirrors assets/status-tint.js so the demo works even
+     if the asset JS hasn't loaded/deployed yet) */
+  .st-demo { border: 1px solid var(--nd-border, #2a2a2a); border-radius: 12px; padding: 14px 16px; background: var(--nd-surface, #1a1a1a); }
+  .nd-tint.nd-under { border-color:#e5484d !important; background:rgba(229,72,77,0.10) !important; box-shadow:0 0 0 1px rgba(229,72,77,0.28), 0 0 18px rgba(229,72,77,0.12); }
+  .nd-tint.nd-over  { border-color:#e3b341 !important; background:rgba(227,179,65,0.10) !important; box-shadow:0 0 0 1px rgba(227,179,65,0.30), 0 0 18px rgba(227,179,65,0.14); }
+  .nd-tint.nd-exact { border-color:#3ab87a !important; background:rgba(58,184,122,0.09) !important; box-shadow:0 0 0 1px rgba(58,184,122,0.22); }
+  .nd-tint.nd-lowvis.nd-under, .nd-tint.nd-lowvis.nd-under * { color:#e5484d !important; }
+  .nd-tint.nd-lowvis.nd-over,  .nd-tint.nd-lowvis.nd-over  * { color:#e3b341 !important; }
+  .nd-tint.nd-lowvis.nd-exact, .nd-tint.nd-lowvis.nd-exact * { color:#3ab87a !important; }
   .wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 80px; }
   header.page { margin-bottom: 24px; }
   header.page h1 { font-size: 26px; font-weight: 600; margin: 0 0 6px; }
@@ -107,7 +116,7 @@
         <strong id="st-val-out" style="min-width:44px;">6.0h</strong>
       </div>
       <label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--nd-muted,#888);margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="st-lowvis" /> Low-vis colours</label>
-      <div id="st-demo-card" style="border:1px solid var(--nd-border,#2a2a2a);border-radius:12px;padding:14px 16px;background:var(--nd-surface,#1a1a1a);">
+      <div id="st-demo-card" class="st-demo">
         <div style="display:flex;justify-content:space-between;"><strong>Tuesday</strong><span style="color:var(--nd-muted,#888);font-size:12px;">target 8h</span></div>
         <div style="font-size:13px;color:var(--nd-muted,#888);margin-top:4px;">Total: <span id="st-demo-total">6.0</span> hrs</div>
       </div>
@@ -230,14 +239,16 @@
 
   /* ---- Status tint demo ---- */
   (function () {
-    if (!window.NDStatusTint) return;
     var val = document.getElementById("st-val"), out = document.getElementById("st-val-out");
     var card = document.getElementById("st-demo-card"), total = document.getElementById("st-demo-total"), lowvis = document.getElementById("st-lowvis");
     if (!val || !card) return;
+    function classify(v, t) { return v > t + 0.01 ? "over" : (v < t - 0.01 ? "under" : "exact"); }
     function upd() {
       var v = Number(val.value);
       out.textContent = v.toFixed(1) + "h"; total.textContent = v.toFixed(1);
-      NDStatusTint.apply(card, v, 8, { lowVis: lowvis.checked });
+      // Use the asset when it's loaded; otherwise fall back so the demo still works.
+      if (window.NDStatusTint) { NDStatusTint.apply(card, v, 8, { lowVis: lowvis.checked }); return; }
+      card.className = "st-demo nd-tint nd-" + classify(v, 8) + (lowvis.checked ? " nd-lowvis" : "");
     }
     val.addEventListener("input", upd); lowvis.addEventListener("change", upd); upd();
   })();

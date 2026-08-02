@@ -152,7 +152,14 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .day-head .dname { font-weight: 600; }
 .day-head .ddate { font-size: 12px; color: var(--text-muted); }
-/* Interactive-times day-card tint comes from assets/status-tint.js (NDStatusTint). */
+/* Interactive-times tint. NDStatusTint (asset) injects these too, but keep a
+ * copy here so the colours never depend on the asset JS having loaded. */
+.nd-tint.nd-under { border-color:#e5484d !important; background:rgba(229,72,77,0.07); box-shadow:0 0 0 1px rgba(229,72,77,0.28), 0 0 18px rgba(229,72,77,0.12); }
+.nd-tint.nd-over  { border-color:#e3b341 !important; background:rgba(227,179,65,0.07); box-shadow:0 0 0 1px rgba(227,179,65,0.30), 0 0 18px rgba(227,179,65,0.14); }
+.nd-tint.nd-exact { border-color:#3ab87a !important; background:rgba(58,184,122,0.06); box-shadow:0 0 0 1px rgba(58,184,122,0.22); }
+.nd-tint.nd-lowvis.nd-under, .nd-tint.nd-lowvis.nd-under * { color:#e5484d !important; }
+.nd-tint.nd-lowvis.nd-over,  .nd-tint.nd-lowvis.nd-over  * { color:#e3b341 !important; }
+.nd-tint.nd-lowvis.nd-exact, .nd-tint.nd-lowvis.nd-exact * { color:#3ab87a !important; }
 /* Snap-times button (history view, bottom-right) */
 #snap-fab { position: fixed; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 45; display: none; align-items: center; gap: 7px; background: var(--surface, #1a1a1a); color: var(--text-primary, #f0f0f0); border: 1px solid var(--border, #2a2a2a); border-radius: 999px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 26px rgba(0,0,0,0.5); }
 #snap-fab.show { display: inline-flex; }
@@ -1967,8 +1974,11 @@ window.Views = {};
       // Interactive times: tint the whole card by hours (worked days only —
       // leave school/sick/static days alone). Off = plain card. Uses the shared
       // NDStatusTint asset (red under / gold over / green bang on).
-      if (st.settings.interactiveTimes !== false && daySessions.length && dayTotal > 0.01 && window.NDStatusTint) {
-        dayCls = NDStatusTint.classNames(dayTotal, stdDay, { lowVis: st.settings.lowVisColours });
+      if (st.settings.interactiveTimes !== false && daySessions.length && dayTotal > 0.01) {
+        const status = window.NDStatusTint
+          ? NDStatusTint.classify(dayTotal, stdDay)
+          : (dayTotal > stdDay + 0.01 ? 'over' : (dayTotal < stdDay - 0.01 ? 'under' : 'exact'));
+        dayCls = 'nd-tint nd-' + status + (st.settings.lowVisColours ? ' nd-lowvis' : '');
       }
       daysHtml.push(`<div class="card day-card ${dayCls}"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
     }
