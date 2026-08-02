@@ -14,6 +14,7 @@
 <script src="../assets/here.js"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
+<script src="../assets/status-tint.js"></script>
 <link rel="icon" href="assets/icons/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -151,13 +152,11 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .day-head .dname { font-weight: 600; }
 .day-head .ddate { font-size: 12px; color: var(--text-muted); }
-.day-foot .day-msg { font-weight: 700; }
-.day-foot.day-under .day-msg { color: #e5484d; animation: dayFlashRed 0.9s ease-in-out infinite; }
-.day-foot.day-over  .day-msg { color: #e07b2a; animation: dayFlashOrange 1.2s ease-in-out infinite; }
-.day-foot.day-exact .day-msg { color: #3ab87a; }
-@keyframes dayFlashRed { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
-@keyframes dayFlashOrange { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
-@media (prefers-reduced-motion: reduce) { .day-foot .day-msg { animation: none !important; } }
+/* Interactive-times day-card tint comes from assets/status-tint.js (NDStatusTint). */
+/* Snap-times button (history view, bottom-right) */
+#snap-fab { position: fixed; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 45; display: none; align-items: center; gap: 7px; background: var(--surface, #1a1a1a); color: var(--text-primary, #f0f0f0); border: 1px solid var(--border, #2a2a2a); border-radius: 999px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 26px rgba(0,0,0,0.5); }
+#snap-fab.show { display: inline-flex; }
+@media print { #snap-fab { display: none !important; } }
 .session-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .session-row:first-child { border-top: none; }
 .session-row .sjob { font-weight: 500; }
@@ -367,6 +366,15 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       </div>
     </div>
     <div class="settings-section">
+      <h3>Interactive times</h3>
+      <div class="card">
+        <div class="field row-between"><label style="margin:0;">Interactive times</label><div class="switch"><input type="checkbox" id="s-interactiveTimes"><span class="knob"></span></div></div>
+        <p class="muted" style="font-size:12px; margin:6px 0 0;">Tints each day card by hours worked — red under standard, gold for overtime, green when bang on. Off = plain cards.</p>
+        <div class="field row-between" style="margin-top:12px;"><label style="margin:0;">Low-vis colours</label><div class="switch"><input type="checkbox" id="s-lowVisColours"><span class="knob"></span></div></div>
+        <p class="muted" style="font-size:12px; margin:6px 0 0;">Also colours all the text in the card to match the status (higher contrast).</p>
+      </div>
+    </div>
+    <div class="settings-section">
       <h3>Time Rounding</h3>
       <div class="card">
         <div class="field"><label>Round clock-on/off to nearest</label>
@@ -491,6 +499,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
   </div>
 </section>
 
+<button id="snap-fab" title="Fill blank clock times">&#8987; Snap times</button>
 <div id="tabbar-root"></div>
 
 <div class="note-modal-backdrop" id="note-backdrop" style="display:none;">
@@ -588,6 +597,7 @@ window.TIMESHEET_CONFIG = {
     payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
     preferredMailApp: "Gmail", mapApp: "google",
     use24hr: true, exportFormats: ["Plain text email", "CSV"],
+    interactiveTimes: true, lowVisColours: false,
     // Payslip estimate (§48). Default preset = Neill Data (rebranded from the
     // Washington example). Hourly rate is the one thing the user must set.
     payslip: {
@@ -1001,6 +1011,37 @@ function reconcileOpenSessions() {
     if (typeof refreshAllViews === 'function') refreshAllViews();
     toast(snapped === 1 ? 'Snapped a missing clock-off to your standard finish' : `Snapped ${snapped} missing clock-offs to your standard finish`);
   }
+}
+
+// Manual "Snap times": fill any blank clock times by chaining adjacent jobs in
+// the day — a blank start takes the previous job's finish, a blank finish takes
+// the next job's start (ends of the day fall back to the standard times).
+function snapTimes() {
+  const st = getState();
+  const stdOn = st.settings.standardClockOn || '07:00';
+  const stdOff = st.settings.standardClockOff || '15:30';
+  const byDate = {};
+  st.sessions.forEach(s => { if (s.date) (byDate[s.date] = byDate[s.date] || []).push(s); });
+  let changed = 0;
+  Object.keys(byDate).forEach(date => {
+    const ds = byDate[date].sort((a, b) => (a.time_on || a.time_off || '99:99').localeCompare(b.time_on || b.time_off || '99:99'));
+    ds.forEach((s, k) => {
+      let touched = false;
+      if (!s.time_on) { const prev = ds[k - 1]; s.time_on = (prev && prev.time_off) ? prev.time_off : stdOn; touched = true; }
+      if (!s.time_off) { const next = ds[k + 1]; s.time_off = (next && next.time_on) ? next.time_on : stdOff; touched = true; }
+      if (touched) {
+        s.time_on_rounded = roundToNearest(s.time_on, st.settings.roundingMin);
+        s.time_off_rounded = roundToNearest(s.time_off, st.settings.roundingMin);
+        s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, sessionBreakMinutes(s));
+        s.overtime_hours = overtimeHours(s.total_hours, st.settings.otThresholdDay);
+        s.entry_method = s.entry_method || 'auto';
+        upsertSession(s);
+        changed++;
+      }
+    });
+  });
+  if (changed) { saveState(); refreshAllViews(); toast(changed === 1 ? 'Snapped 1 blank time' : `Snapped ${changed} blank times`); }
+  else toast('No blank times to snap');
 }
 
 function updateSession(sessionId, patch) {
@@ -1645,7 +1686,7 @@ const TsExport = (() => {
     const sessions = sessionsForWeek(start); const staticDays = staticDaysForWeek(start); const lines = [];
     for (let i = 0; i < 7; i++) {
       const day = addDays(start, i); const iso = isoDate(day);
-      const daySessions = sessions.filter(s => s.date === iso); const dayStatic = staticDays.filter(sd => sd.date === iso);
+      const daySessions = sessions.filter(s => s.date === iso).sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99')); const dayStatic = staticDays.filter(sd => sd.date === iso);
       if (!daySessions.length && !dayStatic.length) continue;
       lines.push(`${dayOfWeek(day)} ${fmtDateHeader(day)}`);
       let dayTotal = 0, dayOt = 0;
@@ -1910,7 +1951,7 @@ window.Views = {};
     const daysHtml = []; let daysWithData = 0;
     for (let i = 0; i < 7; i++) {
       const day = addDays(weekCursor, i); const iso = isoDate(day);
-      const daySessions = sessions.filter(s => s.date === iso); const dayStatic = staticDays.filter(sd => sd.date === iso);
+      const daySessions = sessions.filter(s => s.date === iso).sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99')); const dayStatic = staticDays.filter(sd => sd.date === iso);
       if (!daySessions.length && !dayStatic.length) continue;
       daysWithData++; let dayTotal = 0, dayOt = 0;
       const rows = daySessions.map(s => {
@@ -1922,14 +1963,14 @@ window.Views = {};
         return `<div class="session-row"><span class="sjob">${escapeHtml(sd.template.name)}<span class="static-badge">${escapeHtml(sd.template.type)}</span></span><span class="stime">${fmtTime(sd.template.clock_on, st.settings.use24hr)} &rarr; ${fmtTime(sd.template.clock_off, st.settings.use24hr)}</span><span class="shrs"></span></div>`;
       }).join('');
       const stdDay = Number(st.settings.otThresholdDay) || 8;
-      let dayCls = '', dayMsg = '';
-      // Only flag real worked days — leave school/sick/static days alone.
-      if (daySessions.length && dayTotal > 0.01) {
-        if (dayTotal > stdDay + 0.01) { dayCls = 'day-over'; dayMsg = 'OT — how good!'; }
-        else if (dayTotal < stdDay - 0.01) { dayCls = 'day-under'; dayMsg = 'OI, fix this'; }
-        else { dayCls = 'day-exact'; dayMsg = 'bang on'; }
+      let dayCls = '';
+      // Interactive times: tint the whole card by hours (worked days only —
+      // leave school/sick/static days alone). Off = plain card. Uses the shared
+      // NDStatusTint asset (red under / gold over / green bang on).
+      if (st.settings.interactiveTimes !== false && daySessions.length && dayTotal > 0.01 && window.NDStatusTint) {
+        dayCls = NDStatusTint.classNames(dayTotal, stdDay, { lowVis: st.settings.lowVisColours });
       }
-      daysHtml.push(`<div class="card day-card"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot ${dayCls}"><span>Total: ${dayTotal.toFixed(2)} hrs${dayMsg ? ' <span class="day-msg">' + dayMsg + '</span>' : ''}</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
+      daysHtml.push(`<div class="card day-card ${dayCls}"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
     }
     $('day-cards').innerHTML = daysWithData ? daysHtml.join('') : '<div class="empty-week">No sessions this week.</div>';
     $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', () => openDetail(el.dataset.session)); });
@@ -2103,6 +2144,8 @@ window.Views = {};
     bindToggle('s-notif-weekly', () => s.notifications.weeklySummary, v => saveSettings({ notifications: Object.assign({}, s.notifications, { weeklySummary: v }) }));
     bindText('s-defaultJobNote', 'defaultJobNote', s); bindSelect('s-firstDayOfWeek', 'firstDayOfWeek', s);
     bindToggle('s-use24hr', () => s.use24hr, v => saveSettings({ use24hr: v }));
+    bindToggle('s-interactiveTimes', () => s.interactiveTimes !== false, v => { saveSettings({ interactiveTimes: v }); refreshAllViews(); });
+    bindToggle('s-lowVisColours', () => !!s.lowVisColours, v => { saveSettings({ lowVisColours: v }); refreshAllViews(); });
     renderTemplates(); renderAccountStatus(); renderLastSynced();
   }
   function renderTemplates() {
@@ -2509,6 +2552,7 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const el = document.getElementById('view-' + name); if (el) el.classList.add('active');
   document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+  const snap = document.getElementById('snap-fab'); if (snap) snap.classList.toggle('show', name === 'history');
   if (window.Views[name] && window.Views[name].render) window.Views[name].render();
   window.scrollTo(0, 0);
 }
@@ -2523,6 +2567,7 @@ async function bootApp() {
   registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
   TsGeo.loadMapsJs().catch(() => {});   // preload so NDHere + reverseGeocode use the JS geocoder (referrer-safe)
   reconcileOpenSessions();   // §54 — snap any missed clock-offs before rendering
+  const snapFab = document.getElementById('snap-fab'); if (snapFab) snapFab.addEventListener('click', snapTimes);
   window.Views.clock.init(); window.Views.history.init(); window.Views.jobs.init(); window.Views.settings.init();
   showView('clock');
   await flushQueueOnNextOpen();

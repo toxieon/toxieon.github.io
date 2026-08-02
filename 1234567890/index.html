@@ -17,6 +17,7 @@
 <script src="../assets/sync-fill.js"></script>
 <script src="../assets/camera-capture.js"></script>
 <script src="../assets/logo.js"></script>
+<script src="../assets/status-tint.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
@@ -95,6 +96,22 @@
   </section>
 
   <div class="grid">
+
+    <!-- Status tint -->
+    <div class="card">
+      <h2>status-tint.js <code>NDStatusTint</code></h2>
+      <p>Tint a whole card by a value vs a target — red under, gold over, green bang on (the Timesheet day cards + SWB overload use it).</p>
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0;">
+        <span style="font-size:12px;color:var(--nd-muted,#888);">Hours</span>
+        <input type="range" id="st-val" min="0" max="12" step="0.5" value="6" style="flex:1;" />
+        <strong id="st-val-out" style="min-width:44px;">6.0h</strong>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--nd-muted,#888);margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="st-lowvis" /> Low-vis colours</label>
+      <div id="st-demo-card" style="border:1px solid var(--nd-border,#2a2a2a);border-radius:12px;padding:14px 16px;background:var(--nd-surface,#1a1a1a);">
+        <div style="display:flex;justify-content:space-between;"><strong>Tuesday</strong><span style="color:var(--nd-muted,#888);font-size:12px;">target 8h</span></div>
+        <div style="font-size:13px;color:var(--nd-muted,#888);margin-top:4px;">Total: <span id="st-demo-total">6.0</span> hrs</div>
+      </div>
+    </div>
 
     <!-- Sync tube -->
     <div class="card">
@@ -210,6 +227,20 @@
 
 <script>
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Status tint demo ---- */
+  (function () {
+    if (!window.NDStatusTint) return;
+    var val = document.getElementById("st-val"), out = document.getElementById("st-val-out");
+    var card = document.getElementById("st-demo-card"), total = document.getElementById("st-demo-total"), lowvis = document.getElementById("st-lowvis");
+    if (!val || !card) return;
+    function upd() {
+      var v = Number(val.value);
+      out.textContent = v.toFixed(1) + "h"; total.textContent = v.toFixed(1);
+      NDStatusTint.apply(card, v, 8, { lowVis: lowvis.checked });
+    }
+    val.addEventListener("input", upd); lowvis.addEventListener("change", upd); upd();
+  })();
 
   /* ---- Theme colour changer (showroom demo; presets) ---- */
   (function () {
