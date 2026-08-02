@@ -14,6 +14,9 @@
 <script src="../assets/watermark.js"></script>
 <script src="../assets/remember.js"></script>
 <script src="../assets/logo.js"></script>
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
     <meta name="theme-color" content="#07111f" />
 <title>ND • On-site Quote Tool</title>
 <style>
@@ -1013,6 +1016,13 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
               <label class="btn btn-utility" style="cursor:pointer;">Upload logo<input id="biz-logo-input" type="file" accept="image/*" style="display:none;"></label>
             </div>
             <p class="panel-sub" style="margin:6px 0 0;font-size:0.76rem;">One logo shared across the whole suite. Syncs to Drive when you're online.</p>
+          </div>
+          <div class="field"><label>Google account (optional)</label>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-utility" id="gsignin-btn" type="button">Sign in with Google</button>
+              <span class="panel-sub" id="gsignin-status" style="margin:0;font-size:0.78rem;"></span>
+            </div>
+            <p class="panel-sub" style="margin:6px 0 0;font-size:0.74rem;">Optional — lets the quoter pull your business logo from Drive so it shows on invoices. Not needed to use the quoter.</p>
           </div>
         </div>
       </details>
@@ -3587,6 +3597,7 @@ function renderSettings() {
   setVal('sheet-id',     settings.sheetId,              HARDCODED_SHEET_ID);
   loadWatermarkUI();
   loadLogoUI();
+  setupQuoteGoogle();
   const status = document.getElementById('sheet-status');
   if (settings.sheetLastStatus) {
     status.style.display = 'block';
@@ -3866,8 +3877,8 @@ async function renderQuoteImageCanvas(data) {
     ctx.fillText(data.headerLine, margin, 118);
   }
   // §55 — business logo, top-right of the header on a white chip so it reads on
-  // the dark bar. Uses the shared suite logo (NDLogo current).
-  if (data.logo) {
+  // the dark bar. Uses the shared suite logo (NDLogo current). Not on cash docs.
+  if (data.logo && !data.isCash) {
     try {
       const logoImg = await loadQuoteCanvasImage(data.logo);
       const chipW = 220, chipH = 118, chipX = width - margin - chipW, chipY = 26, pad = 12;
@@ -4537,6 +4548,45 @@ function loadLogoUI() {
       if (tok) NDLogo.pushToDrive(u, { token: tok }).catch(() => {});
     } });
   }
+}
+
+/* ---------- Optional Google sign-in (for Drive logo sync) — separate from
+ * the quoter's passcode auth. Purely for pulling the shared logo from Drive. */
+function setupQuoteGoogle() {
+  const btn = document.getElementById('gsignin-btn'), stEl = document.getElementById('gsignin-status');
+  if (!btn) return;
+  if (!window.NDAuth || !window.ND || !ND.config) { btn.disabled = true; return; }
+  const cfg = ND.config.forApp('quote');
+  const reflect = () => {
+    const inn = NDAuth.isSignedIn && NDAuth.isSignedIn();
+    btn.textContent = inn ? 'Sync logo from Drive' : 'Sign in with Google';
+    const email = NDAuth.getEmail ? NDAuth.getEmail() : null;
+    if (stEl) stEl.textContent = inn ? ('Signed in' + (email ? ' · ' + email : '')) : '';
+  };
+  const syncLogo = () => {
+    if (!(NDAuth.isSignedIn && NDAuth.isSignedIn()) || !window.NDLogo) return;
+    if (stEl) stEl.textContent = 'Syncing logo…';
+    NDLogo.pullLatest({ token: NDAuth.getToken() }).then(u => { loadLogoUI(); if (stEl) stEl.textContent = u ? 'Logo synced from Drive' : 'No logo in Drive yet'; }).catch(() => { if (stEl) stEl.textContent = 'Sync failed'; });
+  };
+  if (!btn._gBound) {
+    btn._gBound = true;
+    btn.addEventListener('click', () => {
+      if (NDAuth.isSignedIn && NDAuth.isSignedIn()) { syncLogo(); return; }
+      if (stEl) stEl.textContent = 'Signing in…';
+      NDAuth.ensureToken({ interactive: true }).then(() => { reflect(); syncLogo(); }).catch(() => { if (stEl) stEl.textContent = 'Sign-in failed'; });
+    });
+  }
+  if (!window._quoteAuthInit) {
+    window._quoteAuthInit = true;
+    (function wait(n) {
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        try { NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes }); } catch (e) {}
+        NDAuth.onAuthChange(() => reflect());
+        NDAuth.ensureToken().then(() => { reflect(); syncLogo(); }).catch(() => {});
+      } else if ((n || 0) < 100) { setTimeout(() => wait((n || 0) + 1), 100); }
+    })();
+  }
+  reflect();
 }
 
 /* ---------- Watermark settings UI load/save ---------- */

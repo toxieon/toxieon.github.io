@@ -8,7 +8,7 @@
     { "id": "swb",       "name": "SWB",       "path": "/swb/",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6, "hidden": false },
     { "id": "fitoff",    "name": "Fit-off",   "path": "/fitoff/",    "icon": "/fitoff/favicon.svg",    "color": "#3ab87a", "order": 7, "hidden": false },
     { "id": "assets",    "name": "Assets",    "path": "/1234567890/", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8, "hidden": false },
-    { "id": "company",   "name": "Company",   "path": "/company/",   "icon": "/favicon.svg",           "color": "#e07b2a", "order": 9, "hidden": false },
+    { "id": "company",   "name": "Company",   "path": "/company/",   "icon": "/company/favicon.svg",   "color": "#e07b2a", "order": 9, "hidden": false },
     { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 10, "hidden": true }
   ]
 }

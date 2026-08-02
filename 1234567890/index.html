@@ -88,6 +88,12 @@
     </div>
   </section>
 
+  <section id="theme-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+    <span style="font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--nd-muted,#888);font-weight:800;">Theme colour</span>
+    <div id="theme-swatches" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+    <span class="muted" style="font-size:12px;color:var(--nd-muted,#888);" id="theme-name"></span>
+  </section>
+
   <div class="grid">
 
     <!-- Sync tube -->
@@ -204,6 +210,33 @@
 
 <script>
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Theme colour changer (showroom demo; presets) ---- */
+  (function () {
+    var THEMES = {
+      amber:  { name: "Orange & black", a: "#e07b2a", s: "#f5a05a" },
+      blue:   { name: "Blue (quoter)",  a: "#31d0ff", s: "#6affb8" },
+      green:  { name: "Green",          a: "#3ab87a", s: "#6ddba3" },
+      purple: { name: "Purple",         a: "#8b5cf6", s: "#c4b5fd" }
+    };
+    var KEY = "nd-showroom-theme";
+    var host = document.getElementById("theme-swatches"), nameEl = document.getElementById("theme-name");
+    if (!host) return;
+    function apply(id) {
+      var t = THEMES[id] || THEMES.amber, r = document.documentElement.style;
+      r.setProperty("--nd-amber", t.a); r.setProperty("--nd-amber-soft", t.s);
+      try { localStorage.setItem(KEY, id); } catch (e) {}
+      if (nameEl) nameEl.textContent = t.name;
+      host.querySelectorAll("[data-theme]").forEach(function (b) { b.style.outline = b.dataset.theme === id ? "2px solid #fff" : "none"; b.style.outlineOffset = "2px"; });
+    }
+    host.innerHTML = Object.keys(THEMES).map(function (id) {
+      var t = THEMES[id];
+      return '<button data-theme="' + id + '" title="' + t.name + '" aria-label="' + t.name + '" style="width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;background:linear-gradient(135deg,' + t.a + ',' + t.s + ');"></button>';
+    }).join("");
+    host.querySelectorAll("[data-theme]").forEach(function (b) { b.addEventListener("click", function () { apply(b.dataset.theme); }); });
+    var saved = null; try { saved = localStorage.getItem(KEY); } catch (e) {}
+    apply(saved && THEMES[saved] ? saved : "amber");
+  })();
 
   /* ---- Logo hero: show the current business logo; upload + Drive sync ---- */
   (function () {

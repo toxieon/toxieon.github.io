@@ -113,13 +113,27 @@
   // <img>. The thumbnail endpoint needs Google cookies we don't have here, so
   // we fetch the bytes with the signed-in token instead. PDFs render via pdf.js.
   var _pdfjs = null;
+  var PDF_VER = "3.11.174";
   function loadPdfJs() {
-    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (window.pdfjsLib && window.__ndPdfWorkerReady) return Promise.resolve(window.pdfjsLib);
     if (_pdfjs) return _pdfjs;
     _pdfjs = new Promise(function (resolve, reject) {
       var s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-      s.onload = function () { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(window.pdfjsLib); } catch (e) { reject(e); } };
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/" + PDF_VER + "/pdf.min.js";
+      s.onload = function () {
+        // Load the worker as a SAME-ORIGIN blob. A cross-origin worker URL is
+        // silently blocked in some mobile browsers — that's why the plan (a PDF)
+        // rendered on desktop/planner but showed blank on the phone.
+        var workerUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/" + PDF_VER + "/pdf.worker.min.js";
+        fetch(workerUrl).then(function (r) { return r.text(); }).then(function (t) {
+          var blobUrl = URL.createObjectURL(new Blob([t], { type: "application/javascript" }));
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = blobUrl;
+          window.__ndPdfWorkerReady = true; resolve(window.pdfjsLib);
+        }).catch(function () {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;   // fallback to cross-origin
+          window.__ndPdfWorkerReady = true; resolve(window.pdfjsLib);
+        });
+      };
       s.onerror = function () { reject(new Error("pdf.js failed")); };
       document.head.appendChild(s);
     });
@@ -166,7 +180,19 @@
       var url = /pdf/i.test(blob.type) ? await pdfBlobToPng(blob) : await blobToDataUrl(blob);
       imgEl.src = url; imgEl.dataset.loaded = "1";
       if (window.NDCache) { try { await NDCache.put(key, url); } catch (e) {} }
-    } catch (e) { console.warn("plan load failed", fileId, e); imgEl.classList.add("img-failed"); }
+    } catch (e) {
+      console.warn("plan load failed", fileId, e);
+      imgEl.classList.add("img-failed");
+      // Surface the reason instead of a blank, so issues are diagnosable.
+      var stage = imgEl.parentNode;
+      if (stage && !stage.querySelector(".plan-err")) {
+        var msg = document.createElement("div");
+        msg.className = "plan-err";
+        msg.style.cssText = "position:absolute;left:50%;top:44%;transform:translateX(-50%);max-width:80vw;text-align:center;color:#f0a0a0;font-size:13px;background:rgba(0,0,0,0.55);padding:10px 14px;border-radius:10px;";
+        msg.textContent = "Couldn't load the floor plan (" + (e && e.message || e) + ")";
+        stage.appendChild(msg);
+      }
+    }
   }
   function qParam(k) { return new URLSearchParams(location.search).get(k); }
   var _maps = null;
