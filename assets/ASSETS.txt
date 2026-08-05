@@ -3,7 +3,7 @@
  A growing library of drop-in feature components shared across the apps
  (uploader, quote, planner, timesheet, swb, hub).
  Update this file whenever an asset is added, changed, or wired into an app.
- Last updated: 2026-08-02
+ Last updated: 2026-08-05
 ========================================================================
 
 HOW THIS RELATES TO /shared
@@ -264,6 +264,35 @@ HOW THIS RELATES TO /shared
     Where to wire: a planner node status dot when it goes Complete, fit-off
               markers when a job opens, a connection/sync dot going live.
 
+[19] confetti.js  —  celebration confetti burst
+    Global:   NDConfetti
+    Needs:    nothing (creates its own canvas).
+    API:      NDConfetti.burst({ duration, count, colors }) -> stop()
+              NDConfetti.start(opts) / NDConfetti.stop()
+    Status:   BUILT + showroom demo
+    Origin:   Brandon's pixel page.  Where: quote accepted, a milestone hit.
+
+[20] floaties.js  —  rising floating particles
+    Global:   NDFloaties
+    Needs:    nothing (self-injects CSS).
+    API:      NDFloaties.rise(container, { emoji, count, minSize, maxSize, duration })
+    Status:   BUILT + showroom demo
+    Origin:   Brandon's pixel page.  Where: light celebration / "nice work" moments.
+
+[21] pixel-cat.js  —  pixel cat, eyes follow the cursor
+    Global:   NDCat
+    Needs:    nothing.
+    API:      NDCat.mount(el, { size }) -> { destroy } ;  NDCat.svg()
+    Status:   BUILT + showroom demo
+    Origin:   Brandon's pixel page.  Where: empty states, a splash/error screen mascot.
+
+[22] dodge-button.js  —  the runaway "are you sure?" button
+    Global:   NDDodge
+    Needs:    nothing.
+    API:      NDDodge.make(btn, { messages, grow, onGiveUp }) -> { reset }
+    Status:   BUILT + showroom demo
+    Origin:   Brandon's pixel page.  Where: a playful cancel / Easter egg.
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -301,6 +330,10 @@ HOW THIS RELATES TO /shared
               anywhere saves to a "Logos" Drive folder and becomes the one
               current logo suite-wide (localStorage cache is shared same-origin).
               Showroom now shows the current logo as a hero + upload/sync.
+  2026-08-05  Extracted 4 delights from a one-off pixel page: confetti.js
+              (NDConfetti), floaties.js (NDFloaties rising particles),
+              pixel-cat.js (NDCat cursor-tracking mascot), dodge-button.js
+              (NDDodge runaway button). All have showroom demos.
   2026-08-02  Added 4 animations: confirm-pop.js (NDConfirmPop success tick),
               odometer.js (NDOdometer count-up), skeleton.js (NDSkeleton shimmer),
               energize.js (NDEnergize on-brand pulse). All have showroom demos.

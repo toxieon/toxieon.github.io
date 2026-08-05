@@ -22,6 +22,10 @@
 <script src="../assets/odometer.js"></script>
 <script src="../assets/skeleton.js"></script>
 <script src="../assets/energize.js"></script>
+<script src="../assets/confetti.js"></script>
+<script src="../assets/floaties.js"></script>
+<script src="../assets/pixel-cat.js"></script>
+<script src="../assets/dodge-button.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
@@ -109,6 +113,42 @@
   </section>
 
   <div class="grid">
+
+    <!-- Confetti -->
+    <div class="card">
+      <h2>confetti.js <code>NDConfetti</code></h2>
+      <p>Full-screen confetti burst for wins — quote accepted, milestone hit.</p>
+      <button id="cf-btn" style="margin-top:8px;padding:9px 16px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">Celebrate</button>
+    </div>
+
+    <!-- Floaties -->
+    <div class="card">
+      <h2>floaties.js <code>NDFloaties</code></h2>
+      <p>Little characters drift up and fade — a light celebratory touch.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button id="fl-heart" style="padding:8px 14px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">❤ Hearts</button>
+        <button id="fl-spark" style="padding:8px 14px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">⚡ Sparks</button>
+        <button id="fl-star" style="padding:8px 14px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">★ Stars</button>
+      </div>
+    </div>
+
+    <!-- Pixel cat -->
+    <div class="card">
+      <h2>pixel-cat.js <code>NDCat</code></h2>
+      <p>A pixel mascot whose eyes follow your cursor. Move your mouse around.</p>
+      <div id="cat-mount" style="width:120px;height:120px;margin:10px auto 0;"></div>
+    </div>
+
+    <!-- Dodge button -->
+    <div class="card">
+      <h2>dodge-button.js <code>NDDodge</code></h2>
+      <p>A cheeky button that shrinks, taunts, then dodges the cursor.</p>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:10px;">
+        <button id="dg-yes" style="padding:10px 18px;border-radius:10px;border:0;background:#3ab87a;color:#052015;font-weight:800;cursor:pointer;">Yes</button>
+        <button id="dg-no" style="padding:10px 18px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">No</button>
+        <button id="dg-reset" style="padding:8px 12px;border-radius:8px;border:1px solid var(--nd-border,#2a2a2a);background:transparent;color:var(--nd-muted,#888);font-size:12px;cursor:pointer;">reset</button>
+      </div>
+    </div>
 
     <!-- Success tick -->
     <div class="card">
@@ -273,6 +313,29 @@
 
 <script>
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Pixel-art animation demos (from Brandon's page) ---- */
+  (function () {
+    var cf = document.getElementById("cf-btn");
+    if (cf && window.NDConfetti) cf.addEventListener("click", function () { NDConfetti.burst({ duration: 2600 }); });
+
+    if (window.NDFloaties) {
+      var fh = document.getElementById("fl-heart"), fsp = document.getElementById("fl-spark"), fst = document.getElementById("fl-star");
+      if (fh) fh.addEventListener("click", function () { NDFloaties.rise(document.body, { emoji: "❤", count: 16 }); });
+      if (fsp) fsp.addEventListener("click", function () { NDFloaties.rise(document.body, { emoji: "⚡", count: 16 }); });
+      if (fst) fst.addEventListener("click", function () { NDFloaties.rise(document.body, { emoji: "★", count: 16 }); });
+    }
+
+    var catMount = document.getElementById("cat-mount");
+    if (catMount && window.NDCat) NDCat.mount(catMount);
+
+    if (window.NDDodge) {
+      var no = document.getElementById("dg-no"), yes = document.getElementById("dg-yes"), reset = document.getElementById("dg-reset");
+      var d = NDDodge.make(no, { grow: yes, messages: ["No", "you sure?", "really?", "think again!", "last chance!", "nope!"] });
+      if (yes) yes.addEventListener("click", function () { if (window.NDConfetti) NDConfetti.burst({ duration: 2200 }); if (d) d.reset(); });
+      if (reset) reset.addEventListener("click", function () { if (d) d.reset(); });
+    }
+  })();
 
   /* ---- Animation demos ---- */
   (function () {
