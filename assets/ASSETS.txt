@@ -214,6 +214,56 @@ HOW THIS RELATES TO /shared
               Prints only the document (hidden iframe) — no popup blocker, the
               app UI never appears in the PDF.
 
+[14] status-tint.js  —  tint a card by a value vs a target
+    Global:   NDStatusTint
+    Origin:   Timesheet interactive-times day cards (and SWB's overload card).
+    Needs:    nothing (self-injects CSS).
+    API:      NDStatusTint.classify(value, target, {epsilon}) -> under|exact|over
+              NDStatusTint.classNames(value, target, {lowVis}) -> class string
+              NDStatusTint.apply(el, value, target, {lowVis}) · clear(el)
+    Used by:  timesheet (day cards)  (WIRED); showroom demo.
+    Status:   WIRED (timesheet)
+    Notes:    Fixed meaning across the suite: under=red, over=gold, exact=green.
+              Add class "nd-tint" + a status class to any full-bordered card.
+              lowVis also colours all the text in the card to match.
+
+[15] confirm-pop.js  —  animated success tick
+    Global:   NDConfirmPop
+    Needs:    nothing (self-injects CSS).
+    API:      NDConfirmPop.show({ label, color, size, duration, onDone }) -> Promise
+    Status:   BUILT + showroom demo
+    Where to wire: after an upload completes (uploader), on clock-on/off
+              (timesheet), on quote/invoice save, on node placed (planner),
+              on member invited (company).
+
+[16] odometer.js  —  count-up numbers
+    Global:   NDOdometer
+    Needs:    nothing.
+    API:      NDOdometer.to(el, value, { from, duration, decimals, prefix, suffix })
+              NDOdometer.count(el, from, to, opts)
+    Status:   BUILT + showroom demo
+    Where to wire: quote grand total (renderTotals), timesheet week total +
+              payslip Gross/Net, planner project stats, hours-on-site panel.
+
+[17] skeleton.js  —  shimmer placeholders
+    Global:   NDSkeleton
+    Needs:    nothing (self-injects CSS).
+    API:      NDSkeleton.lines(n, {lastWidth}) · box(w,h,r) · grid(n,{cols,tile})
+              NDSkeleton.into(el, html)
+    Status:   BUILT + showroom demo
+    Where to wire: drop into a list/grid container before the fetch, replace with
+              real content when it lands — planner project list, search photo
+              grid, timesheet history, quote history. Pairs with loading-bar
+              (global) for a polished load. (nd-ui also has NDUI.skeleton.)
+
+[18] energize.js  —  "powering up" pulse (on-brand)
+    Global:   NDEnergize
+    Needs:    nothing (self-injects CSS).
+    API:      NDEnergize.pulse(el, { color, persist })
+    Status:   BUILT + showroom demo
+    Where to wire: a planner node status dot when it goes Complete, fit-off
+              markers when a job opens, a connection/sync dot going live.
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -251,6 +301,12 @@ HOW THIS RELATES TO /shared
               anywhere saves to a "Logos" Drive folder and becomes the one
               current logo suite-wide (localStorage cache is shared same-origin).
               Showroom now shows the current logo as a hero + upload/sync.
+  2026-08-02  Added 4 animations: confirm-pop.js (NDConfirmPop success tick),
+              odometer.js (NDOdometer count-up), skeleton.js (NDSkeleton shimmer),
+              energize.js (NDEnergize on-brand pulse). All have showroom demos.
+  2026-08-02  Added status-tint.js (NDStatusTint) — extracted the Timesheet
+              interactive-times day-card tint (red under / gold over / green
+              bang on). Wired timesheet onto it; showroom demo added.
   2026-08-02  Wired the assets in: Timesheet payslip generator (Settings →
               Payslip estimate) uses NDDoc + NDLogo and pulls the pay period's
               logged hours. Quote invoice/quote images now draw the shared

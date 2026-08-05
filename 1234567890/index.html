@@ -18,6 +18,10 @@
 <script src="../assets/camera-capture.js"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/status-tint.js"></script>
+<script src="../assets/confirm-pop.js"></script>
+<script src="../assets/odometer.js"></script>
+<script src="../assets/skeleton.js"></script>
+<script src="../assets/energize.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
@@ -105,6 +109,39 @@
   </section>
 
   <div class="grid">
+
+    <!-- Success tick -->
+    <div class="card">
+      <h2>confirm-pop.js <code>NDConfirmPop</code></h2>
+      <p>Self-drawing tick + ring pop for "done!" moments — uploads, clock-on, saves.</p>
+      <button id="pop-btn" style="margin-top:8px;padding:9px 16px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">Show success tick</button>
+    </div>
+
+    <!-- Count-up -->
+    <div class="card">
+      <h2>odometer.js <code>NDOdometer</code></h2>
+      <p>Numbers roll up instead of snapping — quote totals, week hours, stats.</p>
+      <div id="odo-val" style="font-size:32px;font-weight:800;margin:8px 0;">$0.00</div>
+      <button id="odo-btn" style="padding:9px 16px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">Roll to a total</button>
+    </div>
+
+    <!-- Skeleton -->
+    <div class="card">
+      <h2>skeleton.js <code>NDSkeleton</code></h2>
+      <p>Shimmer placeholders while lists/grids load, so content fades in.</p>
+      <div id="sk-demo" style="margin:8px 0;"></div>
+      <button id="sk-btn" style="padding:9px 16px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">Replay load</button>
+    </div>
+
+    <!-- Energize -->
+    <div class="card">
+      <h2>energize.js <code>NDEnergize</code></h2>
+      <p>On-brand "powering up" pulse when a device/node goes live.</p>
+      <div style="display:flex;align-items:center;gap:16px;margin:12px 0;">
+        <span id="en-dot" style="width:20px;height:20px;border-radius:50%;background:var(--nd-amber,#e07b2a);display:inline-block;"></span>
+        <button id="en-btn" style="padding:9px 16px;border-radius:10px;border:1px solid var(--nd-border,#2a2a2a);background:var(--nd-surface,#1a1a1a);color:var(--nd-text,#f0f0f0);font-weight:600;cursor:pointer;">Energize</button>
+      </div>
+    </div>
 
     <!-- Status tint -->
     <div class="card">
@@ -236,6 +273,29 @@
 
 <script>
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
+
+  /* ---- Animation demos ---- */
+  (function () {
+    var pop = document.getElementById("pop-btn");
+    if (pop && window.NDConfirmPop) pop.addEventListener("click", function () { NDConfirmPop.show({ label: "Saved", color: "#3ab87a" }); });
+
+    var odoVal = document.getElementById("odo-val"), odoBtn = document.getElementById("odo-btn");
+    if (odoBtn && window.NDOdometer) odoBtn.addEventListener("click", function () {
+      NDOdometer.to(odoVal, 1000 + Math.round(Math.random() * 8000) + Math.random(), { from: 0, duration: 1100, decimals: 2, prefix: "$" });
+    });
+
+    var skDemo = document.getElementById("sk-demo"), skBtn = document.getElementById("sk-btn");
+    function skRun() {
+      if (!window.NDSkeleton || !skDemo) return;
+      NDSkeleton.into(skDemo, NDSkeleton.lines(3));
+      setTimeout(function () { skDemo.innerHTML = '<div style="font-size:13px;color:var(--nd-muted,#888);">Loaded: 3 items ✓</div>'; }, 1800);
+    }
+    if (skBtn) skBtn.addEventListener("click", skRun);
+    skRun();
+
+    var enDot = document.getElementById("en-dot"), enBtn = document.getElementById("en-btn");
+    if (enBtn && window.NDEnergize) enBtn.addEventListener("click", function () { NDEnergize.pulse(enDot); });
+  })();
 
   /* ---- Status tint demo ---- */
   (function () {
