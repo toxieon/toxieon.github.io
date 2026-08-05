@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Will you go out with me?</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Press Start 2P', monospace;
+    image-rendering: pixelated;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 2 L4 18 L8 14 L11 20 L14 19 L11 13 L17 13 Z' fill='%23ff3d7f' stroke='white' stroke-width='1'/%3E%3C/svg%3E") 4 2, auto;
+  }
+
+  /* ---------- SKY / BACKGROUND ---------- */
+  #scene {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(#ffd1e8 0%, #ffb3d9 45%, #ff9ecb 70%, #ff89c0 100%);
+    overflow: hidden;
+  }
+
+  /* pixel clouds */
+  .cloud {
+    position: absolute;
+    background: #fff0f7;
+    box-shadow:
+      16px 0 0 #fff0f7, 32px 0 0 #fff0f7, 48px 0 0 #fff0f7,
+      16px -16px 0 #fff0f7, 32px -16px 0 #fff0f7,
+      0 16px 0 #ffe0ef, 16px 16px 0 #ffe0ef, 32px 16px 0 #ffe0ef, 48px 16px 0 #ffe0ef, 64px 16px 0 #ffe0ef, -16px 16px 0 #ffe0ef;
+    width: 16px; height: 16px;
+    opacity: 0.9;
+    animation: drift linear infinite;
+  }
+  .cloud.c1 { top: 12%; left: -10%; transform: scale(1.4); animation-duration: 40s; }
+  .cloud.c2 { top: 24%; left: -10%; transform: scale(1.0); animation-duration: 55s; animation-delay: -10s; }
+  .cloud.c3 { top: 8%;  left: -10%; transform: scale(1.8); animation-duration: 70s; animation-delay: -30s; }
+  .cloud.c4 { top: 32%; left: -10%; transform: scale(0.8); animation-duration: 48s; animation-delay: -20s; }
+  @keyframes drift { from { margin-left: 0; } to { margin-left: 120vw; } }
+
+  /* pixel sun / big heart in sky */
+  .sky-heart {
+    position: absolute;
+    top: 10%; right: 12%;
+    font-size: 42px;
+    color: #ff5fa2;
+    text-shadow: 4px 4px 0 #e23e86;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.15);} }
+
+  /* rolling pixel hills */
+  .hill {
+    position: absolute;
+    bottom: 0;
+    width: 130%;
+    left: -15%;
+    border-radius: 50% 50% 0 0;
+  }
+  .hill.h1 { height: 34vh; background: #ff77b8; box-shadow: inset 0 8px 0 #ff8ec5; }
+  .hill.h2 { height: 24vh; left: 30%;  background: #f95ba6; box-shadow: inset 0 8px 0 #ff77b8; }
+  .hill.h3 { height: 20vh; left: -45%; background: #e84896; box-shadow: inset 0 8px 0 #f95ba6; }
+  .hill.h4 { height: 12vh; background: #d63a86; }
+
+  /* little floating hearts rising from hills */
+  .float-heart {
+    position: absolute;
+    bottom: -20px;
+    color: #fff0f7;
+    font-size: 18px;
+    animation: rise linear infinite;
+    opacity: 0;
+  }
+  @keyframes rise {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.9; }
+    100% { transform: translateY(-90vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* ---------- CENTER CARD ---------- */
+  #card {
+    position: relative;
+    z-index: 10;
+    width: 92%;
+    max-width: 460px;
+    margin: 8vh auto 0;
+    background: #fff6fb;
+    border: 6px solid #2b0d1e;
+    box-shadow:
+      0 0 0 6px #ff9ecb,
+      12px 12px 0 rgba(43,13,30,0.35);
+    padding: 26px 20px 30px;
+    text-align: center;
+    animation: floaty 3s ease-in-out infinite;
+  }
+  @keyframes floaty { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-8px);} }
+
+  /* pixel cat inside an SVG */
+  #cat-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
+  #cat { width: 150px; height: 150px; }
+  #cat svg { width: 100%; height: 100%; shape-rendering: crispEdges; }
+
+  #question {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #b3245f;
+    margin-bottom: 22px;
+    text-shadow: 2px 2px 0 #ffd7ea;
+  }
+
+  #buttons {
+    position: relative;
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  button.pixel {
+    font-family: 'Press Start 2P', monospace;
+    border: 4px solid #2b0d1e;
+    padding: 14px 20px;
+    font-size: 14px;
+    cursor: inherit;
+    color: #fff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, font-size 0.2s ease, padding 0.2s ease;
+    user-select: none;
+  }
+  #yesBtn {
+    background: #2ecc71;
+    box-shadow: 4px 4px 0 #1c7a45;
+  }
+  #yesBtn:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 #1c7a45; }
+  #yesBtn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #1c7a45; }
+  #noBtn {
+    background: #ff5fa2;
+    box-shadow: 4px 4px 0 #b3245f;
+  }
+  #noBtn:active { transform: translate(2px,2px); }
+
+  /* ---------- CELEBRATION ---------- */
+  #celebrate {
+    position: fixed; inset: 0; z-index: 50;
+    display: none;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle, rgba(255,220,240,0.65), rgba(255,150,205,0.85));
+  }
+  #yay {
+    font-size: 20vw;
+    color: #fff;
+    -webkit-text-stroke: 6px #ff2e8a;
+    text-shadow: 8px 8px 0 #b3245f;
+    animation: yaybounce 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes yaybounce {
+    from { transform: scale(0.8) rotate(-6deg); }
+    to   { transform: scale(1.15) rotate(6deg); }
+  }
+  canvas#confetti { position: fixed; inset: 0; z-index: 49; pointer-events: none; display: none; }
+
+  /* ---------- DATE PICKER ---------- */
+  #dateScreen {
+    position: fixed; inset: 0; z-index: 60;
+    display: none;
+    align-items: center; justify-content: center;
+    background: linear-gradient(#ffd1e8, #ff9ecb);
+  }
+  #calCard {
+    background: #fff6fb;
+    border: 6px solid #2b0d1e;
+    box-shadow: 0 0 0 6px #ff9ecb, 12px 12px 0 rgba(43,13,30,0.35);
+    padding: 22px;
+    width: 92%; max-width: 420px;
+    text-align: center;
+    animation: popin 0.4s ease;
+  }
+  @keyframes popin { from { transform: scale(0.5); opacity: 0;} to { transform: scale(1); opacity: 1;} }
+  #calTitle { font-size: 13px; color: #b3245f; line-height: 1.7; margin-bottom: 16px; }
+  #calHeader {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; font-size: 11px; color: #b3245f;
+  }
+  #calHeader button {
+    font-family: 'Press Start 2P', monospace;
+    background: #ff5fa2; color: #fff; border: 3px solid #2b0d1e;
+    padding: 6px 10px; cursor: inherit; font-size: 11px;
+    box-shadow: 2px 2px 0 #b3245f;
+  }
+  #grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .dow { font-size: 8px; color: #ff5fa2; padding: 4px 0; }
+  .day {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; padding: 8px 0;
+    background: #ffe0ef; border: 2px solid #ffb3d9;
+    color: #b3245f; cursor: inherit;
+  }
+  .day:hover { background: #ff9ecb; color: #fff; }
+  .day.empty { background: transparent; border: none; cursor: default; }
+  .day.past { opacity: 0.35; pointer-events: none; }
+  .day.selected { background: #2ecc71; border-color: #1c7a45; color: #fff; }
+
+  /* ---------- FINAL ---------- */
+  #finalScreen {
+    position: fixed; inset: 0; z-index: 70;
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(#ffd1e8, #ff89c0);
+    text-align: center;
+  }
+  #finalBig {
+    font-size: 9vw;
+    color: #fff;
+    -webkit-text-stroke: 4px #ff2e8a;
+    text-shadow: 6px 6px 0 #b3245f;
+    animation: yaybounce 0.9s ease-in-out infinite alternate;
+  }
+  #finalDate {
+    margin-top: 26px;
+    font-size: 15px;
+    color: #b3245f;
+    background: #fff6fb;
+    border: 5px solid #2b0d1e;
+    box-shadow: 6px 6px 0 rgba(43,13,30,0.3);
+    padding: 16px 22px;
+    line-height: 1.7;
+  }
+  #finalScreen .float-heart { position: absolute; }
+
+  .hint { margin-top: 14px; font-size: 8px; color: #ff5fa2; }
+</style>
+</head>
+<body>
+
+<div id="scene">
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+  <div class="sky-heart">&#10084;</div>
+
+  <div class="hill h3"></div>
+  <div class="hill h2"></div>
+  <div class="hill h1"></div>
+  <div class="hill h4"></div>
+
+  <div id="card">
+    <div id="cat-wrap">
+      <div id="cat"><!-- SVG cat injected by JS --></div>
+    </div>
+    <div id="question">will you go out with me?</div>
+    <div id="buttons">
+      <button class="pixel" id="yesBtn">YES</button>
+      <button class="pixel" id="noBtn">NO</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<div id="celebrate">
+  <div id="yay">YAY!</div>
+</div>
+
+<div id="dateScreen">
+  <div id="calCard">
+    <div id="calTitle">yay!! now pick our date &#128149;</div>
+    <div id="calHeader">
+      <button id="prevMonth">&#9664;</button>
+      <span id="monthLabel"></span>
+      <button id="nextMonth">&#9654;</button>
+    </div>
+    <div id="grid"></div>
+    <div class="hint">tap a day</div>
+  </div>
+</div>
+
+<div id="finalScreen">
+  <div id="finalBig">IT'S A DATE!</div>
+  <div id="finalDate"></div>
+</div>
+
+<script>
+/* ============ PIXEL CAT (eyes follow cursor) ============ */
+const catEl = document.getElementById('cat');
+// Build the cat SVG. Pupils are separate elements we move.
+catEl.innerHTML = `
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- ears -->
+  <rect x="5" y="4" width="4" height="4" fill="#3a2233"/>
+  <rect x="4" y="5" width="6" height="4" fill="#5a3a52"/>
+  <rect x="23" y="4" width="4" height="4" fill="#3a2233"/>
+  <rect x="22" y="5" width="6" height="4" fill="#5a3a52"/>
+  <rect x="6" y="6" width="2" height="2" fill="#ff9ecb"/>
+  <rect x="24" y="6" width="2" height="2" fill="#ff9ecb"/>
+  <!-- head -->
+  <rect x="6" y="8" width="20" height="16" fill="#6b4560"/>
+  <rect x="5" y="10" width="22" height="12" fill="#6b4560"/>
+  <rect x="7" y="9" width="18" height="14" fill="#7d5171"/>
+  <!-- cheeks -->
+  <rect x="7" y="17" width="3" height="2" fill="#ff9ecb"/>
+  <rect x="22" y="17" width="3" height="2" fill="#ff9ecb"/>
+  <!-- eye whites -->
+  <rect x="9" y="12" width="6" height="6" fill="#fff6fb"/>
+  <rect x="17" y="12" width="6" height="6" fill="#fff6fb"/>
+  <!-- pupils (moved by JS) -->
+  <rect id="pupilL" x="11" y="14" width="3" height="3" fill="#2b0d1e"/>
+  <rect id="pupilR" x="19" y="14" width="3" height="3" fill="#2b0d1e"/>
+  <!-- nose -->
+  <rect x="15" y="18" width="2" height="2" fill="#ff5fa2"/>
+  <!-- mouth -->
+  <rect x="13" y="20" width="2" height="1" fill="#3a2233"/>
+  <rect x="17" y="20" width="2" height="1" fill="#3a2233"/>
+  <!-- whiskers -->
+  <rect x="2" y="15" width="4" height="1" fill="#3a2233"/>
+  <rect x="2" y="18" width="4" height="1" fill="#3a2233"/>
+  <rect x="26" y="15" width="4" height="1" fill="#3a2233"/>
+  <rect x="26" y="18" width="4" height="1" fill="#3a2233"/>
+  <!-- body / paws -->
+  <rect x="9" y="24" width="14" height="5" fill="#6b4560"/>
+  <rect x="10" y="25" width="12" height="4" fill="#7d5171"/>
+  <rect x="11" y="28" width="3" height="2" fill="#fff6fb"/>
+  <rect x="18" y="28" width="3" height="2" fill="#fff6fb"/>
+</svg>`;
+
+const pupilL = document.getElementById('pupilL');
+const pupilR = document.getElementById('pupilR');
+// base positions (top-left of each pupil) and the eye-white center
+const eyes = [
+  { el: pupilL, cx: 12, cy: 15, w: 3 },  // eye white center approx
+  { el: pupilR, cx: 20, cy: 15, w: 3 }
+];
+
+function moveEyes(clientX, clientY) {
+  const svg = catEl.querySelector('svg');
+  const rect = svg.getBoundingClientRect();
+  // convert cursor to svg (0-32) coordinates
+  const sx = ((clientX - rect.left) / rect.width) * 32;
+  const sy = ((clientY - rect.top) / rect.height) * 32;
+  eyes.forEach(e => {
+    const dx = sx - e.cx;
+    const dy = sy - e.cy;
+    const ang = Math.atan2(dy, dx);
+    const r = 1.6; // how far pupil can travel
+    const px = e.cx + Math.cos(ang) * r - e.w / 2;
+    const py = e.cy + Math.sin(ang) * r - e.w / 2;
+    e.el.setAttribute('x', px.toFixed(2));
+    e.el.setAttribute('y', py.toFixed(2));
+  });
+}
+window.addEventListener('mousemove', ev => moveEyes(ev.clientX, ev.clientY));
+window.addEventListener('touchmove', ev => {
+  if (ev.touches[0]) moveEyes(ev.touches[0].clientX, ev.touches[0].clientY);
+});
+
+/* ============ FLOATING HEARTS in scene ============ */
+function spawnHearts(container, count) {
+  for (let i = 0; i < count; i++) {
+    const h = document.createElement('div');
+    h.className = 'float-heart';
+    h.textContent = '❤';
+    h.style.left = Math.random() * 100 + '%';
+    h.style.fontSize = (12 + Math.random() * 16) + 'px';
+    h.style.animationDuration = (5 + Math.random() * 6) + 's';
+    h.style.animationDelay = (Math.random() * 6) + 's';
+    container.appendChild(h);
+  }
+}
+spawnHearts(document.getElementById('scene'), 14);
+
+/* ============ NO BUTTON antics ============ */
+const noBtn = document.getElementById('noBtn');
+const yesBtn = document.getElementById('yesBtn');
+const noMessages = [
+  "NO",
+  "are you sure?",
+  "really sure??",
+  "think again!",
+  "pretty please?",
+  "don't do this :(",
+  "my heart...",
+  "the cat is sad now",
+  "reconsider?",
+  "you're breaking pixels",
+  "last chance!",
+  "wrong button!",
+  "try the green one",
+  "nope not happening",
+  "i'll cry ;_;",
+  "boo!!",
+  "unbelievable",
+  "come oooon",
+  "just say yes!",
+  "resistance is futile"
+];
+let noIndex = 0;
+let yesScale = 1;
+
+function handleNo() {
+  noIndex++;
+  // cycle the message
+  const msg = noMessages[Math.min(noIndex, noMessages.length - 1)];
+  noBtn.textContent = msg;
+
+  // shrink the No button
+  const noSize = Math.max(6, 14 - noIndex * 0.9);
+  const noPad = Math.max(4, 14 - noIndex);
+  noBtn.style.fontSize = noSize + 'px';
+  noBtn.style.padding = noPad + 'px ' + (noPad + 4) + 'px';
+
+  // grow the Yes button
+  yesScale = Math.min(3.4, 1 + noIndex * 0.28);
+  yesBtn.style.fontSize = (14 * yesScale) + 'px';
+  yesBtn.style.padding = (14 * Math.min(2, yesScale)) + 'px ' + (20 * Math.min(2, yesScale)) + 'px';
+
+  // once it's tiny, make it dodge the cursor for extra chaos
+  if (noIndex >= noMessages.length - 1) {
+    dodge();
+  }
+}
+
+function dodge() {
+  const card = document.getElementById('card');
+  const cr = card.getBoundingClientRect();
+  const maxX = Math.min(window.innerWidth - 80, cr.right + 40);
+  const x = Math.random() * (window.innerWidth - 80);
+  const y = Math.random() * (window.innerHeight - 60);
+  noBtn.style.position = 'fixed';
+  noBtn.style.left = x + 'px';
+  noBtn.style.top = y + 'px';
+}
+noBtn.addEventListener('click', handleNo);
+noBtn.addEventListener('mouseenter', () => { if (noIndex >= noMessages.length - 1) dodge(); });
+
+/* ============ YES -> CELEBRATION ============ */
+yesBtn.addEventListener('click', celebrate);
+
+let confettiRAF;
+function celebrate() {
+  document.getElementById('celebrate').style.display = 'flex';
+  startConfetti();
+  spawnHearts(document.getElementById('celebrate'), 20);
+
+  const dur = 2500 + Math.random() * 2000; // 2.5 - 4.5s
+  setTimeout(() => {
+    document.getElementById('celebrate').style.display = 'none';
+    stopConfetti();
+    openCalendar();
+  }, dur);
+}
+
+/* confetti particles on canvas */
+const canvas = document.getElementById('confetti');
+const ctx = canvas.getContext('2d');
+let parts = [];
+function startConfetti() {
+  canvas.style.display = 'block';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const colors = ['#ff2e8a', '#ffd7ea', '#2ecc71', '#fff', '#ff9ecb', '#ffe000'];
+  parts = [];
+  for (let i = 0; i < 180; i++) {
+    parts.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * -canvas.height,
+      s: 6 + Math.random() * 8,
+      vy: 2 + Math.random() * 4,
+      vx: -2 + Math.random() * 4,
+      c: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * Math.PI,
+      vr: -0.2 + Math.random() * 0.4
+    });
+  }
+  loopConfetti();
+}
+function loopConfetti() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  parts.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
+    ctx.restore();
+  });
+  confettiRAF = requestAnimationFrame(loopConfetti);
+}
+function stopConfetti() {
+  cancelAnimationFrame(confettiRAF);
+  canvas.style.display = 'none';
+}
+
+/* ============ DATE PICKER ============ */
+const grid = document.getElementById('grid');
+const monthLabel = document.getElementById('monthLabel');
+const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const today = new Date();
+let viewYear = today.getFullYear();
+let viewMonth = today.getMonth();
+let chosen = null;
+
+function openCalendar() {
+  document.getElementById('dateScreen').style.display = 'flex';
+  renderCalendar();
+}
+
+function renderCalendar() {
+  grid.innerHTML = '';
+  monthLabel.textContent = monthNames[viewMonth] + ' ' + viewYear;
+  ['S','M','T','W','T','F','S'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+  const first = new Date(viewYear, viewMonth, 1).getDay();
+  const days = new Date(viewYear, viewMonth + 1, 0).getDate();
+  for (let i = 0; i < first; i++) {
+    const e = document.createElement('div');
+    e.className = 'day empty';
+    grid.appendChild(e);
+  }
+  for (let d = 1; d <= days; d++) {
+    const e = document.createElement('div');
+    e.className = 'day';
+    e.textContent = d;
+    const cellDate = new Date(viewYear, viewMonth, d);
+    const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (cellDate < t0) e.classList.add('past');
+    if (chosen && chosen.getTime() === cellDate.getTime()) e.classList.add('selected');
+    e.addEventListener('click', () => pickDate(cellDate));
+    grid.appendChild(e);
+  }
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } renderCalendar();
+});
+
+function pickDate(dateObj) {
+  chosen = dateObj;
+  renderCalendar();
+  setTimeout(showFinal, 350);
+}
+
+/* ============ FINAL SCREEN ============ */
+function showFinal() {
+  document.getElementById('dateScreen').style.display = 'none';
+  const fs = document.getElementById('finalScreen');
+  fs.style.display = 'flex';
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const nice = chosen.toLocaleDateString(undefined, opts);
+  document.getElementById('finalDate').innerHTML =
+    'see you on<br>' + nice.toUpperCase() + '<br>&#128149; &#128008; &#128149;';
+  startConfetti();
+  spawnHearts(fs, 22);
+  setTimeout(stopConfetti, 4000);
+}
+</script>
+</body>
+</html>
