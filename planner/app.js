@@ -3372,10 +3372,15 @@ function handleAction(event) {
     case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
     case "refresh-batch": toast("Refreshing batch nodes…"); refreshInbox({ silent: false }).then(() => toast("Batch nodes refreshed")).catch(() => {}); return;
     case "open-batch-folder": {
+      // Drive can't filter a folder view by tag via URL, but the batch photos
+      // are named with the job's address — so a Drive search for the address
+      // shows exactly this project's batch images. Falls back to the workspace
+      // root if there's no address.
       const p = project();
-      const fid = (p && state.drive.projectFolderMap[p.id]) || state.drive.rootFolderId;
-      if (fid) window.open("https://drive.google.com/drive/folders/" + fid, "_blank", "noopener");
-      else toast("Drive folder not ready yet");
+      const term = p && (String(p.address || "").trim() || String(p.name || "").trim());
+      if (term) window.open("https://drive.google.com/drive/search?q=" + encodeURIComponent(term), "_blank", "noopener");
+      else if (state.drive.rootFolderId) window.open("https://drive.google.com/drive/folders/" + state.drive.rootFolderId, "_blank", "noopener");
+      else toast("No address to search on this project");
       return;
     }
     case "toggle-batch": {
@@ -4522,7 +4527,7 @@ function renderBatchNodesPanel(proj) {
     <div class="batch-head-row">
       <button class="collapsible-heading batch-head" data-action="toggle-batch"><h3 class="section-title">Batch nodes${n ? ` (${n})` : ""}</h3><span class="compact-toggle">${collapsed ? "Show" : "Hide"}</span></button>
       <button class="icon-button batch-mini" data-action="refresh-batch" title="Refresh batch nodes">${icon("refresh")}</button>
-      <button class="icon-button batch-mini" data-action="open-batch-folder" title="Open Drive folder">${icon("folder")}</button>
+      <button class="icon-button batch-mini" data-action="open-batch-folder" title="Find this job's photos in Drive">${icon("folder")}</button>
     </div>
     ${collapsed ? "" : `<p class="summary-hint">Drag a node onto the plan to place it.</p><div class="batch-list">${body}</div>`}
   </div>`;
