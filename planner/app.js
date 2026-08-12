@@ -42,7 +42,7 @@ const CATEGORIES_HEADER = ["Item", "Code", "Description", "Color", "Shorthand"];
 const MASTER_SHEET_NAME = "NeillPlanner-Master";
 const MASTER_TABS = {
   Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected"],
-  Floors:   ["Floor ID", "Project ID", "Project Name", "Floor Name", "Order", "Plan Drive File ID", "Drive Folder ID", "Node Count", "Created At", "Plan Aspect Ratio"],
+  Floors:   ["Floor ID", "Project ID", "Project Name", "Floor Name", "Order", "Plan Drive File ID", "Drive Folder ID", "Node Count", "Created At", "Plan Aspect Ratio", "Plan PNG File ID"],
   Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version"],
   Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link"],
   Folders:  ["Folder ID", "Name", "Color", "Project Count", "Drive Folder ID"],
@@ -373,6 +373,23 @@ function isPhoneLayout() {
 function project() { return state.projects.find((p) => p.id === state.selectedProjectId) || state.projects[0] || null; }
 function projectById(id) { return state.projects.find((p) => p.id === id) || null; }
 function projectFolder(item = project()) { if (!item || !item.folderId) return null; return state.projectFolders.find((f) => f.id === item.folderId) || null; }
+
+/* ── Project colour + completed status (main-page redesign) ──────────────
+ * Colour lives on the project now (p.color), falling back to its folder's
+ * colour so existing jobs keep the colour they had. Completed is auto-derived
+ * (every node done + photographed) with a manual override (p.completed). */
+const PROJECT_COLORS = ["#e07b2a", "#3ab87a", "#5b9ce6", "#e5484d", "#a855f7", "#e3b341", "#14b8a6", "#94a3b8"];
+function projectColor(p) { return (p && p.color) || projectFolder(p)?.color || "#94a3b8"; }
+function projectAutoComplete(p) { const s = stats(state.nodes.filter((n) => n.projectId === p.id)); return s.total > 0 && s.completePercent === 100 && s.missingPhotos === 0; }
+function isProjectComplete(p) { return typeof p.completed === "boolean" ? p.completed : projectAutoComplete(p); }
+function partitionProjects(list) {
+  const q = (state.projectsQuery || "").trim();
+  let items = q && window.NDMatch ? NDMatch.fuzzyFilter(q, list, projectSearchTexts) : list.slice();
+  const inProgress = items.filter((p) => !isProjectComplete(p)).sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0) || String(a.name).localeCompare(String(b.name)));
+  const completed = items.filter((p) => isProjectComplete(p)).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return { inProgress, completed };
+}
+
 function folderProjects(folderId = state.selectedFolderId) {
   if (folderId === "all") return state.projects;
   if (folderId === "unfiled") return state.projects.filter((p) => !p.folderId);
@@ -1310,6 +1327,10 @@ async function hydrateFromMasterSheet(opts = {}) {
     state.projectFolders = folderRows.map((r) => ({
       id: r[0], name: r[1], color: r[2] || "#0ea5e9", driveFolderId: r[4] || null
     }));
+    // Preserve device-local project fields (colour / completed / rooms toggle)
+    // across a cloud rebuild — they're not columns in the sheet (yet).
+    const localExtras = {};
+    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms }; });
     const projectMap = {};
     for (const r of projRows) {
       if (!r[0]) continue;
@@ -1327,13 +1348,20 @@ async function hydrateFromMasterSheet(opts = {}) {
       projectMap[p.id] = p;
     }
     state.projects = Object.values(projectMap);
+    state.projects.forEach((p) => {
+      const e = localExtras[p.id]; if (!e) return;
+      if (e.color != null) p.color = e.color;
+      if (typeof e.completed === "boolean") p.completed = e.completed;
+      if (e.showRooms != null) p.showRooms = e.showRooms;
+    });
     for (const r of floorRows) {
       if (!r[0]) continue;
       const proj = projectMap[r[1]]; if (!proj) continue;
       const fl = {
         id: r[0], name: r[3] || "Floor", order: Number(r[4]) || 0,
         planDriveFileId: r[5] || null, planMimeType: null, planWebViewLink: null, planFileName: null,
-        createdAt: r[8] || nowStamp(), planAspectRatio: Number(r[9]) || null
+        createdAt: r[8] || nowStamp(), planAspectRatio: Number(r[9]) || null,
+        planPngFileId: r[10] || null
       };
       if (r[6]) state.drive.floorFolderMap[fl.id] = r[6];
       proj.floors.push(fl);
@@ -1456,7 +1484,7 @@ function buildMasterRows() {
     out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : ""]);
     (p.floors || []).forEach((f) => {
       const count = state.nodes.filter((n) => n.floorId === f.id).length;
-      out.Floors.set(f.id, [f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || ""]);
+      out.Floors.set(f.id, [f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || "", f.planPngFileId || ""]);
     });
   });
   state.nodes.forEach((n) => {
@@ -2035,23 +2063,21 @@ function renderSidebar() {
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark">NP</div><div><h1>NeillPlanner</h1><p>Neill Data &amp; Security</p></div></div>
       <nav class="nav-list" aria-label="Primary">${navItems().map((i) => `<button class="nav-button ${state.activeView === i.id ? "is-active" : ""}" data-view="${i.id}">${icon(i.icon)}<span>${i.label}</span></button>`).join("")}</nav>
-      <div class="sidebar-section-title">Folders</div>
-      <div class="folder-list">${renderFolderButton({ id: "all", name: "All Projects", color: "#94a3b8" }, true)}${state.projectFolders.map((f) => renderFolderButton(f)).join("")}${renderFolderButton({ id: "unfiled", name: "Unfiled", color: "#64748b" })}</div>
       <div class="sidebar-section-title">Projects</div>
+      <div class="search-wrap sidebar-search">${icon("search")}<input data-projects-search data-search-scope="sidebar" value="${escapeHtml(state.projectsQuery || "")}" placeholder="Search projects" aria-label="Search projects" /></div>
       <div class="project-list">${state.projects.length === 0 ? '<div class="empty-state" style="font-size:12px;padding:14px">No projects yet</div>' : groupedProjectButtons()}</div>
     </aside>`;
 }
 
 function groupedProjectButtons() {
-  const groups = [];
-  state.projectFolders.forEach((folder) => {
-    const projects = state.projects.filter((p) => p.folderId === folder.id);
-    if (!projects.length) return;
-    groups.push(`<div class="project-folder-group"><div class="folder-heading" style="--folder:${folder.color}"><span class="folder-dot"></span><span>${escapeHtml(folder.name)}</span></div>${projects.map(renderProjectButton).join("")}</div>`);
-  });
-  const unfiled = state.projects.filter((p) => !p.folderId);
-  if (unfiled.length) groups.push(`<div class="project-folder-group"><div class="folder-heading" style="--folder:#64748b"><span class="folder-dot"></span><span>${DRIVE_UNFILED_FOLDER}</span></div>${unfiled.map(renderProjectButton).join("")}</div>`);
-  return groups.join("");
+  const { inProgress, completed } = partitionProjects(state.projects);
+  let html = `<div class="proj-section-label">In progress <span>${inProgress.length}</span></div>`;
+  html += inProgress.length ? inProgress.map(renderProjectButton).join("") : '<div class="proj-empty">Nothing in progress</div>';
+  if (completed.length) {
+    html += `<button class="proj-section-toggle ${state.ui.showCompleted ? "is-open" : ""}" data-action="toggle-completed">${icon("arrowRight")}Completed <span>${completed.length}</span></button>`;
+    if (state.ui.showCompleted) html += completed.map(renderProjectButton).join("");
+  }
+  return html;
 }
 
 function renderFolderButton(folder, isAll = false) {
@@ -2063,8 +2089,7 @@ function renderFolderButton(folder, isAll = false) {
 function renderProjectButton(item) {
   const nodes = state.nodes.filter((n) => n.projectId === item.id);
   const s = stats(nodes);
-  const folder = projectFolder(item);
-  const color = folder?.color || "#64748b";
+  const color = projectColor(item);
   const linkedCount = nodes.filter((n) => n.type === "portal").length;
   return `<button class="project-button ${item.id === state.selectedProjectId ? "is-active" : ""}" data-project="${item.id}" style="--folder:${color}"><span class="status-dot" style="--status:${s.issue ? "var(--red)" : "var(--teal)"}"></span><span><strong>${escapeHtml(item.name)}</strong><span class="project-meta"><span>${s.total} nodes</span><span>${s.completePercent}%</span><span title="Floors">${icon("layers")}${item.floors?.length || 1}</span>${linkedCount ? `<span title="Linked">${icon("link")}${linkedCount}</span>` : ""}${s.missingPhotos ? `<span class="missing-photos-badge" title="${s.missingPhotos} node${s.missingPhotos === 1 ? "" : "s"} missing a photo">${icon("camera")}${s.missingPhotos}</span>` : ""}</span></span></button>`;
 }
@@ -2112,34 +2137,50 @@ function projectSearchTexts(p) {
 }
 
 function renderProjectsView() {
-  let visible = folderProjects();
-  if ((state.projectsQuery || "").trim() && window.NDMatch) {
-    visible = NDMatch.fuzzyFilter(state.projectsQuery, visible, projectSearchTexts);   // §2.5
-  }
-  const activeName = state.selectedFolderId === "all" ? "All Projects" : state.selectedFolderId === "unfiled" ? DRIVE_UNFILED_FOLDER : (state.projectFolders.find((f) => f.id === state.selectedFolderId)?.name || "All Projects");
+  const { inProgress, completed } = partitionProjects(state.projects);
+  const q = (state.projectsQuery || "").trim();
+  const recent = state.projects.filter((p2) => p2.lastOpenedAt).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 4);
+  const emptyIn = state.projects.length
+    ? `<div class="empty-state" style="grid-column:1/-1;padding:28px;text-align:center"><p>${q ? "No projects match your search." : "No jobs in progress."}</p></div>`
+    : `<div class="empty-state" style="grid-column:1/-1;padding:36px;text-align:center"><p style="margin-bottom:12px">No projects yet.</p><button class="primary-button" data-action="new-project">${icon("plus")}Create your first project</button></div>`;
   return `
     <section class="view-panel">
-      <div class="panel-header"><h3 class="section-title">Project Dashboard</h3><div class="button-row"><button class="ghost-button" data-action="new-folder">${icon("folder")}Folder</button><button class="primary-button" data-action="new-project">${icon("plus")}New project</button></div></div>
+      <div class="panel-header"><h3 class="section-title">Projects</h3><div class="button-row"><button class="primary-button" data-action="new-project">${icon("plus")}New project</button></div></div>
       ${renderInboxBanners()}
-      ${(() => {
-        const recent = state.projects.filter((p2) => p2.lastOpenedAt).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 4);
-        return recent.length ? `<div class="recent-projects"><span class="recents-label">Recent</span>${recent.map((p2) => `<button class="recent-project-chip" data-project-open="${p2.id}">${escapeHtml(p2.name)}</button>`).join("")}</div>` : "";
-      })()}
-      <div class="search-wrap projects-search">${icon("search")}<input data-projects-search value="${escapeHtml(state.projectsQuery || "")}" placeholder="Search projects: name, address, node, room" aria-label="Search projects" /></div>
-      <div class="folder-strip">${renderFolderButton({ id: "all", name: "All Projects", color: "#94a3b8" }, true)}${state.projectFolders.map((f) => renderFolderButton(f)).join("")}${renderFolderButton({ id: "unfiled", name: "Unfiled", color: "#64748b" })}</div>
-      ${state.projectFolders.length ? `<div class="folder-manager"><div><h3 class="section-title">Folder Colours</h3><p>Folders are for towers, apartment blocks, stages, or buildings inside one large job.</p></div><div class="folder-color-grid">${state.projectFolders.map(renderFolderColourRow).join("")}</div></div>` : ""}
-      <div class="projects-grid">${visible.length ? visible.map(renderProjectCard).join("") : `<div class="empty-state" style="grid-column:1/-1;padding:36px;text-align:center"><p style="margin-bottom:12px">No projects in <strong>${escapeHtml(activeName)}</strong>.</p><button class="primary-button" data-action="new-project">${icon("plus")}Create your first project</button></div>`}</div>
+      ${recent.length && !q ? `<div class="recent-projects"><span class="recents-label">Recent</span>${recent.map((p2) => `<button class="recent-project-chip" data-project-open="${p2.id}"><span class="rc-dot" style="background:${projectColor(p2)}"></span>${escapeHtml(p2.name)}</button>`).join("")}</div>` : ""}
+      <div class="search-wrap projects-search">${icon("search")}<input data-projects-search data-search-scope="main" value="${escapeHtml(state.projectsQuery || "")}" placeholder="Search projects: name, address, node" aria-label="Search projects" /></div>
+      <div class="proj-section-label">In progress <span>${inProgress.length}</span></div>
+      <div class="projects-grid">${inProgress.length ? inProgress.map(renderProjectCard).join("") : emptyIn}</div>
+      ${completed.length ? `<button class="proj-section-toggle ${state.ui.showCompleted ? "is-open" : ""}" data-action="toggle-completed">${icon("arrowRight")}Completed <span>${completed.length}</span></button>${state.ui.showCompleted ? `<div class="projects-grid">${completed.map(renderProjectCard).join("")}</div>` : ""}` : ""}
     </section>`;
 }
 
 function renderProjectCard(item) {
   const nodes = state.nodes.filter((n) => n.projectId === item.id);
   const s = stats(nodes);
-  const folder = projectFolder(item);
-  const folderName = folder?.name || DRIVE_UNFILED_FOLDER;
-  const folderColor = folder?.color || "#64748b";
+  const color = projectColor(item);
+  const complete = isProjectComplete(item);
   const links = state.nodes.filter((n) => n.projectId === item.id && n.type === "portal").length;
-  return `<article class="project-card" style="--folder:${folderColor}"><div class="project-card-map"></div><div class="project-card-body"><div class="compact-row" style="margin-bottom:10px"><span class="mini-chip folder-label" style="--folder:${folderColor}">${icon("folder")}${escapeHtml(folderName)}</span><span class="mini-chip">${icon("layers")}${item.floors?.length || 1} floor(s)</span>${links ? `<span class="mini-chip">${icon("link")}${links} linked</span>` : ""}</div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description || "No description")}</p><div class="compact-row" style="margin-top:12px">${statusPill(`${s.completePercent}% complete`)}<span class="mini-chip">${s.total} nodes</span><span class="mini-chip">${s.issue} issues</span></div><div class="project-card-controls"><label><span>Folder</span><select data-project-folder="${item.id}" aria-label="Folder for ${escapeHtml(item.name)}"><option value="">${DRIVE_UNFILED_FOLDER}</option>${state.projectFolders.map((f) => `<option value="${f.id}" ${f.id === item.folderId ? "selected" : ""}>${escapeHtml(f.name)}</option>`).join("")}</select></label></div><div class="button-row" style="margin-top:14px"><button class="primary-button" data-project-open="${item.id}">${icon("map")}Open</button><button class="ghost-button" data-project-delete="${item.id}">${icon("trash")}Delete</button></div></div></article>`;
+  const swatches = PROJECT_COLORS.map((c) => `<button class="proj-swatch ${c === color ? "is-active" : ""}" style="background:${c}" data-project-color="${item.id}" data-color="${c}" title="Set colour" aria-label="Set colour ${c}"></button>`).join("");
+  return `<article class="project-card ${complete ? "is-complete" : ""}" style="--folder:${color}">
+    <div class="project-card-body">
+      <div class="compact-row" style="margin-bottom:10px">
+        <span class="mini-chip">${icon("layers")}${item.floors?.length || 1} floor(s)</span>
+        ${links ? `<span class="mini-chip">${icon("link")}${links} linked</span>` : ""}
+        ${complete ? `<span class="mini-chip complete-chip">${icon("check")}Complete</span>` : ""}
+      </div>
+      <h3>${escapeHtml(item.name)}</h3>
+      <p>${escapeHtml(item.address || item.description || "No address")}</p>
+      <div class="compact-row" style="margin-top:12px">${statusPill(`${s.completePercent}% complete`)}<span class="mini-chip">${s.total} nodes</span>${s.issue ? `<span class="mini-chip">${s.issue} issues</span>` : ""}</div>
+      <div class="proj-swatches" aria-label="Project colour">${swatches}</div>
+      <label class="proj-toggle-row"><input type="checkbox" data-project-rooms="${item.id}" ${item.showRooms ? "checked" : ""}><span>Show rooms bar on the map</span></label>
+      <div class="button-row" style="margin-top:12px">
+        <button class="primary-button" data-project-open="${item.id}">${icon("map")}Open</button>
+        <button class="ghost-button" data-project-complete="${item.id}">${complete ? "Reopen" : "Mark complete"}</button>
+        <button class="ghost-button icon-only" data-project-delete="${item.id}" title="Delete project">${icon("trash")}</button>
+      </div>
+    </div>
+  </article>`;
 }
 
 function renderFolderColourRow(folder) {
@@ -2171,12 +2212,12 @@ function renderMapView() {
           <button class="floor-tab floor-tab--add" data-action="rename-floor" title="Rename current floor">${icon("edit")}</button>
           <button class="floor-tab floor-tab--add" data-action="delete-floor" title="Delete current floor">${icon("trash")}</button><button class="floor-tab floor-tab--add floor-tab--help" data-action="show-help" title="Help / Legend">${icon("question")}</button>
         </div>
-        <div class="room-strip" aria-label="Rooms">
+        ${proj.showRooms ? `<div class="room-strip" aria-label="Rooms">
           <button class="room-chip ${state.selectedRoomId === "all" ? "is-active" : ""}" data-room="all">All rooms <span>${allFloorNodes.length}</span></button>
           ${rooms.map((r) => `<button class="room-chip ${state.selectedRoomId === r.id ? "is-active" : ""}" data-room="${r.id}">${escapeHtml(r.name)} <span>${state.nodes.filter((n) => n.roomId === r.id).length}</span></button>`).join("")}
           <button class="room-chip room-chip--add" data-action="new-room">${icon("plus")}Room</button>
           ${state.selectedRoomId !== "all" ? `<button class="room-chip" data-action="rename-room">${icon("edit")}Rename</button><button class="room-chip room-chip--danger" data-action="delete-room">${icon("trash")}Delete</button>` : ""}
-        </div>
+        </div>` : ""}
         <div class="map-toolbar">
           <div class="search-wrap">${icon("search")}<input data-filter="query" value="${escapeHtml(state.filters.query)}" placeholder="Search nodes, tags, users" aria-label="Search" /></div>
           <div class="filter-row">${renderSelect("status", ["All", ...Object.keys(statusMeta)], state.filters.status)}${renderSelect("category", cats, state.filters.category)}${renderSelect("assignee", ["All", ...teamNames()], state.filters.assignee)}</div>
@@ -2514,6 +2555,13 @@ function renderSettingsView() {
         <div class="integration-list">
           <div class="integration-row"><span><strong>Inbox</strong><span>${state.bulkPhotos.filter((p) => (p.status || "Inbox") !== "Allocated").length} unallocated photo(s)</span></span>${statusPill("In Progress")}</div>
           <div class="integration-row"><span><strong>Allocated</strong><span>${state.bulkPhotos.filter((p) => p.status === "Allocated").length} mapped photo(s)</span></span>${statusPill("Complete")}</div>
+        </div>
+      </div>
+      <div class="view-panel">
+        <div class="panel-header"><h3 class="section-title">Diagnostics</h3><span class="sync-chip">Bucket test</span></div>
+        <div class="settings-actions">
+          <div class="settings-action-row"><span><strong>Inject test bucket node</strong><span>Drops a fake unplaced node straight into the current project's "To sort" bucket (in memory only — never written to the sheet). Isolates bucket UI vs. the upload pipeline.</span></span><button class="ghost-button" data-action="diag-inject-bucket-node">${icon("plus")}Inject</button></div>
+          <div class="settings-action-row"><span><strong>Bucket state (live)</strong><span>${_inboxRecords.length} inbox record(s) loaded${proj ? ` · ${trayRecords(proj.id).length} in this project's bucket` : " · no project open"}</span></span>${statusPill(proj ? "Ready" : "Open a project")}</div>
         </div>
       </div>
       <div class="view-panel">
@@ -3036,6 +3084,22 @@ function bindEvents() {
     if (proj && window.NDUI?.recordVisit) NDUI.recordVisit("planner", proj.id, proj.name, "/planner/#project=" + encodeURIComponent(proj.id));
   }));
   document.querySelectorAll("[data-project-delete]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); deleteProject(b.dataset.projectDelete); }));
+  document.querySelectorAll("[data-project-color]").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const p = projectById(b.dataset.projectColor); if (!p) return;
+    p.color = b.dataset.color; persist(); render();
+  }));
+  document.querySelectorAll("[data-project-complete]").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const p = projectById(b.dataset.projectComplete); if (!p) return;
+    p.completed = !isProjectComplete(p); persist(); render();
+    toast(p.completed ? `${p.name} marked complete` : `${p.name} reopened`);
+  }));
+  document.querySelectorAll("[data-project-rooms]").forEach((cb) => cb.addEventListener("change", (e) => {
+    e.stopPropagation();
+    const p = projectById(cb.dataset.projectRooms); if (!p) return;
+    p.showRooms = cb.checked; if (!cb.checked && p.id === state.selectedProjectId) state.selectedRoomId = "all"; persist(); render();
+  }));
   document.querySelectorAll("[data-folder]").forEach((b) => b.addEventListener("click", () => { state.selectedFolderId = b.dataset.folder; state.activeView = "projects"; state.drawerOpen = false; persist(); render(); }));
   document.querySelectorAll("[data-room]").forEach((b) => b.addEventListener("click", () => { state.selectedRoomId = b.dataset.room || "all"; state.selectedNodeId = null; state.drawerOpen = false; persist(); render(); }));
   document.querySelectorAll("[data-folder-color]").forEach((input) => input.addEventListener("change", () => {
@@ -3286,6 +3350,7 @@ function handleAction(event) {
     case "refresh-users": return refreshUsers();
     case "refresh-bulk-photos": return refreshBulkPhotos();
     case "upload-bulk-photos": return uploadBulkPhotos();
+    case "diag-inject-bucket-node": return diagInjectBucketNode();
     case "show-help": state.modal = { mode: "help" }; return render();
     case "refresh-categories": return refreshCategories();
     case "save-category-csv": return saveCategoryCsvFromSettings();
@@ -3304,6 +3369,7 @@ function handleAction(event) {
       return render();
     }
     case "toggle-plan-lock": state.ui.planLocked = !state.ui.planLocked; persist(); return render();
+    case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
     case "toggle-batch": {
       const collapsedNow = state.ui.batchCollapsed != null ? state.ui.batchCollapsed : (batchNodeGroups(project()).length === 0);
       state.ui.batchCollapsed = !collapsedNow;
@@ -3517,7 +3583,11 @@ function selectProject(projectId) {
 function maybeFetchPlanForCurrentFloor() {
   const fl = currentFloor(); if (!fl) return;
   if (!state.floorPlans[fl.id] && fl.planDriveFileId && isTokenValid()) {
-    fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); } }).catch((e) => console.warn(e));
+    fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); await ensurePlanPng(project(), fl, false); } }).catch((e) => console.warn(e));
+  } else if (state.floorPlans[fl.id] && !fl.planPngFileId && isTokenValid()) {
+    // Have a rendered plan but no PNG in Drive yet (existing plan) — backfill it
+    // so fit-off can load a plain image instead of re-parsing the PDF.
+    ensurePlanPng(project(), fl, false);
   }
 }
 
@@ -4133,6 +4203,31 @@ function readImageAspectRatio(src) {
   });
 }
 
+// Upload the rasterised PNG of a plan to Drive so consumers (fit-off) can load
+// a plain image instead of re-parsing the PDF on-device. Idempotent unless
+// force is set (a fresh plan upload updates the existing PNG).
+async function ensurePlanPng(proj, floor, force) {
+  try {
+    if (!isTokenValid() || !proj || !floor) return;
+    if (floor.planPngFileId && !force) return;
+    const png = state.floorPlans[floor.id];
+    if (!png || typeof png !== "string" || png.indexOf("data:image") !== 0) return;  // need a rasterised image
+    const folderId = await ensureFloorDriveFolder(proj, floor);
+    if (!folderId) return;
+    const blob = await (await fetch(png)).blob();
+    const file = new File([blob], "floor-plan-render.png", { type: "image/png" });
+    let result;
+    if (floor.planPngFileId) {
+      try { result = await updateFileBytes(floor.planPngFileId, file); }
+      catch (e) { result = await uploadFileToDrive(file, folderId, "floor-plan-render.png"); }
+    } else {
+      result = await uploadFileToDrive(file, folderId, "floor-plan-render.png");
+    }
+    floor.planPngFileId = result.id;
+    persist();
+  } catch (e) { console.warn("plan png sync failed", e); }
+}
+
 function uploadFloorPlan() {
   const proj = project(); if (!proj) { toast("Create a project first"); return; }
   const floor = currentFloor(); if (!floor) { toast("Add a floor first"); return; }
@@ -4164,6 +4259,7 @@ function uploadFloorPlan() {
           floor.planMimeType = result.mimeType;
           floor.planWebViewLink = result.webViewLink;
           persist(); render();
+          await ensurePlanPng(proj, floor, true);   // also store a PNG render for fit-off
           toast(`Plan synced to Drive`);
         } catch (e) { console.warn(e); toast("Drive sync failed: " + describeError(e)); }
       }
@@ -4351,6 +4447,7 @@ async function createJobFromInboxGroup(addressKey) {
         if (url) {
           await cacheFloorPlan(floor.id, url, { planDriveFileId: group.floorPlan.driveFileId });
           floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || 1.6;
+          await ensurePlanPng(proj, floor, true);
         }
       } catch (e) { console.warn("Plan fetch failed (still linked)", e); }
     }
@@ -4542,6 +4639,38 @@ async function dismissInboxToBatch(driveFileId) {
   } catch (e) { toast("Dismiss failed: " + describeError(e)); }
 }
 
+/* ==== DIAGNOSTIC (temporary) — bucket render isolation test ==============
+ * Injects a synthetic FILED_TO_PROJECT record into _inboxRecords (in memory
+ * ONLY — never written to the sheet, wiped on the next inbox refresh) so we can
+ * see whether the "To sort" bucket / Batch-nodes panel renders a node when the
+ * data is definitely present.
+ *   - Node appears  -> bucket UI works; the bug is upstream (upload -> Inbox feed).
+ *   - Node missing  -> the bug is in the bucket render path itself.
+ * Triggered from Settings -> Diagnostics -> "Inject test bucket node".
+ * Safe to delete this whole block + its switch case + the Settings panel once
+ * the bucket bug is resolved. */
+function diagInjectBucketNode() {
+  const proj = project();
+  if (!proj) { toast("Open a project first, then run the diagnostic"); state.activeView = "projects"; return render(); }
+  const floorId = currentFloor()?.id || proj.floors?.[0]?.id || "";
+  const STATUS_FTP = window.NDInbox?.STATUS?.FILED_TO_PROJECT || "FILED_TO_PROJECT";
+  const tag = "thermostat bedroom two";
+  const id = "DIAG-" + Date.now();
+  _inboxRecords.push({
+    driveFileId: id, photoId: id, name: "DIAGNOSTIC test photo.jpg",
+    status: STATUS_FTP, projectId: proj.id, floorId,
+    room: tag, location: tag, isFloorPlan: false,
+    thumbnailLink: "", webViewLink: "", mimeType: "image/jpeg",
+    uploader: "diagnostic", uploadedAt: nowStamp(), _diagnostic: true
+  });
+  state.ui.batchCollapsed = false;                          // reveal Batch-nodes panel
+  state.activeView = "map";                                 // where the bucket lives
+  state.modal = { mode: "sort-tray", projectId: proj.id };  // and open the tray
+  render();
+  console.info("[diag] injected test bucket node", { projectId: proj.id, floorId, inboxCount: _inboxRecords.length, trayCount: trayRecords(proj.id).length });
+  toast(`Injected 1 test node ("${tag}"). If it shows in the tray / Batch panel, the bucket UI works — bug is upstream.`);
+}
+
 /* v1.0 §5.3 — one-time migration: unallocated legacy Bulk Photos move to
  * Batch + the Inbox tab. Photo-Allocation + Bulk Photos become READ-ONLY
  * (nothing writes them any more); hard-delete comes one release later. */
@@ -4583,10 +4712,11 @@ document.addEventListener("input", (ev) => {
   const input = ev.target.closest("[data-projects-search]");
   if (!input) return;
   state.projectsQuery = input.value;
+  const scope = input.dataset.searchScope || "";
   clearTimeout(_projectsSearchTimer);
   _projectsSearchTimer = setTimeout(() => {
     render();
-    const fresh = document.querySelector("[data-projects-search]");
+    const fresh = document.querySelector(`[data-projects-search][data-search-scope="${scope}"]`) || document.querySelector("[data-projects-search]");
     if (fresh) { fresh.focus(); fresh.setSelectionRange(fresh.value.length, fresh.value.length); }
   }, 250);
 });

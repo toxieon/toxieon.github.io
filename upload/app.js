@@ -496,13 +496,30 @@ function renderProgressItem(item) {
 }
 
 function renderComplete() {
+  const ib = state.upload.inbox;
+  let filing = "";
+  if (ib) {
+    const good = ib.fail === 0 && ib.ok > 0;
+    const folderLink = ib.folderId ? `https://drive.google.com/drive/folders/${ib.folderId}` : "";
+    filing = `
+      <div class="filing-report ${good ? "ok" : "warn"}" style="text-align:left;margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid ${good ? "rgba(58,184,122,0.4)" : "rgba(224,123,42,0.5)"};background:${good ? "rgba(58,184,122,0.08)" : "rgba(224,123,42,0.10)"};font-size:13px;line-height:1.5;">
+        <strong>${good ? "✓ Filed to the inbox" : "⚠ Filing issue"}</strong><br>
+        ${ib.ok} of ${ib.ok + ib.fail} photo${(ib.ok + ib.fail) === 1 ? "" : "s"} recorded in the inbox (what Search &amp; Planner read).
+        ${!good ? `<br><span style="color:#f0b078;">${ib.err ? escapeHtml(ib.err) : (ib.ready ? "Some rows didn't write." : "Inbox module wasn't ready.")}</span>` : ""}
+        <div style="margin-top:8px;color:var(--muted,#8a8a8a);font-size:11px;">
+          Batch folder: ${folderLink ? `<a href="${folderLink}" target="_blank" rel="noopener" style="color:#85b7eb;">open in Drive</a>` : (ib.folderId || "—")}<br>
+          Inbox sheet: <span style="font-family:monospace;">${escapeHtml(String(ib.sheetId || "—").slice(0, 12))}…</span>
+        </div>
+      </div>`;
+  }
   return `
     <section class="done-wrap">
       <div class="done-card">
         <div class="done-mark">${icon("check")}</div>
         <h2>Upload complete</h2>
         <p>Everything has been submitted. You can safely leave this page.</p>
-        <button type="button" class="primary-button" data-action="new-batch">${icon("upload")}Upload More Files</button>
+        ${filing}
+        <button type="button" class="primary-button" data-action="new-batch" style="margin-top:16px;">${icon("upload")}Upload More Files</button>
       </div>
     </section>
   `;
@@ -1466,12 +1483,17 @@ async function uploadBatch() {
     // v1.0 §7: dedup must check contentHash across the WHOLE Inbox/Photos
     // set, not just the Batch folder (files move out of Batch when filed).
     const inboxApi = getInboxApi();
+    // Diagnostics: track whether each photo actually made it into the Inbox tab
+    // (what search + planner read). Shown on the complete screen.
+    state.upload.inbox = { ok: 0, fail: 0, err: null, ready: !!inboxApi, sheetId: CONFIG.masterSpreadsheetId, folderId: batchRootId, ensured: null };
+    if (!inboxApi) state.upload.inbox.err = "Inbox module not ready (NDInbox / nd-sheets / master sheet id missing)";
     let inboxRecords = [];
     if (inboxApi) {
       try {
         await NDInbox.ensureInboxTab(ND.sheetsKit.gapiGateway(), CONFIG.masterSpreadsheetId);
         inboxRecords = await inboxApi.list();
-      } catch (e) { console.warn("Inbox ledger unavailable, continuing with folder-only dedup", e); }
+        state.upload.inbox.ensured = true;
+      } catch (e) { state.upload.inbox.ensured = false; state.upload.inbox.err = state.upload.inbox.err || describeError(e); console.warn("Inbox ledger unavailable, continuing with folder-only dedup", e); }
     }
 
     for (const [index, item] of state.items.entries()) {
@@ -1551,8 +1573,9 @@ async function uploadBatch() {
           const rec = inboxRecordFor(item, result);
           await inboxApi.upsert(rec);
           inboxRecords.push(rec);
-        } catch (e) { console.warn("Inbox row write failed (photo IS in Drive + Upload Log)", e); }
-      }
+          state.upload.inbox.ok += 1;
+        } catch (e) { state.upload.inbox.fail += 1; state.upload.inbox.err = describeError(e); console.warn("Inbox row write failed (photo IS in Drive + Upload Log)", e); }
+      } else { state.upload.inbox.fail += 1; }
       render();
     }
 
