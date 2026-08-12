@@ -3372,15 +3372,12 @@ function handleAction(event) {
     case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
     case "refresh-batch": toast("Refreshing batch nodes…"); refreshInbox({ silent: false }).then(() => toast("Batch nodes refreshed")).catch(() => {}); return;
     case "open-batch-folder": {
-      // Drive can't filter a folder view by tag via URL, but the batch photos
-      // are named with the job's address — so a Drive search for the address
-      // shows exactly this project's batch images. Falls back to the workspace
-      // root if there's no address.
-      const p = project();
-      const term = p && (String(p.address || "").trim() || String(p.name || "").trim());
-      if (term) window.open("https://drive.google.com/drive/search?q=" + encodeURIComponent(term), "_blank", "noopener");
-      else if (state.drive.rootFolderId) window.open("https://drive.google.com/drive/folders/" + state.drive.rootFolderId, "_blank", "noopener");
-      else toast("No address to search on this project");
+      // Open the raw Batch folder in Drive (all uploads). The batch-nodes panel
+      // itself already filters to this job by address.
+      if (!state.drive.rootFolderId) { toast("Drive not ready yet"); return; }
+      ensureBatchFolderId()
+        .then((bid) => window.open("https://drive.google.com/drive/folders/" + (bid || state.drive.rootFolderId), "_blank", "noopener"))
+        .catch(() => window.open("https://drive.google.com/drive/folders/" + state.drive.rootFolderId, "_blank", "noopener"));
       return;
     }
     case "toggle-batch": {
@@ -4485,7 +4482,20 @@ async function createJobFromInboxGroup(addressKey) {
 }
 
 function trayRecords(projectId) {
-  return _inboxRecords.filter((r) => r.status === NDInbox.STATUS.FILED_TO_PROJECT && r.projectId === projectId && !r.isFloorPlan);
+  // Whitelist by the project's address (read from the master Inbox), so photos
+  // uploaded for this job show up as batch nodes without a manual "file" step —
+  // both those already filed to it AND unfiled ones whose address matches.
+  const proj = projectById(projectId);
+  const projKey = (proj && window.NDMatch) ? NDMatch.addressKey(proj.address || "") : "";
+  return _inboxRecords.filter((r) => {
+    if (r.isFloorPlan) return false;
+    if (r.status === NDInbox.STATUS.FILED_TO_PROJECT && r.projectId === projectId) return true;
+    if (projKey && (r.status === NDInbox.STATUS.UNFILED || r.status === NDInbox.STATUS.UPLOADED)) {
+      const rk = r.addressKey || (window.NDMatch ? NDMatch.addressKey(r.address || "") : "");
+      return rk === projKey;
+    }
+    return false;
+  });
 }
 
 /* §26/§32 Batch nodes: premade nodes from the uploader (photos filed to this
@@ -4527,7 +4537,7 @@ function renderBatchNodesPanel(proj) {
     <div class="batch-head-row">
       <button class="collapsible-heading batch-head" data-action="toggle-batch"><h3 class="section-title">Batch nodes${n ? ` (${n})` : ""}</h3><span class="compact-toggle">${collapsed ? "Show" : "Hide"}</span></button>
       <button class="icon-button batch-mini" data-action="refresh-batch" title="Refresh batch nodes">${icon("refresh")}</button>
-      <button class="icon-button batch-mini" data-action="open-batch-folder" title="Find this job's photos in Drive">${icon("folder")}</button>
+      <button class="icon-button batch-mini" data-action="open-batch-folder" title="Open the Batch folder in Drive">${icon("folder")}</button>
     </div>
     ${collapsed ? "" : `<p class="summary-hint">Drag a node onto the plan to place it.</p><div class="batch-list">${body}</div>`}
   </div>`;
@@ -4611,7 +4621,7 @@ async function fileInboxToNode(driveFileId, nodeId) {
         uploader: rec.uploader || "", uploadedAt: rec.uploadedAt || nowStamp()
       });
     }
-    const updated = await api.setStatus(rec, NDInbox.STATUS.FILED_TO_NODE, { nodeId: node.id, floorId: node.floorId });
+    const updated = await api.setStatus(rec, NDInbox.STATUS.FILED_TO_NODE, { projectId: node.projectId, nodeId: node.id, floorId: node.floorId });
     Object.assign(rec, updated);
     persist();   // delta sync writes the Photos/Nodes rows
     logAudit("Photo Sorted", { nodeId: node.id, details: rec.name });
