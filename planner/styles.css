@@ -206,6 +206,10 @@ button {
 }
 .proj-toggle-row input { width: 16px; height: 16px; flex: none; }
 .button-row .icon-only { padding: 8px 10px; }
+.batch-head-row { display: flex; align-items: center; gap: 6px; }
+.batch-head-row .batch-head { flex: 1; }
+.batch-mini { flex: none; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
+.batch-mini svg { width: 16px; height: 16px; }
 .recent-project-chip .rc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 
 .project-list {

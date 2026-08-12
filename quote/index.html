@@ -1607,7 +1607,7 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'settings') { renderSettings(); renderMergeList(); }
     if (t.dataset.tab === 'staff')    loadStaffList();
     if (t.dataset.tab === 'calendar') { renderCalendar(); if (settings.weatherEnabled !== false) scheduleCalendarWeatherFetch(); }
-    if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showMasterCards(); renderGalleryFilters(); renderGalleryGrid(); }
+    if (t.dataset.tab === 'settings' && currentUser && currentUser.role === 'master') { showMasterCards(); loadGalleryOnce(); }
   };
 });
 
@@ -5010,6 +5010,15 @@ async function setPhotoTags(ref, tags) {
   }
 }
 
+/* Lazy gallery/tags load — renders cached instantly, fetches once on first
+ * Settings-tab open so boot doesn't wait on these Apps Script calls. */
+let _galleryLoaded = false;
+function loadGalleryOnce() {
+  renderGalleryFilters(); renderGalleryGrid();
+  if (_galleryLoaded) return;
+  _galleryLoaded = true;
+  syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { renderGalleryFilters(); renderGalleryGrid(); }).catch(() => {});
+}
 async function syncKnownTags() {
   if (!currentUser || !currentUser.passwordHash) return;
   try {
@@ -5734,7 +5743,7 @@ function init() {
   loadGoogleMaps();
   syncFromSheet(true);
   syncQuotesFromBackend();
-  syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { showMasterCards(); renderGalleryFilters(); });
+  showMasterCards();   // gallery/tags data loads lazily on first Settings-tab open (faster boot)
   // Pre-warm weather so the Calendar tab paints instantly when first opened
   if (settings.weatherEnabled !== false) {
     setTimeout(() => scheduleCalendarWeatherFetch(), 50);

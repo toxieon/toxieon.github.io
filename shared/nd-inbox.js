@@ -224,9 +224,12 @@
           }
           return false;                        // present + sane
         }
-        const write = function () { return gateway.appendValues(spreadsheetId, "'" + INBOX_TAB + "'", [HEADER.slice()]); };
+        // Wrap gateway calls in Promise.resolve() — gapi requests are thenables
+        // with .then() but NO .catch(), so calling .catch() on them throws
+        // ("gateway.addSheet(...).catch is not a function") and nothing gets filed.
+        const write = function () { return Promise.resolve(gateway.appendValues(spreadsheetId, "'" + INBOX_TAB + "'", [HEADER.slice()])); };
         if (values === null && gateway.addSheet) {
-          return gateway.addSheet(spreadsheetId, INBOX_TAB).catch(function () {}).then(write).then(function () { return true; });
+          return Promise.resolve(gateway.addSheet(spreadsheetId, INBOX_TAB)).catch(function () {}).then(write).then(function () { return true; });
         }
         return write().then(function () { return true; });
       });

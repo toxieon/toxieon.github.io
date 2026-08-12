@@ -3370,6 +3370,14 @@ function handleAction(event) {
     }
     case "toggle-plan-lock": state.ui.planLocked = !state.ui.planLocked; persist(); return render();
     case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
+    case "refresh-batch": toast("Refreshing batch nodes…"); refreshInbox({ silent: false }).then(() => toast("Batch nodes refreshed")).catch(() => {}); return;
+    case "open-batch-folder": {
+      const p = project();
+      const fid = (p && state.drive.projectFolderMap[p.id]) || state.drive.rootFolderId;
+      if (fid) window.open("https://drive.google.com/drive/folders/" + fid, "_blank", "noopener");
+      else toast("Drive folder not ready yet");
+      return;
+    }
     case "toggle-batch": {
       const collapsedNow = state.ui.batchCollapsed != null ? state.ui.batchCollapsed : (batchNodeGroups(project()).length === 0);
       state.ui.batchCollapsed = !collapsedNow;
@@ -4511,7 +4519,11 @@ function renderBatchNodesPanel(proj) {
         return `<div class="batch-floor"><div class="batch-floor-name">${icon("layers")}${escapeHtml(fname)}</div>${byFloor[fk].map((g) => `<div class="batch-chip" draggable="true" data-batch-key="${escapeHtml(g.key)}" title="Drag onto the plan to place"><span class="batch-chip-main"><strong>${escapeHtml(g.room)}</strong><span class="batch-sub">${escapeHtml(fname)} &middot; ${g.records.length} photo${g.records.length === 1 ? "" : "s"}</span></span>${icon("map")}</div>`).join("")}</div>`;
       }).join("");
   return `<div class="batch-panel">
-    <button class="collapsible-heading batch-head" data-action="toggle-batch"><h3 class="section-title">Batch nodes${n ? ` (${n})` : ""}</h3><span class="compact-toggle">${collapsed ? "Show" : "Hide"}</span></button>
+    <div class="batch-head-row">
+      <button class="collapsible-heading batch-head" data-action="toggle-batch"><h3 class="section-title">Batch nodes${n ? ` (${n})` : ""}</h3><span class="compact-toggle">${collapsed ? "Show" : "Hide"}</span></button>
+      <button class="icon-button batch-mini" data-action="refresh-batch" title="Refresh batch nodes">${icon("refresh")}</button>
+      <button class="icon-button batch-mini" data-action="open-batch-folder" title="Open Drive folder">${icon("folder")}</button>
+    </div>
     ${collapsed ? "" : `<p class="summary-hint">Drag a node onto the plan to place it.</p><div class="batch-list">${body}</div>`}
   </div>`;
 }
