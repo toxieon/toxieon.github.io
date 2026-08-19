@@ -293,6 +293,22 @@ HOW THIS RELATES TO /shared
     Status:   BUILT + showroom demo
     Origin:   Brandon's pixel page.  Where: a playful cancel / Easter egg.
 
+[23] status-wheel.js  —  donut progress ring (NDWheel)
+    Global:   NDWheel
+    Origin:   Install Checklist (per-job progress) — the "status wheel" ask.
+    Needs:    nothing (pure inline SVG; no deps).
+    API:      NDWheel.svg({done,total,issues,na,size,stroke,label,sublabel,accent}) -> markup
+              NDWheel.render(el, opts) · NDWheel.update(el, opts)
+              NDWheel.percent({done,total}) -> 0..100
+    Behaviour: ring fills teal->green with % complete, an amber inner arc shows
+              open issues, centre reads "NN%" over "done/total", turns solid
+              green at 100%. Themed to the suite; crisp at any size.
+    Used by:  checklist (job cards + hero); available suite-wide (planner
+              project rings, timesheet week ring, quote pipeline).
+    Status:   BUILT
+    Notes:    Sibling of the progress rails — the rail is linear, the wheel is
+              radial. Same colour language (done green / issue amber).
+
 ------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
@@ -344,3 +360,5 @@ HOW THIS RELATES TO /shared
               Payslip estimate) uses NDDoc + NDLogo and pulls the pay period's
               logged hours. Quote invoice/quote images now draw the shared
               NDLogo in the header; logo upload added to Quote business settings.
+  2026-08-19  Added status-wheel.js (NDWheel) — donut progress ring built for
+              the Install Checklist's per-job status wheels; reusable suite-wide.
