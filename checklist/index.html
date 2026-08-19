@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>ND • Install Checklist</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Checklist">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#07111f; --panel:#0e1a2b; --panel-2:#132339; --line:#1d3350;
+  --text:#e8f0f9; --muted:#8ba3bf; --dim:#5d7691;
+  --brand:#35d0ba; --done:#2ee6a8; --issue:#ffb020; --na:#6b7f99; --danger:#ff6b5e;
+  --r:14px; --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--ink);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom);overscroll-behavior-y:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+.hide{display:none !important}
+.mono{font-family:var(--mono)}
+
+#lock{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(120% 80% at 50% -10%, #12283f 0%, transparent 60%),var(--ink);padding:24px}
+.brandmark{font-family:var(--mono);font-size:13px;letter-spacing:.34em;color:var(--brand);text-transform:uppercase;margin-bottom:6px}
+.lock-title{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+.lock-sub{color:var(--muted);font-size:14px;margin:0 0 26px;text-align:center}
+.pips{display:flex;gap:12px;margin-bottom:26px;min-height:16px}
+.pip{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);transition:.15s}
+.pip.on{background:var(--brand);border-color:var(--brand);transform:scale(1.08)}
+.pip.err{border-color:var(--danger);background:transparent;animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,74px);gap:14px}
+.key{height:74px;border-radius:50%;background:var(--panel);border:1px solid var(--line);font-size:26px;font-weight:600;
+  font-family:var(--mono);display:flex;align-items:center;justify-content:center;transition:.1s}
+.key:active{background:var(--panel-2);transform:scale(.94)}
+.key.ghost{background:none;border-color:transparent;font-size:15px;color:var(--muted);font-family:inherit}
+.lock-hint{margin-top:24px;color:var(--dim);font-size:12.5px;text-align:center;line-height:1.7;max-width:330px}
+.lock-hint code{font-family:var(--mono);color:var(--muted)}
+#nameEntry{width:100%;max-width:300px;text-align:center}
+.field{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:12px;
+  padding:13px 14px;font-size:16px;margin-bottom:12px}
+select.field{appearance:none}
+.btn{background:var(--brand);color:#04231f;font-weight:700;border-radius:12px;padding:13px 18px;width:100%;font-size:15px}
+.btn.sec{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}
+
+#app{max-width:760px;margin:0 auto}
+header{position:sticky;top:0;z-index:30;background:rgba(7,17,31,.94);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) 14px 10px}
+.hrow{display:flex;align-items:center;gap:10px}
+.back{width:34px;height:34px;border-radius:10px;background:var(--panel);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+.htitle{flex:1;min-width:0}
+.htitle h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htitle span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+  border-radius:999px;padding:5px 11px 5px 6px;font-size:12.5px;flex:0 0 auto}
+.avatar{width:22px;height:22px;border-radius:50%;background:var(--brand);color:#04231f;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.avatar.admin{background:#7fb2ff}
+.avatar.master{background:#c3a3ff}
+
+.rail{height:5px;background:var(--panel-2);border-radius:99px;overflow:hidden;margin-top:11px}
+.rail i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--done));width:0;transition:width .35s ease}
+.railmeta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px;font-family:var(--mono)}
+
+.toolbar{display:flex;gap:8px;padding:12px 14px 0}
+.search{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 12px;color:var(--text);font-size:14.5px}
+.chips{display:flex;gap:7px;padding:12px 14px 4px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 13px;font-size:13px;
+  white-space:nowrap;color:var(--muted)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#04231f;font-weight:700}
+
+main{padding:8px 14px 120px}
+
+.jobcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px;margin-bottom:11px;
+  display:block;width:100%;text-align:left}
+.jobcard h3{margin:0 0 3px;font-size:16.5px;font-weight:700}
+.jobcard p{margin:0;color:var(--muted);font-size:13px}
+.jobcard .rail{margin-top:12px}
+.jobwrap{position:relative}
+.jobwrap .dots{position:absolute;top:12px;right:10px}
+
+.level{margin-bottom:8px}
+.levelhead{display:flex;align-items:center;gap:10px;width:100%;padding:12px 4px;font-size:12px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+.levelhead .ln{flex:1;height:1px;background:var(--line)}
+.levelhead .cnt{font-family:var(--mono);letter-spacing:0;color:var(--dim)}
+.caret{transition:transform .2s;font-size:11px;color:var(--dim)}
+.level.closed .caret{transform:rotate(-90deg)}
+.level.closed .aptlist{display:none}
+
+.apt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:9px;overflow:hidden}
+.apt.allDone{border-color:rgba(46,230,168,.34)}
+.apt.hasIssue{border-color:rgba(255,176,32,.42)}
+.apthead{display:flex;align-items:center;gap:12px;padding:13px 12px 13px 14px;width:100%;text-align:left}
+.aptno{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-.02em;min-width:60px}
+.aptmeta{flex:1;min-width:0}
+.apttype{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.strip{display:flex;gap:4px;margin-top:7px}
+.strip i{width:16px;height:7px;border-radius:2px;background:var(--panel-2);border:1px solid var(--line);transition:.2s}
+.strip i.d{background:var(--done);border-color:var(--done)}
+.strip i.x{background:var(--issue);border-color:var(--issue)}
+.strip i.n{background:transparent;border-style:dashed;border-color:var(--na)}
+.strip i.o{border-radius:99px}
+.frac{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.frac.full{color:var(--done)}
+.dots{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;
+  justify-content:center;font-size:17px;color:var(--muted);flex:0 0 auto}
+.dots:active{background:var(--panel-2)}
+
+.units{border-top:1px solid var(--line);padding:4px 0 6px}
+.apt.closed .units{display:none}
+.unit{display:flex;align-items:center;gap:12px;padding:9px 12px 9px 14px}
+.unit+.unit{border-top:1px solid rgba(29,51,80,.5)}
+.tick{width:42px;height:42px;border-radius:12px;border:2px solid var(--line);background:var(--panel-2);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:21px;color:transparent;transition:.14s}
+.tick:active{transform:scale(.9)}
+.unit.done .tick{background:var(--done);border-color:var(--done);color:#04231f}
+.unit.na .tick{border-style:dashed;color:var(--na);font-size:14px}
+.uinfo{flex:1;min-width:0}
+.uroom{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.unit.done .uroom,.unit.na .uroom{color:var(--muted)}
+.umodel{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:2px}
+.tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 6px;border-radius:5px;
+  background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
+.tag.out{color:var(--brand);border-color:rgba(53,208,186,.35)}
+.tag.bh{color:#c3a3ff;border-color:rgba(195,163,255,.32)}
+
+.flag{margin:2px 12px 8px 68px;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.3);
+  border-radius:11px;padding:9px 11px}
+.flag.apt-level{margin:8px 12px 4px 14px}
+.flag .ftxt{font-size:13.5px}
+.flag .fmeta{font-size:11px;color:var(--issue);margin-top:5px;display:flex;justify-content:space-between;gap:8px;font-family:var(--mono)}
+.flag.note{background:rgba(139,163,191,.07);border-color:var(--line)}
+.flag.note .fmeta{color:var(--muted)}
+.flag.fixed{opacity:.5}
+.flag.fixed .ftxt{text-decoration:line-through}
+.stamp{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:3px}
+
+#scrim{position:fixed;inset:0;background:rgba(3,8,15,.7);z-index:40;opacity:0;pointer-events:none;transition:.2s}
+#scrim.on{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--panel);border-top:1px solid var(--line);
+  border-radius:20px 20px 0 0;padding:8px 16px calc(env(safe-area-inset-bottom) + 20px);
+  transform:translateY(102%);transition:transform .25s cubic-bezier(.32,.72,0,1);max-width:760px;margin:0 auto;
+  max-height:86vh;overflow-y:auto}
+#sheet.on{transform:translateY(0)}
+.grab{width:38px;height:4px;background:var(--line);border-radius:99px;margin:6px auto 14px}
+.sheet-h{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:3px}
+.sheet-t{font-size:19px;font-weight:700;margin:0 0 14px}
+.opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px 12px;border-radius:12px;
+  background:var(--panel-2);margin-bottom:8px;font-size:15px}
+.opt:active{background:var(--line)}
+.opt .ic{width:22px;text-align:center;font-size:17px}
+.opt.danger{color:var(--danger)}
+.opt[disabled]{opacity:.4}
+.opt .sub{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+textarea.field{min-height:110px;resize:vertical;font-family:inherit;line-height:1.5}
+
+.row{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid var(--line)}
+.row .who-n{flex:1;min-width:0}
+.row .who-n b{display:block;font-size:15px}
+.row .who-n span{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.pill{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;padding:3px 8px;border-radius:6px;
+  border:1px solid var(--line);color:var(--muted)}
+.pill.admin{color:#7fb2ff;border-color:rgba(127,178,255,.35)}
+.pill.master{color:#c3a3ff;border-color:rgba(195,163,255,.35)}
+
+.logline{display:flex;gap:11px;padding:11px 4px;border-bottom:1px solid var(--line);font-size:13.5px}
+.logline .lt{font-family:var(--mono);font-size:11.5px;color:var(--dim);flex:0 0 62px;padding-top:2px}
+.logline .lb{flex:1;min-width:0}
+.logline .la{font-family:var(--mono);font-size:11px;color:var(--brand);letter-spacing:.04em}
+
+.empty{text-align:center;color:var(--muted);padding:52px 24px}
+.empty .big{font-size:34px;margin-bottom:10px}
+.empty h3{margin:0 0 6px;color:var(--text);font-size:17px}
+.empty p{margin:0 0 18px;font-size:14px}
+
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,80px);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:11px;padding:11px 17px;font-size:14px;z-index:70;opacity:0;
+  transition:.24s;pointer-events:none;max-width:88vw;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.upload{border:0;padding:6px;text-align:center;color:var(--muted);font-size:14px}
+.upload b{color:var(--brand)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <div id="padWrap" style="display:flex;flex-direction:column;align-items:center">
+    <div class="brandmark">Neill Data</div>
+    <h1 class="lock-title">Install Checklist</h1>
+    <p class="lock-sub">Enter your passcode</p>
+    <div class="pips" id="pips"></div>
+    <div class="keypad" id="keypad"></div>
+    <p class="lock-hint" id="lockHint"></p>
+  </div>
+  <div id="nameEntry" class="hide">
+    <div class="brandmark" style="text-align:center">New passcode</div>
+    <h1 class="lock-title" style="text-align:center">Who's this?</h1>
+    <p class="lock-sub">Your name goes against every unit you tick.</p>
+    <input class="field" id="newName" placeholder="First name" autocomplete="off">
+    <button class="btn" id="saveName">Start ticking</button>
+    <button class="btn sec" id="cancelName" style="margin-top:8px">Back</button>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <div class="hrow">
+      <button class="back hide" id="back" aria-label="Back">‹</button>
+      <div class="htitle"><h1 id="hTitle">Jobs</h1><span id="hSub"></span></div>
+      <button class="who" id="whoBtn"><span class="avatar" id="avatar">B</span><span id="whoName"></span></button>
+    </div>
+    <div id="hProg" class="hide">
+      <div class="rail"><i id="railFill"></i></div>
+      <div class="railmeta"><span id="railLeft"></span><span id="railRight"></span></div>
+    </div>
+  </header>
+  <div id="jobTools" class="hide">
+    <div class="toolbar"><input class="search" id="search" placeholder="Find apartment or model…" autocomplete="off"></div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <main id="main"></main>
+</div>
+
+<div id="scrim"></div>
+<div id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+<div id="toast"></div>
+<input type="file" id="fileIn" accept="application/pdf" class="hide">
+<input type="file" id="sheetIn" accept=".csv,.xlsx,.xls,text/csv" class="hide">
+<input type="file" id="importIn" accept="application/json" class="hide">
+
+<!-- ============ ND CORE (shared Neill Data suite core) ============ -->
+<script>
+/* ============================================================
+   ND CORE  v1.0
+   Shared auth, storage, records and activity log for the
+   Neill Data suite (Install Checklist · anything next).
+
+   Drop this in once, point every app at it. All apps then share:
+     - one staff list (same passcodes, same roles, everywhere)
+     - one save/load pipeline (jobs, records — same plumbing)
+     - one activity log
+
+   BACKENDS
+     auto      picks the best available (default)
+     local     localStorage            — normal web deployment
+     artifact  window.storage (shared) — Claude artifact sandbox
+     sheet     your Google Sheet via Apps Script — see ND.store.configure
+
+   Records are namespaced by type. Add a type, get save/list/get/
+   remove/export/expiry for free:
+     ND.records.define('job',   { expiresDays:null })
+     ND.records.define('job',   { expiresDays:null })
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const NS = 'nd:';
+  const K_STAFF = NS + 'staff';
+  const K_ACTIVITY = NS + 'activity';
+  const K_SETTINGS = NS + 'settings';
+  const ACTIVITY_DAYS = 90;
+
+  const now = () => Date.now();
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  /* ----------------------------------------------------------
+     STORAGE — one async interface, several backends
+     ---------------------------------------------------------- */
+  const memory = {};
+
+  const backends = {
+    memory: {
+      name: 'memory',
+      async get(k) { return k in memory ? memory[k] : null; },
+      async set(k, v) { memory[k] = v; },
+      async del(k) { delete memory[k]; },
+      async keys(p) { return Object.keys(memory).filter(k => k.startsWith(p)); }
+    },
+
+    local: {
+      name: 'local',
+      async get(k) { const r = localStorage.getItem(k); return r === null ? null : JSON.parse(r); },
+      async set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+      async del(k) { localStorage.removeItem(k); },
+      async keys(p) { return Object.keys(localStorage).filter(k => k.startsWith(p)); }
+    },
+
+    /* Claude artifact sandbox. shared:true so the whole crew sees one board. */
+    artifact: {
+      name: 'artifact',
+      async get(k) {
+        try { const r = await global.storage.get(k, true); return r ? JSON.parse(r.value) : null; }
+        catch (e) { return null; }
+      },
+      async set(k, v) { await global.storage.set(k, JSON.stringify(v), true); },
+      async del(k) { try { await global.storage.delete(k, true); } catch (e) {} },
+      async keys(p) {
+        try { const r = await global.storage.list(p, true); return r ? r.keys : []; }
+        catch (e) { return []; }
+      }
+    },
+
+    /* Google Sheet via Apps Script web app.
+       Deploy a doPost that reads {action,key,value} and reads/writes a
+       key/value sheet tab. */
+    sheet: {
+      name: 'sheet',
+      endpoint: null,
+      async _call(body) {
+        if (!this.endpoint) throw new Error('ND.store: sheet endpoint not configured');
+        const res = await fetch(this.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('sheet ' + res.status);
+        return res.json();
+      },
+      async get(k) { const r = await this._call({ action: 'get', key: k }); return r.value ? JSON.parse(r.value) : null; },
+      async set(k, v) { await this._call({ action: 'set', key: k, value: JSON.stringify(v) }); },
+      async del(k) { await this._call({ action: 'del', key: k }); },
+      async keys(p) { const r = await this._call({ action: 'keys', prefix: p }); return r.keys || []; }
+    }
+  };
+
+  function pickBackend() {
+    if (global.storage && typeof global.storage.get === 'function') return backends.artifact;
+    try {
+      localStorage.setItem(NS + '__t', '1');
+      localStorage.removeItem(NS + '__t');
+      return backends.local;
+    } catch (e) { return backends.memory; }
+  }
+
+  let active = null;
+  let mirror = null;           // optional second backend written to as well
+  const writeQueue = new Map();
+  const DEBOUNCE = 450;
+
+  const store = {
+    get backendName() { return (active || (active = pickBackend())).name; },
+
+    /* ND.store.configure({ backend:'sheet', endpoint:'https://script.google.com/…/exec', mirror:'local' })
+       mirror:'local' keeps a device copy so the app still opens with no signal. */
+    configure(opts = {}) {
+      if (opts.backend && opts.backend !== 'auto') {
+        active = backends[opts.backend];
+        if (!active) throw new Error('ND.store: unknown backend ' + opts.backend);
+      } else active = pickBackend();
+      if (opts.endpoint) backends.sheet.endpoint = opts.endpoint;
+      mirror = opts.mirror ? backends[opts.mirror] : null;
+      return this;
+    },
+
+    async get(key) {
+      if (!active) active = pickBackend();
+      try {
+        const v = await active.get(key);
+        if (v !== null && v !== undefined) return v;
+      } catch (e) { /* fall through to mirror */ }
+      if (mirror) { try { return await mirror.get(key); } catch (e) {} }
+      return null;
+    },
+
+    async set(key, value) {
+      if (!active) active = pickBackend();
+      try { await active.set(key, value); } catch (e) {}
+      if (mirror) { try { await mirror.set(key, value); } catch (e) {} }
+    },
+
+    /* Debounced — for things ticked rapidly on site. */
+    save(key, value) {
+      if (writeQueue.has(key)) clearTimeout(writeQueue.get(key));
+      writeQueue.set(key, setTimeout(() => { writeQueue.delete(key); store.set(key, value); }, DEBOUNCE));
+    },
+
+    async flush() {
+      const pending = [...writeQueue.keys()];
+      pending.forEach(k => clearTimeout(writeQueue.get(k)));
+      writeQueue.clear();
+      return pending;
+    },
+
+    async del(key) {
+      if (!active) active = pickBackend();
+      try { await active.del(key); } catch (e) {}
+      if (mirror) { try { await mirror.del(key); } catch (e) {} }
+    },
+
+    async keys(prefix) {
+      if (!active) active = pickBackend();
+      try { return await active.keys(prefix); } catch (e) { return []; }
+    }
+  };
+
+  /* ----------------------------------------------------------
+     AUTH — one staff list across every ND app
+     ---------------------------------------------------------- */
+  const ROLES = {
+    staff: { rank: 1, label: 'Staff' },
+    admin: { rank: 2, label: 'Admin' },
+    master: { rank: 3, label: 'Master' }
+  };
+
+  /* What each role may do. Apps ask ND.auth.can('…'). */
+  const CAPS = {
+    'record.create': 1,
+    'record.edit': 1,
+    'issue.raise': 1,
+    'issue.resolve': 1,
+    'record.clearAll': 2,   // wipe every tick on an apartment
+    'record.delete': 2,
+    'staff.manage': 2,
+    'activity.view': 3,
+    'data.export': 2,
+    'client.edit': 2        // staff see client details read-only
+  };
+
+  let current = null;
+
+  const auth = {
+    ROLES,
+
+    async all() {
+      const s = await store.get(K_STAFF);
+      return s && typeof s === 'object' ? s : {};
+    },
+
+    /* Seeds only run when the staff list is empty, so pointing this at a
+       live ND deployment picks up the real users and skips the demo ones. */
+    async seed(users) {
+      const existing = await this.all();
+      if (Object.keys(existing).length) return existing;
+      await store.set(K_STAFF, users);
+      return users;
+    },
+
+    async signIn(code) {
+      const users = await this.all();
+      const u = users[code];
+      if (!u) return null;
+      if (u.locked) return { locked: true };
+      current = { code, ...u };
+      await activity.push('login', code, { name: u.name });
+      return current;
+    },
+
+    signOut() {
+      if (current) activity.push('logout', current.code, { name: current.name });
+      current = null;
+    },
+
+    current() { return current; },
+
+    /* Install a session authenticated against the shared Neill Data staff
+       backend. This is how the checklist signs people in — the local
+       `signIn`/`create` passcode list is NOT the source of truth any more. */
+    setSession(user) {
+      current = user ? { role: 'staff', ...user } : null;
+      if (current) activity.push('login', current.code || '', { name: current.name });
+      return current;
+    },
+
+    async create({ code, name, role = 'staff', phone = '', email = '', discountCap = 0, notes = '' }) {
+      const users = await this.all();
+      if (users[code]) throw new Error('That passcode is already taken.');
+      users[code] = { name, role, phone, email, discountCap, notes, locked: false, createdAt: now() };
+      await store.set(K_STAFF, users);
+      await activity.push('staff.create', code, { name, role });
+      return users[code];
+    },
+
+    async update(code, patch) {
+      const users = await this.all();
+      if (!users[code]) throw new Error('No user with that passcode.');
+      users[code] = { ...users[code], ...patch };
+      await store.set(K_STAFF, users);
+      await activity.push('staff.update', code, patch);
+      return users[code];
+    },
+
+    async remove(code) {
+      const users = await this.all();
+      const gone = users[code];
+      delete users[code];
+      await store.set(K_STAFF, users);
+      await activity.push('staff.delete', code, { name: gone && gone.name });
+    },
+
+    can(capability, user) {
+      const u = user || current;
+      if (!u) return false;
+      const need = CAPS[capability];
+      if (need === undefined) return true;
+      const have = (ROLES[u.role] || ROLES.staff).rank;
+      return have >= need;
+    },
+
+    initials(user) {
+      const u = user || current;
+      return u && u.name ? u.name.trim()[0].toUpperCase() : '?';
+    }
+  };
+
+  /* ----------------------------------------------------------
+     ACTIVITY LOG — 90 days
+     ---------------------------------------------------------- */
+  const activity = {
+    async push(action, target, meta = {}) {
+      try {
+        const log = (await store.get(K_ACTIVITY)) || [];
+        log.unshift({
+          id: uid(), at: now(), action, target,
+          by: current ? current.name : 'system',
+          code: current ? current.code : null,
+          app: ND.app, meta
+        });
+        const cutoff = now() - ACTIVITY_DAYS * 864e5;
+        await store.set(K_ACTIVITY, log.filter(e => e.at > cutoff).slice(0, 800));
+      } catch (e) {}
+    },
+    async list({ app = null, limit = 200 } = {}) {
+      const log = (await store.get(K_ACTIVITY)) || [];
+      return (app ? log.filter(e => e.app === app) : log).slice(0, limit);
+    },
+    async clear() { await store.set(K_ACTIVITY, []); }
+  };
+
+  /* ----------------------------------------------------------
+     RECORDS — jobs and records: one pipeline
+     ---------------------------------------------------------- */
+  const types = {};
+  const kIndex = t => NS + 'index:' + t;
+  const kRec = (t, id) => NS + 'rec:' + t + ':' + id;
+
+  const records = {
+    /* expiresDays: null = never. keepWhen: record => true keeps it forever. */
+    define(type, cfg = {}) {
+      types[type] = { expiresDays: null, keepWhen: () => false, label: type, ...cfg };
+      return this;
+    },
+
+    async index(type) {
+      const idx = (await store.get(kIndex(type))) || [];
+      const cfg = types[type] || {};
+      if (!cfg.expiresDays) return idx;
+      const cutoff = now() - cfg.expiresDays * 864e5;
+      return idx.filter(r => r.createdAt > cutoff || cfg.keepWhen(r));
+    },
+
+    async list(type) { return this.index(type); },
+
+    async get(type, id) { return store.get(kRec(type, id)); },
+
+    async save(type, id, data, summary = {}) {
+      const rid = id || uid();
+      const rec = { ...data, id: rid, type, updatedAt: now(), updatedBy: current ? current.name : null };
+      if (!rec.createdAt) rec.createdAt = now();
+      await store.set(kRec(type, rid), rec);
+
+      const idx = (await store.get(kIndex(type))) || [];
+      const entry = {
+        id: rid, title: summary.title || rec.title || rid,
+        subtitle: summary.subtitle || '', status: summary.status || rec.status || 'open',
+        createdAt: rec.createdAt, updatedAt: rec.updatedAt,
+        by: rec.updatedBy, ...summary
+      };
+      const at = idx.findIndex(r => r.id === rid);
+      if (at >= 0) idx[at] = { ...idx[at], ...entry }; else idx.unshift(entry);
+      await store.set(kIndex(type), idx);
+      return rec;
+    },
+
+    /* Debounced — the on-site tick path, where taps come in bursts. */
+    _t: {},
+    saveSoon(type, id, data, summary = {}) {
+      const k = type + ':' + id;
+      clearTimeout(this._t[k]);
+      this._t[k] = setTimeout(() => this.save(type, id, data, summary), 500);
+    },
+
+    async remove(type, id) {
+      if (!auth.can('record.delete')) throw new Error('Your role cannot delete records.');
+      await store.del(kRec(type, id));
+      const idx = ((await store.get(kIndex(type))) || []).filter(r => r.id !== id);
+      await store.set(kIndex(type), idx);
+      await activity.push('record.delete', type + ':' + id);
+    },
+
+    async exportAll() {
+      const out = { exportedAt: now(), by: current && current.name, app: ND.app, types: {} };
+      for (const t of Object.keys(types)) {
+        out.types[t] = [];
+        for (const r of await this.index(t)) out.types[t].push(await this.get(t, r.id));
+      }
+      out.staff = await auth.all();
+      out.activity = await activity.list({ limit: 800 });
+      return out;
+    },
+
+    async importAll(payload, { merge = true } = {}) {
+      if (!payload || !payload.types) throw new Error('That file is not an ND export.');
+      for (const [t, recs] of Object.entries(payload.types)) {
+        for (const r of recs) {
+          if (!merge && await this.get(t, r.id)) continue;
+          await this.save(t, r.id, r, { title: r.title, status: r.status });
+        }
+      }
+      if (payload.staff) {
+        const existing = await auth.all();
+        await store.set(K_STAFF, merge ? { ...existing, ...payload.staff } : payload.staff);
+      }
+      await activity.push('data.import', ND.app, { types: Object.keys(payload.types) });
+    }
+  };
+
+  /* ----------------------------------------------------------
+     SETTINGS — business info, logo, sheet id: shared across apps
+     ---------------------------------------------------------- */
+  const settings = {
+    async all() { return (await store.get(K_SETTINGS)) || {}; },
+    async get(k, fallback = null) { const s = await this.all(); return k in s ? s[k] : fallback; },
+    async set(patch) {
+      const s = await this.all();
+      const next = { ...s, ...patch };
+      await store.set(K_SETTINGS, next);
+      await activity.push('settings.update', ND.app, Object.keys(patch));
+      return next;
+    }
+  };
+
+  const ND = {
+    version: '1.0',
+    app: 'nd',                       // each app sets this: ND.app = 'checklist'
+    store, auth, activity, records, settings,
+    uid,
+    keys: { STAFF: K_STAFF, ACTIVITY: K_ACTIVITY, SETTINGS: K_SETTINGS },
+    timeAgo(ts) {
+      const m = Math.floor((now() - ts) / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      const d = Math.floor(h / 24);
+      return d < 30 ? d + 'd ago' : new Date(ts).toLocaleDateString('en-AU');
+    }
+  };
+
+  global.ND = ND;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+
+<!-- ============ CHECKLIST APP ============ -->
+<script>
+ND.app = 'checklist';
+
+ND.records.define('job',     { expiresDays: null, label: 'Install job' });
+
+/* ============================================================
+   SHARED SUITE LOGIN  (the ONLY link between this app and the suite)
+   ------------------------------------------------------------
+   Same passcode, same staff sheet, same lockout as the rest of the
+   Neill Data suite. We POST {action:'login', passwordHash, fingerprint}
+   to the shared Apps Script and get back {ok, user:{username, role}}.
+   Accounts are created and managed centrally — never here.
+
+   Everything else (jobs, ticks, issues, activity) stays on THIS device.
+   No job data is ever sent to the shared backend.
+   ============================================================ */
+const SuiteAuth = (function () {
+  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
+  const FP_KEY   = 'nd_device_fp_v1';        // shared convention with the suite
+  const CACHE_KEY = 'nd:checklist:knownLogins'; // {hash:{username,role,at}} for offline unlock
+
+  async function sha256Hex(str) {
+    const buf = new TextEncoder().encode(String(str || ''));
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  function fingerprint() {
+    let fp = null;
+    try { fp = localStorage.getItem(FP_KEY); } catch (e) {}
+    if (!fp) {
+      const rand = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('');
+      fp = 'fp-' + Date.now().toString(36) + '-' + rand;
+      try { localStorage.setItem(FP_KEY, fp); } catch (e) {}
+    }
+    return fp;
+  }
+  function cache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch (e) { return {}; } }
+  function remember(hash, user) {
+    try {
+      const c = cache();
+      c[hash] = { username: user.username || user.name || 'User', role: user.role || 'staff', at: Date.now() };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(c));
+    } catch (e) {}
+  }
+
+  /* Returns one of:
+       {ok:true, user, offline?}          — signed in
+       {locked:true}                      — account locked in the sheet
+       {cooldownMs:n}                     — rate-limited by the backend
+       {ok:false, attemptsRemaining?, error?}  — wrong passcode / other */
+  async function login(passcode) {
+    const hash = await sha256Hex(passcode);
+    let data = null, networkFailed = false;
+    try {
+      const r = await fetch(BACKEND_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'login', passwordHash: hash, fingerprint: fingerprint() }),
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        redirect: 'follow'
+      });
+      if (r.ok) data = await r.json();
+      else networkFailed = true;
+    } catch (e) { networkFailed = true; }
+
+    if (data) {
+      if (data.ok && data.user) { remember(hash, data.user); return { ok: true, user: data.user }; }
+      if (data.locked)   return { locked: true };
+      if (data.cooldownMs) return { cooldownMs: data.cooldownMs };
+      return { ok: false, attemptsRemaining: data.attemptsRemaining, error: data.error };
+    }
+
+    /* Backend unreachable — on-site, poor signal. Fall back to a passcode that
+       has successfully signed in on THIS device before. No new accounts, ever. */
+    if (networkFailed) {
+      const known = cache()[hash];
+      if (known) return { ok: true, user: { username: known.username, role: known.role }, offline: true };
+      return { ok: false, error: 'No signal — connect once to sign in the first time.' };
+    }
+    return { ok: false, error: 'Login failed' };
+  }
+
+  return { login, cache };
+})();
+
+/* ---------- schedules transcribed from the two PDFs ---------- */
+const TAYLOR_ROWS = `
+2.01|Multi VRV|FXAQ63BVM,FXAQ50BVM|RXYMQ4A2V4A
+2.02|Single|FTXF50WVMA|RXV50WVMA
+2.03|Single|FTXF50WVMA|RXV50WVMA
+2.04|Single|FTXF50WVMA|RXV50WVMA
+2.05|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+2.06|Multi SDA|CTXM71RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+2.07|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+2.08|Single|FTXF50WVMA|RXV50WVMA
+2.09|Single|FTXF50WVMA|RXV50WVMA
+2.10|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+3.01|Multi|CTXM50RVMA,CTXM50RVMA|4MXM80R2VMA
+3.02|Single|FTXF50WVMA|RXV50WVMA
+3.03|Single|FTXF50WVMA|RXV50WVMA
+3.04|Single|FTXF50WVMA|RXV50WVMA
+3.05|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+3.06|Multi SDA|CTXM71RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+3.07|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+3.08|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+3.09|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+4.01|Multi|CTXM50RVMA,CTXM50RVMA|4MXM80R2VMA
+4.02|Single|FTXF50WVMA|RXV50WVMA
+4.03|Single|FTXF50WVMA|RXV50WVMA
+4.04|Single|FTXF50WVMA|RXV50WVMA
+4.05|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+4.06|Multi SDA|CTXM71RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+4.07|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+4.08|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+4.09|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+5.01|Multi|CTXM50RVMA,CTXM50RVMA|4MXM80R2VMA
+5.02|Single|FTXF50WVMA|RXV50WVMA
+5.03|Single|FTXF50WVMA|RXV50WVMA
+5.04|Single|FTXF50WVMA|RXV50WVMA
+5.05|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+5.06|Multi SDA|CTXM71RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+5.07|Multi SDA|CTXM50RVMA,CTXM20RVMA,CTXM20RVMA|4MXM80R2VMA
+5.08|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+5.09|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+6.01|Multi|CTXM50RVMA,CTXM50RVMA|4MXM80R2VMA
+6.02|Single|FTXF50WVMA|RXV50WVMA
+6.03|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+6.04|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+6.05|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+6.06|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+6.07|Single|FTXF50WVMA|RXV50WVMA
+6.08|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+7.01|Multi|CTXM50RVMA,CTXM50RVMA|4MXM80R2VMA
+7.02|Single|FTXF50WVMA|RXV50WVMA
+7.03|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+7.04|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+7.05|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+7.06|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+7.07|Single|FTXF50WVMA|RXV50WVMA
+7.08|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+8.01|Multi VRV|FXAQ100BVM,FXAQ25BVM|RXYMQ4A2V4A
+8.02|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+8.03|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+8.04|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+8.05|Single|FTXV71WVMA|RXV71WVMA
+8.06|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+9.01|Single|FTXV60WVMA|RXV60WVMA
+9.02|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+9.03|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+9.04|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+9.05|Single|FTXV71WVMA|RXV71WVMA
+9.06|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+10.01|Single|FTXV60WVMA|RXV60WVMA
+10.02|Multi|CTXM50RVMA,CTXM20RVMA|4MXM68R2VMA
+10.03|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+10.04|Multi|CTXM71RVMA,CTXM20RVMA|4MXM80R2VMA
+10.05|Single|FTXV71WVMA|RXV71WVMA
+10.06|Multi|CTXM71RVMA,CTXM25RVMA|4MXM80R2VMA
+`;
+
+const TAYLOR_COMMON = [
+  {id:'KB.1', type:'VRF', units:[{room:'Kitchen / Bar', model:'FXAQ100BVM'}], outdoor:null},
+  {id:'KB.2', type:'VRF', units:[{room:'Kitchen / Bar', model:'FXAQ100BVM'}], outdoor:null},
+  {id:'RBS', type:'Single', units:[{room:'Residential bin room', model:'FTXV60WVMA'}], outdoor:{model:'RXV60WVMA'}},
+  {id:'CBS', type:'Single', units:[{room:'Commercial bin room', model:'FTXV60WVMA'}], outdoor:{model:'RXV60WVMA'}},
+  {id:'CR',  type:'Single', units:[{room:'Comms room', model:'FTXF50WVMA'}], outdoor:{model:'RXV50WVMA'}},
+  {id:'PLANT', type:'VRF plant', units:[], outdoor:{model:'RXYMQ8AY1', note:'Serves KB.1 + KB.2'}}
+];
+
+const COMO_ROWS = `
+G.01||ARXK024GLGH 7.1,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT045LCLCH 14.0
+G.02||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.03||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.04||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.06||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.07||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.08||ARXK024GLGH 7.1,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT045LCLCH 14.0
+G.09||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.10||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.11||ASYA018GBCH 5.6,ASYA009GCGH 2.8,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.12||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.13||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.14||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.15||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.16||ASYA030GTEH 9.0,ASYA009GCGH 2.8,ASYA009GCGH 2.8|AJT045LCLCH 14.0
+G.17||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.18||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+G.19||ASYA024GBCH 7.1,ASYA012GCGH 3.6|AJT040LCLCH 12.1
+G.20||ASYA024GBCH 7.1,ASYA012GCGH 3.6|AJT040LCLCH 12.1
+G.21||ASYA034GTEH 10.0,ASYA009GCGH 2.8|AJT045LCLCH 14.0
+G.22||ASYA034GTEH 10.0,ASYA012GCGH 3.6|AJT045LCLCH 14.0
+G.23||ASYA034GTEH 10.0,ASYA012GCGH 3.6|AJT045LCLCH 14.0
+1.01||ARXK024GLGH 7.1,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT045LCLCH 14.0
+1.02||ARXK024GLGH 7.1,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT045LCLCH 14.0
+1.03||ARXK024GLGH 7.1,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT045LCLCH 14.0
+1.04||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.05||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LBLCH 12.1
+1.06||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LBLCH 12.1
+1.07||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.08||ASYA018GBCH 5.6,ASYA009GCGH 2.8|AJT040LBLCH 12.1
+1.11||ARXK012GLGH 3.5 B/H,ARXK012GLGH 3.5 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT054LCLCH 15.5
+1.12||ARXK012GLGH 3.5 B/H,ARXK012GLGH 3.5 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT054LCLCH 15.5
+1.13||ARXK012GLGH 3.5 B/H,ARXK012GLGH 3.5 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT054LCLCH 15.5
+1.14||ARXK012GLGH 3.5 B/H,ARXK012GLGH 3.5 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H,ARXK009GLGH 2.8 B/H|AJT054LCLCH 15.5
+1.15||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.16||ASYA024GBCH 7.1,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.17||ASYA024GBCH 7.1,ASYA009GCGH 2.8,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.18||ASYA024GBCH 7.1,ASYA012GCGH 3.6|AJT040LCLCH 12.1
+1.19||ASYA034GTEH 10.0,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+1.20||ASYA034GTEH 10.0,ASYA009GCGH 2.8|AJT040LCLCH 12.1
+`;
+
+const ROOMS_DAIKIN = {1:['Living room'],2:['Living room','Master bed'],3:['Living room','Master bed','Bedroom 1']};
+const ROOMS_FUJI = {1:['Living room'],2:['Living room','Master bed'],3:['Living room','Master bed','Bed 2'],
+  4:['Living room','Master bed','Bed 2','Bed 3'],5:['Living room 1','Living room 2','Master bed','Bed 2','Bed 3']};
+
+function parseToken(t){
+  const p=t.trim().split(/\s+/); const model=p.shift(); let kw=null,note='';
+  if(p.length && /^\d+(\.\d+)?$/.test(p[0])) kw=p.shift();
+  if(p.length) note=p.join(' ');
+  return {model,kw,note};
+}
+function buildSchedule(rowText,roomMap,common){
+  const apts=[];
+  rowText.trim().split('\n').forEach(line=>{
+    const [aptId,type,indoor,outdoor]=line.split('|');
+    const toks=indoor.split(',').filter(Boolean).map(parseToken);
+    const names=roomMap[toks.length]||toks.map((_,i)=>'Unit '+(i+1));
+    apts.push({id:aptId,type:type||'',units:toks.map((t,i)=>({room:names[i],...t})),
+      outdoor:outdoor?parseToken(outdoor):null});
+  });
+  if(common) common.forEach(c=>apts.push(c));
+  return groupSections(apts, common?common.map(c=>c.id):[]);
+}
+function groupSections(apts,commonIds){
+  const map=new Map();
+  apts.forEach(a=>{
+    let key = commonIds.includes(a.id) ? 'Common areas'
+            : a.id.startsWith('G.') ? 'Ground floor'
+            : 'Level '+a.id.split('.')[0];
+    if(!map.has(key)) map.set(key,[]);
+    map.get(key).push(a);
+  });
+  return [...map].map(([name,apts])=>({name,apts}));
+}
+
+const SEED_JOBS = [
+  {id:'taylor', name:'Taylor St', site:'Daikin — 72 apartments + common areas',
+   sections:buildSchedule(TAYLOR_ROWS,ROOMS_DAIKIN,TAYLOR_COMMON)},
+  {id:'como', name:'152 Como Pde West, Parkdale', site:'Fujitsu — ground + first floor',
+   sections:buildSchedule(COMO_ROWS,ROOMS_FUJI,null)}
+];
+
+/* ---------- app state ---------- */
+let job=null, jobState={ticks:{},flags:{}}, filter='all', query='', view='jobs';
+const openLevels=new Set(), openApts=new Set();
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const me=()=>ND.auth.current();
+
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove('on'),1900);
+}
+
+function allUnits(apt){
+  const u=apt.units.map((x,i)=>({...x,key:apt.id+'::'+i,outdoor:false}));
+  if(apt.outdoor) u.push({...apt.outdoor,room:'Outdoor / condenser',key:apt.id+'::out',outdoor:true});
+  return u;
+}
+const tickOf=k=>jobState.ticks[k]||null;
+const flagsOf=k=>jobState.flags[k]||[];
+const openFlags=k=>flagsOf(k).filter(f=>f.kind==='issue'&&!f.fixed);
+
+function aptStats(apt){
+  const us=allUnits(apt); let done=0,na=0,issues=openFlags(apt.id).length;
+  us.forEach(u=>{const t=tickOf(u.key);
+    if(t&&t.v==='done')done++; if(t&&t.v==='na')na++; issues+=openFlags(u.key).length;});
+  return {total:us.length,done,na,issues,complete:us.length>0&&done+na===us.length};
+}
+function statsFor(sections,state){
+  const prev=jobState; jobState=state;
+  let t=0,d=0,i=0;
+  sections.forEach(s=>s.apts.forEach(a=>{const st=aptStats(a); t+=st.total; d+=st.done+st.na; i+=st.issues;}));
+  jobState=prev; return {total:t,done:d,issues:i};
+}
+
+function persist(){
+  const st=statsFor(job.sections,jobState);
+  ND.records.saveSoon('job', job.id, {
+    name:job.name, site:job.site, sections:job.sections,
+    ticks:jobState.ticks, flags:jobState.flags,
+    status: st.done===st.total ? 'complete' : 'open'
+  },{
+    title:job.name, subtitle:job.site,
+    status: st.done===st.total ? 'complete' : 'open',
+    done:st.done, total:st.total, issues:st.issues
+  });
+}
+
+/* ---------- lock ---------- */
+let entered='';
+function renderPips(err){
+  $('#pips').innerHTML=[0,1,2,3].map(i=>`<div class="pip ${err?'err':(i<entered.length?'on':'')}"></div>`).join('');
+}
+$('#keypad').innerHTML=['1','2','3','4','5','6','7','8','9','','0','⌫']
+  .map(k=>k===''?'<div></div>':`<button class="key ${k==='⌫'?'ghost':''}" data-k="${k}">${k}</button>`).join('');
+renderPips();
+
+$('#keypad').addEventListener('click',e=>{
+  const b=e.target.closest('[data-k]'); if(!b) return;
+  const k=b.dataset.k;
+  if(k==='⌫'){entered=entered.slice(0,-1);renderPips();return;}
+  if(entered.length>=4) return;
+  entered+=k; renderPips();
+  if(entered.length===4) setTimeout(tryCode,150);
+});
+
+let cooldownTimer=null;
+function bumpPad(msg){ renderPips(true); entered=''; setTimeout(()=>renderPips(),400); if(msg) toast(msg); }
+
+async function tryCode(){
+  const code=entered;
+  $('#lockHint').dataset.busy='1';
+  const res=await SuiteAuth.login(code);
+
+  if(res.ok){
+    ND.auth.setSession({ code, name: res.user.username || res.user.name || 'User', role: res.user.role || 'staff' });
+    if(res.offline) toast('Signed in offline');
+    enterApp();
+    return;
+  }
+  if(res.locked){ bumpPad('That account is locked — contact your admin'); return; }
+  if(res.cooldownMs){ startCooldown(res.cooldownMs); return; }
+
+  let msg='Passcode not recognised';
+  if(typeof res.attemptsRemaining==='number') msg+=' — '+res.attemptsRemaining+' left before lockout';
+  else if(res.error) msg=res.error;
+  bumpPad(msg);
+}
+
+function startCooldown(ms){
+  const endsAt=Date.now()+ms; entered=''; renderPips();
+  clearInterval(cooldownTimer);
+  const tick=()=>{
+    const rem=Math.max(0,endsAt-Date.now());
+    if(rem<=0){ clearInterval(cooldownTimer); $('#lockHint').textContent=''; refreshHint(); return; }
+    const s=Math.ceil(rem/1000);
+    $('#lockHint').textContent='🔒 Too many tries — wait '+(s<60?s+'s':Math.ceil(s/60)+'m');
+  };
+  tick(); cooldownTimer=setInterval(tick,500);
+}
+
+function enterApp(){
+  const u=me();
+  $('#lock').classList.add('hide'); $('#app').classList.remove('hide');
+  $('#avatar').textContent=ND.auth.initials(); $('#avatar').className='avatar '+u.role;
+  $('#whoName').textContent=u.name;
+  showJobs();
+}
+
+/* ---------- account / suite menu ---------- */
+$('#whoBtn').onclick=()=>{
+  const u=me();
+  openSheet('Signed in', u.name+' · '+ND.auth.ROLES[u.role].label, [
+    ...(ND.auth.can('staff.manage')?[{ic:'👥',label:'Staff',sub:'Who has access · managed by your admin',act:()=>{closeSheet();showStaff();}}]:[]),
+    ...(ND.auth.can('activity.view')?[{ic:'🪪',label:'Activity log',sub:'Last 90 days, this device',act:()=>{closeSheet();showActivity();}}]:[]),
+    ...(ND.auth.can('data.export')?[
+      {ic:'⬇️',label:'Export everything',sub:'Jobs, staff, log — one JSON',act:exportAll},
+      {ic:'⬆️',label:'Import an ND export',act:()=>{closeSheet();$('#importIn').click();}}
+    ]:[]),
+    {ic:'🔒',label:'Sign out',danger:true,act:()=>{
+      closeSheet(); ND.auth.signOut(); entered=''; renderPips();
+      $('#app').classList.add('hide'); $('#lock').classList.remove('hide');
+      $('#nameEntry').classList.add('hide'); $('#padWrap').classList.remove('hide');
+      refreshHint();
+    }}
+  ]);
+};
+
+async function exportAll(){
+  closeSheet();
+  await ND.store.flush();
+  const data=await ND.records.exportAll();
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='nd-export-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Exported');
+}
+$('#importIn').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return; e.target.value='';
+  try{
+    await ND.records.importAll(JSON.parse(await f.text()));
+    toast('Imported'); showJobs();
+  }catch(err){ toast("That file isn't an ND export"); }
+};
+
+/* ---------- view: jobs ---------- */
+async function showJobs(){
+  view='jobs'; job=null;
+  $('#back').classList.add('hide');
+  $('#hTitle').textContent='Jobs';
+  $('#hSub').textContent=me()?ND.auth.ROLES[me().role].label+' · '+me().name:'';
+  $('#hProg').classList.add('hide'); $('#jobTools').classList.add('hide');
+
+  const idx=await ND.records.list('job');
+  const cards=idx.map(r=>{
+    const pct=r.total?Math.round(r.done/r.total*100):0;
+    return `<div class="jobwrap">
+      <button class="jobcard" data-job="${r.id}">
+        <h3>${esc(r.title)}</h3>
+        <p>${esc(r.subtitle||'')}${r.issues?` · <span style="color:var(--issue)">${r.issues} open issue${r.issues>1?'s':''}</span>`:''}</p>
+        <div class="rail"><i style="width:${pct}%"></i></div>
+        <div class="railmeta"><span>${r.done||0} of ${r.total||0} done</span><span>${pct}%</span></div>
+      </button>
+      ${ND.auth.can('record.delete')?`<button class="dots" data-jmenu="${r.id}" aria-label="Job options">⋯</button>`:''}
+    </div>`;
+  }).join('');
+
+  $('#main').innerHTML = cards + `
+    <button class="jobcard" id="addJob" style="border-style:dashed;text-align:center">
+      <div class="upload"><b>+ Add a schedule</b><br>Spreadsheet, PDF, or convert any format with AI</div>
+    </button>`;
+
+  $('#main').querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>openJob(b.dataset.job));
+  $('#main').querySelectorAll('[data-jmenu]').forEach(b=>b.onclick=()=>jobMenu(b.dataset.jmenu));
+  $('#addJob').onclick=openImportChooser;
+}
+
+/* ---------- import chooser ---------- */
+function openImportChooser(){
+  openSheet('New job','How do you want to add it?',[
+    {ic:'📊',label:'Upload a spreadsheet',sub:'CSV or Excel — the reliable way',act:()=>{closeSheet();$('#sheetIn').click();}},
+    {ic:'🤖',label:'Convert another format with AI',sub:'Photo, PDF, messy sheet → clean import',act:()=>{closeSheet();showAiHelper();}},
+    {ic:'📄',label:'Read a PDF schedule',sub:'Works when the PDF is real text, not a scan',act:()=>{closeSheet();$('#fileIn').click();}}
+  ]);
+}
+
+function jobMenu(id){
+  openSheet('Job','Options',[
+    {ic:'🗑',label:'Delete this job',sub:'Removes the schedule and every tick',danger:true,act:async()=>{
+      closeSheet(); await ND.records.remove('job',id); showJobs(); toast('Job deleted');
+    }}
+  ]);
+}
+
+/* ---------- view: job detail ---------- */
+async function openJob(id){
+  const rec=await ND.records.get('job',id);
+  if(!rec){ toast('That job has gone'); return showJobs(); }
+  view='job';
+  job={id:rec.id,name:rec.name,site:rec.site,sections:rec.sections};
+  jobState={ticks:rec.ticks||{},flags:rec.flags||{}};
+  openLevels.clear(); openApts.clear();
+  job.sections.forEach(s=>openLevels.add(s.name));
+  filter='all'; query=''; $('#search').value='';
+  $('#back').classList.remove('hide');
+  $('#hTitle').textContent=job.name; $('#hSub').textContent=job.site;
+  $('#hProg').classList.remove('hide'); $('#jobTools').classList.remove('hide');
+  renderJob();
+}
+$('#back').onclick=showJobs;
+
+function renderJob(){
+  const st=statsFor(job.sections,jobState);
+  const pct=st.total?Math.round(st.done/st.total*100):0;
+  $('#railFill').style.width=pct+'%';
+  $('#railLeft').textContent=`${st.done}/${st.total} units`;
+  $('#railRight').textContent=pct+'%'+(st.issues?`  ·  ${st.issues} issue${st.issues>1?'s':''}`:'');
+
+  $('#chips').innerHTML=[['all','All'],['todo','To do'],['issues','Issues'],['done','Done']]
+    .map(([k,l])=>`<button class="chip ${filter===k?'on':''}" data-f="${k}">${l}</button>`).join('');
+  $('#chips').querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{filter=c.dataset.f;renderJob()});
+
+  const q=query.toLowerCase(); let html='',shown=0;
+  job.sections.forEach(sec=>{
+    const rows=sec.apts.filter(a=>{
+      const s=aptStats(a);
+      if(filter==='todo'&&s.complete) return false;
+      if(filter==='done'&&!s.complete) return false;
+      if(filter==='issues'&&!s.issues) return false;
+      if(q){
+        const hay=(a.id+' '+a.type+' '+allUnits(a).map(u=>u.model+' '+u.room).join(' ')).toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    if(!rows.length) return;
+    shown+=rows.length;
+    const secDone=rows.filter(a=>aptStats(a).complete).length;
+    const isOpen=openLevels.has(sec.name)||!!q;
+    html+=`<div class="level ${isOpen?'':'closed'}">
+      <button class="levelhead" data-lvl="${esc(sec.name)}">
+        <span class="caret">▼</span>${esc(sec.name)}<span class="ln"></span><span class="cnt">${secDone}/${rows.length}</span>
+      </button>
+      <div class="aptlist">${rows.map(aptHTML).join('')}</div></div>`;
+  });
+
+  $('#main').innerHTML = shown ? html : emptyHTML();
+  wireJob();
+}
+
+function emptyHTML(){
+  if(filter==='issues') return `<div class="empty"><div class="big">✓</div><h3>Nothing flagged</h3><p>Open the ⋯ menu on any unit to raise an issue.</p></div>`;
+  if(filter==='todo') return `<div class="empty"><div class="big">🎉</div><h3>Every unit ticked</h3><p>Job's done. Switch to All to review.</p></div>`;
+  if(query) return `<div class="empty"><div class="big">🔍</div><h3>No match for "${esc(query)}"</h3><p>Try an apartment number or a model code.</p></div>`;
+  return `<div class="empty"><div class="big">—</div><h3>Nothing here yet</h3><p>Switch filters to see the rest.</p></div>`;
+}
+
+function aptHTML(apt){
+  const us=allUnits(apt), st=aptStats(apt), open=openApts.has(apt.id);
+  const strip=us.map(u=>{
+    const t=tickOf(u.key);
+    const cls=openFlags(u.key).length?'x':(t&&t.v==='done')?'d':(t&&t.v==='na')?'n':'';
+    return `<i class="${cls}${u.outdoor?' o':''}"></i>`;
+  }).join('');
+  const aptFlags=flagsOf(apt.id).map(f=>flagHTML(f,apt.id,true)).join('');
+  const units=us.map(u=>{
+    const t=tickOf(u.key);
+    const cls=t&&t.v==='done'?'done':t&&t.v==='na'?'na':'';
+    const mark=t&&t.v==='na'?'N/A':'✓';
+    const tags=[u.outdoor?'<span class="tag out">Outdoor</span>':'',
+      u.kw?`<span class="tag">${u.kw} kW</span>`:'',
+      /B\/H/i.test(u.note||'')?'<span class="tag bh">Bulkhead</span>':''].join('');
+    const stamp=t?`<div class="stamp">${t.v==='na'?'Marked N/A':'Ticked'} by ${esc(t.by)} · ${ND.timeAgo(t.at)}</div>`:'';
+    return `<div class="unit ${cls}">
+      <button class="tick" data-tick="${u.key}" aria-label="Tick ${esc(u.room)}">${mark}</button>
+      <div class="uinfo"><div class="uroom">${esc(u.room)} ${tags}</div>
+        <div class="umodel">${esc(u.model)}</div>${stamp}</div>
+      <button class="dots" data-umenu="${u.key}" aria-label="Options">⋯</button>
+    </div>${flagsOf(u.key).map(f=>flagHTML(f,u.key,false)).join('')}`;
+  }).join('');
+
+  return `<div class="apt ${open?'':'closed'} ${st.complete?'allDone':''} ${st.issues?'hasIssue':''}">
+    <div style="display:flex;align-items:center">
+      <button class="apthead" data-apt="${apt.id}">
+        <span class="aptno">${esc(apt.id)}</span>
+        <span class="aptmeta"><span class="apttype">${esc(apt.type||(us.length+' units'))}</span>
+        <span class="strip">${strip}</span></span>
+        <span class="frac ${st.complete?'full':''}">${st.done+st.na}/${st.total}</span>
+      </button>
+      <button class="dots" data-amenu="${apt.id}" style="margin-right:12px" aria-label="Apartment options">⋯</button>
+    </div>${aptFlags}
+    <div class="units">${units||'<div style="padding:12px 14px;color:var(--muted);font-size:13.5px">No indoor units listed.</div>'}</div>
+  </div>`;
+}
+
+function flagHTML(f,key,aptLevel){
+  const canResolve=ND.auth.can('issue.resolve');
+  return `<div class="flag ${f.kind==='note'?'note':''} ${f.fixed?'fixed':''} ${aptLevel?'apt-level':''}">
+    <div class="ftxt">${f.kind==='issue'?'⚠️ ':'📝 '}${esc(f.text)}</div>
+    <div class="fmeta"><span>${esc(f.by)} · ${ND.timeAgo(f.at)}</span>
+    ${canResolve?`<button data-flag="${key}|${f.id}" style="text-decoration:underline">${f.fixed?'reopen':(f.kind==='issue'?'mark fixed':'remove')}</button>`:''}
+    </div></div>`;
+}
+
+function wireJob(){
+  const m=$('#main');
+  m.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>{
+    const n=b.dataset.lvl; openLevels.has(n)?openLevels.delete(n):openLevels.add(n); renderJob();});
+  m.querySelectorAll('[data-apt]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.apt; openApts.has(id)?openApts.delete(id):openApts.add(id); renderJob();});
+  m.querySelectorAll('[data-tick]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleTick(b.dataset.tick);});
+  m.querySelectorAll('[data-umenu]').forEach(b=>b.onclick=e=>{e.stopPropagation();unitMenu(b.dataset.umenu);});
+  m.querySelectorAll('[data-amenu]').forEach(b=>b.onclick=e=>{e.stopPropagation();aptMenu(b.dataset.amenu);});
+  m.querySelectorAll('[data-flag]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const [key,id]=b.dataset.flag.split('|');
+    const f=flagsOf(key).find(x=>x.id===id); if(!f) return;
+    if(f.kind==='note'&&!f.fixed) jobState.flags[key]=flagsOf(key).filter(x=>x.id!==id);
+    else { f.fixed=!f.fixed; ND.activity.push(f.fixed?'issue.resolve':'issue.reopen',job.id+':'+key); }
+    persist(); renderJob();
+  });
+}
+$('#search').addEventListener('input',e=>{query=e.target.value.trim();renderJob();});
+
+function toggleTick(key){
+  const cur=tickOf(key);
+  if(cur&&cur.v==='done'){ delete jobState.ticks[key]; ND.activity.push('unit.untick',job.id+':'+key); }
+  else { jobState.ticks[key]={v:'done',by:me().name,at:Date.now()}; ND.activity.push('unit.tick',job.id+':'+key); }
+  persist(); renderJob();
+}
+
+function findUnit(key){
+  const [aptId]=key.split('::');
+  for(const s of job.sections) for(const a of s.apts)
+    if(a.id===aptId) return {apt:a,unit:allUnits(a).find(u=>u.key===key)};
+  return {};
+}
+
+function unitMenu(key){
+  const {apt,unit}=findUnit(key); const t=tickOf(key);
+  openSheet(apt.id+' · '+unit.room, unit.model+(unit.kw?'  ·  '+unit.kw+' kW':''),[
+    {ic:'⚠️',label:'Flag an issue',act:()=>flagForm(key,apt.id+' — '+unit.room,'issue')},
+    {ic:'📝',label:'Add a note',act:()=>flagForm(key,apt.id+' — '+unit.room,'note')},
+    {ic:'🚫',label:t&&t.v==='na'?'Un-mark not applicable':'Mark not applicable',act:()=>{
+      if(t&&t.v==='na') delete jobState.ticks[key];
+      else jobState.ticks[key]={v:'na',by:me().name,at:Date.now()};
+      persist(); closeSheet(); renderJob();}},
+    ...(t?[{ic:'↺',label:'Clear tick',danger:true,act:()=>{
+      delete jobState.ticks[key]; persist(); closeSheet(); renderJob();}}]:[])
+  ]);
+}
+
+function aptMenu(aptId){
+  let apt; job.sections.forEach(s=>s.apts.forEach(a=>{if(a.id===aptId)apt=a;}));
+  const us=allUnits(apt);
+  const canClear=ND.auth.can('record.clearAll');
+  openSheet('Apartment '+aptId, us.length+' units · '+(apt.type||'—'),[
+    {ic:'⚠️',label:'Flag an apartment issue',act:()=>flagForm(aptId,'Apartment '+aptId,'issue')},
+    {ic:'📝',label:'Add a note',act:()=>flagForm(aptId,'Apartment '+aptId,'note')},
+    {ic:'✅',label:'Tick every unit',act:()=>{
+      us.forEach(u=>jobState.ticks[u.key]={v:'done',by:me().name,at:Date.now()});
+      ND.activity.push('apt.tickAll',job.id+':'+aptId,{units:us.length});
+      persist(); closeSheet(); renderJob(); toast(aptId+' — all '+us.length+' ticked');}},
+    {ic:'↺',label:'Clear all ticks',sub:canClear?'':'Admin or Master only',danger:true,disabled:!canClear,act:()=>{
+      if(!canClear) return;
+      us.forEach(u=>delete jobState.ticks[u.key]);
+      ND.activity.push('apt.clearAll',job.id+':'+aptId);
+      persist(); closeSheet(); renderJob();}}
+  ]);
+}
+
+function flagForm(key,title,kind){
+  $('#sheetBody').innerHTML=`
+    <div class="grab" style="margin-top:0"></div>
+    <div class="sheet-h">${kind==='issue'?'New issue':'New note'}</div>
+    <h2 class="sheet-t">${esc(title)}</h2>
+    <textarea class="field" id="flagTxt" placeholder="${kind==='issue'
+      ?'Bracket fouls the bulkhead, wrong model delivered, no power at the isolator…'
+      :'Anything worth knowing next visit…'}"></textarea>
+    <button class="btn" id="flagSave">${kind==='issue'?'Flag it':'Save note'}</button>
+    <button class="btn sec" id="flagCancel" style="margin-top:8px">Cancel</button>`;
+  setTimeout(()=>$('#flagTxt').focus(),80);
+  $('#flagSave').onclick=()=>{
+    const txt=$('#flagTxt').value.trim(); if(!txt){$('#flagTxt').focus();return;}
+    if(!jobState.flags[key]) jobState.flags[key]=[];
+    jobState.flags[key].push({id:ND.uid(),kind,text:txt,by:me().name,at:Date.now(),fixed:false});
+    ND.activity.push(kind==='issue'?'issue.raise':'note.add',job.id+':'+key,{text:txt.slice(0,80)});
+    persist(); closeSheet(); renderJob();
+    toast(kind==='issue'?'Issue flagged':'Note saved');
+  };
+  $('#flagCancel').onclick=closeSheet;
+}
+
+/* ---------- view: staff (read-only) ----------
+   Accounts are managed centrally by your admin. Here we just show who has
+   signed in on this device, so the crew lead can confirm access. */
+async function showStaff(){
+  view='staff'; job=null;
+  $('#back').classList.remove('hide'); $('#back').onclick=showJobs;
+  $('#hTitle').textContent='Staff';
+  $('#hSub').textContent='Signed in on this device';
+  $('#hProg').classList.add('hide'); $('#jobTools').classList.add('hide');
+  const known=SuiteAuth.cache();
+  const rows=Object.values(known).sort((a,b)=>(b.at||0)-(a.at||0));
+  const list=rows.length ? rows.map(u=>{
+    const role=ND.auth.ROLES[u.role]?u.role:'staff';
+    return `<div class="row">
+      <span class="avatar ${role}">${esc((u.username||'?')[0].toUpperCase())}</span>
+      <span class="who-n"><b>${esc(u.username||'User')}</b><span>last in ${ND.timeAgo(u.at||Date.now())}</span></span>
+      <span class="pill ${role}">${ND.auth.ROLES[role].label}</span>
+    </div>`;
+  }).join('') : `<div class="empty"><div class="big">—</div><h3>No one yet</h3><p>People appear here after they sign in once.</p></div>`;
+  $('#main').innerHTML=list+`
+    <div class="flag note" style="margin:18px 2px 0">
+      <div class="ftxt">👥 Accounts, passcodes and roles are managed centrally by your admin. Add or remove people there and they can sign in here straight away — same passcode.</div>
+    </div>`;
+}
+
+/* ---------- view: activity ---------- */
+async function showActivity(){
+  view='activity'; job=null;
+  $('#back').classList.remove('hide'); $('#back').onclick=showJobs;
+  $('#hTitle').textContent='Activity log';
+  $('#hSub').textContent='This device · last 90 days';
+  $('#hProg').classList.add('hide'); $('#jobTools').classList.add('hide');
+  const log=await ND.activity.list({limit:200});
+  $('#main').innerHTML = log.length ? log.map(e=>`
+    <div class="logline">
+      <span class="lt">${ND.timeAgo(e.at)}</span>
+      <span class="lb"><span class="la">${esc(e.app)}·${esc(e.action)}</span><br>
+      ${esc(e.by)}${e.target?' — '+esc(String(e.target)):''}</span>
+    </div>`).join('')
+    : `<div class="empty"><div class="big">—</div><h3>Nothing logged yet</h3><p>Ticks, issues and sign-ins land here.</p></div>`;
+}
+
+/* ---------- sheet ---------- */
+function openSheet(eyebrow,title,opts){
+  $('#sheetBody').innerHTML=`
+    <div class="grab" style="margin-top:0"></div>
+    <div class="sheet-h">${esc(eyebrow)}</div><h2 class="sheet-t">${esc(title)}</h2>
+    ${opts.map((o,i)=>`<button class="opt ${o.danger?'danger':''}" data-o="${i}" ${o.disabled?'disabled':''}>
+      <span class="ic">${o.ic}</span><span>${o.label}${o.sub?`<span class="sub">${esc(o.sub)}</span>`:''}</span></button>`).join('')}`;
+  $('#sheetBody').querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>opts[+b.dataset.o].act());
+  $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
+}
+function closeSheet(){ $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on'); }
+$('#scrim').onclick=closeSheet;
+
+/* ---------- shared: commit a parsed schedule as a job ---------- */
+async function commitImportedJob(parsed){
+  if(!parsed.sections.length) throw new Error('no rows');
+  const apts=parsed.sections.reduce((n,s)=>n+s.apts.length,0);
+  let total=0; parsed.sections.forEach(s=>s.apts.forEach(a=>total+=a.units.length+(a.outdoor?1:0)));
+  const id='up_'+ND.uid();
+  await ND.records.save('job',id,{...parsed,ticks:{},flags:{},status:'open'},
+    {title:parsed.name,subtitle:parsed.site,status:'open',done:0,total,issues:0});
+  ND.activity.push('job.import',id,{name:parsed.name,apartments:apts});
+  openJob(id);
+  toast('Added '+apts+' apartment'+(apts===1?'':'s'));
+}
+function importError(title,detail){
+  $('#main').innerHTML=`<div class="empty"><div class="big">⚠️</div><h3>${esc(title)}</h3>
+    <p>${detail}</p><button class="btn sec" id="backJobs">Back to jobs</button></div>`;
+  $('#backJobs').onclick=showJobs;
+}
+
+/* ---------- spreadsheet reader (CSV / Excel) ----------
+   Canonical columns (header row, any order, case-insensitive):
+     apartment, section, type, room, indoor_model, kw, bulkhead, outdoor_model
+   One row per indoor unit. This is what the AI prompt and template produce. */
+$('#sheetIn').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return; e.target.value='';
+  $('#main').innerHTML=`<div class="empty"><div class="big">⏳</div><h3>Reading ${esc(file.name)}</h3><p>Building the checklist from your spreadsheet…</p></div>`;
+  try{
+    const rows=await readSpreadsheet(file);
+    if(!rows.length) throw new Error('empty');
+    const parsed=buildFromRows(rows, file.name);
+    if(!parsed.sections.length) throw new Error('no apartments');
+    await commitImportedJob(parsed);
+  }catch(err){
+    importError("Couldn't read that spreadsheet",
+      `It needs a header row with at least <code>apartment</code> and <code>indoor_model</code> columns, one row per indoor unit.
+       Tap <b>Convert another format with AI</b> to turn any layout into the right shape, or grab the template first.`);
+  }
+});
+
+function normKey(k){ return String(k||'').trim().toLowerCase().replace(/[\s\-]+/g,'_'); }
+const COL_ALIASES={
+  apartment:['apartment','apt','unit','unit_no','apt_no','number','no'],
+  section:['section','level','floor','area','block'],
+  type:['type','system','system_type'],
+  room:['room','location','position','served'],
+  indoor_model:['indoor_model','indoor','model','head','indoor_unit','fancoil'],
+  kw:['kw','kw_capacity','capacity','capacity_kw','size'],
+  bulkhead:['bulkhead','bh','b_h','ducted','concealed'],
+  outdoor_model:['outdoor_model','outdoor','condenser','odu','outdoor_unit']
+};
+function mapRow(raw){
+  const low={}; Object.keys(raw).forEach(k=>{ low[normKey(k)]=raw[k]; });
+  const out={};
+  for(const canon in COL_ALIASES){
+    for(const a of COL_ALIASES[canon]){ if(low[a]!==undefined && String(low[a]).trim()!==''){ out[canon]=low[a]; break; } }
+  }
+  return out;
+}
+
+async function readSpreadsheet(file){
+  const isCsv=/\.csv$/i.test(file.name) || file.type==='text/csv';
+  let records;
+  if(isCsv){
+    records=parseCsv(await file.text());
+  }else{
+    if(!window.XLSX) throw new Error('xlsx lib missing');
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    records=XLSX.utils.sheet_to_json(ws,{defval:''});
+  }
+  return records.map(mapRow).filter(r=>r.apartment && (r.indoor_model||r.outdoor_model));
+}
+
+/* Small dependency-free CSV parser (handles quotes, commas, CRLF). */
+function parseCsv(text){
+  const rows=[]; let row=[], val='', q=false;
+  text=String(text).replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){ val+='"'; i++; } else q=false; }
+      else val+=c;
+    }else{
+      if(c==='"') q=true;
+      else if(c===','){ row.push(val); val=''; }
+      else if(c==='\n'){ row.push(val); rows.push(row); row=[]; val=''; }
+      else if(c==='\r'){ /* skip */ }
+      else val+=c;
+    }
+  }
+  if(val!==''||row.length){ row.push(val); rows.push(row); }
+  const clean=rows.filter(r=>r.some(c=>String(c).trim()!==''));
+  if(clean.length<2) return [];
+  const head=clean[0].map(h=>String(h).trim());
+  return clean.slice(1).map(r=>{ const o={}; head.forEach((h,i)=>o[h]=r[i]!==undefined?r[i]:''); return o; });
+}
+
+const YES_RE=/^(y|yes|true|1|b\/?h|bulkhead|ducted|concealed)$/i;
+function buildFromRows(rows, filename){
+  const byApt=new Map(), order=[];
+  rows.forEach(r=>{
+    const apt=String(r.apartment).trim(); if(!apt) return;
+    if(!byApt.has(apt)){ byApt.set(apt,{id:apt,type:'',section:'',units:[],outdoor:null}); order.push(apt); }
+    const a=byApt.get(apt);
+    if(!a.type && r.type) a.type=String(r.type).trim();
+    if(!a.section && r.section) a.section=String(r.section).trim();
+    const model=String(r.indoor_model||'').trim();
+    if(model){
+      const bulk=YES_RE.test(String(r.bulkhead||'').trim());
+      const kw=(r.kw!=null&&String(r.kw).trim()!=='')?String(r.kw).replace(/kw/i,'').trim():null;
+      a.units.push({model,kw,room:String(r.room||'').trim(),note:bulk?'B/H':''});
+    }
+    const out=String(r.outdoor_model||'').trim();
+    if(out && !a.outdoor) a.outdoor={model:out,kw:null,note:''};
+  });
+  const apts=order.map(id=>{
+    const a=byApt.get(id);
+    a.units.forEach((u,i)=>{ if(!u.room) u.room=(ROOMS_FUJI[a.units.length]||[])[i]||('Unit '+(i+1)); });
+    return a;
+  });
+  const total=apts.length;
+  return {
+    name:(filename||'Imported schedule').replace(/\.(csv|xlsx?|xls)$/i,'').replace(/[_-]+/g,' ').trim()||'Imported schedule',
+    site:'From spreadsheet · '+total+' apartment'+(total===1?'':'s'),
+    sections:groupSectionsFlexible(apts)
+  };
+}
+function groupSectionsFlexible(apts){
+  const map=new Map();
+  apts.forEach(a=>{
+    let key;
+    const sec=(a.section||'').trim();
+    if(sec) key = /^\d+$/.test(sec) ? 'Level '+String(Number(sec)) : sec;   // bare "5" -> "Level 5"
+    else key = /^g[\.\-]?/i.test(a.id) ? 'Ground floor'
+      : a.id.includes('.') ? 'Level '+a.id.split('.')[0].replace(/^0+/,'')
+      : 'Units';
+    if(!map.has(key)) map.set(key,[]);
+    map.get(key).push(a);
+  });
+  return [...map].map(([name,apts])=>({name,apts}));
+}
+
+/* ---------- AI conversion helper ---------- */
+const AI_COLUMNS='apartment,section,type,room,indoor_model,kw,bulkhead,outdoor_model';
+const AI_TEMPLATE=
+`${AI_COLUMNS}
+2.01,Level 2,Multi VRV,Living room,FXAQ63BVM,6.3,no,RXYMQ4A2V4A
+2.01,Level 2,Multi VRV,Master bed,FXAQ50BVM,5.0,no,RXYMQ4A2V4A
+1.11,Level 1,Multi SDA,Living room,ARXK012GLGH,3.5,yes,AJT054LCLCH
+1.11,Level 1,Multi SDA,Bed 2,ARXK009GLGH,2.8,yes,AJT054LCLCH
+G.03,Ground floor,Single,Living room,FTXF50WVMA,5.0,no,RXV50WVMA
+`;
+const AI_PROMPT=
+`You are converting an air-conditioning INSTALL SCHEDULE into a CSV for the Neill Data Install Checklist app. The job is SPLIT SYSTEMS and BULKHEAD units only.
+
+Read whatever I give you below (a PDF, a photo, an email, or a messy spreadsheet) and output ONLY a CSV — no explanation, no code fence — with EXACTLY this header row:
+
+${AI_COLUMNS}
+
+Rules:
+- ONE ROW PER INDOOR UNIT. An apartment with 3 indoor heads becomes 3 rows that all share the same "apartment" value.
+- apartment: the apartment/unit number exactly as written (e.g. 2.01, G.04, 1.11).
+- section: the level or area if shown (e.g. "Level 2", "Ground floor", "Common areas"). Leave blank if unknown — the app will group by apartment number.
+- type: the system type if shown (Single, Multi, Multi SDA, VRV, VRF). Blank if unknown.
+- room: the room the head serves (Living room, Master bed, Bed 2, Kitchen…). Blank if not stated.
+- indoor_model: the indoor unit model code exactly (e.g. FTXF50WVMA, ASYA018GBCH, ARXK009GLGH).
+- kw: capacity in kW as a number only, no unit (e.g. 2.8, 7.1). Blank if unknown.
+- bulkhead: "yes" if the head is a bulkhead / concealed / ducted-into-bulkhead unit (often marked B/H, BH or "bulkhead"), otherwise "no".
+- outdoor_model: the outdoor/condenser model for that apartment (e.g. RXV50WVMA, 4MXM80R2VMA, AJT040LCLCH). Repeat it on each row of the apartment.
+
+Do not invent data. If a field is unknown, leave it blank. Quote any value that contains a comma. Output the CSV and nothing else.
+
+Here is the schedule:
+[ PASTE THE SCHEDULE HERE — or attach the file ]`;
+
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
+    catch(_){ return false; }
+  }
+}
+function downloadBlob(blob,name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function showAiHelper(){
+  $('#sheetBody').innerHTML=`
+    <div class="grab" style="margin-top:0"></div>
+    <div class="sheet-h">Convert with AI</div>
+    <h2 class="sheet-t">Any format → clean import</h2>
+    <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">
+      Got a schedule in some other shape — a builder's PDF, a photo, a spreadsheet that doesn't match?
+      Copy the prompt, paste it into ChatGPT or Claude with your file, and it hands back a CSV you can upload here.
+      Split systems and bulkheads.</p>
+    <button class="opt" id="aiCopy"><span class="ic">📋</span><span>Copy the AI prompt<span class="sub">Paste into ChatGPT / Claude with your schedule</span></span></button>
+    <button class="opt" id="aiTpl"><span class="ic">⬇️</span><span>Download the CSV template<span class="sub">See the exact columns · fill it in by hand if you like</span></span></button>
+    <button class="opt" id="aiUpload"><span class="ic">📊</span><span>Upload the CSV / Excel<span class="sub">Once the AI (or you) has filled it in</span></span></button>
+    <button class="btn sec" id="aiClose" style="margin-top:8px">Close</button>`;
+  $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
+  $('#aiCopy').onclick=async()=>{ toast(await copyText(AI_PROMPT)?'Prompt copied — paste it into your AI':'Copy failed — long-press to select'); };
+  $('#aiTpl').onclick=()=>{ downloadBlob(new Blob([AI_TEMPLATE],{type:'text/csv'}),'checklist-schedule-template.csv'); toast('Template downloaded'); };
+  $('#aiUpload').onclick=()=>{ closeSheet(); $('#sheetIn').click(); };
+  $('#aiClose').onclick=closeSheet;
+}
+
+/* ---------- PDF reader ---------- */
+const MODEL_RE=/^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{7,14}$/;
+$('#fileIn').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return; e.target.value='';
+  $('#main').innerHTML=`<div class="empty"><div class="big">⏳</div><h3>Reading ${esc(file.name)}</h3><p>Pulling apartment numbers and model codes…</p></div>`;
+  try{
+    const parsed=await readPdf(file);
+    await commitImportedJob(parsed);
+  }catch(err){
+    importError("Couldn't read that PDF",
+      `The reader looks for rows starting with an apartment number (2.01, G.04) followed by model codes.
+       If this PDF is a scan rather than text, tap <b>Convert another format with AI</b> instead — it can read a photo or scan.`);
+  }
+});
+
+async function readPdf(file){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const lines=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const tc=await (await pdf.getPage(p)).getTextContent();
+    const rows=new Map();
+    tc.items.forEach(it=>{
+      const y=Math.round(it.transform[5]);
+      let bucket=[...rows.keys()].find(k=>Math.abs(k-y)<4);
+      if(bucket===undefined){bucket=y;rows.set(y,[]);}
+      rows.get(bucket).push({x:it.transform[4],s:it.str});
+    });
+    [...rows.entries()].sort((a,b)=>b[0]-a[0]).forEach(([,items])=>
+      lines.push(items.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ').replace(/\s+/g,' ').trim()));
+  }
+  const apts=[];
+  lines.forEach(line=>{
+    const m=line.match(/^([A-Z]{0,2}\d{0,2}\.\d{1,2})\s+(.*)$/); if(!m) return;
+    const units=[]; let cur=null; const typeBits=[];
+    m[2].split(/\s+/).forEach(t=>{
+      const clean=t.replace(/[^A-Z0-9./]/gi,'').toUpperCase();
+      if(MODEL_RE.test(clean)){ cur={model:clean,kw:null,note:''}; units.push(cur); return; }
+      const kw=t.match(/^(\d+(?:\.\d+)?)KW$/i)||t.match(/^(\d+(?:\.\d+)?)$/);
+      if(kw&&cur&&!cur.kw){ cur.kw=kw[1]; return; }
+      if(cur) cur.note=(cur.note+' '+t).trim();
+      else if(/^[A-Z\-*]+$/i.test(t)) typeBits.push(t);
+    });
+    if(!units.length) return;
+    const outdoor=units.pop();
+    const names=ROOMS_FUJI[units.length]||units.map((_,i)=>'Unit '+(i+1));
+    apts.push({id:m[1],type:typeBits.join(' ').replace(/\*/g,'').trim(),
+      units:units.map((u,i)=>({...u,room:names[i]})),outdoor});
+  });
+  return {name:file.name.replace(/\.pdf$/i,'').replace(/[_-]/g,' '),
+    site:'Read from PDF · '+apts.length+' apartments', sections:groupSections(apts,[])};
+}
+
+/* ---------- boot ---------- */
+function refreshHint(){
+  $('#lockHint').innerHTML='Use your <b>Neill Data</b> passcode.<br>'+
+    'New people are added by your admin.<br>'+
+    `<span style="opacity:.65">On-device storage · ND Core v${ND.version}</span>`;
+}
+
+(async function(){
+  /* Jobs, ticks and the activity log live on THIS device only. Login is the
+     one thing shared with the suite (see the SuiteAuth module up top), so we keep the
+     record store local and never point it at the shared backend. */
+  ND.store.configure({ backend:'local' });
+
+  const existing = await ND.records.list('job');
+  for (const j of SEED_JOBS) {
+    if (existing.some(r => r.id === j.id)) continue;
+    let total=0; j.sections.forEach(s=>s.apts.forEach(a=>total+=a.units.length+(a.outdoor?1:0)));
+    await ND.records.save('job', j.id, {...j, ticks:{}, flags:{}, status:'open'},
+      {title:j.name, subtitle:j.site, status:'open', done:0, total, issues:0});
+  }
+  refreshHint();
+})();
+
+/* PWA: register the service worker so the app installs and opens offline.
+   Skipped on file:// (local preview) where SWs aren't allowed. */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
