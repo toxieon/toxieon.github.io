@@ -2502,7 +2502,7 @@ window.Views = {};
           <span class="job-card-main"><span class="job-name">${escapeHtml(j.job_name || 'Job')}</span><span class="job-addr">${escapeHtml(j.address || 'No address')}</span></span>
           <span class="job-meta"><span class="job-type-badge type-${type}">${escapeHtml(TYPE_LABEL[type] || type)}</span><span class="job-stat"><strong>${s.hours.toFixed(1)}</strong> hrs</span><span class="job-stat"><strong>${s.shifts}</strong></span></span>
         </button>
-        ${open ? `<div class="job-card-body"><div class="job-actions"><a class="btn btn-ghost btn-sm" href="${mapUrlForJob(j)}" target="_blank" rel="noopener">Route to job</a><button type="button" class="btn btn-ghost btn-sm" data-job-delete="${escapeHtml(j.job_id)}" style="color:var(--danger,#e53e3e);">Delete location</button></div><textarea class="job-note-input" data-note-job="${escapeHtml(j.job_id)}" placeholder="Add a note for this job…">${escapeHtml(j.notes || '')}</textarea><div class="job-note-row"><button type="button" class="btn btn-primary btn-sm" data-note-save="${escapeHtml(j.job_id)}">Save note</button></div><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
+        ${open ? `<div class="job-card-body"><div class="job-actions"><a class="btn btn-ghost btn-sm" href="${mapUrlForJob(j)}" target="_blank" rel="noopener">Route to job</a><button type="button" class="btn btn-ghost btn-sm" data-job-delete="${escapeHtml(j.job_id)}" style="color:var(--danger,#e53e3e);">Delete location</button></div><div class="field job-edit-field"><label>Name / title</label><input class="job-name-input" data-name-job="${escapeHtml(j.job_id)}" value="${escapeHtml(j.job_name || '')}"></div><div class="field job-edit-field"><label>Address</label><input class="job-addr-input" data-addr-job="${escapeHtml(j.job_id)}" value="${escapeHtml(j.address || '')}" placeholder="Corrected address — map location stays put"></div><div class="field job-edit-field"><label>Notes</label><textarea class="job-note-input" data-note-job="${escapeHtml(j.job_id)}" placeholder="Add a note for this job…">${escapeHtml(j.notes || '')}</textarea></div><div class="job-note-row"><button type="button" class="btn btn-primary btn-sm" data-job-save="${escapeHtml(j.job_id)}">Save changes</button></div><div class="job-shift-list">${jobShiftRows(j.job_id)}</div></div>` : ''}
       </div>`;
     }).join('');
     wrap.innerHTML = mapCardHtml() + listHtml;
@@ -2510,11 +2510,21 @@ window.Views = {};
     if (mapToggle) mapToggle.addEventListener('click', () => { mapOpen = !mapOpen; render(); });
     if (mapOpen && document.getElementById('jobs-map')) initJobsMap();
     wrap.querySelectorAll('[data-job-toggle]').forEach(el => el.addEventListener('click', () => { const id = el.dataset.jobToggle; expanded[id] = !expanded[id]; render(); }));
-    wrap.querySelectorAll('[data-note-save]').forEach(btn => btn.addEventListener('click', () => {
-      const id = btn.dataset.noteSave;
-      const ta = wrap.querySelector(`textarea[data-note-job="${id}"]`);
+    wrap.querySelectorAll('[data-job-save]').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.dataset.jobSave;
       const job = getState().jobs.find(j => j.job_id === id);
-      if (job && ta) { job.notes = ta.value.trim(); saveState(); queueSheetWrite('jobs', job, true); toast('Note saved'); }
+      if (!job) return;
+      const nameEl = wrap.querySelector(`input[data-name-job="${id}"]`);
+      const addrEl = wrap.querySelector(`input[data-addr-job="${id}"]`);
+      const ta = wrap.querySelector(`textarea[data-note-job="${id}"]`);
+      if (nameEl && nameEl.value.trim()) job.job_name = nameEl.value.trim();
+      if (addrEl) job.address = addrEl.value.trim();
+      if (ta) job.notes = ta.value.trim();
+      // lat/lng are deliberately left untouched — fixing the label never moves the saved location.
+      saveState();
+      queueSheetWrite('jobs', job, true);
+      if (refreshAllViews) refreshAllViews(); else render();
+      toast('Saved');
     }));
     wrap.querySelectorAll('[data-job-delete]').forEach(btn => btn.addEventListener('click', () => {
       const id = btn.dataset.jobDelete;
