@@ -115,7 +115,7 @@
 ### Timesheet
 - [ ] Add a manual shift for last Tuesday → done in <20s → totals/OT correct
 - [ ] Check the sessions tab in Timesheet-Data: `break_minutes` + `entry_method` columns populate (if the sheet pre-dates this update, add those two headers to the sessions tab once) — same for `last_visit` on jobs
-- [ ] Send Timesheet → "Sent ✓" **(requires #36 below first)**
+- [ ] Export timesheet → Copy timesheet / Open in mail app (auto-emailer removed; no Apps Script deploy)
 - [ ] On your send day with unsent hours: nudge card appears on the clock screen
 
 ### Quote
@@ -128,7 +128,7 @@
 - [ ] After opening a Planner project: it appears under "Continue where you left off" and deep-links back
 
 ### Your three admin tasks
-- [ ] **#36** Apps Script: paste `timesheet/apps-script-sendTimesheet.gs` into the Quote backend project, merge the doPost branch, deploy new version (I can walk you through it in Chrome)
+- [x] **#36** CANCELLED — timesheet auto-emailer removed; client uses Copy / Open in mail app only. `timesheet/apps-script-sendTimesheet.gs` deleted. Optional: remove leftover `sendTimesheet` branch from Quote Apps Script backend if still present.
 - [ ] **#35** New referrer-restricted API keys → swap in `shared/nd-config.js` `keys` block → deploy → delete old keys
 - [ ] Tell me the destination repo for `battleship/` and I'll cut it over
 

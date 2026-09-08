@@ -4,7 +4,7 @@ Read this FIRST each session (with the two spec docs Brandon uploads:
 Working copy of the repo lives in the Cowork outputs folder: `toxieon.github.io-main/`.
 Deliverable each session: updated `toxieon-github-io-sliceX.zip` in outputs; Brandon deploys to GitHub Pages (site: www.neilldata.com — note the www; all apps same origin).
 
-## Status: Slices 0–5 COMPLETE (code). Remaining: #34 legacy hard-delete (deliberately ONE RELEASE after Slice 2 migration ships — do NOT do yet), Brandon #35 (keys), #36 (deploy apps-script-sendTimesheet.gs), battleship/ move (needs Brandon's destination repo). Field verification for Slices 2–5.
+## Status: Slices 0–5 COMPLETE (code). Remaining: #34 legacy hard-delete (deliberately ONE RELEASE after Slice 2 migration ships — do NOT do yet), Brandon #35 (keys), battleship/ move (needs Brandon's destination repo). Field verification for Slices 2–5. **#36 cancelled** — timesheet Apps Script emailer removed (client Copy / mailto only); `apps-script-sendTimesheet.gs` deleted.
 
 ### Done (tasks #1–#11 of the §10 master list)
 - `shared/` layer, all modules UMD (browser global + Node `module.exports`), each with a passing `*.test.js` (run `node shared/<m>.test.js`):
@@ -27,7 +27,7 @@ Deliverable each session: updated `toxieon-github-io-sliceX.zip` in outputs; Bra
 
 ### Gotchas
 - Site canonicalises to https://www.neilldata.com (www). Same origin for all apps — SSO depends on this.
-- planner assets use `?v=0.7.2` query strings — bump on deploy if needed.
+- planner assets use `?v=` query strings on styles/app.js — keep `planner/sw.js` SHELL_ASSETS in sync (currently styles `0.8.0` / app `0.8.1`, cache `planner-v4`).
 - app.js files are classic scripts (not modules); shared libs loaded via <script> before them.
 - The extracted `matchFile` in search/app.js now calls `NDMatch.rankDestinations` — behaviour must stay identical (tests freeze weights).
 - Timesheet still on its OWN queue/auth until Slice 3/5. SWB own auth until Slice 5.
@@ -53,7 +53,7 @@ Resolved decisions (handoff §2.1): exifr; geocode capped/deduped; tidy stack; l
 - #22 +Add shift: openAddShift(dateIso) reuses detail modal (date field added, defaults standardClockOn/Off + defaultBreakMin, entry_method:'manual', OT recalc, queueSheetWrite); "+" button on each day-card head + FAB on History (bottom-right above tabbar).
 - #23 AI-prompt copier fully removed (button/const/listener). CSV import + template kept.
 - #24 Tabs 4→3 (Clock·History·Settings): export view/module deleted; export = <details id=export-panel> at bottom of History sharing weekCursor (preview renders on open); print CSS repointed to #view-history .export-panel.
-- #25 sendViaBackend(): POST text/plain JSON {action:'sendTimesheet',to,cc,subject,body} → backendUrl (settings override or TIMESHEET_CONFIG.neillQuote.backendUrl); saves lastSent/lastSentWeek; primary Send btn = backend, "Open in Mail app instead" = old mailto path. Apps Script written: timesheet/apps-script-sendTimesheet.gs (Brandon deploys into the existing Quote backend project, task #36). Send-day nudge: maybeShowSendNudge() card on clock screen (sendDay + week has sessions + lastSentWeek≠this week + not dismissed 'ts_nudge_dismissed'), hooks: boot + visibilitychange; Preview opens History panel, Send→backend.
+- #25 (superseded): timesheet auto-emailer REMOVED — export is client "Copy timesheet" + "Open in mail app" only. `timesheet/apps-script-sendTimesheet.gs` deleted; do not deploy #36. Send-day nudge may still surface on clock screen; Preview opens History. Optional backend cleanup: drop leftover `sendTimesheet` from Quote Apps Script if present.
 - #26 Today chip (wk-today, hidden on current week); period totals honour payPeriodType (Fortnightly/Monthly window from payPeriodStartDay) + last-4-weeks hours strip (#period-summary); flexible breaks: break_minutes field (chips 0/30/60) in edit + add modals, settings defaultBreakMin (s-defaultBreakMin), netHours(minutes) w/ legacy bool→30 compat, sessionBreakMinutes(), sheet headers gained break_minutes + entry_method (ensureTabs adds tabs but NOT new columns on existing sheets — Brandon may need to add the two columns to sessions tab manually OR fine since writeRow maps by header; VERIFY a manual shift row lands with break/entry values).
 - #27 NDUI.accordion(root,{sectionSelector,titleSelector,storageKey,danger[]}) added to shared/nd-ui.js + .nd-acc CSS in nd-core.css — THE §3.6 pattern for Quote #29. Timesheet settings init wraps .settings-section blocks (collapsed by default, remembers open, "More" = danger-styled). Timesheet loads nd-core.css + nd-ui.js; its sw.js ported to v2 strategy (cache timesheet-v3, shell incl. shared assets).
 - NOTE: Timesheet still runs its ORIGINAL inline queue/auth — nd-queue/nd-auth adoption deferred to #33 (semantics identical; low-risk swap later).
