@@ -17,6 +17,7 @@ function makeEnv(opts) {
   if (opts.storedToken) store[A.STORAGE_KEY] = JSON.stringify(opts.storedToken);
   const timers = [];
   const requests = [];   // prompts passed to requestAccessToken
+  const clientHints = []; // hint args passed to createTokenClient
   let tcCallback = null, tcError = null;
   let visible = true;
   let visibilityCb = null, storageCb = null;
@@ -25,13 +26,14 @@ function makeEnv(opts) {
       now: () => nowMs,
       storage: {
         get: k => (k in store ? store[k] : null),
-        set: (k, v) => { store[k] = v; },
+        set: (k, v) => { store[k] = v; return true; },
         remove: k => { delete store[k]; }
       },
       setTimer: (fn, ms) => { const id = timers.length; timers.push({ fn, at: nowMs + ms, fired: false }); return id; },
       clearTimer: id => { if (timers[id]) timers[id].fired = true; },
       createTokenClient: o => {
         tcCallback = o.callback; tcError = o.error_callback;
+        clientHints.push(o.hint || null);
         return { requestAccessToken: r => requests.push(r.prompt) };
       },
       revoke: () => { env.revoked = true; },
@@ -40,7 +42,7 @@ function makeEnv(opts) {
       onVisibility: cb => { visibilityCb = cb; },
       onStorage: cb => { storageCb = cb; }
     },
-    store, requests, revoked: false,
+    store, requests, clientHints, revoked: false,
     advance: ms => {
       nowMs += ms;
       timers.forEach(t => { if (!t.fired && t.at <= nowMs) { t.fired = true; t.fn(); } });
@@ -177,7 +179,31 @@ ok(A.parseStored("garbage") === null, "parseStored rejects garbage");
     ok(!auth.isSignedIn(), "signed out");
     ok(env.revoked, "token revoked");
     ok(!(A.STORAGE_KEY in env.store), "storage cleared");
+    ok(!(A.IDENTITY_KEY in env.store), "identity cleared");
     ok(events.indexOf("signout") !== -1, "signout event");
+  }
+
+  console.log("identity + resume hint");
+  {
+    const env = makeEnv({
+      storedToken: { access_token: "OLD", expiry: 1000000000 - 1000, scopes: ["a"], email: "b@x.com", profile: { email: "b@x.com", name: "B" } }
+    });
+    // also seed identity key as if a prior session wrote it
+    env.store[A.IDENTITY_KEY] = JSON.stringify({ email: "b@x.com", profile: { email: "b@x.com", name: "B" } });
+    const auth = A.createAuth(env.deps).init(CFG);
+    ok(auth.hasPriorSession(), "hasPriorSession when expired token + email");
+    ok(auth.getResumeEmail() === "b@x.com", "getResumeEmail from expired token");
+    ok(env.clientHints[0] === "b@x.com", "token client created with hint");
+    auth.ensureToken({ interactive: true });
+    ok(env.clientHints.indexOf("b@x.com") !== -1, "interactive rebuild keeps hint");
+  }
+  {
+    // identity alone (token wiped by quota) still offers Continue-as
+    const env = makeEnv({});
+    env.store[A.IDENTITY_KEY] = JSON.stringify({ email: "solo@x.com", profile: { email: "solo@x.com" } });
+    const auth = A.createAuth(env.deps).init(CFG);
+    ok(auth.hasPriorSession(), "hasPriorSession from identity alone");
+    ok(auth.getResumeEmail() === "solo@x.com", "resume email from identity key");
   }
 
   console.log("profile fetch");
@@ -190,6 +216,7 @@ ok(A.parseStored("garbage") === null, "parseStored rejects garbage");
     ok(auth.getProfile() && auth.getProfile().email === "b@x.com", "profile fetched + exposed");
     ok(auth.getEmail() === "b@x.com", "email cached on token");
     ok(JSON.parse(env.store[A.STORAGE_KEY]).email === "b@x.com", "email persisted for next boot");
+    ok(JSON.parse(env.store[A.IDENTITY_KEY]).email === "b@x.com", "identity key mirrored");
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");

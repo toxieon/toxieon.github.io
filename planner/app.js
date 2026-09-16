@@ -2030,15 +2030,20 @@ function render() {
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
 }
 
+function authContinueLabel(fallback) {
+  const email = (window.NDAuth && NDAuth.getResumeEmail && NDAuth.getResumeEmail()) || null;
+  return email ? ("Continue as " + email) : (fallback || "Sign in with Google");
+}
 function renderLoginGate() {
   const auth = state.googleAuth;
+  const prior = !!(window.NDAuth && NDAuth.hasPriorSession && NDAuth.hasPriorSession());
   return `
     <div class="login-gate">
       <div class="login-card">
         <div class="brand" style="justify-content:center;margin-bottom:18px"><div class="brand-mark">NP</div><div><h1>NeillPlanner</h1><p>Neill Data &amp; Security</p></div></div>
-        <h2>Sign in to continue</h2>
-        <p>This is an internal app. Only invited Google accounts can access it.</p>
-        <button class="primary-button login-button" data-action="google-sign-in" ${!hasGoogleClientId || !auth.librariesReady ? "disabled" : ""}>${icon("google")}Sign in with Google</button>
+        <h2>${prior ? "Welcome back" : "Sign in to continue"}</h2>
+        <p>${prior ? "Tap below to resume your Google session (no re-consent if Google still remembers this device)." : "This is an internal app. Only invited Google accounts can access it."}</p>
+        <button class="primary-button login-button" data-action="google-sign-in" ${!hasGoogleClientId || !auth.librariesReady ? "disabled" : ""}>${icon("google")}${escapeHtml(authContinueLabel())}</button>
         ${auth.bootstrapping ? `<div class="login-spinner-row"><span class="app-spinner"></span><span>Signing in and loading planner data...</span></div>` : ""}
         ${auth.lastError ? `<p class="login-error">${escapeHtml(auth.lastError)}</p>` : ""}
         ${!auth.librariesReady ? `<p class="login-status">Loading Google libraries...</p>` : ""}

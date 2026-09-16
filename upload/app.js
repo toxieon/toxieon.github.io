@@ -235,7 +235,7 @@ function renderTopbar() {
         ${
           isTokenValid()
             ? `<button type="button" class="ghost-button" data-action="sign-out">${icon("refresh")}Switch account</button>`
-            : `<button type="button" class="ghost-button" data-action="sign-in" ${state.googleAuth.librariesReady ? "" : "disabled"}>${icon("google")}Sign In</button>`
+            : `<button type="button" class="ghost-button" data-action="sign-in" ${state.googleAuth.librariesReady ? "" : "disabled"}>${icon("google")}${escapeHtml((window.NDAuth && NDAuth.getResumeEmail && NDAuth.getResumeEmail()) ? ("Continue as " + NDAuth.getResumeEmail()) : "Sign In")}</button>`
         }
       </div>
     </header>

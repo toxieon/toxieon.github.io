@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'upload-v4';
+const CACHE_VERSION = 'upload-v5';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
