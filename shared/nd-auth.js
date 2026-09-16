@@ -18,7 +18,7 @@
  *  - Multi-tab: a token refreshed in one tab reaches the others via the
  *    'storage' event.
  *
- *  API (browser): NDAuth.init(cfg) · NDAuth.ensureToken({interactive}) ·
+ *  API (browser): NDAuth.init(cfg) · NDAuth.ensureToken({interactive, force}) ·
  *  NDAuth.onAuthChange(cb) · NDAuth.signOut() · NDAuth.getToken() ·
  *  NDAuth.getExpiry() · NDAuth.getProfile() · NDAuth.getEmail() ·
  *  NDAuth.getResumeEmail() · NDAuth.isSignedIn() · NDAuth.hasPriorSession()
@@ -303,9 +303,11 @@
 
     api.ensureToken = function (opts) {
       const interactive = !!(opts && opts.interactive);
+      const force = !!(opts && opts.force);
       if (!cfg) return Promise.reject(new Error("nd-auth: init() first"));
       const now = deps.now();
-      if (isValid(token, now)) {
+      // force: mid-session 401 — local expiry may still look valid; renew anyway.
+      if (!force && isValid(token, now)) {
         if (needsProactiveRefresh(token, now)) silentRenew(); // top up in background
         return Promise.resolve(token.access_token);
       }

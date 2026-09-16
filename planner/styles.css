@@ -3157,3 +3157,14 @@ button[disabled],
   font-size: 0.82rem; cursor: pointer;
 }
 .recent-project-chip:hover { border-color: var(--blue); }
+
+
+/* Hydrate / boot skeletons (NDUI.skeletonMarkup) */
+.loading-card--skel {
+  min-width: min(360px, 92vw);
+  align-items: stretch;
+  gap: 12px;
+}
+.loading-card--skel .nd-skel { width: 100%; }
+.login-skel-wrap { margin-top: 16px; text-align: left; }
+.login-skel-label { margin: 10px 0 0; font-size: 13px; opacity: 0.8; text-align: center; }
