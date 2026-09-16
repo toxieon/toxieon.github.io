@@ -1,5 +1,5 @@
 /* =========================================================================
- *  NeillPlanner v0.8.0
+ *  NeillPlanner v0.8.2
  *  Centralised Drive: all files live in primaryOwnerEmail's Drive.
  *  Other users (added via Settings -> Team Access) share the folder.
  *  Login is mandatory.
@@ -9,7 +9,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.8.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 const statusMeta = {
@@ -124,7 +124,7 @@ function freshState() {
     canvas: { zoom: 1, panX: 0, panY: 0 },
     projectFolders: [], projects: [], rooms: [], nodes: [], floorPlans: {}, bulkPhotos: [],
     bulkSelection: [],
-    googleAuth: { librariesReady: false, signedIn: false, accessToken: null, expiresAt: null, profile: null, bootstrapped: false, bootstrapping: false, lastError: null },
+    googleAuth: { librariesReady: false, signedIn: false, accessToken: null, expiresAt: null, profile: null, bootstrapped: false, bootstrapping: false, hydrating: false, lastError: null },
     drive: { rootFolderId: null, adminFolderId: null, projectsFolderId: null, unfiledFolderId: null, bulkPhotosFolderId: null, sortedPhotosFolderId: null, auditSheetId: null, categoriesSheetId: null, masterSheetId: null, usersSheetId: null, photoAllocationSheetId: null, projectFolderMap: {}, nodeFolderMap: {}, floorFolderMap: {}, sortedPhotoFolderMap: {} },
     users: [],
     myRole: null,
@@ -622,12 +622,30 @@ function isRetryableGoogleError(e) {
   const message = describeError(e).toLowerCase();
   return status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || (status === 403 && /rate|quota|user.?limit|backend/i.test(message));
 }
+function isUnauthorizedGoogleError(e) {
+  const status = Number(e?.status || e?.result?.error?.code || 0);
+  if (status === 401) return true;
+  const message = describeError(e).toLowerCase();
+  return /invalid.?credentials|unauthenticated|auth(entication|orization)?.?(required|failed)|access.?token/i.test(message) && (status === 401 || status === 403 || status === 0);
+}
 async function googleCall(fn, attempts = 4) {
   let lastError = null;
+  let did401Renew = false;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try { return await fn(); }
     catch (e) {
       lastError = e;
+      // Mid-session expiry: renew once via NDAuth, then retry the same call.
+      if (!did401Renew && isUnauthorizedGoogleError(e) && window.NDAuth) {
+        did401Renew = true;
+        try {
+          await NDAuth.ensureToken({ force: true });
+          continue;
+        } catch (renewErr) {
+          lastError = renewErr;
+          break;
+        }
+      }
       if (!isRetryableGoogleError(e) || attempt === attempts - 1) break;
       await sleep(Math.min(12000, 600 * (2 ** attempt)) + Math.floor(Math.random() * 300));
     }
@@ -1290,6 +1308,8 @@ function stopMasterPhotoImportLoop() { /* listeners self-guard via isTokenValid 
 async function hydrateFromMasterSheet(opts = {}) {
   const silent = opts.silent || false;
   if (!isTokenValid() || !state.drive.masterSheetId) return;
+  state.googleAuth.hydrating = true;
+  render();
   try {
     if (!silent) toast("Loading from cloud...");
     const resp = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
@@ -1413,6 +1433,9 @@ async function hydrateFromMasterSheet(opts = {}) {
   } catch (e) {
     console.warn("Hydrate failed", e);
     if (!silent) toast("Cloud reload failed: " + describeError(e));
+  } finally {
+    state.googleAuth.hydrating = false;
+    render();
   }
 }
 
@@ -2004,7 +2027,8 @@ function render() {
   const app = document.getElementById("app"); if (!app) return;
   // Returning user — silent re-auth in flight, show reconnecting screen
   if (state.googleAuth.bootstrapped && !state.googleAuth.signedIn && state.googleAuth.bootstrapping) {
-    app.innerHTML = `<div class="login-gate"><div class="brand" style="justify-content:center;margin-bottom:18px"><div class="brand-mark">NP</div></div><div class="login-spinner-row" style="justify-content:center;margin-top:24px"><span class="app-spinner"></span><span style="margin-left:10px">Reconnecting&hellip;</span></div></div>`; return;
+    const skel = (window.NDUI && NDUI.skeletonMarkup) ? NDUI.skeletonMarkup({ rows: 3, variant: "list-row" }) : '<span class="app-spinner"></span>';
+    app.innerHTML = `<div class="login-gate"><div class="brand" style="justify-content:center;margin-bottom:18px"><div class="brand-mark">NP</div></div><div class="login-skel-wrap" style="max-width:320px;margin:24px auto 0;text-align:center">${skel}<p style="margin-top:12px;opacity:.75">Reconnecting&hellip;</p></div></div>`; return;
   }
   // Mandatory login gate: render only the sign-in screen until signed in
   if (!state.googleAuth.signedIn) { app.innerHTML = renderLoginGate(); bindLoginEvents(); return; }
@@ -2019,7 +2043,7 @@ function render() {
     ${state.drawerOpen && selectedNode() ? renderDrawer(selectedNode()) : ""}
     ${state.modal ? renderModal() : ""}
     ${state.lightbox ? renderLightbox() : ""}
-    ${state.googleAuth.bootstrapping ? renderLoadingOverlay("Loading planner data...") : ""}
+    ${(state.googleAuth.bootstrapping || state.googleAuth.hydrating) ? renderLoadingOverlay(state.googleAuth.hydrating && !state.googleAuth.bootstrapping ? "Loading from cloud..." : "Loading planner data...") : ""}
     ${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}
   `;
   // Hide the fixed sync tube while a drawer/modal/lightbox is open so it
@@ -2028,6 +2052,9 @@ function render() {
   bindEvents();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
+  if (window.NDUI && NDUI.skeletonOverlay) {
+    NDUI.skeletonOverlay(!!(state.googleAuth.signedIn && (state.googleAuth.bootstrapping || state.googleAuth.hydrating)));
+  }
 }
 
 function authContinueLabel(fallback) {
@@ -2044,7 +2071,7 @@ function renderLoginGate() {
         <h2>${prior ? "Welcome back" : "Sign in to continue"}</h2>
         <p>${prior ? "Tap below to resume your Google session (no re-consent if Google still remembers this device)." : "This is an internal app. Only invited Google accounts can access it."}</p>
         <button class="primary-button login-button" data-action="google-sign-in" ${!hasGoogleClientId || !auth.librariesReady ? "disabled" : ""}>${icon("google")}${escapeHtml(authContinueLabel())}</button>
-        ${auth.bootstrapping ? `<div class="login-spinner-row"><span class="app-spinner"></span><span>Signing in and loading planner data...</span></div>` : ""}
+        ${auth.bootstrapping ? `<div class="login-skel-wrap">${(window.NDUI && NDUI.skeletonMarkup) ? NDUI.skeletonMarkup({ rows: 3, variant: "list-row" }) : '<span class="app-spinner"></span>'}<p class="login-skel-label">Signing in and loading planner data...</p></div>` : ""}
         ${auth.lastError ? `<p class="login-error">${escapeHtml(auth.lastError)}</p>` : ""}
         ${!auth.librariesReady ? `<p class="login-status">Loading Google libraries...</p>` : ""}
         <p class="login-footnote">If you can't sign in, ask your administrator to invite your Google email.</p>
@@ -2053,7 +2080,10 @@ function renderLoginGate() {
 }
 
 function renderLoadingOverlay(message = "Loading...") {
-  return `<div class="loading-overlay" role="status"><div class="loading-card"><span class="app-spinner"></span><strong>${escapeHtml(message)}</strong></div></div>`;
+  const skel = (window.NDUI && NDUI.skeletonMarkup)
+    ? NDUI.skeletonMarkup({ rows: 4, variant: "list-row" })
+    : '<span class="app-spinner"></span>';
+  return `<div class="loading-overlay" role="status" aria-live="polite"><div class="loading-card loading-card--skel">${skel}<strong>${escapeHtml(message)}</strong></div></div>`;
 }
 
 function bindLoginEvents() {

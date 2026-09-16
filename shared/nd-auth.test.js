@@ -130,6 +130,18 @@ ok(A.parseStored("garbage") === null, "parseStored rejects garbage");
     ok(env.requests.length === 1, "no consent attempt without user gesture");
   }
 
+  console.log("force renew even when token still looks valid");
+  {
+    const env = makeEnv({ storedToken: { access_token: "S", expiry: 1000000000 + 3600000, scopes: ["a"], email: "b@x.com" } });
+    const auth = A.createAuth(env.deps).init(CFG);
+    const p = auth.ensureToken({ force: true });
+    ok(env.requests.join(",") === "", "force renew uses prompt:''");
+    env.respond({ access_token: "F", expires_in: 3600 });
+    await tick(); await tick();
+    ok((await p) === "F", "force ensureToken resolves renewed token");
+    ok(auth.getToken() === "F", "forced renew rotated token");
+  }
+
   console.log("proactive refresh timer");
   {
     const env = makeEnv({ storedToken: { access_token: "S", expiry: 1000000000 + 3600000, scopes: ["a"] } });
