@@ -1030,16 +1030,18 @@ function render() {
 function renderLoginGate() {
   const busy   = state.googleAuth.bootstrapping;
   const failed = state.googleAuth.authFailed;
+  const resume = (window.NDAuth && NDAuth.getResumeEmail && NDAuth.getResumeEmail()) || null;
+  const cta = busy ? "Signing in…" : failed ? "Try again" : (resume ? ("Continue as " + resume) : "Sign in with Google");
   return `
     <div class="login-gate">
       <div class="login-logo">SWB</div>
       <h1 class="login-heading">Switchboard Planner</h1>
       <p class="login-sub">AS/NZS 3000:2018 compliant circuit planning for electricians</p>
       <div class="login-card">
-        ${failed ? `<p style="color:var(--error);margin-bottom:12px;font-size:13px">Sign-in failed. Check your Google account and try again.</p>` : `<p>Sign in with your Neill Data Google account to access your switchboard projects.</p>`}
+        ${failed ? `<p style="color:var(--error);margin-bottom:12px;font-size:13px">Sign-in failed. Check your Google account and try again.</p>` : `<p>${resume ? "Tap to resume your Google session." : "Sign in with your Neill Data Google account to access your switchboard projects."}</p>`}
         <button class="google-btn" data-action="sign-in" ${busy?"disabled":""}>
           ${busy?`<div class="g-spinner"></div>`:I.google}
-          ${busy?"Signing in…": failed ? "Try again" : "Sign in with Google"}
+          ${cta}
         </button>
       </div>
       <p style="margin-top:28px;font-size:12px;color:var(--text-3)">SWB v${SWB_VERSION} · neilldata.com/swb</p>

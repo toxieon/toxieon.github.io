@@ -226,13 +226,15 @@ function renderContent() {
 }
 
 function renderLogin() {
+  const resume = (window.NDAuth && NDAuth.getResumeEmail && NDAuth.getResumeEmail()) || null;
+  const cta = resume ? ("Continue as " + resume) : "Sign In";
   return `
     <section class="hero">
       <div class="hero-card">
         <div class="hero-badge">${icon("search")}</div>
-        <h2>Search Files</h2>
-        <p>Sign in to review uploaded batch files, match project destinations, edit details, and file images into project folders.</p>
-        <button type="button" class="primary-button" data-action="sign-in" ${state.googleAuth.librariesReady ? "" : "disabled"}>${icon("google")}Sign In</button>
+        <h2>${resume ? "Welcome back" : "Search Files"}</h2>
+        <p>${resume ? "Tap to resume your Google session and keep searching." : "Sign in to review uploaded batch files, match project destinations, edit details, and file images into project folders."}</p>
+        <button type="button" class="primary-button" data-action="sign-in" ${state.googleAuth.librariesReady ? "" : "disabled"}>${icon("google")}${escapeHtml(cta)}</button>
         ${state.googleAuth.lastError ? `<div class="status-error">${escapeHtml(state.googleAuth.lastError)}</div>` : ""}
       </div>
     </section>
