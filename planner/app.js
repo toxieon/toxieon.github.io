@@ -1,15 +1,16 @@
 /* =========================================================================
- *  NeillPlanner v0.8.2
+ *  NeillPlanner v0.9.0
  *  Centralised Drive: all files live in primaryOwnerEmail's Drive.
  *  Other users (added via Settings -> Team Access) share the folder.
  *  Login is mandatory.
  *  Multi-floor projects. Drag-to-move. Bulk-select. Print/PDF export.
  *  Categories sheet, audit sheet, portal nodes, mass-create mode, etc.
  *  v0.8.0: Switchboard & Sub-board node types. SWB deep-link integration.
+ *  v0.9.0: Room plan overlays, full project report, floor layers, mobile polish.
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.8.2";
+const APP_VERSION = "0.9.0";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 const statusMeta = {
@@ -46,7 +47,7 @@ const MASTER_TABS = {
   Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version"],
   Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link"],
   Folders:  ["Folder ID", "Name", "Color", "Project Count", "Drive Folder ID"],
-  Rooms:    ["Room ID", "Project ID", "Floor ID", "Name", "Created At", "Updated At", "Sort Order"]
+  Rooms:    ["Room ID", "Project ID", "Floor ID", "Name", "Created At", "Updated At", "Sort Order", "Shape"]
 };
 const USERS_SHEET_NAME = "NeillPlanner-Users";
 const USERS_TAB = "Users";
@@ -134,7 +135,8 @@ function freshState() {
     auditQueue: [],
     auditView: { loaded: false, loading: false, rows: [], lastFetchedAt: null,
       filters: { from: "", to: "", user: "All", action: "All", projectId: "All", nodeQuery: "", detailsQuery: "", query: "" } },
-    massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 }
+    massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
+    roomDraw: { mode: null, points: [], roomId: null }
   };
 }
 
@@ -151,7 +153,7 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(localStorage.getItem("neillplanner-state-v3"));
     if (saved && typeof saved === "object") {
       const fresh = freshState();
-      const merged = { ...fresh, ...saved, modal: null, lightbox: null, toast: "", massMode: fresh.massMode, bulkSelection: [] };
+      const merged = { ...fresh, ...saved, modal: null, lightbox: null, toast: "", massMode: fresh.massMode, bulkSelection: [], roomDraw: fresh.roomDraw };
       merged.googleAuth = { ...fresh.googleAuth, bootstrapped: saved.googleAuth?.bootstrapped || false, profile: saved.googleAuth?.profile || null };
       merged.drive = { ...fresh.drive, ...(saved.drive || {}) };
       merged.auditView = { ...fresh.auditView, filters: { ...fresh.auditView.filters, ...(saved.auditView?.filters || {}) } };
@@ -206,12 +208,15 @@ function migrateState(s) {
     if (!("linkedRoomId" in n)) n.linkedRoomId = null;
   });
   if (s.selectedRoomId && s.selectedRoomId !== "all" && !s.rooms.some((r) => r.id === s.selectedRoomId)) s.selectedRoomId = "all";
+  (s.rooms || []).forEach((r) => { if (!("shape" in r)) r.shape = null; });
+  if (!s.roomDraw) s.roomDraw = { mode: null, points: [], roomId: null };
 }
 
 function persist(opts = {}) {
   const saveable = {
     ...state, modal: null, lightbox: null, toast: "",
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
+    roomDraw: { mode: null, points: [], roomId: null },
     bulkSelection: [],
     googleAuth: { bootstrapped: state.googleAuth.bootstrapped, profile: state.googleAuth.profile },
     auditView: { ...freshState().auditView, filters: state.auditView.filters },
@@ -421,6 +426,131 @@ function floorRooms(floorId = state.selectedFloorId) { if (!floorId) return []; 
 function roomName(roomId) { return roomById(roomId)?.name || ""; }
 function roomLabel(roomId) { return roomName(roomId) || "No room"; }
 function selectedRoomNodes(nodes) { return state.selectedRoomId && state.selectedRoomId !== "all" ? nodes.filter((n) => (n.roomId || "") === state.selectedRoomId) : nodes; }
+
+function parseRoomShape(raw) {
+  if (!raw) return null;
+  let obj = raw;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return null;
+    try { obj = JSON.parse(s); } catch (e) { return null; }
+  }
+  if (!obj || obj.type !== "poly" || !Array.isArray(obj.pts) || obj.pts.length < 3) return null;
+  const pts = obj.pts.map((p) => {
+    if (!Array.isArray(p) || p.length < 2) return null;
+    const x = Number(p[0]), y = Number(p[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return [Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y))];
+  }).filter(Boolean);
+  if (pts.length < 3) return null;
+  return { type: "poly", pts };
+}
+function serializeRoomShape(shape) {
+  const parsed = parseRoomShape(shape);
+  if (!parsed) return "";
+  return JSON.stringify({ type: "poly", pts: parsed.pts.map(([x, y]) => [Number(x.toFixed(1)), Number(y.toFixed(1))]) });
+}
+function pointInPolygon(x, y, pts) {
+  if (!pts || pts.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i][0], yi = pts[i][1];
+    const xj = pts[j][0], yj = pts[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+function polygonArea(pts) {
+  if (!pts || pts.length < 3) return 0;
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
+  return Math.abs(a) / 2;
+}
+function polygonCentroid(pts) {
+  if (!pts || !pts.length) return { x: 50, y: 50 };
+  let cx = 0, cy = 0;
+  pts.forEach(([x, y]) => { cx += x; cy += y; });
+  return { x: cx / pts.length, y: cy / pts.length };
+}
+function roomAtPlanPoint(x, y, floorId = state.selectedFloorId) {
+  const candidates = floorRooms(floorId).map((r) => {
+    const shape = parseRoomShape(r.shape);
+    if (!shape) return null;
+    if (!pointInPolygon(x, y, shape.pts)) return null;
+    return { room: r, area: polygonArea(shape.pts) };
+  }).filter(Boolean);
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.area - b.area);
+  return candidates[0].room;
+}
+function resolveInitialRoomId(position) {
+  if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+    const hit = roomAtPlanPoint(position.x, position.y);
+    if (hit) return hit.id;
+  }
+  if (state.selectedRoomId && state.selectedRoomId !== "all") return state.selectedRoomId;
+  return "";
+}
+function clearRoomDraw() {
+  state.roomDraw = { mode: null, points: [], roomId: null };
+}
+function startRoomDraw(mode, roomId = null) {
+  const fl = currentFloor();
+  if (!fl || !(state.floorPlans[fl.id] || fl.planDriveFileId)) { toast("Upload a plan first"); return; }
+  if (state.massMode.active) stopMassMode();
+  state.roomDraw = { mode, points: [], roomId: roomId || null };
+  if (roomId) {
+    const shape = parseRoomShape(roomById(roomId)?.shape);
+    if (shape) state.roomDraw.points = shape.pts.map((p) => [...p]);
+  }
+  state.modal = null;
+  render();
+  toast(mode === "rect" ? "Tap two corners of the rectangle" : "Tap vertices on the plan, then Done");
+}
+function finishRoomDraw() {
+  const draw = state.roomDraw || {};
+  let pts = (draw.points || []).map((p) => [...p]);
+  if (draw.mode === "rect" && pts.length === 2) {
+    const [a, b] = pts;
+    pts = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+  }
+  if (pts.length < 3) { toast("Need at least 3 points"); return; }
+  const shape = { type: "poly", pts };
+  if (draw.roomId) {
+    const room = roomById(draw.roomId);
+    if (!room) { clearRoomDraw(); render(); return; }
+    room.shape = shape;
+    room.updatedAt = nowStamp();
+    clearRoomDraw();
+    persist(); render();
+    logAudit("Room Shape Updated", { projectId: room.projectId, floorId: room.floorId, details: room.name });
+    toast(`Updated shape for ${room.name}`);
+    return;
+  }
+  state.roomDraw = { mode: null, points: pts, roomId: null, pendingShape: shape };
+  state.modal = { mode: "new-room" };
+  render();
+}
+function handleRoomDrawPoint(pos) {
+  if (!pos || !state.roomDraw?.mode) return;
+  const draw = state.roomDraw;
+  if (draw.mode === "poly") {
+    draw.points.push([pos.x, pos.y]);
+    render();
+    return;
+  }
+  if (draw.mode === "rect") {
+    draw.points.push([pos.x, pos.y]);
+    if (draw.points.length >= 2) {
+      finishRoomDraw();
+      return;
+    }
+    render();
+  }
+}
+
+
 function categoryNames() { return Object.keys(state.categoriesData || {}); }
 function categoryColor(name) { return state.categoriesData?.[name]?.color || hashColor(name); }
 function categoryItems(name) { return state.categoriesData?.[name]?.items || []; }
@@ -777,26 +907,29 @@ async function ensureMasterTabsExist() {
   const existing = new Set((meta.result.sheets || []).map((sh) => sh.properties.title));
   const needed = Object.keys(MASTER_TABS);
   const missing = needed.filter((t) => !existing.has(t));
-  if (!missing.length) return;
-  const addReqs = missing.map((tab) => ({ addSheet: { properties: { title: tab } } }));
-  const result = await gapi.client.sheets.spreadsheets.batchUpdate({
-    spreadsheetId: state.drive.masterSheetId,
-    resource: { requests: addReqs }
-  });
-  const headerWrites = missing.map((tab) => ({ range: `${tab}!A1`, values: [MASTER_TABS[tab]] }));
+  let result = null;
+  if (missing.length) {
+    const addReqs = missing.map((tab) => ({ addSheet: { properties: { title: tab } } }));
+    result = await gapi.client.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: state.drive.masterSheetId,
+      resource: { requests: addReqs }
+    });
+    const fmtReqs = [];
+    for (const reply of (result.result.replies || [])) {
+      const sid = reply.addSheet?.properties?.sheetId;
+      if (sid == null) continue;
+      fmtReqs.push({ repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } });
+      fmtReqs.push({ updateSheetProperties: { properties: { sheetId: sid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } });
+    }
+    if (fmtReqs.length) await gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId: state.drive.masterSheetId, resource: { requests: fmtReqs } });
+    console.log("Added missing master sheet tabs:", missing);
+  }
+  // Always rewrite MASTER_TABS headers so new columns (e.g. Rooms.Shape) land.
+  const headerWrites = needed.map((tab) => ({ range: `${tab}!A1`, values: [MASTER_TABS[tab]] }));
   await gapi.client.sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: state.drive.masterSheetId,
     resource: { valueInputOption: "RAW", data: headerWrites }
   });
-  const fmtReqs = [];
-  for (const reply of (result.result.replies || [])) {
-    const sid = reply.addSheet?.properties?.sheetId;
-    if (sid == null) continue;
-    fmtReqs.push({ repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } });
-    fmtReqs.push({ updateSheetProperties: { properties: { sheetId: sid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } });
-  }
-  if (fmtReqs.length) await gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId: state.drive.masterSheetId, resource: { requests: fmtReqs } });
-  console.log("Added missing master sheet tabs:", missing);
 }
 
 async function ensureUsersSheet(adminId) {
@@ -1394,7 +1527,8 @@ async function hydrateFromMasterSheet(opts = {}) {
       name: r[3] || "Room",
       createdAt: r[4] || nowStamp(),
       updatedAt: r[5] || r[4] || nowStamp(),
-      order: Number(r[6]) || 0
+      order: Number(r[6]) || 0,
+      shape: parseRoomShape(r[7]) || null
     }));
     const photoMap = buildMasterPhotoMap(photoRows);
     state.nodes = nodeRows.filter((r) => r[0] && r[1]).map((r) => {
@@ -1522,7 +1656,7 @@ function buildMasterRows() {
     });
   });
   state.projectFolders.forEach((f) => out.Folders.set(f.id, [f.id, f.name, f.color || "", state.projects.filter((p) => p.folderId === f.id).length, f.driveFolderId || ""]));
-  state.rooms.forEach((r) => out.Rooms.set(r.id, [r.id, r.projectId || "", r.floorId || "", r.name || "", r.createdAt || "", r.updatedAt || "", r.order || 0]));
+  state.rooms.forEach((r) => out.Rooms.set(r.id, [r.id, r.projectId || "", r.floorId || "", r.name || "", r.createdAt || "", r.updatedAt || "", r.order || 0, serializeRoomShape(r.shape)]));
   return out;
 }
 
@@ -2038,7 +2172,7 @@ function render() {
       <main class="main">${renderTopbar()}<div class="content">${renderView()}</div></main>
       ${renderBottomNav()}
     </div>
-    ${state.massMode.active ? renderMassBanner() : ""}
+    ${state.massMode.active ? renderMassBanner() : ""}${state.roomDraw?.mode ? renderRoomDrawBanner() : ""}
     ${state.bulkSelection.length ? renderBulkBar() : ""}
     ${state.drawerOpen && selectedNode() ? renderDrawer(selectedNode()) : ""}
     ${state.modal ? renderModal() : ""}
@@ -2241,17 +2375,19 @@ function renderMapView() {
   return `
     <section class="map-layout">
       <div class="map-panel">
-        <div class="floor-tabs">
-          ${proj.floors.sort((a, b) => (a.order || 0) - (b.order || 0)).map((f) => `<button class="floor-tab ${f.id === state.selectedFloorId ? "is-active" : ""}" data-floor="${f.id}" data-floor-tab="${f.id}" draggable="true">${escapeHtml(f.name)}</button>`).join("")}
-          <button class="floor-tab floor-tab--add" data-action="add-floor" title="Add floor">${icon("plus")}</button>
+        <div class="floor-tabs floor-layers" aria-label="Floor layers">
+          <span class="floor-layers-label" title="Floor layers">${icon("layers")}<span>Layers</span></span>
+          ${proj.floors.sort((a, b) => (a.order || 0) - (b.order || 0)).map((f) => { const fc = state.nodes.filter((n) => n.floorId === f.id).length; return `<button class="floor-tab ${f.id === state.selectedFloorId ? "is-active" : ""}" data-floor="${f.id}" data-floor-tab="${f.id}" draggable="true" title="Switch to ${escapeHtml(f.name)} layer">${escapeHtml(f.name)}<span class="floor-tab-count">${fc}</span></button>`; }).join("")}
+          <button class="floor-tab floor-tab--add" data-action="add-floor" title="Add floor layer">${icon("plus")}</button>
           <button class="floor-tab floor-tab--add" data-action="rename-floor" title="Rename current floor">${icon("edit")}</button>
           <button class="floor-tab floor-tab--add" data-action="delete-floor" title="Delete current floor">${icon("trash")}</button><button class="floor-tab floor-tab--add floor-tab--help" data-action="show-help" title="Help / Legend">${icon("question")}</button>
         </div>
         ${proj.showRooms ? `<div class="room-strip" aria-label="Rooms">
           <button class="room-chip ${state.selectedRoomId === "all" ? "is-active" : ""}" data-room="all">All rooms <span>${allFloorNodes.length}</span></button>
-          ${rooms.map((r) => `<button class="room-chip ${state.selectedRoomId === r.id ? "is-active" : ""}" data-room="${r.id}">${escapeHtml(r.name)} <span>${state.nodes.filter((n) => n.roomId === r.id).length}</span></button>`).join("")}
+          ${rooms.map((r) => `<button class="room-chip ${state.selectedRoomId === r.id ? "is-active" : ""}" data-room="${r.id}">${escapeHtml(r.name)} <span>${state.nodes.filter((n) => n.roomId === r.id).length}</span>${parseRoomShape(r.shape) ? '<span class="room-chip-shape" title="Has plan shape">◇</span>' : ""}</button>`).join("")}
           <button class="room-chip room-chip--add" data-action="new-room">${icon("plus")}Room</button>
-          ${state.selectedRoomId !== "all" ? `<button class="room-chip" data-action="rename-room">${icon("edit")}Rename</button><button class="room-chip room-chip--danger" data-action="delete-room">${icon("trash")}Delete</button>` : ""}
+          ${hasPlan ? `<button class="room-chip ${state.roomDraw?.mode === "poly" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-poly" title="Draw polygon room">${icon("edit")}Draw</button><button class="room-chip ${state.roomDraw?.mode === "rect" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-rect" title="Draw rectangle room">${icon("plus")}Rect</button>` : ""}
+          ${state.selectedRoomId !== "all" ? `<button class="room-chip" data-action="rename-room">${icon("edit")}Rename</button>${hasPlan ? `<button class="room-chip" data-action="edit-room-shape" title="Edit room shape on plan">${icon("layers")}Edit shape</button>` : ""}<button class="room-chip room-chip--danger" data-action="delete-room">${icon("trash")}Delete</button>` : ""}
         </div>` : ""}
         <div class="map-toolbar">
           <div class="search-wrap">${icon("search")}<input data-filter="query" value="${escapeHtml(state.filters.query)}" placeholder="Search nodes, tags, users" aria-label="Search" /></div>
@@ -2261,13 +2397,14 @@ function renderMapView() {
             <button class="primary-button" data-action="create-node" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("plus")}<span>Node</span></button>
             <button class="ghost-button" data-action="mass-start" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("mass")}<span>Mass</span></button>
             <button class="ghost-button" data-action="add-portal" ${!hasPlan ? "disabled" : ""}>${icon("portal")}<span>Door</span></button>
-            <button class="ghost-button" data-action="print-report">${icon("printer")}<span>Print</span></button>
+            <button class="ghost-button" data-action="print-report" title="Print plan overview">${icon("printer")}<span>Overview</span></button>
+            <button class="ghost-button" data-action="print-full-report" title="Full project report with rooms, notes and photos">${icon("download")}<span>Full report</span></button>
           </div>
         </div>
         <div class="canvas-shell">
-          <div class="canvas-viewport ${state.massMode.active ? "is-placing" : ""}" id="canvasViewport">
+          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode ? "is-placing" : ""}" id="canvasViewport">
             <div class="plan-stage" id="planStage" style="--plan-ar:${planAspect}">
-              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}` : renderEmptyPlanArea()}
+              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
@@ -2305,6 +2442,39 @@ function removePlan() {
   });
 }
 
+function renderRoomOverlays(rooms) {
+  const polys = (rooms || []).map((r) => {
+    const shape = parseRoomShape(r.shape);
+    if (!shape) return "";
+    const pts = shape.pts.map(([x, y]) => `${x},${y}`).join(" ");
+    const c = polygonCentroid(shape.pts);
+    const selected = state.selectedRoomId === r.id;
+    return `<g class="room-poly ${selected ? "is-selected" : ""}" data-room-poly="${escapeHtml(r.id)}"><polygon points="${pts}"></polygon><text x="${c.x}" y="${c.y}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(r.name)}</text></g>`;
+  }).join("");
+  if (!polys) return "";
+  return `<svg class="room-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${polys}</svg>`;
+}
+function renderRoomDrawPreview() {
+  const draw = state.roomDraw;
+  if (!draw?.mode || !(draw.points || []).length) return "";
+  let pts = draw.points.map((p) => [...p]);
+  if (draw.mode === "rect" && pts.length === 2) {
+    const [a, b] = pts;
+    pts = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+  }
+  const pointsAttr = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const dots = draw.points.map(([x, y], i) => `<circle class="room-draw-vertex" cx="${x}" cy="${y}" r="0.9" data-i="${i}"></circle>`).join("");
+  const closed = pts.length >= 3 && (draw.mode === "poly" || draw.points.length >= 2);
+  return `<svg class="room-overlay room-overlay--draw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${closed ? `<polygon class="room-draw-poly" points="${pointsAttr}"></polygon>` : `<polyline class="room-draw-line" points="${pointsAttr}" fill="none"></polyline>`}${dots}</svg>`;
+}
+function renderRoomDrawBanner() {
+  const draw = state.roomDraw || {};
+  const n = (draw.points || []).length;
+  const editing = Boolean(draw.roomId);
+  const label = draw.mode === "rect" ? "Rectangle" : "Polygon";
+  const hint = draw.mode === "rect" ? "Tap two opposite corners." : "Tap to add vertices (≥3), then Done.";
+  return `<div class="mass-banner room-draw-banner" role="status">${icon("layers")}<span>${editing ? "Editing room shape" : `Drawing room (${label})`} &middot; ${n} pt${n === 1 ? "" : "s"}</span><span class="hint">${hint} <kbd>Esc</kbd> cancel.</span><button class="ghost-button" data-action="room-draw-cancel">${icon("close")}Cancel</button><button class="primary-button" data-action="room-draw-done" ${n < (draw.mode === "rect" ? 2 : 3) ? "disabled" : ""}>${icon("check")}Done</button></div>`;
+}
 function renderEmptyPlanArea() {
   return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan (PNG, JPG, SVG, or PDF). It will sync to Drive automatically.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
 }
@@ -2453,7 +2623,7 @@ function renderProgressView() {
   const floorRows = (proj.floors || []).map((f) => { const fn = nodes.filter((n) => n.floorId === f.id); return { name: f.name, total: fn.length, percent: stats(fn).completePercent, issues: stats(fn).issue }; });
   return `
     <section class="view-panel">
-      <div class="panel-header"><h3 class="section-title">Progress Dashboard</h3><div class="button-row"><button class="ghost-button" data-action="print-report">${icon("printer")}Print</button></div></div>
+      <div class="panel-header"><h3 class="section-title">Progress Dashboard</h3><div class="button-row"><button class="ghost-button" data-action="print-report">${icon("printer")}Overview</button><button class="ghost-button" data-action="print-full-report">${icon("download")}Full report</button></div></div>
       <div class="metrics-grid"><div class="metric"><span>Total nodes</span><strong>${s.total}</strong></div><div class="metric"><span>Complete</span><strong>${s.completePercent}%</strong></div><div class="metric"><span>In progress</span><strong>${s.progress}</strong></div><div class="metric"><span>Issues</span><strong>${s.issue}</strong></div></div>
     </section>
     <section class="view-panel">
@@ -2923,7 +3093,7 @@ function renderDrawer(node) {
       <div class="drawer-body">
         <div class="drawer-actions">${statusPill(node.status)}${isPortal && linkedProject ? `<button class="primary-button" data-action="follow-portal">${icon("arrowRight")}Walk to ${escapeHtml(linkedLabel || linkedProject.name)}</button>` : ""}<button class="icon-button" data-action="share-node" title="Share">${icon("share")}</button><button class="icon-button" data-action="edit-node" title="Edit">${icon("edit")}</button>${!isPortal ? `<button class="icon-button" data-action="clone-node" title="Duplicate">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="delete-node" title="Delete">${icon("trash")}</button></div>
         ${!isPortal ? `
-        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button" style="cursor:pointer">${icon("upload")}<span>Upload photos</span><input type="file" accept="image/*" multiple data-photo-upload="${node.id}" style="display:none" /></label>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
+        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload photos</span><input type="file" accept="image/*" multiple capture="environment" data-photo-upload="${node.id}" style="display:none" /></label>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
         <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
@@ -2988,7 +3158,7 @@ function renderNodeModal() {
   const initialItem = node?.lineItem || items[0]?.item || "";
   const assignees = teamNames();
   const rooms = floorRooms();
-  const initialRoom = node?.roomId || (state.selectedRoomId !== "all" ? state.selectedRoomId : "");
+  const initialRoom = node?.roomId || resolveInitialRoomId(state.modal?.position) || "";
   const nodeTypeOptions = [
     ["marker","Marker (default)"],
     ["portal","Door / Portal"],
@@ -3002,7 +3172,7 @@ function renderNodeModal() {
     <div class="field"><label for="nodeSwbProjectId">SWB Project ID <span class="form-note">(auto-filled by SWB)</span></label><input id="nodeSwbProjectId" name="swbProjectId" value="${escapeHtml(node?.swbProjectId||"")}" placeholder="Leave blank — SWB will set this" /></div>` : `
     <div class="field"><label for="nodeCircuit">Circuit</label><input id="nodeCircuit" name="circuit" value="${escapeHtml(node?.circuit||"")}" placeholder="e.g. L1-7" /></div>
     <div class="field"><label for="nodeCableRunM">Cable run (m)</label><input id="nodeCableRunM" name="cableRunM" type="number" step="0.5" min="0" value="${escapeHtml(String(node?.cableRunM||""))}" placeholder="0" /></div>`;
-  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="nodeForm" role="dialog">
+  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal modal--node" id="nodeForm" role="dialog">
     <div class="modal-header"><div><h3>${isEdit ? "Edit Node" : "Create Node"}</h3><p>${escapeHtml(currentFloor()?.name || "")}</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div>
     <div class="modal-body"><div class="form-grid">
       <div class="field"><label for="nodeType">Node type</label><select id="nodeType" name="nodeType">${nodeTypeOptions.map(([v,l])=>`<option value="${v}" ${nodeType===v?"selected":""}>${l}</option>`).join("")}</select></div>
@@ -3038,30 +3208,107 @@ function renderPortalCreateModal() {
   return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="portalForm" role="dialog"><div class="modal-header"><div><h3>Add door / stairs</h3><p>Link floors or rooms. A matching return door is created automatically.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="portalLabel">Label</label><input id="portalLabel" name="label" required placeholder="Door to Store Room" /></div><div class="field"><label for="portalSourceRoom">From room</label><select id="portalSourceRoom" name="sourceRoomId"><option value="">No room</option>${currentRooms.map((r) => `<option value="${escapeHtml(r.id)}" ${state.selectedRoomId === r.id ? "selected" : ""}>${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field"><label for="portalTarget">Links to project</label><select id="portalTarget" name="targetProjectId" required data-portal-target>${others.length ? others.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("") : `<option value="">No projects exist yet</option>`}</select></div><div class="field"><label for="portalFloor">Target floor</label><select id="portalFloor" name="targetFloorId" data-portal-floor>${initialTarget ? (initialTarget.floors || []).map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("") : `<option value="">No floors</option>`}</select></div><div class="field"><label for="portalTargetRoom">Target room</label><select id="portalTargetRoom" name="targetRoomId"><option value="">No room</option>${initialTargetRooms.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field full"><label for="portalReturn">Return door label</label><input id="portalReturn" name="returnLabel" placeholder="Door back" /></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit" ${state.projects.length ? "" : "disabled"}>${icon("check")}Create door</button></div></form>`;
 }
 
+function renderPrintPlanHero(floor, nodes, heading) {
+  if (!floor) return "<p>(No floor.)</p>";
+  const planUrl = state.floorPlans[floor.id];
+  const planAspect = Number(floor.planAspectRatio) || 1.6;
+  const title = heading || floor.name;
+  return `
+    <section class="print-hero">
+      <h2>${escapeHtml(title)}</h2>
+      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : "<p>(No floor plan uploaded.)</p>"}
+    </section>`;
+}
+function renderPrintNodeCard(n) {
+  const photos = n.imageRefs || [];
+  const comments = n.comments || [];
+  const photoHtml = photos.length
+    ? `<div class="print-photos">${photos.map((image) => {
+        const did = image.driveFileId || image.id || "";
+        const tsrc = image.thumbnailLink || driveThumb(did, 400);
+        return `<figure class="print-photo">${(tsrc || did) ? `<img ${did ? `data-fileid="${escapeHtml(did)}"` : ""} src="${escapeHtml(tsrc || "")}" alt="${escapeHtml(image.name || "Photo")}" loading="lazy" referrerpolicy="no-referrer" onerror="this.classList.add('is-broken');this.alt='Photo unavailable'" />` : `<div class="print-photo-fallback">Photo</div>`}<figcaption>${escapeHtml(image.name || "")}</figcaption></figure>`;
+      }).join("")}</div>`
+    : `<p class="print-muted">No photos</p>`;
+  const commentsHtml = comments.length
+    ? `<ul class="print-comments">${comments.map((c) => `<li><strong>${escapeHtml(c.author || "")}</strong> <span>${escapeHtml(c.time || "")}</span><br>${escapeHtml(c.text || "")}</li>`).join("")}</ul>`
+    : "";
+  return `<article class="print-node-card">
+    <header><h4>${escapeHtml(nodeDisplayTitle(n))}</h4><p>${escapeHtml(n.category || "-")} / ${escapeHtml(n.lineItem || "-")} &middot; <strong>${escapeHtml(n.status || "")}</strong>${n.assignedTo ? " &middot; " + escapeHtml(n.assignedTo) : ""}</p></header>
+    ${n.description ? `<p class="print-notes">${escapeHtml(n.description)}</p>` : ""}
+    ${(n.tags || []).length ? `<p class="print-muted">Tags: ${escapeHtml(n.tags.join(", "))}</p>` : ""}
+    ${commentsHtml}
+    <div class="print-photo-block"><span class="print-muted">${photos.length} photo${photos.length === 1 ? "" : "s"}</span>${photoHtml}</div>
+  </article>`;
+}
+function renderPrintOverviewBody(proj, floor) {
+  const nodes = floor ? floorNodes(floor.id) : [];
+  return `
+    <header class="print-header">
+      <h1>${escapeHtml(proj.name)}</h1>
+      <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(nowStamp())}</p>
+      <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; Total nodes (this floor): ${nodes.length}</p>
+    </header>
+    ${renderPrintPlanHero(floor, nodes, floor?.name || "Plan")}
+    <h2>Node Schedule</h2>
+    <table class="print-table">
+      <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Line item</th><th>Status</th><th>Assignee</th><th>Room</th><th>Updated</th></tr></thead>
+      <tbody>${nodes.map((n, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(nodeDisplayTitle(n))}</td><td>${escapeHtml(n.category || "")}</td><td>${escapeHtml(n.lineItem || "")}</td><td>${escapeHtml(n.status)}</td><td>${escapeHtml(n.assignedTo || "-")}</td><td>${escapeHtml(roomLabel(n.roomId))}</td><td>${escapeHtml(n.updatedAt || "")}</td></tr>`).join("")}</tbody>
+    </table>`;
+}
+function renderPrintFullBody(proj) {
+  const floors = [...(proj.floors || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const current = currentFloor();
+  const coverNodes = current ? floorNodes(current.id) : [];
+  const sections = floors.map((fl, idx) => {
+    const nodes = floorNodes(fl.id).filter((n) => n.type !== "portal");
+    const rooms = floorRooms(fl.id);
+    const byRoom = new Map();
+    rooms.forEach((r) => byRoom.set(r.id, []));
+    const unassigned = [];
+    nodes.forEach((n) => {
+      if (n.roomId && byRoom.has(n.roomId)) byRoom.get(n.roomId).push(n);
+      else unassigned.push(n);
+    });
+    const roomBlocks = [
+      ...rooms.map((r) => {
+        const list = byRoom.get(r.id) || [];
+        if (!list.length) return `<section class="print-room"><h3>${escapeHtml(r.name)}</h3><p class="print-muted">No nodes</p></section>`;
+        return `<section class="print-room"><h3>${escapeHtml(r.name)} <span class="print-muted">(${list.length})</span></h3>${list.map(renderPrintNodeCard).join("")}</section>`;
+      }),
+      unassigned.length ? `<section class="print-room"><h3>No room <span class="print-muted">(${unassigned.length})</span></h3>${unassigned.map(renderPrintNodeCard).join("")}</section>` : ""
+    ].join("");
+    return `<section class="print-floor-section ${idx ? "print-break" : ""}">
+      ${renderPrintPlanHero(fl, floorNodes(fl.id), `Floor: ${fl.name}`)}
+      ${roomBlocks || `<p class="print-muted">No nodes on this floor.</p>`}
+    </section>`;
+  }).join("");
+  return `
+    <header class="print-header">
+      <h1>${escapeHtml(proj.name)} — Full project report</h1>
+      <p>${escapeHtml(proj.address || "")} &middot; Generated ${escapeHtml(nowStamp())}</p>
+      <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; ${floors.length} floor(s) &middot; ${projectNodes(proj.id).length} nodes</p>
+    </header>
+    ${current ? `<section class="print-cover print-break-after">${renderPrintPlanHero(current, coverNodes, `Cover — ${current.name}`)}</section>` : ""}
+    ${sections}`;
+}
 function renderPrintPreviewModal() {
   const proj = project(); if (!proj) return "";
   const floor = currentFloor();
-  const nodes = floor ? floorNodes(floor.id) : [];
-  const planUrl = floor ? state.floorPlans[floor.id] : null;
-  const planAspect = Number(floor?.planAspectRatio) || 1.6;
+  const reportMode = state.modal?.reportMode === "full" ? "full" : "overview";
+  const body = reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
   return `
     <div class="modal-backdrop" data-action="close-modal"></div>
     <div class="modal print-modal" role="dialog">
-      <div class="modal-header"><div><h3>Print / PDF preview</h3><p>${escapeHtml(proj.name)} / ${escapeHtml(floor?.name || "")}</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div>
+      <div class="modal-header">
+        <div><h3>${reportMode === "full" ? "Full project report" : "Print overview"}</h3><p>${escapeHtml(proj.name)}${reportMode === "overview" ? " / " + escapeHtml(floor?.name || "") : ""}</p></div>
+        <button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button>
+      </div>
+      <div class="print-mode-tabs">
+        <button type="button" class="ghost-button ${reportMode === "overview" ? "is-active" : ""}" data-action="print-mode-overview">${icon("printer")}Overview</button>
+        <button type="button" class="ghost-button ${reportMode === "full" ? "is-active" : ""}" data-action="print-mode-full">${icon("download")}Full report</button>
+      </div>
       <div class="modal-body">
-        <div class="print-page" id="printPage">
-          <header class="print-header">
-            <h1>${escapeHtml(proj.name)}</h1>
-            <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(nowStamp())}</p>
-            <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; Total nodes (this floor): ${nodes.length}</p>
-          </header>
-          ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : "<p>(No floor plan uploaded.)</p>"}
-          <h2>Node Schedule</h2>
-          <table class="print-table">
-            <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Line item</th><th>Status</th><th>Assignee</th><th>Tags</th><th>Updated</th></tr></thead>
-            <tbody>${nodes.map((n, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(nodeDisplayTitle(n))}</td><td>${escapeHtml(n.category || "")}</td><td>${escapeHtml(n.lineItem || "")}</td><td>${escapeHtml(n.status)}</td><td>${escapeHtml(n.assignedTo || "-")}</td><td>${escapeHtml((n.tags || []).join(", "))}</td><td>${escapeHtml(n.updatedAt || "")}</td></tr>`).join("")}</tbody>
-          </table>
-        </div>
+        <div class="print-page" id="printPage">${body}</div>
       </div>
       <div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
     </div>`;
@@ -3085,7 +3332,9 @@ function renderHelpModal() {
           <li>Drag a marker to move it. Shift-click to multi-select.</li>
           <li>Use the marker size slider in the drawer to resize a node.</li>
           <li>The <strong>Mass</strong> button lets you drop many of the same item in a row.</li>
-          <li>The <strong>Door</strong> button creates a portal linking this floor to another project / floor.</li>
+          <li>The <strong>Door</strong> button creates a portal linking this floor to another project / floor. Tap a door marker to jump to that floor layer.</li>
+          <li>With <strong>Show rooms</strong> on, use Draw/Rect to outline rooms on the plan. New nodes auto-pick the room under the tap.</li>
+          <li><strong>Overview</strong> prints the current floor plan; <strong>Full report</strong> adds rooms, notes, comments and photos.</li>
           <li><kbd>Esc</kbd> closes the active modal / drawer / mass mode.</li>
           <li>Categories &amp; line items live in <code>NeillPlanner-Categories</code> on Drive - edit there, then hit Refresh in Settings.</li>
         </ul>
@@ -3157,6 +3406,13 @@ function bindEvents() {
   document.querySelectorAll("[data-node]").forEach((b) => b.addEventListener("click", (e) => {
     e.stopPropagation();
     if (e.shiftKey) return toggleBulkSelect(b.dataset.node);
+    const node = state.nodes.find((n) => n.id === b.dataset.node);
+    // Portal = floor-layer jump affordance: one tap walks through when linked.
+    if (node?.type === "portal" && node.linkedProjectId && node.linkedFloorId
+        && (node.linkedFloorId !== state.selectedFloorId || node.linkedProjectId !== state.selectedProjectId)) {
+      state.selectedNodeId = node.id;
+      return followPortal();
+    }
     openNode(b.dataset.node);
   }));
   document.querySelectorAll("[data-filter]").forEach((input) => { const en = input.tagName === "INPUT" ? "input" : "change"; input.addEventListener(en, () => { state.filters[input.dataset.filter] = input.value; persist(); render(); }); });
@@ -3430,6 +3686,11 @@ function handleAction(event) {
     case "new-room": state.modal = { mode: "new-room" }; return render();
     case "rename-room": if (state.selectedRoomId === "all") return; state.modal = { mode: "rename-room", roomId: state.selectedRoomId }; return render();
     case "delete-room": return deleteSelectedRoom();
+    case "draw-room-poly": return startRoomDraw("poly");
+    case "draw-room-rect": return startRoomDraw("rect");
+    case "edit-room-shape": if (state.selectedRoomId === "all") return; return startRoomDraw("poly", state.selectedRoomId);
+    case "room-draw-done": return finishRoomDraw();
+    case "room-draw-cancel": clearRoomDraw(); return render();
     case "rename-floor": if (!currentFloor()) return; state.modal = { mode: "rename-floor" }; return render();
     case "delete-floor": return deleteCurrentFloor();
     case "upload-plan": return uploadFloorPlan();
@@ -3443,7 +3704,7 @@ function handleAction(event) {
     case "zoom-out": return setZoom(state.canvas.zoom - 0.15);
     case "reset-view": state.canvas = { zoom: 1, panX: 0, panY: 0 }; persist(); return render();
     case "close-drawer": state.drawerOpen = false; persist(); return render();
-    case "close-modal": state.modal = null; return render();
+    case "close-modal": state.modal = null; if (state.roomDraw?.pendingShape) state.roomDraw = { mode: null, points: [], roomId: null }; return render();
     case "close-lightbox": state.lightbox = null; return render();
     case "edit-node": state.modal = { mode: "edit" }; return render();
     case "bulk-photo-picker": state.modal = { mode: "bulk-photo-picker" }; return render();
@@ -3459,7 +3720,10 @@ function handleAction(event) {
     case "hours-range": { _hoursUI.range = event.currentTarget.dataset.range || "all"; return render(); }
     case "audit-download": return downloadAuditCsv(filteredAuditRows());
     case "audit-clear-filters": state.auditView.filters = freshState().auditView.filters; persist(); return render();
-    case "print-report": state.modal = { mode: "print-preview" }; return render();
+    case "print-report": state.modal = { mode: "print-preview", reportMode: "overview" }; return render();
+    case "print-full-report": state.modal = { mode: "print-preview", reportMode: "full" }; return render();
+    case "print-mode-overview": if (state.modal) state.modal.reportMode = "overview"; return render();
+    case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
     case "print-now": return window.print();
     case "bulk-delete": return bulkDelete();
     case "bulk-clear": state.bulkSelection = []; return render();
@@ -3504,7 +3768,7 @@ function bindCanvasEvents() {
     }
     if (!dragState || dragState.pointerId !== e.pointerId) return;
     const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 5) {
+    if (Math.abs(dx) + Math.abs(dy) > 10) {
       dragState.moved = true;
       if (!state.ui.planLocked) {   // §38 locked plan doesn't pan
         viewport.classList.add("is-dragging");
@@ -3533,8 +3797,9 @@ function bindCanvasEvents() {
     const wasMoved = dragState.moved;
     dragState = null;
     persist();
-    if (!wasMoved && Date.now() - lastPinchEndedAt > 350 && !e.target.closest(".node-marker") && !e.target.closest(".empty-plan") && !e.target.closest("button")) {
+    if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest(".empty-plan") && !e.target.closest("button")) {
       const pos = pointerToPlanPosition(e); if (!pos) return;
+      if (state.roomDraw?.mode) return handleRoomDrawPoint(pos);
       if (state.massMode.active) return placeMassNode(pos);
       const proj = project();
       const fl = currentFloor();
@@ -3782,7 +4047,7 @@ function placeMassNode(position) {
     id: uid("node"), projectId: proj.id, floorId: floor.id, type: "marker",
     category: m.category, lineItem: m.lineItem, customTitle: autoName,
     status: m.status || "Not Started",
-    roomId: state.selectedRoomId !== "all" ? state.selectedRoomId : null,
+    roomId: resolveInitialRoomId(position) || null,
     assignedTo: "", tags: [], description: "", position,
     createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local",
     createdAt: nowStamp(), updatedAt: nowStamp(),
@@ -3907,12 +4172,15 @@ function handleRoomForm(event) {
     logAudit("Room Renamed", { projectId: proj.id, floorId: floor.id, details: `${old} -> ${name}` });
   } else {
     const order = floorRooms(floor.id).reduce((m, r) => Math.max(m, r.order || 0), -1) + 1;
-    const room = { id: uid("room"), projectId: proj.id, floorId: floor.id, name, createdAt: nowStamp(), updatedAt: nowStamp(), order };
+    const pending = parseRoomShape(state.roomDraw?.pendingShape) || parseRoomShape({ type: "poly", pts: state.roomDraw?.points || [] });
+    const room = { id: uid("room"), projectId: proj.id, floorId: floor.id, name, createdAt: nowStamp(), updatedAt: nowStamp(), order, shape: pending || null };
     state.rooms.push(room);
     state.selectedRoomId = room.id;
-    logAudit("Room Created", { projectId: proj.id, floorId: floor.id, details: name });
+    logAudit("Room Created", { projectId: proj.id, floorId: floor.id, details: pending ? `${name} (with shape)` : name });
   }
-  state.modal = null; persist(); render();
+  state.modal = null;
+  clearRoomDraw();
+  persist(); render();
 }
 
 function deleteSelectedRoom() {
@@ -4039,10 +4307,13 @@ function followPortal() {
   const linkedRoomId = node.linkedRoomId;
   selectProject(target.id);
   if (linkedFloorId) state.selectedFloorId = linkedFloorId;
-  state.selectedRoomId = linkedRoomId || "all";
+  // Floor layer jump: reset room filter to All (prefer clear layer context).
+  state.selectedRoomId = "all";
   if (linkedNodeId) { state.selectedNodeId = linkedNodeId; state.drawerOpen = true; state.activeView = "map"; }
+  else { state.selectedNodeId = null; state.drawerOpen = false; state.activeView = "map"; }
   persist(); render();
   maybeFetchPlanForCurrentFloor();
+  toast(`Switched to ${target.name}${linkedFloorId ? " / " + (floorById(target, linkedFloorId)?.name || "floor") : ""}`);
 }
 
 async function deleteFolder(folderId) {
@@ -4361,7 +4632,9 @@ function hydrateFromHash() {
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
-    if (state.modal) { state.modal = null; render(); }
+    if (state.modal) { state.modal = null; if (state.roomDraw?.pendingShape) clearRoomDraw(); render(); }
+    else if (state.roomDraw?.mode) { clearRoomDraw(); render(); }
+    else if (state.massMode.active) { stopMassMode(); }
     else if (state.drawerOpen) { state.drawerOpen = false; render(); }
   }
   if ((e.key === "Delete" || e.key === "Backspace") && state.selectedNodeId && !e.target.closest("input,textarea,select,[contenteditable]")) {
@@ -4585,7 +4858,7 @@ async function placeBatchNode(key, pos) {
     customTitle: g.room, category: "", lineItem: "", status: "Not Started", assignedTo: "", tags: [],
     description: `Placed from batch (${g.records.length} photo${g.records.length === 1 ? "" : "s"})`,
     position: pos, createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "owner",
-    createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: [], roomId: null, linkedRoomId: null
+    createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: [], roomId: resolveInitialRoomId(pos) || null, linkedRoomId: null
   };
   state.nodes.push(node); persist(); render();
   logAudit("Node Placed From Batch", { nodeId: node.id, details: g.room });
