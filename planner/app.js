@@ -1,5 +1,5 @@
 /* =========================================================================
- *  NeillPlanner v0.9.1
+ *  NeillPlanner v0.9.2
  *  Centralised Drive: all files live in primaryOwnerEmail's Drive.
  *  Other users (added via Settings -> Team Access) share the folder.
  *  Login is mandatory.
@@ -7,11 +7,23 @@
  *  Categories sheet, audit sheet, portal nodes, mass-create mode, etc.
  *  v0.8.0: Switchboard & Sub-board node types. SWB deep-link integration.
  *  v0.9.0: Room plan overlays, full project report, floor layers, mobile polish.
+ *  v0.9.1: Projects master row Updated At column alignment.
+ *  v0.9.2: Lean Drive PDF export for Full report / Overview (html2canvas+jsPDF CDN).
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.9.1";
+const APP_VERSION = "0.9.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
+
+/* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
+const DRIVE_PDF_MAX_PHOTOS_PER_NODE = 3;
+const DRIVE_PDF_MAX_IMAGES_TOTAL = 48;
+const DRIVE_PDF_MAX_PAGES = 40;
+const DRIVE_PDF_MAX_BLOB_BYTES = 18 * 1024 * 1024;
+const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
+const DRIVE_PDF_HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+const DRIVE_PDF_JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+let _drivePdfBusy = false;
 
 const statusMeta = {
   "Not Started": { color: "#2563eb", key: "not-started" },
@@ -3310,7 +3322,7 @@ function renderPrintPreviewModal() {
       <div class="modal-body">
         <div class="print-page" id="printPage">${body}</div>
       </div>
-      <div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
+      <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
     </div>`;
 }
 
@@ -3334,7 +3346,7 @@ function renderHelpModal() {
           <li>The <strong>Mass</strong> button lets you drop many of the same item in a row.</li>
           <li>The <strong>Door</strong> button creates a portal linking this floor to another project / floor. Tap a door marker to jump to that floor layer.</li>
           <li>With <strong>Show rooms</strong> on, use Draw/Rect to outline rooms on the plan. New nodes auto-pick the room under the tap.</li>
-          <li><strong>Overview</strong> prints the current floor plan; <strong>Full report</strong> adds rooms, notes, comments and photos.</li>
+          <li><strong>Overview</strong> prints the current floor plan; <strong>Full report</strong> adds rooms, notes, comments and photos. Use <strong>Save PDF to Drive</strong> for large reports (photo caps apply).</li>
           <li><kbd>Esc</kbd> closes the active modal / drawer / mass mode.</li>
           <li>Categories &amp; line items live in <code>NeillPlanner-Categories</code> on Drive - edit there, then hit Refresh in Settings.</li>
         </ul>
@@ -3725,6 +3737,7 @@ function handleAction(event) {
     case "print-mode-overview": if (state.modal) state.modal.reportMode = "overview"; return render();
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
     case "print-now": return window.print();
+    case "save-pdf-drive": return savePrintPdfToDrive();
     case "bulk-delete": return bulkDelete();
     case "bulk-clear": state.bulkSelection = []; return render();
     case "wipe-local": return confirmWipeLocal();
@@ -4605,6 +4618,216 @@ async function uploadPhotosToNode(nodeId, files) {
     toast(`Uploaded ${files.length}`);
     logAudit("Photos Uploaded", { nodeId: node.id, details: `${files.length} file(s)` });
   } catch (e) { console.error(e); toast("Upload failed: " + describeError(e)); }
+}
+
+
+/* ============================================================ DRIVE PDF (v0.9.2)
+ * Lean path: on-demand CDN html2canvas + jsPDF → blob → uploadFileToDrive.
+ * Browser Print remains the full-fidelity path; Drive PDF caps photos/pages.
+ * ======================================================================= */
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-np-cdn="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "1") return resolve();
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Failed to load " + src)), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.dataset.npCdn = src;
+    s.onload = () => { s.dataset.loaded = "1"; resolve(); };
+    s.onerror = () => reject(new Error("Failed to load " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function loadDrivePdfLibs() {
+  if (!window.html2canvas) await loadScriptOnce(DRIVE_PDF_HTML2CANVAS_CDN);
+  if (!(window.jspdf && window.jspdf.jsPDF) && !window.jsPDF) await loadScriptOnce(DRIVE_PDF_JSPDF_CDN);
+  const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  if (!window.html2canvas || !JsPDF) throw new Error("PDF libraries failed to load");
+  return { html2canvas: window.html2canvas, jsPDF: JsPDF };
+}
+
+function applyDrivePdfPhotoCaps(root) {
+  const perNode = DRIVE_PDF_MAX_PHOTOS_PER_NODE;
+  let totalKept = 0;
+  let totalDropped = 0;
+  let nodesCapped = 0;
+  root.querySelectorAll(".print-node-card").forEach((card) => {
+    const photos = [...card.querySelectorAll(".print-photo")];
+    if (!photos.length) return;
+    let keptHere = 0;
+    photos.forEach((fig) => {
+      if (keptHere >= perNode || totalKept >= DRIVE_PDF_MAX_IMAGES_TOTAL) {
+        fig.remove();
+        totalDropped++;
+        return;
+      }
+      keptHere++;
+      totalKept++;
+    });
+    if (photos.length > keptHere) {
+      nodesCapped++;
+      const note = document.createElement("p");
+      note.className = "print-muted";
+      note.textContent = `Drive PDF: showing ${keptHere} of ${photos.length} photos (cap ${perNode}/node, ${DRIVE_PDF_MAX_IMAGES_TOTAL} total).`;
+      const block = card.querySelector(".print-photo-block") || card;
+      block.appendChild(note);
+    }
+  });
+  if (totalDropped > 0 || nodesCapped > 0) {
+    const banner = document.createElement("p");
+    banner.className = "print-muted";
+    banner.style.cssText = "margin:8px 0 16px;padding:8px 10px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#92400e;";
+    banner.textContent = `Lean Drive PDF: omitted ${totalDropped} photo(s) across ${nodesCapped} node(s) to keep file size manageable. Use Print / Save as PDF for the full set.`;
+    const header = root.querySelector(".print-header");
+    if (header && header.nextSibling) header.parentNode.insertBefore(banner, header.nextSibling);
+    else root.insertBefore(banner, root.firstChild);
+  }
+  return { totalKept, totalDropped, nodesCapped };
+}
+
+function waitForPrintImages(root, timeoutMs = 12000) {
+  const imgs = [...root.querySelectorAll("img")];
+  if (!imgs.length) return Promise.resolve();
+  return Promise.race([
+    Promise.all(imgs.map((img) => {
+      if (img.complete && img.naturalWidth) return Promise.resolve();
+      return new Promise((res) => {
+        const done = () => res();
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+      });
+    })),
+    new Promise((res) => setTimeout(res, timeoutMs))
+  ]);
+}
+
+async function buildPdfBlobFromPrintElement(sourceEl) {
+  const { html2canvas, jsPDF } = await loadDrivePdfLibs();
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;pointer-events:none;";
+  const clone = sourceEl.cloneNode(true);
+  clone.id = "printPageDriveClone";
+  clone.style.width = "794px";
+  clone.style.maxWidth = "794px";
+  clone.style.background = "#fff";
+  clone.style.color = "#111";
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  const caps = applyDrivePdfPhotoCaps(clone);
+  // Prefer already-hydrated blob/data URLs from the live preview when present.
+  const liveImgs = sourceEl.querySelectorAll("img");
+  clone.querySelectorAll("img").forEach((img, i) => {
+    const live = liveImgs[i];
+    if (live && live.src && (live.src.startsWith("blob:") || live.src.startsWith("data:"))) {
+      img.src = live.src;
+      img.removeAttribute("data-fileid");
+    }
+  });
+  await waitForPrintImages(clone);
+
+  let canvas;
+  try {
+    canvas = await html2canvas(clone, {
+      scale: 1.35,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 8000,
+      windowWidth: 794
+    });
+  } finally {
+    host.remove();
+  }
+
+  const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 8;
+  const usableW = pageW - margin * 2;
+  const usableH = pageH - margin * 2;
+  const imgW = usableW;
+  const imgH = (canvas.height * usableW) / canvas.width;
+  const pageCount = Math.max(1, Math.ceil(imgH / usableH));
+  if (pageCount > DRIVE_PDF_MAX_PAGES) {
+    throw new Error(`Report would be ~${pageCount} pages (cap ${DRIVE_PDF_MAX_PAGES}). Narrow the project or use Print.`);
+  }
+
+  const imgData = canvas.toDataURL("image/jpeg", 0.82);
+  let heightLeft = imgH;
+  let y = margin;
+  pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
+  heightLeft -= usableH;
+  let pages = 1;
+  while (heightLeft > 2 && pages < DRIVE_PDF_MAX_PAGES) {
+    y = margin - pages * usableH;
+    pdf.addPage();
+    pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
+    heightLeft -= usableH;
+    pages++;
+  }
+  if (heightLeft > 2) {
+    throw new Error(`PDF exceeded ${DRIVE_PDF_MAX_PAGES} pages after photo caps`);
+  }
+
+  const blob = pdf.output("blob");
+  if (!blob || blob.size < 64) throw new Error("PDF generation produced an empty file");
+  if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) {
+    throw new Error(`PDF is ${(blob.size / (1024 * 1024)).toFixed(1)} MB (cap ${DRIVE_PDF_MAX_BLOB_BYTES / (1024 * 1024)} MB)`);
+  }
+  return { blob, pages, caps };
+}
+
+async function savePrintPdfToDrive() {
+  if (_drivePdfBusy) return;
+  const page = document.getElementById("printPage");
+  if (!page) { toast("Open Overview or Full report first"); return; }
+  if (!isTokenValid()) { toast("Sign in required to save to Drive"); return; }
+  const proj = project();
+  if (!proj) { toast("No project selected"); return; }
+
+  // Snapshot the live preview *before* any re-render so hydrated Drive
+  // image blobs (data:/blob:) are preserved for html2canvas.
+  const snapshot = page.cloneNode(true);
+  _drivePdfBusy = true;
+  const reportMode = state.modal?.reportMode === "full" ? "full" : "overview";
+  toast("Building PDF for Drive…");
+  render();
+  try {
+    const { blob, pages, caps } = await buildPdfBlobFromPrintElement(snapshot);
+    const parentId = await ensureProjectDriveFolder(proj);
+    if (!parentId) throw new Error("Project Drive folder unavailable");
+    const exportsId = await ensureFolder(DRIVE_PDF_EXPORTS_FOLDER, parentId);
+    const stamp = nowStamp().replace(/[:\s]/g, "-").slice(0, 19);
+    const safeName = (proj.name || "project").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80);
+    const fileName = `${safeName} — ${reportMode === "full" ? "Full report" : "Overview"} — ${stamp}.pdf`;
+    const file = new File([blob], fileName, { type: "application/pdf" });
+    const uploaded = await uploadFileToDrive(file, exportsId || parentId, fileName);
+    const capNote = caps.totalDropped ? ` (${caps.totalDropped} photos omitted)` : "";
+    toast(`Saved PDF to Drive (${pages}p)${capNote}`);
+    logAudit("Report PDF to Drive", {
+      projectId: proj.id,
+      details: `${reportMode}; ${pages} pages; ${(blob.size / 1024).toFixed(0)} KB; dropped ${caps.totalDropped} photos`
+    });
+    if (uploaded?.webViewLink) {
+      try { window.open(uploaded.webViewLink, "_blank", "noopener"); } catch (e) {}
+    }
+  } catch (e) {
+    console.warn("Drive PDF failed", e);
+    toast("Drive PDF failed: " + describeError(e) + " — try Print / Save as PDF");
+  } finally {
+    _drivePdfBusy = false;
+    render();
+  }
 }
 
 function toast(message) {
