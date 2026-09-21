@@ -3399,3 +3399,22 @@ button[disabled],
   background: #e5e7eb;
   opacity: 0.7;
 }
+
+/* v0.9.2 Drive PDF button row */
+.print-modal-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.print-modal-actions .ghost-button,
+.print-modal-actions .primary-button {
+  flex: 1 1 auto;
+}
+@media (max-width: 540px) {
+  .print-modal-actions {
+    flex-direction: column-reverse;
+  }
+  .print-modal-actions .ghost-button,
+  .print-modal-actions .primary-button {
+    width: 100%;
+  }
+}
