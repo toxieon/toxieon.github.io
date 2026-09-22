@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.9.2";
+const APP_VERSION = "0.9.3";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -3712,9 +3712,15 @@ function handleAction(event) {
     case "mass-stop": return stopMassMode();
     case "add-portal": state.modal = { mode: "portal-create" }; return render();
     case "follow-portal": return followPortal();
-    case "zoom-in": return setZoom(state.canvas.zoom + 0.15);
-    case "zoom-out": return setZoom(state.canvas.zoom - 0.15);
-    case "reset-view": state.canvas = { zoom: 1, panX: 0, panY: 0 }; persist(); return render();
+    case "zoom-in": return setZoom(state.canvas.zoom + 0.15, false, { animate: true });
+    case "zoom-out": return setZoom(state.canvas.zoom - 0.15, false, { animate: true });
+    case "reset-view":
+      state.canvas = { zoom: 1, panX: 0, panY: 0 };
+      persist();
+      applyCanvasTransform();
+      updateScaleReadout();
+      flashStageAnimating();
+      return;
     case "close-drawer": state.drawerOpen = false; persist(); return render();
     case "close-modal": state.modal = null; if (state.roomDraw?.pendingShape) state.roomDraw = { mode: null, points: [], roomId: null }; return render();
     case "close-lightbox": state.lightbox = null; return render();
@@ -3755,18 +3761,49 @@ function bindCanvasEvents() {
     const pos = pointerToPlanPosition(e) || { x: 50, y: 50 };
     placeBatchNode(key, pos);
   });
-  viewport.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(state.canvas.zoom + (e.deltaY < 0 ? 0.08 : -0.08), false); }, { passive: false });
+  // Non-passive touch listeners: block Safari page pinch/double-tap zoom while plan-pinching.
+  const blockSafariPageZoom = (e) => {
+    if ((e.touches && e.touches.length >= 2) || pinchState) e.preventDefault();
+  };
+  viewport.addEventListener("touchstart", blockSafariPageZoom, { passive: false });
+  viewport.addEventListener("touchmove", blockSafariPageZoom, { passive: false });
+  ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+    viewport.addEventListener(type, (e) => e.preventDefault());
+  });
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const focal = clientToViewportFocal(e.clientX, e.clientY, viewport);
+    setZoom(state.canvas.zoom + (e.deltaY < 0 ? 0.08 : -0.08), false, { skipPersist: true, focal });
+    // Persist after a short idle so live wheel doesn't jank every tick.
+    clearTimeout(bindCanvasEvents._wheelPersistT);
+    bindCanvasEvents._wheelPersistT = setTimeout(() => persist(), 180);
+  }, { passive: false });
   viewport.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".node-marker")) return;
     if (e.target.closest(".empty-plan")) return;
     if (e.target.closest("button")) return;
-    viewport.setPointerCapture(e.pointerId);
+    // Do not capture touch pointers — setPointerCapture on the first finger
+    // prevents iOS from delivering a second finger for pinch.
+    if (e.pointerType !== "touch") {
+      try { viewport.setPointerCapture(e.pointerId); } catch (err) {}
+    }
     canvasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (canvasPointers.size >= 2) {
       const points = [...canvasPointers.values()].slice(0, 2);
-      pinchState = { distance: pointerDistance(points[0], points[1]), zoom: state.canvas.zoom };
+      const mid = pointerMidpoint(points[0], points[1]);
+      const focal = clientToViewportFocal(mid.x, mid.y, viewport);
+      pinchState = {
+        distance: pointerDistance(points[0], points[1]),
+        zoom: state.canvas.zoom,
+        panX: state.canvas.panX,
+        panY: state.canvas.panY,
+        focalX: focal.x,
+        focalY: focal.y
+      };
       dragState = null;
-      viewport.classList.add("is-dragging");
+      viewport.classList.add("is-dragging", "is-gesturing");
+      const stage = document.getElementById("planStage");
+      if (stage) stage.classList.remove("is-animating");
       return;
     }
     dragState = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, panX: state.canvas.panX, panY: state.canvas.panY, moved: false };
@@ -3776,7 +3813,17 @@ function bindCanvasEvents() {
     if (pinchState && canvasPointers.size >= 2) {
       const points = [...canvasPointers.values()].slice(0, 2);
       const distance = pointerDistance(points[0], points[1]);
-      if (pinchState.distance > 0) setZoom(pinchState.zoom * (distance / pinchState.distance), false);
+      if (pinchState.distance > 0) {
+        const mid = pointerMidpoint(points[0], points[1]);
+        const focal = clientToViewportFocal(mid.x, mid.y, viewport);
+        const rawZoom = pinchState.zoom * (distance / pinchState.distance);
+        const newZoom = Math.max(0.55, Math.min(6, Number(rawZoom.toFixed(2))));
+        const ratio = newZoom / pinchState.zoom;
+        // Absolute focal zoom from pinch-start: keeps midpoint under fingers and pans with mid movement.
+        state.canvas.panX = focal.x - (pinchState.focalX - pinchState.panX) * ratio;
+        state.canvas.panY = focal.y - (pinchState.focalY - pinchState.panY) * ratio;
+        setZoom(newZoom, false, { skipPersist: true });
+      }
       return;
     }
     if (!dragState || dragState.pointerId !== e.pointerId) return;
@@ -3784,7 +3831,7 @@ function bindCanvasEvents() {
     if (Math.abs(dx) + Math.abs(dy) > 10) {
       dragState.moved = true;
       if (!state.ui.planLocked) {   // §38 locked plan doesn't pan
-        viewport.classList.add("is-dragging");
+        viewport.classList.add("is-dragging", "is-gesturing");
         state.canvas.panX = dragState.panX + dx; state.canvas.panY = dragState.panY + dy;
         applyCanvasTransform();
       }
@@ -3800,13 +3847,13 @@ function bindCanvasEvents() {
         persist();
       }
       dragState = null;
-      viewport.classList.remove("is-dragging");
+      viewport.classList.remove("is-dragging", "is-gesturing");
       try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
       return;
     }
     if (!dragState || dragState.pointerId !== e.pointerId) return;
-    viewport.releasePointerCapture(e.pointerId);
-    viewport.classList.remove("is-dragging");
+    try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
+    viewport.classList.remove("is-dragging", "is-gesturing");
     const wasMoved = dragState.moved;
     dragState = null;
     persist();
@@ -3821,14 +3868,29 @@ function bindCanvasEvents() {
   });
   viewport.addEventListener("pointercancel", (e) => {
     canvasPointers.delete(e.pointerId);
+    const endingPinch = Boolean(pinchState);
     pinchState = null;
     dragState = null;
-    viewport.classList.remove("is-dragging");
+    viewport.classList.remove("is-dragging", "is-gesturing");
+    if (endingPinch || canvasPointers.size === 0) persist();
   });
 }
 
 function pointerDistance(a, b) {
   return Math.hypot((a?.x || 0) - (b?.x || 0), (a?.y || 0) - (b?.y || 0));
+}
+
+function pointerMidpoint(a, b) {
+  return { x: ((a?.x || 0) + (b?.x || 0)) / 2, y: ((a?.y || 0) + (b?.y || 0)) / 2 };
+}
+
+/** Focal point in viewport-center-relative pixels (matches panX/panY space). */
+function clientToViewportFocal(clientX, clientY, viewport) {
+  const rect = viewport.getBoundingClientRect();
+  return {
+    x: clientX - (rect.left + rect.width / 2),
+    y: clientY - (rect.top + rect.height / 2)
+  };
 }
 
 function bindMarkerDrag() {
@@ -3883,8 +3945,50 @@ function pointerToPlanPosition(event) {
   return { x: Number(Math.max(0, Math.min(100, x)).toFixed(1)), y: Number(Math.max(0, Math.min(100, y)).toFixed(1)) };
 }
 
-function applyCanvasTransform() { const stage = document.getElementById("planStage"); if (!stage) return; stage.style.transform = `translate(calc(-50% + ${state.canvas.panX}px), calc(-50% + ${state.canvas.panY}px)) scale(${state.canvas.zoom})`; }
-function setZoom(value, rerender = true) { state.canvas.zoom = Math.max(0.55, Math.min(6, Number(value.toFixed(2)))); persist(); if (rerender) render(); else applyCanvasTransform(); }
+function applyCanvasTransform() {
+  const stage = document.getElementById("planStage");
+  if (!stage) return;
+  stage.style.transform = `translate(calc(-50% + ${state.canvas.panX}px), calc(-50% + ${state.canvas.panY}px)) scale(${state.canvas.zoom})`;
+}
+
+function updateScaleReadout() {
+  const el = document.querySelector(".scale-readout span:last-child");
+  if (el) el.textContent = `${Math.round(state.canvas.zoom * 100)}%`;
+}
+
+function flashStageAnimating() {
+  const stage = document.getElementById("planStage");
+  if (!stage) return;
+  stage.classList.add("is-animating");
+  clearTimeout(flashStageAnimating._t);
+  flashStageAnimating._t = setTimeout(() => stage.classList.remove("is-animating"), 160);
+}
+
+/**
+ * @param {number} value
+ * @param {boolean} [rerender=true]
+ * @param {{ skipPersist?: boolean, focal?: {x:number,y:number}|null, animate?: boolean }} [opts]
+ */
+function setZoom(value, rerender = true, opts = {}) {
+  const skipPersist = Boolean(opts && opts.skipPersist);
+  const focal = opts && opts.focal;
+  const animate = Boolean(opts && opts.animate);
+  const oldZoom = state.canvas.zoom;
+  const newZoom = Math.max(0.55, Math.min(6, Number(value.toFixed(2))));
+  if (focal && oldZoom > 0 && newZoom !== oldZoom) {
+    const ratio = newZoom / oldZoom;
+    state.canvas.panX = focal.x - (focal.x - state.canvas.panX) * ratio;
+    state.canvas.panY = focal.y - (focal.y - state.canvas.panY) * ratio;
+  }
+  state.canvas.zoom = newZoom;
+  if (!skipPersist) persist();
+  if (animate) flashStageAnimating();
+  if (rerender) render();
+  else {
+    applyCanvasTransform();
+    updateScaleReadout();
+  }
+}
 
 /* ============================================================ MUTATIONS */
 
