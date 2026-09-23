@@ -12,6 +12,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../assets/here.js"></script>
+<script src="../assets/job-locator.js"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -171,6 +172,20 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .session-row .shrs { font-family: var(--mono-font); }
 .static-badge { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
 .day-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; }
+.day-card.expandable .day-head { cursor: pointer; user-select: none; }
+.day-card .day-chevron { margin-left: 6px; color: var(--text-muted); font-size: 12px; transition: transform 160ms ease; display: inline-block; }
+.day-card.expanded .day-chevron { transform: rotate(90deg); }
+.day-travel { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: none; }
+.day-card.expanded .day-travel { display: block; }
+.day-travel-map { height: 200px; width: 100%; border-radius: 10px; overflow: hidden; background: #12141a; margin-bottom: 10px; }
+.day-travel-legs { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
+.day-travel-legs th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 0; }
+.day-travel-legs td { padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+.day-travel-legs .leg-km { font-family: var(--mono-font); white-space: nowrap; text-align: right; }
+.day-travel-totals { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 12.5px; }
+.day-travel-totals .tval { font-family: var(--mono-font); font-weight: 600; }
+.day-travel-meta { font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+.day-travel-empty { font-size: 12.5px; color: var(--text-muted); padding: 4px 0 2px; }
 .ot-flag { color: var(--off-accent); }
 .week-summary { position: sticky; bottom: 76px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; justify-content: space-between; margin-top: 16px; }
 .session-detail { display: flex; flex-direction: column; gap: 10px; }
@@ -424,6 +439,17 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
       </div>
     </div>
     <div class="settings-section">
+      <h3>Travel &amp; fuel</h3>
+      <div class="card">
+        <p class="muted" style="font-size:12px; margin-top:0;">Used on History day cards to estimate km between jobs and fuel cost. Efficiency is litres per 100 km (AU standard).</p>
+        <div class="row">
+          <div class="field" style="flex:1;"><label>Car efficiency (L/100km)</label><input type="number" step="0.1" min="0" id="s-fuelLPer100km"></div>
+          <div class="field" style="flex:1;"><label>Fuel price ($/L)</label><input type="number" step="0.01" min="0" id="s-fuelPricePerLitre"></div>
+        </div>
+        <p class="muted" style="font-size:11px; margin:0;">Fuel L = km × (L/100km) ÷ 100. Cost = L × $/L. Live AU pump prices are not wired in v1 — set $/L here (national averages often sit around $1.80–$2.10/L).</p>
+      </div>
+    </div>
+    <div class="settings-section">
       <h3>Neill Quote Integration</h3>
       <div class="card">
         <div class="row-between">
@@ -605,6 +631,8 @@ window.TIMESHEET_CONFIG = {
     preferredMailApp: "Gmail", mapApp: "google",
     use24hr: true, exportFormats: ["Plain text email", "CSV"],
     interactiveTimes: true, lowVisColours: false,
+    // Travel + fuel (v1). L/100km is the AU-standard efficiency unit.
+    fuelLPer100km: 8.5, fuelPricePerLitre: 1.90,
     // Payslip estimate (§48). Default preset = Neill Data (rebranded from the
     // Washington example). Hourly rate is the one thing the user must set.
     payslip: {
@@ -1936,10 +1964,212 @@ window.Views = {};
   window.Views.clock = { init, render };
 })();
 
+
+/* ----- TRAVEL + FUEL (History day expand) ----- */
+const TsTravel = (() => {
+  function distFn() {
+    if (window.NDJobLocator && typeof NDJobLocator.distanceMetres === 'function') return NDJobLocator.distanceMetres;
+    return distanceMetres;
+  }
+  function hasCoords(lat, lng) {
+    lat = Number(lat); lng = Number(lng);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  }
+  // Prefer known job lat/lng; fall back to session clock-on fix.
+  function stopForSession(session, st) {
+    const job = (st.jobs || []).find(j => j.job_id === session.job_id);
+    let lat = null, lng = null, address = session.address_confirmed || '';
+    if (job && hasCoords(job.lat, job.lng)) {
+      lat = Number(job.lat); lng = Number(job.lng);
+      if (!address) address = job.address || '';
+    } else if (hasCoords(session.lat_on, session.lng_on)) {
+      lat = Number(session.lat_on); lng = Number(session.lng_on);
+    }
+    return {
+      session_id: session.session_id,
+      job_id: session.job_id,
+      name: session.job_name || (job && job.job_name) || 'Job',
+      address,
+      time_on: session.time_on_rounded || session.time_on || '',
+      lat, lng,
+      geocoded: hasCoords(lat, lng)
+    };
+  }
+  function stopsForDay(daySessions, st) {
+    return (daySessions || []).map(s => stopForSession(s, st));
+  }
+  function haversineKm(a, b) {
+    const m = distFn()(a.lat, a.lng, b.lat, b.lng);
+    if (!Number.isFinite(m) || m === Infinity) return null;
+    return m / 1000;
+  }
+  // Consecutive geocoded stops → legs. Same-spot pairs still get a 0 km leg.
+  function buildLegs(stops) {
+    const legs = [];
+    for (let i = 0; i < stops.length - 1; i++) {
+      const from = stops[i], to = stops[i + 1];
+      if (!from.geocoded || !to.geocoded) {
+        legs.push({ from, to, km: null, method: null, skipped: true });
+        continue;
+      }
+      legs.push({ from, to, km: null, method: null, skipped: false });
+    }
+    return legs;
+  }
+  function fillHaversine(legs) {
+    legs.forEach(leg => {
+      if (leg.skipped) return;
+      leg.km = haversineKm(leg.from, leg.to);
+      leg.method = 'haversine';
+    });
+    return legs;
+  }
+  function roadDistanceMatrix(legs) {
+    return new Promise((resolve) => {
+      const pending = legs.filter(l => !l.skipped);
+      if (!pending.length) { resolve(legs); return; }
+      if (!(window.google && google.maps && google.maps.DistanceMatrixService)) {
+        fillHaversine(legs); resolve(legs); return;
+      }
+      const svc = new google.maps.DistanceMatrixService();
+      const origins = pending.map(l => ({ lat: l.from.lat, lng: l.from.lng }));
+      const destinations = pending.map(l => ({ lat: l.to.lat, lng: l.to.lng }));
+      svc.getDistanceMatrix({
+        origins, destinations,
+        travelMode: google.maps.TravelMode.DRIVING,
+        unitSystem: google.maps.UnitSystem.METRIC
+      }, (resp, status) => {
+        if (status !== 'OK' || !resp || !resp.rows) {
+          fillHaversine(legs); resolve(legs); return;
+        }
+        let anyRoad = false;
+        pending.forEach((leg, i) => {
+          const el = resp.rows[i] && resp.rows[i].elements && resp.rows[i].elements[i];
+          if (el && el.status === 'OK' && el.distance && Number.isFinite(el.distance.value)) {
+            leg.km = el.distance.value / 1000;
+            leg.method = 'road';
+            anyRoad = true;
+          } else {
+            leg.km = haversineKm(leg.from, leg.to);
+            leg.method = 'haversine';
+          }
+        });
+        if (!anyRoad) fillHaversine(legs);
+        resolve(legs);
+      });
+    });
+  }
+  async function computeDayTravel(daySessions, st) {
+    const stops = stopsForDay(daySessions, st);
+    const geocoded = stops.filter(s => s.geocoded);
+    let legs = buildLegs(stops);
+    const methodLabel = { road: 'road (Distance Matrix)', haversine: 'straight-line (Haversine)' };
+    try {
+      if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs();
+      legs = await roadDistanceMatrix(legs);
+    } catch (e) {
+      console.warn('TsTravel road distance failed, using Haversine', e);
+      fillHaversine(legs);
+    }
+    const usable = legs.filter(l => !l.skipped && l.km != null && Number.isFinite(l.km));
+    const totalKm = usable.reduce((sum, l) => sum + l.km, 0);
+    const methods = [...new Set(usable.map(l => l.method).filter(Boolean))];
+    const eff = Number(st.settings.fuelLPer100km);
+    const price = Number(st.settings.fuelPricePerLitre);
+    const litres = (Number.isFinite(eff) && eff > 0) ? totalKm * (eff / 100) : null;
+    const cost = (litres != null && Number.isFinite(price) && price >= 0) ? litres * price : null;
+    return {
+      stops, geocoded, legs, totalKm, litres, cost, eff, price,
+      methodSummary: methods.map(m => methodLabel[m] || m).join(' + ') || 'n/a'
+    };
+  }
+  function fmtKm(km) {
+    if (km == null || !Number.isFinite(km)) return '—';
+    return (km < 10 ? km.toFixed(1) : km.toFixed(1)) + ' km';
+  }
+  function fmtMoney(n) {
+    if (n == null || !Number.isFinite(n)) return '—';
+    return '$' + n.toFixed(2);
+  }
+  function fmtL(n) {
+    if (n == null || !Number.isFinite(n)) return '—';
+    return n.toFixed(2) + ' L';
+  }
+  function renderMap(el, stops) {
+    if (!el) return;
+    const pins = (stops || []).filter(s => s.geocoded);
+    if (!pins.length) {
+      el.innerHTML = '<div class="day-travel-empty" style="padding:16px;">No located jobs this day — map skipped.</div>';
+      return;
+    }
+    if (!(window.google && google.maps && google.maps.Map)) {
+      el.innerHTML = '<div class="day-travel-empty" style="padding:16px;">Map unavailable.</div>';
+      return;
+    }
+    const map = new google.maps.Map(el, { mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoom: 12 });
+    const bounds = new google.maps.LatLngBounds();
+    pins.forEach((s, idx) => {
+      const pos = { lat: s.lat, lng: s.lng };
+      const mk = new google.maps.Marker({
+        map, position: pos,
+        title: s.name,
+        label: { text: String(idx + 1), color: '#111', fontWeight: '700' }
+      });
+      const info = new google.maps.InfoWindow({
+        content: `<div style="color:#111;font-size:13px;max-width:200px"><strong>${escapeHtml(s.name)}</strong><br>${escapeHtml(s.address || '')}</div>`
+      });
+      mk.addListener('click', () => info.open(map, mk));
+      bounds.extend(pos);
+    });
+    if (pins.length === 1) { map.setCenter(bounds.getCenter()); map.setZoom(14); }
+    else map.fitBounds(bounds, 48);
+  }
+  function panelHtml(iso, travel) {
+    if (!travel) return `<div class="day-travel" data-day-travel="${iso}"><div class="day-travel-empty">Loading travel…</div></div>`;
+    const { stops, geocoded, legs, totalKm, litres, cost, price, methodSummary } = travel;
+    if (!stops.length) {
+      return `<div class="day-travel" data-day-travel="${iso}"><div class="day-travel-empty">No shifts to map.</div></div>`;
+    }
+    let body = '';
+    if (geocoded.length) {
+      body += `<div class="day-travel-map" data-day-map="${iso}"></div>`;
+    } else {
+      body += `<div class="day-travel-empty">Jobs listed below have no coordinates — map and km skipped.</div>`;
+      body += `<ul style="margin:6px 0 10px; padding-left:18px; font-size:12.5px;">${stops.map(s => `<li>${escapeHtml(s.name)}${s.address ? ' · ' + escapeHtml(s.address) : ''}</li>`).join('')}</ul>`;
+    }
+    if (legs.length) {
+      const rows = legs.map(leg => {
+        const label = `${escapeHtml(leg.from.name)} → ${escapeHtml(leg.to.name)}`;
+        const kmCell = leg.skipped ? 'no coords' : fmtKm(leg.km);
+        const tip = leg.method === 'haversine' ? 'straight-line' : (leg.method === 'road' ? 'road' : '');
+        return `<tr><td>${label}</td><td class="leg-km" title="${tip}">${kmCell}</td></tr>`;
+      }).join('');
+      body += `<table class="day-travel-legs"><thead><tr><th>Leg</th><th style="text-align:right;">Km</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    if (geocoded.length >= 2) {
+      body += `<div class="day-travel-totals">
+        <div><span class="muted">Day km</span><div class="tval">${fmtKm(totalKm)}</div></div>
+        <div><span class="muted">Fuel</span><div class="tval">${fmtL(litres)}</div></div>
+        <div><span class="muted">Est. cost</span><div class="tval">${fmtMoney(cost)}</div></div>
+      </div>`;
+      const priceBit = (price != null && Number.isFinite(price))
+        ? `estimated using $${Number(price).toFixed(2)}/L`
+        : 'set a $/L price in Settings → Travel & fuel';
+      body += `<div class="day-travel-meta">Distances: ${escapeHtml(methodSummary)}. Fuel ${priceBit}. Efficiency from Settings (L/100km).</div>`;
+    } else if (geocoded.length === 1) {
+      body += `<div class="day-travel-meta">Only one located job — need 2+ stops for leg km / fuel.</div>`;
+    }
+    return `<div class="day-travel" data-day-travel="${iso}">${body}</div>`;
+  }
+  return { computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney };
+})();
+window.TsTravel = TsTravel;
+
 /* HISTORY */
 (function () {
   let weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
   let touchStartX = null;
+  const expandedDays = new Set(); // iso dates with travel panel open
   function $(id) { return document.getElementById(id); }
   function render() {
     const st = getState();
@@ -1980,11 +2210,50 @@ window.Views = {};
           : (dayTotal > stdDay + 0.01 ? 'over' : (dayTotal < stdDay - 0.01 ? 'under' : 'exact'));
         dayCls = 'nd-tint nd-' + status + (st.settings.lowVisColours ? ' nd-lowvis' : '');
       }
-      daysHtml.push(`<div class="card day-card ${dayCls}"><div class="day-head"><span class="dname">${dayOfWeek(day)}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div></div>`);
+      const canExpand = daySessions.length > 0;
+      const isExpanded = canExpand && expandedDays.has(iso);
+      const chevron = canExpand ? '<span class="day-chevron" aria-hidden="true">▸</span>' : '';
+      const travelStub = canExpand
+        ? (isExpanded ? TsTravel.panelHtml(iso, null) : `<div class="day-travel" data-day-travel="${iso}" hidden></div>`)
+        : '';
+      const headAttrs = canExpand
+        ? ` data-day-toggle="${iso}" role="button" aria-expanded="${isExpanded ? 'true' : 'false'}"`
+        : '';
+      daysHtml.push(`<div class="card day-card ${canExpand ? 'expandable' : ''} ${dayCls}${isExpanded ? ' expanded' : ''}" data-day="${iso}"><div class="day-head"${headAttrs}><span class="dname">${dayOfWeek(day)}${chevron}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div>${travelStub}</div>`);
     }
     $('day-cards').innerHTML = daysWithData ? daysHtml.join('') : '<div class="empty-week">No sessions this week.</div>';
-    $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', () => openDetail(el.dataset.session)); });
+    $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', (e) => { e.stopPropagation(); openDetail(el.dataset.session); }); });
     $('day-cards').querySelectorAll('[data-add-shift]').forEach(el => { el.addEventListener('click', (e) => { e.stopPropagation(); openAddShift(el.dataset.addShift); }); });
+    $('day-cards').querySelectorAll('[data-day-toggle]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-add-shift]')) return;
+        const iso = el.dataset.dayToggle;
+        if (expandedDays.has(iso)) expandedDays.delete(iso); else expandedDays.add(iso);
+        render();
+      });
+    });
+    // Hydrate travel panels for currently expanded days (async distance + map).
+    $('day-cards').querySelectorAll('.day-card.expanded[data-day]').forEach(card => {
+      const iso = card.dataset.day;
+      const daySessions = sessionsForWeek(weekCursor).filter(s => s.date === iso)
+        .sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99'));
+      if (!daySessions.length) return;
+      const panel = card.querySelector('[data-day-travel]');
+      if (!panel) return;
+      TsTravel.computeDayTravel(daySessions, getState()).then(travel => {
+        if (!expandedDays.has(iso)) return; // collapsed while loading
+        const fresh = card.isConnected ? card : $('day-cards').querySelector(`.day-card[data-day="${iso}"]`);
+        if (!fresh) return;
+        const wrap = fresh.querySelector('[data-day-travel]');
+        if (!wrap) return;
+        wrap.outerHTML = TsTravel.panelHtml(iso, travel);
+        const mapEl = fresh.querySelector(`[data-day-map="${iso}"]`);
+        if (mapEl) TsTravel.renderMap(mapEl, travel.stops);
+      }).catch(err => {
+        console.warn('day travel failed', err);
+        if (panel) panel.innerHTML = '<div class="day-travel-empty">Travel details unavailable.</div>';
+      });
+    });
   }
 
   /* §3.5 — honour payPeriodType: period totals + a 4-week hours summary */
@@ -2138,6 +2407,8 @@ window.Views = {};
     bindText('s-employerName', 'employerName', s); bindText('s-employerEmail', 'employerEmail', s);
     bindSelect('s-payPeriodType', 'payPeriodType', s); bindSelect('s-payPeriodStartDay', 'payPeriodStartDay', s);
     bindSelect('s-mapApp', 'mapApp', s);
+    bindNumber('s-fuelLPer100km', 'fuelLPer100km', s);
+    bindNumber('s-fuelPricePerLitre', 'fuelPricePerLitre', s);
     bindText('s-standardClockOn', 'standardClockOn', s); bindText('s-standardClockOff', 'standardClockOff', s);
     bindNumber('s-otThresholdDay', 'otThresholdDay', s); bindNumber('s-otThresholdWeek', 'otThresholdWeek', s); bindNumber('s-otMultiplier', 'otMultiplier', s);
     $('s-roundingMin').value = String(s.roundingMin ?? 30);
