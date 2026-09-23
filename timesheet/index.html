@@ -12,6 +12,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../assets/here.js"></script>
+<script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
@@ -186,6 +187,13 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .day-travel-totals .tval { font-family: var(--mono-font); font-weight: 600; }
 .day-travel-meta { font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
 .day-travel-empty { font-size: 12.5px; color: var(--text-muted); padding: 4px 0 2px; }
+.day-travel-commute { margin-bottom: 10px; padding: 8px 0; }
+.day-travel-commute label { font-size: 13px; font-weight: 500; }
+.day-travel-need-home { background: rgba(224,123,42,0.12); border: 1px solid rgba(224,123,42,0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; line-height: 1.45; }
+.day-travel-need-home .btn { margin-top: 8px; }
+.day-travel-legs tr.commute-leg td:first-child { color: var(--on-accent); }
+.home-coords-status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.home-coords-status.ok { color: var(--on-accent); }
 .ot-flag { color: var(--off-accent); }
 .week-summary { position: sticky; bottom: 76px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; justify-content: space-between; margin-top: 16px; }
 .session-detail { display: flex; flex-direction: column; gap: 10px; }
@@ -446,7 +454,14 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
           <div class="field" style="flex:1;"><label>Car efficiency (L/100km)</label><input type="number" step="0.1" min="0" id="s-fuelLPer100km"></div>
           <div class="field" style="flex:1;"><label>Fuel price ($/L)</label><input type="number" step="0.01" min="0" id="s-fuelPricePerLitre"></div>
         </div>
-        <p class="muted" style="font-size:11px; margin:0;">Fuel L = km × (L/100km) ÷ 100. Cost = L × $/L. Live AU pump prices are not wired in v1 — set $/L here (national averages often sit around $1.80–$2.10/L).</p>
+        <div class="field" style="margin-top:12px;"><label>Home location</label>
+          <div class="field-with-here"><input id="s-homeAddress" type="text" autocomplete="off" placeholder="e.g. 1/84 Mount Eliza Way, Mount Eliza VIC"><button type="button" class="btn btn-ghost here-btn" id="s-homeHere" title="Use my current location">Here</button></div>
+          <div class="home-coords-status" id="s-homeStatus">No coordinates yet — use Here or pick an address.</div>
+        </div>
+        <div class="field row-between" style="margin-top:12px;"><label style="margin:0;">Include commute (History day expand)</label>
+          <div class="switch"><input type="checkbox" id="s-includeCommute"><span class="knob"></span></div>
+        </div>
+        <p class="muted" style="font-size:11px; margin:0;">Fuel L = km × (L/100km) ÷ 100. Cost = L × $/L. When Include commute is on, day totals also add Home → first job and last job → Home (same Distance Matrix → Haversine stack). Live AU pump prices are not wired in v1 — set $/L here (national averages often sit around $1.80–$2.10/L).</p>
       </div>
     </div>
     <div class="settings-section">
@@ -633,6 +648,8 @@ window.TIMESHEET_CONFIG = {
     interactiveTimes: true, lowVisColours: false,
     // Travel + fuel (v1). L/100km is the AU-standard efficiency unit.
     fuelLPer100km: 8.5, fuelPricePerLitre: 1.90,
+    // Home base for commute legs (History day expand). Include commute defaults OFF.
+    homeAddress: '', homeLat: null, homeLng: null, includeCommute: false,
     // Payslip estimate (§48). Default preset = Neill Data (rebranded from the
     // Washington example). Hourly rate is the one thing the user must set.
     payslip: {
@@ -1416,7 +1433,7 @@ const TsGeo = (() => {
     _mapsJsPromise = new Promise((resolve, reject) => {
       window.__tsMapsReady = () => resolve();
       const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async&callback=__tsMapsReady`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async&callback=__tsMapsReady`;
       s.async = true; s.defer = true; s.onerror = () => reject(new Error('maps js load failed'));
       document.head.appendChild(s);
     });
@@ -1975,6 +1992,20 @@ const TsTravel = (() => {
     lat = Number(lat); lng = Number(lng);
     return Number.isFinite(lat) && Number.isFinite(lng);
   }
+  function homeStop(st) {
+    const lat = st.settings && st.settings.homeLat;
+    const lng = st.settings && st.settings.homeLng;
+    const address = (st.settings && st.settings.homeAddress) || '';
+    const ok = hasCoords(lat, lng);
+    return {
+      session_id: null, job_id: null, name: 'Home', address,
+      time_on: '', lat: ok ? Number(lat) : null, lng: ok ? Number(lng) : null,
+      geocoded: ok, isHome: true
+    };
+  }
+  function hasHomeCoords(st) {
+    return !!(st && st.settings && hasCoords(st.settings.homeLat, st.settings.homeLng));
+  }
   // Prefer known job lat/lng; fall back to session clock-on fix.
   function stopForSession(session, st) {
     const job = (st.jobs || []).find(j => j.job_id === session.job_id);
@@ -1992,7 +2023,8 @@ const TsTravel = (() => {
       address,
       time_on: session.time_on_rounded || session.time_on || '',
       lat, lng,
-      geocoded: hasCoords(lat, lng)
+      geocoded: hasCoords(lat, lng),
+      isHome: false
     };
   }
   function stopsForDay(daySessions, st) {
@@ -2009,10 +2041,10 @@ const TsTravel = (() => {
     for (let i = 0; i < stops.length - 1; i++) {
       const from = stops[i], to = stops[i + 1];
       if (!from.geocoded || !to.geocoded) {
-        legs.push({ from, to, km: null, method: null, skipped: true });
+        legs.push({ from, to, km: null, method: null, skipped: true, commute: null });
         continue;
       }
-      legs.push({ from, to, km: null, method: null, skipped: false });
+      legs.push({ from, to, km: null, method: null, skipped: false, commute: null });
     }
     return legs;
   }
@@ -2059,10 +2091,35 @@ const TsTravel = (() => {
       });
     });
   }
+  function buildCommuteLegs(jobStops, home) {
+    if (!home.geocoded || !jobStops.length) return [];
+    const first = jobStops[0], last = jobStops[jobStops.length - 1];
+    return [
+      {
+        from: home, to: first, km: null, method: null, skipped: false,
+        commute: 'out', label: `Home → ${first.name}`
+      },
+      {
+        from: last, to: home, km: null, method: null, skipped: false,
+        commute: 'back', label: `${last.name} → Home`
+      }
+    ];
+  }
   async function computeDayTravel(daySessions, st) {
+    const includeCommute = !!(st.settings && st.settings.includeCommute);
     const stops = stopsForDay(daySessions, st);
     const geocoded = stops.filter(s => s.geocoded);
+    const home = homeStop(st);
+    let needsHome = false;
     let legs = buildLegs(stops);
+    if (includeCommute) {
+      if (!home.geocoded) {
+        needsHome = true; // never invent 0 km commute
+      } else if (geocoded.length) {
+        const [out, back] = buildCommuteLegs(geocoded, home);
+        legs = [out, ...legs, back];
+      }
+    }
     const methodLabel = { road: 'road (Distance Matrix)', haversine: 'straight-line (Haversine)' };
     try {
       if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs();
@@ -2078,8 +2135,12 @@ const TsTravel = (() => {
     const price = Number(st.settings.fuelPricePerLitre);
     const litres = (Number.isFinite(eff) && eff > 0) ? totalKm * (eff / 100) : null;
     const cost = (litres != null && Number.isFinite(price) && price >= 0) ? litres * price : null;
+    const mapStops = [];
+    if (includeCommute && home.geocoded) mapStops.push(home);
+    stops.forEach(s => mapStops.push(s));
     return {
       stops, geocoded, legs, totalKm, litres, cost, eff, price,
+      includeCommute, needsHome, home, mapStops, usableCount: usable.length,
       methodSummary: methods.map(m => methodLabel[m] || m).join(' + ') || 'n/a'
     };
   }
@@ -2108,12 +2169,14 @@ const TsTravel = (() => {
     }
     const map = new google.maps.Map(el, { mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoom: 12 });
     const bounds = new google.maps.LatLngBounds();
-    pins.forEach((s, idx) => {
+    let jobIdx = 0;
+    pins.forEach((s) => {
       const pos = { lat: s.lat, lng: s.lng };
+      const labelText = s.isHome ? 'H' : String(++jobIdx);
       const mk = new google.maps.Marker({
         map, position: pos,
         title: s.name,
-        label: { text: String(idx + 1), color: '#111', fontWeight: '700' }
+        label: { text: labelText, color: '#111', fontWeight: '700' }
       });
       const info = new google.maps.InfoWindow({
         content: `<div style="color:#111;font-size:13px;max-width:200px"><strong>${escapeHtml(s.name)}</strong><br>${escapeHtml(s.address || '')}</div>`
@@ -2126,12 +2189,25 @@ const TsTravel = (() => {
   }
   function panelHtml(iso, travel) {
     if (!travel) return `<div class="day-travel" data-day-travel="${iso}"><div class="day-travel-empty">Loading travel…</div></div>`;
-    const { stops, geocoded, legs, totalKm, litres, cost, price, methodSummary } = travel;
+    const {
+      stops, geocoded, legs, totalKm, litres, cost, price, methodSummary,
+      includeCommute, needsHome, mapStops, usableCount
+    } = travel;
     if (!stops.length) {
       return `<div class="day-travel" data-day-travel="${iso}"><div class="day-travel-empty">No shifts to map.</div></div>`;
     }
     let body = '';
-    if (geocoded.length) {
+    body += `<div class="day-travel-commute field row-between">
+      <label style="margin:0;" for="commute-${iso}">Include commute</label>
+      <div class="switch ${includeCommute ? 'on' : ''}"><input type="checkbox" id="commute-${iso}" data-commute-toggle="${iso}" ${includeCommute ? 'checked' : ''}><span class="knob"></span></div>
+    </div>`;
+    if (needsHome) {
+      body += `<div class="day-travel-need-home">Include commute is on, but home has no coordinates yet. Set Home in Settings → Travel &amp; fuel (Here or Maps geocode). Commute km are not counted as 0.
+        <button type="button" class="btn btn-ghost btn-block" data-goto-home-settings>Open Settings</button>
+      </div>`;
+    }
+    const pins = (mapStops && mapStops.length) ? mapStops.filter(s => s.geocoded) : geocoded;
+    if (pins.length) {
       body += `<div class="day-travel-map" data-day-map="${iso}"></div>`;
     } else {
       body += `<div class="day-travel-empty">Jobs listed below have no coordinates — map and km skipped.</div>`;
@@ -2139,14 +2215,17 @@ const TsTravel = (() => {
     }
     if (legs.length) {
       const rows = legs.map(leg => {
-        const label = `${escapeHtml(leg.from.name)} → ${escapeHtml(leg.to.name)}`;
+        const label = leg.label
+          ? escapeHtml(leg.label)
+          : `${escapeHtml(leg.from.name)} → ${escapeHtml(leg.to.name)}`;
         const kmCell = leg.skipped ? 'no coords' : fmtKm(leg.km);
         const tip = leg.method === 'haversine' ? 'straight-line' : (leg.method === 'road' ? 'road' : '');
-        return `<tr><td>${label}</td><td class="leg-km" title="${tip}">${kmCell}</td></tr>`;
+        const rowCls = leg.commute ? ' class="commute-leg"' : '';
+        return `<tr${rowCls}><td>${label}</td><td class="leg-km" title="${tip}">${kmCell}</td></tr>`;
       }).join('');
       body += `<table class="day-travel-legs"><thead><tr><th>Leg</th><th style="text-align:right;">Km</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
-    if (geocoded.length >= 2) {
+    if (usableCount > 0) {
       body += `<div class="day-travel-totals">
         <div><span class="muted">Day km</span><div class="tval">${fmtKm(totalKm)}</div></div>
         <div><span class="muted">Fuel</span><div class="tval">${fmtL(litres)}</div></div>
@@ -2155,13 +2234,18 @@ const TsTravel = (() => {
       const priceBit = (price != null && Number.isFinite(price))
         ? `estimated using $${Number(price).toFixed(2)}/L`
         : 'set a $/L price in Settings → Travel & fuel';
-      body += `<div class="day-travel-meta">Distances: ${escapeHtml(methodSummary)}. Fuel ${priceBit}. Efficiency from Settings (L/100km).</div>`;
-    } else if (geocoded.length === 1) {
-      body += `<div class="day-travel-meta">Only one located job — need 2+ stops for leg km / fuel.</div>`;
+      const commuteBit = includeCommute
+        ? (needsHome ? ' Commute legs pending home coordinates.' : ' Includes Home → first job and last job → Home.')
+        : '';
+      body += `<div class="day-travel-meta">Distances: ${escapeHtml(methodSummary)}. Fuel ${priceBit}. Efficiency from Settings (L/100km).${commuteBit}</div>`;
+    } else if (geocoded.length === 1 && !includeCommute) {
+      body += `<div class="day-travel-meta">Only one located job — need 2+ stops for leg km / fuel, or turn on Include commute with a home location set.</div>`;
+    } else if (geocoded.length === 1 && includeCommute && needsHome) {
+      body += `<div class="day-travel-meta">One located job — set home to estimate commute km / fuel.</div>`;
     }
     return `<div class="day-travel" data-day-travel="${iso}">${body}</div>`;
   }
-  return { computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney };
+  return { computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop };
 })();
 window.TsTravel = TsTravel;
 
@@ -2233,8 +2317,7 @@ window.TsTravel = TsTravel;
       });
     });
     // Hydrate travel panels for currently expanded days (async distance + map).
-    $('day-cards').querySelectorAll('.day-card.expanded[data-day]').forEach(card => {
-      const iso = card.dataset.day;
+    function hydrateDayTravel(iso, card) {
       const daySessions = sessionsForWeek(weekCursor).filter(s => s.date === iso)
         .sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99'));
       if (!daySessions.length) return;
@@ -2248,11 +2331,40 @@ window.TsTravel = TsTravel;
         if (!wrap) return;
         wrap.outerHTML = TsTravel.panelHtml(iso, travel);
         const mapEl = fresh.querySelector(`[data-day-map="${iso}"]`);
-        if (mapEl) TsTravel.renderMap(mapEl, travel.stops);
+        if (mapEl) TsTravel.renderMap(mapEl, travel.mapStops || travel.stops);
+        wireTravelPanel(iso, fresh);
       }).catch(err => {
         console.warn('day travel failed', err);
         if (panel) panel.innerHTML = '<div class="day-travel-empty">Travel details unavailable.</div>';
       });
+    }
+    function wireTravelPanel(iso, card) {
+      const toggle = card.querySelector(`[data-commute-toggle="${iso}"]`);
+      if (toggle && !toggle._tsBound) {
+        toggle._tsBound = true;
+        const sync = () => { const sw = toggle.closest('.switch'); if (sw) sw.classList.toggle('on', toggle.checked); };
+        sync();
+        toggle.addEventListener('change', () => {
+          const on = !!toggle.checked;
+          sync();
+          saveSettings({ includeCommute: on });
+          if (on && !TsTravel.hasHomeCoords(getState())) {
+            toast('Set your home address in Settings → Travel & fuel');
+          }
+          hydrateDayTravel(iso, card);
+        });
+      }
+      card.querySelectorAll('[data-goto-home-settings]').forEach(btn => {
+        if (btn._tsBound) return;
+        btn._tsBound = true;
+        btn.addEventListener('click', () => {
+          if (typeof showView === 'function') showView('settings');
+          toast('Set Home under Travel & fuel');
+        });
+      });
+    }
+    $('day-cards').querySelectorAll('.day-card.expanded[data-day]').forEach(card => {
+      hydrateDayTravel(card.dataset.day, card);
     });
   }
 
@@ -2397,6 +2509,101 @@ window.TsTravel = TsTravel;
       catch (e2) { return false; }
     }
   }
+  function updateHomeStatus(settings) {
+    const el = $('s-homeStatus'); if (!el) return;
+    const lat = settings.homeLat, lng = settings.homeLng;
+    const ok = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    if (ok) {
+      el.textContent = `Coordinates saved (${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}).`;
+      el.classList.add('ok');
+    } else if ((settings.homeAddress || '').trim()) {
+      el.textContent = 'Address saved but not geocoded yet — tap Here or re-select from suggestions.';
+      el.classList.remove('ok');
+    } else {
+      el.textContent = 'No coordinates yet — use Here or pick an address.';
+      el.classList.remove('ok');
+    }
+  }
+  async function geocodeHomeAddress(addr) {
+    addr = (addr || '').trim();
+    if (!addr) {
+      saveSettings({ homeAddress: '', homeLat: null, homeLng: null });
+      updateHomeStatus(getState().settings);
+      return;
+    }
+    saveSettings({ homeAddress: addr });
+    try {
+      if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs();
+      if (!(window.google && google.maps && google.maps.Geocoder)) throw new Error('no geocoder');
+      const geocoder = new google.maps.Geocoder();
+      const res = await geocoder.geocode({ address: addr, region: 'au' });
+      const r0 = (res && res.results && res.results[0]) || null;
+      if (!r0 || !r0.geometry || !r0.geometry.location) {
+        toast('Could not geocode that address — try Here or pick a suggestion');
+        updateHomeStatus(getState().settings);
+        return;
+      }
+      const lat = r0.geometry.location.lat();
+      const lng = r0.geometry.location.lng();
+      const formatted = r0.formatted_address || addr;
+      const input = $('s-homeAddress');
+      if (input) input.value = formatted;
+      saveSettings({ homeAddress: formatted, homeLat: lat, homeLng: lng });
+      updateHomeStatus(getState().settings);
+      toast('Home location saved');
+    } catch (e) {
+      console.warn('home geocode failed', e);
+      toast('Could not geocode home address');
+      updateHomeStatus(getState().settings);
+    }
+  }
+  function wireHomeLocation(settings) {
+    const input = $('s-homeAddress');
+    const btn = $('s-homeHere');
+    if (!input) return;
+    input.value = settings.homeAddress || '';
+    updateHomeStatus(settings);
+    if (btn && window.NDHere && !btn._tsHomeBound) {
+      btn._tsHomeBound = true;
+      NDHere.attachButton(btn, input, {
+        region: 'au', busyLabel: 'Locating…',
+        mapsKey: (window.TIMESHEET_CONFIG || {}).mapsKey,
+        notify: (msg) => toast(msg),
+        onResult(address, coords) {
+          saveSettings({
+            homeAddress: address || input.value,
+            homeLat: coords && coords.lat,
+            homeLng: coords && coords.lng
+          });
+          updateHomeStatus(getState().settings);
+          toast('Home location saved');
+        }
+      });
+    }
+    if (!input._tsHomeBound) {
+      input._tsHomeBound = true;
+      input.addEventListener('change', () => { geocodeHomeAddress(input.value); });
+    }
+    if (window.TsGeo && TsGeo.loadMapsJs) {
+      TsGeo.loadMapsJs().then(() => {
+        if (window.NDAutocomplete && !input._ndAcBound) {
+          NDAutocomplete.attach(input, {
+            country: 'au',
+            onSelect(place) {
+              if (!place || !place.geometry || !place.geometry.location) return;
+              const lat = place.geometry.location.lat();
+              const lng = place.geometry.location.lng();
+              const addr = place.formatted_address || input.value;
+              input.value = addr;
+              saveSettings({ homeAddress: addr, homeLat: lat, homeLng: lng });
+              updateHomeStatus(getState().settings);
+              toast('Home location saved');
+            }
+          });
+        }
+      }).catch(() => {});
+    }
+  }
   function bindText(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: el.value })); }
   function bindNumber(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: parseFloat(el.value) || 0 })); }
   function bindSelect(id, key, settings) { const el = $(id); el.value = settings[key] ?? ''; if (el._tsBound) return; el._tsBound = true; el.addEventListener('change', () => saveSettings({ [key]: el.value })); }
@@ -2409,6 +2616,8 @@ window.TsTravel = TsTravel;
     bindSelect('s-mapApp', 'mapApp', s);
     bindNumber('s-fuelLPer100km', 'fuelLPer100km', s);
     bindNumber('s-fuelPricePerLitre', 'fuelPricePerLitre', s);
+    wireHomeLocation(s);
+    bindToggle('s-includeCommute', () => !!s.includeCommute, v => saveSettings({ includeCommute: v }));
     bindText('s-standardClockOn', 'standardClockOn', s); bindText('s-standardClockOff', 'standardClockOff', s);
     bindNumber('s-otThresholdDay', 'otThresholdDay', s); bindNumber('s-otThresholdWeek', 'otThresholdWeek', s); bindNumber('s-otMultiplier', 'otMultiplier', s);
     $('s-roundingMin').value = String(s.roundingMin ?? 30);
