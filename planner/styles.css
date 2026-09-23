@@ -591,6 +591,11 @@ textarea:focus {
   overflow: hidden;
 }
 
+.canvas-shell,
+.canvas-viewport {
+  touch-action: none;
+}
+
 .canvas-viewport {
   position: absolute;
   inset: 0;
@@ -599,7 +604,8 @@ textarea:focus {
   touch-action: none;
 }
 
-.canvas-viewport.is-dragging {
+.canvas-viewport.is-dragging,
+.canvas-viewport.is-gesturing {
   cursor: grabbing;
 }
 
@@ -610,7 +616,16 @@ textarea:focus {
   width: min(1440px, 96%);
   aspect-ratio: 16 / 10;
   transform-origin: center center;
+  touch-action: none;
+  /* No always-on transition — it fights live pinch/pan. Buttons add .is-animating. */
+}
+
+.plan-stage.is-animating {
   transition: transform 0.12s ease-out;
+}
+
+.canvas-viewport.is-gesturing .plan-stage {
+  transition: none;
 }
 
 .floor-plan {
@@ -622,11 +637,13 @@ textarea:focus {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.38);
   user-select: none;
   pointer-events: none;
+  touch-action: none;
 }
 
 .node-layer {
   position: absolute;
   inset: 0;
+  touch-action: none;
 }
 
 .node-marker {
