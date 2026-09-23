@@ -1,5 +1,5 @@
 /* =========================================================================
- *  NeillPlanner v0.9.2
+ *  NeillPlanner v0.9.4
  *  Centralised Drive: all files live in primaryOwnerEmail's Drive.
  *  Other users (added via Settings -> Team Access) share the folder.
  *  Login is mandatory.
@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.9.3";
+const APP_VERSION = "0.9.4";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -506,6 +506,23 @@ function resolveInitialRoomId(position) {
 }
 function clearRoomDraw() {
   state.roomDraw = { mode: null, points: [], roomId: null };
+}
+
+function dismissModal() {
+  state.modal = null;
+  // P0-1: close-modal / Escape must not wipe in-progress room geometry.
+  // Keep pendingShape and restore draw mode so Done reopens the name modal; only
+  // clearRoomDraw (Cancel/Discard) or successful save clears it.
+  if (state.roomDraw?.pendingShape) {
+    const existing = (state.roomDraw.points || []).map((p) => [...p]);
+    const fromShape = (parseRoomShape(state.roomDraw.pendingShape)?.pts || []).map((p) => [...p]);
+    state.roomDraw = {
+      mode: "poly",
+      points: existing.length ? existing : fromShape,
+      roomId: null,
+      pendingShape: state.roomDraw.pendingShape
+    };
+  }
 }
 function startRoomDraw(mode, roomId = null) {
   const fl = currentFloor();
@@ -3322,6 +3339,7 @@ function renderPrintPreviewModal() {
       <div class="modal-body">
         <div class="print-page" id="printPage">${body}</div>
       </div>
+      ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Photo-heavy jobs: use <strong>Save PDF to Drive</strong> (capped) — browser Print can choke on large reports.</p>` : ""}
       <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
     </div>`;
 }
@@ -3722,7 +3740,7 @@ function handleAction(event) {
       flashStageAnimating();
       return;
     case "close-drawer": state.drawerOpen = false; persist(); return render();
-    case "close-modal": state.modal = null; if (state.roomDraw?.pendingShape) state.roomDraw = { mode: null, points: [], roomId: null }; return render();
+    case "close-modal": dismissModal(); return render();
     case "close-lightbox": state.lightbox = null; return render();
     case "edit-node": state.modal = { mode: "edit" }; return render();
     case "bulk-photo-picker": state.modal = { mode: "bulk-photo-picker" }; return render();
@@ -3927,9 +3945,15 @@ function bindMarkerDrag() {
         if (node) {
           node.position.x = Number(node.position.x.toFixed(1));
           node.position.y = Number(node.position.y.toFixed(1));
+          const prevRoomId = node.roomId || "";
+          const nextRoomId = resolveInitialRoomId(node.position) || "";
+          node.roomId = nextRoomId || null;
           node.updatedAt = nowStamp();
           persist();
           logAudit("Node Moved", { nodeId: node.id, details: `to ${node.position.x},${node.position.y}` });
+          if (nextRoomId !== prevRoomId) {
+            toast(nextRoomId ? `Room → ${roomName(nextRoomId) || roomLabel(nextRoomId)}` : "Moved outside room");
+          }
         }
       }
     });
@@ -4424,8 +4448,8 @@ function followPortal() {
   const linkedRoomId = node.linkedRoomId;
   selectProject(target.id);
   if (linkedFloorId) state.selectedFloorId = linkedFloorId;
-  // Floor layer jump: reset room filter to All (prefer clear layer context).
-  state.selectedRoomId = "all";
+  // P0-3 / P1: honour linkedRoomId when following a portal (don't force All).
+  state.selectedRoomId = linkedRoomId || "all";
   if (linkedNodeId) { state.selectedNodeId = linkedNodeId; state.drawerOpen = true; state.activeView = "map"; }
   else { state.selectedNodeId = null; state.drawerOpen = false; state.activeView = "map"; }
   persist(); render();
@@ -4959,7 +4983,7 @@ function hydrateFromHash() {
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
-    if (state.modal) { state.modal = null; if (state.roomDraw?.pendingShape) clearRoomDraw(); render(); }
+    if (state.modal) { dismissModal(); render(); }
     else if (state.roomDraw?.mode) { clearRoomDraw(); render(); }
     else if (state.massMode.active) { stopMassMode(); }
     else if (state.drawerOpen) { state.drawerOpen = false; render(); }
