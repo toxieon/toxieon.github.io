@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'timesheet-v11';
+const CACHE_VERSION = 'timesheet-v12';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
