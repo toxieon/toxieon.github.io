@@ -1,9 +1,9 @@
 /* Timesheet Live — public, read-only view of Brandon's current week.
  *
- * Gate: same flow as Neill Quote — the passcode is SHA-256'd in the browser
- * and checked by an Apps Script backend (never shipped to the page). A good
- * code returns a short-lived session token; polling uses the token, so the
- * code isn't re-sent every refresh. No Google sign-in, no write access, no
+ * Gate: the passcode is sent over HTTPS to the Neill Data Backend (Apps
+ * Script) and checked there against peppered hashes — nothing is hashed or
+ * compared in the browser, and neither the code nor any hash is stored here.
+ * A good code returns a session token (14 h); polling uses the token. No Google sign-in, no write access, no
  * editing controls: the backend only ever returns the sanitized week snapshot. */
 (function () {
   'use strict';
@@ -14,7 +14,7 @@
   const REMEMBER_HOURS = 14;              // like Quote: stay unlocked for the working day
   const $ = (id) => document.getElementById(id);
 
-  let session = loadSession();            // { token, codeHash, label }
+  let session = loadSession();            // { token, label }
   let snap = null, fetchedAt = 0, pollTimer = null, tickTimer = null, inflight = false, rendered = false, lastErr = '';
 
   /* ── helpers ── */
@@ -35,24 +35,11 @@
     let a = t(on), b = t(off); if (b < a) b += 1440; return Math.round(((b - a) / 60) * 100) / 100;
   }
   function h2(n) { return (Number(n) || 0).toFixed(2); }
-  async function sha256Hex(str) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(str)));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  function fingerprint() {   // same per-device key Quote uses, only for the backend rate limiter
-    const KEY = 'nd_device_fp_v1';
-    let fp = null; try { fp = localStorage.getItem(KEY); } catch (e) {}
-    if (!fp) {
-      fp = 'fp-' + Date.now().toString(36) + '-' + Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('');
-      try { localStorage.setItem(KEY, fp); } catch (e) {}
-    }
-    return fp;
-  }
   function loadSession() {
     try {
-      if (window.NDRemember) { const d = NDRemember.load(SESSION_KEY); return d && d.codeHash ? d : null; }
+      if (window.NDRemember) { const d = NDRemember.load(SESSION_KEY); return d && d.token && !d.codeHash ? d : null; }
       const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-      return s && s.codeHash && Date.now() - s.at < REMEMBER_HOURS * 3600e3 ? s : null;
+      return s && s.token && !s.codeHash && Date.now() - s.at < REMEMBER_HOURS * 3600e3 ? s : null;
     } catch (e) { return null; }
   }
   function saveSession(s) {
@@ -93,10 +80,10 @@
       setTimeout(tick, 500);
     })();
   }
-  async function login(codeHash, silent) {
-    const data = await call({ action: 'tsl_login', codeHash, fingerprint: fingerprint() });
+  async function login(code) {
+    const data = await call({ action: 'tsl_login', code });
     if (data && data.ok && data.token) {
-      saveSession({ token: data.token, codeHash, label: data.label || '' });
+      saveSession({ token: data.token, label: data.label || '' });
       applyFeed(data.feed); showApp(); schedulePoll();
       return { ok: true };
     }
@@ -108,7 +95,7 @@
     if (!code) return;
     $('lock-err').textContent = ''; setBusy(true);
     try {
-      const res = await login(await sha256Hex(code), false);
+      const res = await login(code);
       if (res.ok) return;
       const d = res.data;
       if (d.cooldownMs) { startCooldown(d.cooldownMs); $('passcode-input').value = ''; return; }
@@ -135,9 +122,8 @@
       const data = await call({ action: 'tsl_get', token: session.token });
       if (data && data.ok) { lastErr = ''; applyFeed(data.feed); }
       else if (data && data.reauth) {
-        // token expired (6h) → silently re-unlock with the remembered code
-        const res = await login(session.codeHash, true);
-        if (!res.ok) { clearSession(); showLock(res.data.cooldownMs ? 'Too many attempts — try again shortly.' : 'Please enter your passcode again.'); }
+        // session expired or code revoked → ask again (no code/hash is kept on the device)
+        clearSession(); snap = null; rendered = false; showLock('Please enter your passcode again.');
       } else { lastErr = (data && data.error) || 'Update failed'; renderClockAndStatus(); }
     } catch (e) { lastErr = 'Offline — retrying'; renderClockAndStatus(); }
     finally { inflight = false; schedulePoll(); }
@@ -220,7 +206,7 @@
 
   /* ── boot ── */
   $('lock-form').addEventListener('submit', onSubmit);
-  $('btn-lock').addEventListener('click', () => { clearSession(); snap = null; rendered = false; showLock(''); });
+  $('btn-lock').addEventListener('click', () => { if (session) call({ action: 'tsl_logout', token: session.token }).catch(() => {}); clearSession(); snap = null; rendered = false; showLock(''); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { clearTimeout(pollTimer); pollTimer = null; }
     else if (session && !$('app').hidden) refresh();   // immediate refresh on return
