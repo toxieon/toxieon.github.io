@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0d0d0d" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="referrer" content="no-referrer" />
+<title>Timesheet Live — Neill Data</title>
+<link rel="icon" href="../timesheet/assets/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="../timesheet/assets/icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="live.css" />
+<script src="../assets/remember.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+
+<!-- LOCK (same flow as Neill Quote: passcode → server-side check) -->
+<div id="lock-screen" class="lock-screen">
+  <form class="lock-card" id="lock-form" autocomplete="off">
+    <div class="lock-mark">ND</div>
+    <h1>Timesheet Live</h1>
+    <p id="lock-sub">Enter your passcode</p>
+    <input type="password" id="passcode-input" class="lock-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Passcode" />
+    <div class="lock-err" id="lock-err" role="alert"></div>
+    <button class="btn btn-primary btn-block" id="passcode-submit" type="submit">Unlock</button>
+  </form>
+</div>
+
+<!-- READ-ONLY WEEK VIEW -->
+<main id="app" class="page" hidden>
+  <header class="live-head">
+    <div>
+      <div class="page-title" id="live-title">Timesheet</div>
+      <div class="live-status"><span class="live-dot" id="live-dot"></span><span id="live-updated">Loading…</span></div>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btn-lock" type="button" aria-label="Lock">🔒 Lock</button>
+  </header>
+  <div class="week-nav"><div><div class="week-label" id="wk-label">—</div><div class="week-sub" id="wk-sub">This week</div></div></div>
+  <div id="notice" class="live-notice" hidden></div>
+  <div id="on-clock" class="card on-clock" hidden></div>
+  <div id="day-cards"></div>
+  <div class="week-summary">
+    <div><div class="muted lbl">TOTAL</div><div class="mono" id="wk-total">0.00 hrs</div></div>
+    <div><div class="muted lbl">OT</div><div class="mono" id="wk-ot">0.00 hrs</div></div>
+    <div><div class="muted lbl">DAYS</div><div class="mono" id="wk-days">0</div></div>
+  </div>
+  <p class="live-foot muted">Read-only live view · refreshes automatically</p>
+</main>
+
+<script src="live.js"></script>
+</body>
+</html>
