@@ -218,6 +218,34 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .nudge-card { border-color:var(--on-glow); background:linear-gradient(135deg, rgba(58,184,122,0.14), var(--surface)); margin:14px 0 0; width:100%; max-width:420px; }
 .icon-x { background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; min-width:44px; min-height:44px; }
 
+/* ── Saved-location picker (map pins + searchable list) ── */
+.lp-row { display:flex; gap:8px; margin-top:8px; }
+.lp-row .btn { flex:1; min-height:44px; text-transform:none; letter-spacing:0; font-size:13px; }
+.lp-picked { margin-top:8px; font-size:12.5px; color:var(--on-accent); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.lp-picked[hidden] { display:none; }
+.lp-unpick { color:var(--text-muted); min-width:32px; min-height:32px; font-size:14px; }
+.lp-backdrop { z-index:90; }
+.lp-sheet { display:flex; flex-direction:column; height:86vh; height:86dvh; max-height:none; overflow:hidden; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+.lp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.lp-search { width:100%; font-size:16px; min-height:46px; margin-bottom:10px; }  /* 16px stops iOS zoom-on-focus */
+.lp-seg { flex:none; }
+.lp-list { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:8px; }
+.lp-list[hidden], .lp-mapwrap[hidden], .lp-card[hidden] { display:none !important; }
+.lp-item { text-align:left; padding:12px 14px; min-height:52px; background:rgba(255,255,255,0.04); border:1px solid transparent; border-radius:10px; display:flex; flex-direction:column; gap:2px; width:100%; }
+.lp-item:active { border-color:var(--on-primary); background:rgba(58,184,122,0.10); }
+.lp-item .pname { font-weight:500; }
+.lp-item .paddr { font-size:12px; color:var(--text-muted); }
+.lp-meta { font-size:11px; color:var(--text-muted); }
+.lp-empty { color:var(--text-muted); font-size:13px; text-align:center; padding:24px 8px; }
+.lp-mapwrap { flex:1; display:flex; flex-direction:column; min-height:0; position:relative; }
+.lp-map { flex:1; min-height:240px; border-radius:12px; overflow:hidden; background:#12141a; }
+.lp-mapnote { font-size:11.5px; margin-top:6px; }
+.lp-card { position:absolute; left:8px; right:8px; bottom:30px; display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--on-glow); border-radius:14px; padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,0.55); }
+.lp-card-main { flex:1; min-width:0; }
+.lp-card-name { font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; }
+.lp-card-addr { font-size:12px; overflow:hidden; text-overflow:ellipsis; }
+.lp-card .btn { flex:none; min-height:44px; }
+
 @media print { .tabbar, .nd-sync-tube, .nd-sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
 .settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
@@ -431,6 +459,11 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
           <select id="s-preferredMailApp"><option>Gmail</option><option>Outlook (web)</option><option>Apple / default mail</option><option>Just copy</option></select>
         </div>
         <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email.</p>
+      </div>
+      <div class="card">
+        <div class="row-between"><div style="font-weight:500;">Timesheet Live</div><a href="../timesheetlive/" target="_blank" rel="noopener" style="font-size:13px; color:var(--on-accent);">Open ↗</a></div>
+        <p class="muted" style="font-size:12px; margin:6px 0 10px;">Your current week is published read-only to /timesheetlive (passcode-gated) each time you save, while signed in with your main Google account.</p>
+        <div class="row-between"><span class="muted" id="live-pub-status" style="font-size:12px;">—</span><button class="btn btn-ghost btn-sm" id="btn-live-publish" type="button">Publish now</button></div>
       </div>
     </div>
     <div class="settings-section">
@@ -921,7 +954,7 @@ function loadState() {
     return Object.assign(DEFAULT_STATE(), parsed, { settings: Object.assign(DEFAULT_STATE().settings, parsed.settings || {}) });
   } catch (e) { console.warn('loadState failed', e); return DEFAULT_STATE(); }
 }
-function saveState() { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+function saveState() { localStorage.setItem(STATE_KEY, JSON.stringify(state)); if (window.TsLive) TsLive.schedule(); }
 function getState() { return state; }
 // Identity for the `user` column + per-user sheet tabs: the signed-in Google
 // account, falling back to the stored current user, then "Brandon".
@@ -1733,29 +1766,112 @@ window.TsNotifications = TsNotifications;
 
 /* ----- EXPORT LOGIC ----- */
 const TsExport = (() => {
-  function formatWeekPreview(weekStart) {
-    const st = getState(); const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
-    const sessions = sessionsForWeek(start); const staticDays = staticDaysForWeek(start); const lines = [];
+  const RULE = '────────────────────────────';
+  // 7 → "7 hrs", 7.5 → "7.5 hrs", 1 → "1 hr", 7.25 → "7.25 hrs". Never NaN.
+  function fmtHrs(h) {
+    let n = Math.round((Number(h) || 0) * 100) / 100;
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    const txt = String(n);            // String() already drops trailing zeros
+    return txt + (n === 1 ? ' hr' : ' hrs');
+  }
+  function cleanName(s, fallback) {
+    const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return (!t || /^(undefined|null|nan)$/i.test(t)) ? fallback : t;
+  }
+  function fmtT(hhmmStr, use24) { const t = fmtTime(hhmmStr || '', use24); return t || '—'; }
+  function fmtDayLabel(day) {
+    return new Date(day).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '');
+  }
+  function fmtRange(start) {
+    const end = addDays(start, 6);
+    const y = end.getFullYear();
+    return `${fmtDayLabel(start)} – ${fmtDayLabel(end)} ${y}`;
+  }
+  // "Neill, Brandon" → "Brandon Neill". Falls back to the Google profile name.
+  function exporterName(st) {
+    const raw = cleanName(st.settings.payslip && st.settings.payslip.employee, '');
+    if (raw) {
+      const m = raw.match(/^([^,]+),\s*(.+)$/);
+      return m ? `${m[2].trim()} ${m[1].trim()}` : raw;
+    }
+    const p = (window.TsSheets && TsSheets.getProfile && TsSheets.getProfile()) || null;
+    return cleanName(p && p.name, '');
+  }
+  /* Structured week model shared by the text export (and print, which prints
+   * the same text). Totals here always equal the History week totals. */
+  function buildWeekModel(weekStart) {
+    const st = getState(); const use24 = st.settings.use24hr !== false;
+    const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const sessions = sessionsForWeek(start); const staticDays = staticDaysForWeek(start);
+    const days = []; const sites = new Map();
+    const addSite = (name, hrs) => {
+      const key = name.toLowerCase();
+      const cur = sites.get(key) || { name, hours: 0, days: new Set() };
+      cur.hours += hrs; sites.set(key, cur); return cur;
+    };
     for (let i = 0; i < 7; i++) {
       const day = addDays(start, i); const iso = isoDate(day);
-      const daySessions = sessions.filter(s => s.date === iso).sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99')); const dayStatic = staticDays.filter(sd => sd.date === iso);
+      const daySessions = sessions.filter(s => s.date === iso).sort((a, b) => (a.time_on_rounded || a.time_on || '99:99').localeCompare(b.time_on_rounded || b.time_on || '99:99'));
+      const dayStatic = staticDays.filter(sd => sd.date === iso);
       if (!daySessions.length && !dayStatic.length) continue;
-      lines.push(`${dayOfWeek(day)} ${fmtDateHeader(day)}`);
-      let dayTotal = 0, dayOt = 0;
-      daySessions.forEach(s => { lines.push(`${s.job_name}  ${fmtTime(s.time_on_rounded, st.settings.use24hr)} -> ${fmtTime(s.time_off_rounded, st.settings.use24hr)}`); dayTotal += parseFloat(s.total_hours) || 0; dayOt += parseFloat(s.overtime_hours) || 0; });
-      dayStatic.forEach(sd => { lines.push(`${sd.template.name} (${sd.template.type})  ${fmtTime(sd.template.clock_on, st.settings.use24hr)} -> ${fmtTime(sd.template.clock_off, st.settings.use24hr)}`); dayTotal += hoursBetween(sd.template.clock_on, sd.template.clock_off); });
-      lines.push(`Total: ${dayTotal.toFixed(2)} hrs  |  OT: ${dayOt.toFixed(2)} hrs`); lines.push('');
+      const rows = []; let total = 0, ot = 0, breakMin = 0;
+      daySessions.forEach(s => {
+        const job = (st.jobs || []).find(j => j.job_id && j.job_id === s.job_id);
+        const hrs = parseFloat(s.total_hours) || 0;
+        const name = cleanName(s.job_name, '') || cleanName(job && job.job_name, '') || cleanName(s.address_confirmed, '') || 'Unnamed job';
+        total += hrs; ot += parseFloat(s.overtime_hours) || 0; breakMin += sessionBreakMinutes(s);
+        rows.push({ name, on: fmtT(s.time_on_rounded || s.time_on, use24), off: fmtT(s.time_off_rounded || s.time_off, use24), hours: hrs, breakMin: sessionBreakMinutes(s) });
+        addSite(name, hrs).days.add(iso);
+      });
+      dayStatic.forEach(sd => {
+        const hrs = hoursBetween(sd.template.clock_on, sd.template.clock_off) || 0;
+        const name = cleanName(sd.template.name, 'Static day') + (sd.template.type ? ` (${cleanName(sd.template.type, '')})` : '');
+        total += hrs;
+        rows.push({ name, on: fmtT(sd.template.clock_on, use24), off: fmtT(sd.template.clock_off, use24), hours: hrs, isStatic: true });
+        addSite(name, hrs).days.add(iso);
+      });
+      days.push({ iso, day, label: fmtDayLabel(day).toUpperCase(), rows, total: Math.round(total * 100) / 100, ot: Math.round(ot * 100) / 100, breakMin });
     }
     const totals = weekTotals(sessions, staticDays);
-    lines.push(`Week Total: ${totals.total.toFixed(2)} hrs  |  OT: ${totals.ot.toFixed(2)} hrs`);
+    const siteList = Array.from(sites.values())
+      .map(s => ({ name: s.name, hours: Math.round(s.hours * 100) / 100, dayCount: s.days.size }))
+      .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+    return { start, range: fmtRange(start), name: exporterName(st), employer: cleanName(st.settings.employerName, ''), days, sites: siteList, totals, dayCount: days.length };
+  }
+  function formatWeekPreview(weekStart) {
+    const m = buildWeekModel(weekStart);
+    const lines = [];
+    lines.push(m.name ? `TIMESHEET — ${m.name}` : 'TIMESHEET');
+    lines.push(`Week: ${m.range}`);
+    if (m.employer) lines.push(`Employer: ${m.employer}`);
+    lines.push(RULE);
+    if (!m.days.length) { lines.push(''); lines.push('No hours logged this week.'); return lines.join('\n'); }
+    m.days.forEach(d => {
+      lines.push('');
+      lines.push(d.label);
+      d.rows.forEach(r => lines.push(`  ${r.on}–${r.off}  ·  ${r.name}  ·  ${fmtHrs(r.hours)}`));
+      const extras = [];
+      if (d.breakMin > 0) extras.push(`break ${d.breakMin} min`);
+      if (d.ot > 0) extras.push(`OT ${fmtHrs(d.ot)}`);
+      lines.push(`  Day total: ${fmtHrs(d.total)}${extras.length ? '  (' + extras.join(', ') + ')' : ''}`);
+    });
+    lines.push('');
+    lines.push(RULE);
+    lines.push('WEEKLY SUMMARY — HOURS BY SITE');
+    lines.push('');
+    m.sites.forEach(s => lines.push(`  ${s.name} — ${fmtHrs(s.hours)}${s.dayCount > 1 ? ` (${s.dayCount} days)` : ''}`));
+    lines.push(RULE);
+    lines.push(`TOTAL: ${fmtHrs(m.totals.total)}  ·  ${m.dayCount} day${m.dayCount === 1 ? '' : 's'}${m.totals.ot > 0 ? `  ·  OT ${fmtHrs(m.totals.ot)}` : ''}`);
     return lines.join('\n');
   }
   /* §5.2 — plain-text timesheet payload for the clipboard (+ optional mail). */
   function buildTimesheetText(weekStart) {
-    const st = getState();
-    const greeting = `Hi ${st.settings.recipientName || 'there'}, please find my timesheet for the week below.`;
-    const body = greeting + '\n\n' + formatWeekPreview(weekStart);
-    const subject = `Timesheet — Week of ${isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek))}`;
+    const st = getState(); const m = buildWeekModel(weekStart);
+    const recipient = cleanName(st.settings.recipientName, '');
+    const greeting = `Hi ${recipient || 'there'},\n\nPlease find my timesheet for the week of ${m.range} below.`;
+    const signOff = m.name ? `\n\nThanks,\n${m.name}` : '\n\nThanks';
+    const body = greeting + '\n\n' + formatWeekPreview(weekStart) + signOff;
+    const subject = `Timesheet${m.name ? ' — ' + m.name : ''} — w/c ${fmtDayLabel(m.start)} ${m.start.getFullYear()}`;
     return { to: st.settings.recipientEmail || '', subject, body };
   }
   /* §5.4 — compose-window URL for the chosen mail app. Body is deliberately NOT
@@ -1801,9 +1917,96 @@ const TsExport = (() => {
   }
   function csvCell(v) { const s = String(v ?? ''); return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
   function printPdf() { window.print(); }
-  return { formatWeekPreview, buildTimesheetText, composeMailUrl, copyTimesheet, openInMail, exportCsv, printPdf };
+  return { formatWeekPreview, buildTimesheetText, buildWeekModel, fmtHrs, exporterName: () => exporterName(getState()), composeMailUrl, copyTimesheet, openInMail, exportCsv, printPdf };
 })();
 window.TsExport = TsExport;
+
+/* ----- TIMESHEET LIVE PUBLISHER (/timesheetlive) -----
+ * After every local save (debounced), the PRIMARY account's app writes a
+ * sanitized snapshot of the CURRENT week into the `live_snapshot` tab of its
+ * own private Timesheet-Data spreadsheet, using the Google sign-in it already
+ * has. The public /timesheetlive page never touches Google directly: it asks
+ * the Timesheet Live Apps Script (timesheetlive/apps-script/Code.gs), which
+ * checks the passcode server-side and returns only this snapshot.
+ * Payload = display fields only: job names, rounded times, hours, OT, break
+ * minutes, static-day names, week totals, in-progress shift start. No
+ * addresses, coordinates, notes, emails, pay rates or other users' rows. */
+const TsLive = (() => {
+  const TAB = 'live_snapshot';
+  const DEBOUNCE_MS = 4000;
+  const LAST_KEY = 'ts_live_last_v1';
+  let timer = null, busy = false, again = false, tabReady = false;
+  const primary = () => String((window.TIMESHEET_CONFIG || {}).primaryUserEmail || '').toLowerCase();
+  function isPrimarySignedIn() {
+    if (!(window.TsSheets && TsSheets.isReady && TsSheets.isReady())) return false;
+    const email = String((TsSheets.getProfile && TsSheets.getProfile() && TsSheets.getProfile().email) || '').toLowerCase();
+    return !!email && email === primary();   // only Brandon's own standard tabs ever get published
+  }
+  function hrs(v) { const n = Math.round((parseFloat(v) || 0) * 100) / 100; return Number.isFinite(n) ? n : 0; }
+  function buildSnapshot(now) {
+    now = now || new Date();
+    const st = getState(); const s = st.settings;
+    const start = startOfWeek(now, s.firstDayOfWeek);
+    const sessions = sessionsForWeek(start); const staticDays = staticDaysForWeek(start);
+    const totals = weekTotals(sessions, staticDays);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i); const iso = isoDate(day);
+      const ds = sessions.filter(x => x.date === iso).sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99'));
+      const dst = staticDays.filter(x => x.date === iso);
+      if (!ds.length && !dst.length) continue;
+      let total = 0, ot = 0;
+      const rows = ds.map(x => { const h = hrs(x.total_hours); total += h; ot += hrs(x.overtime_hours); const jb = (st.jobs || []).find(j => j.job_id && j.job_id === x.job_id); return { job: String(x.job_name || (jb && jb.job_name) || 'Job').slice(0, 120), on: x.time_on_rounded || '', off: x.time_off_rounded || '', hrs: h, brk: sessionBreakMinutes(x) }; });
+      const stat = dst.map(x => { const h = hoursBetween(x.template.clock_on, x.template.clock_off) || 0; total += h; return { name: String(x.template.name || 'Static day').slice(0, 80), type: String(x.template.type || '').slice(0, 40), on: x.template.clock_on || '', off: x.template.clock_off || '' }; });
+      days.push({ date: iso, dow: dayOfWeek(day), rows, stat, total: Math.round(total * 100) / 100, ot: Math.round(ot * 100) / 100, worked: ds.length > 0 });
+    }
+    const cs = st.currentSession && st.currentSession.date && st.currentSession.date >= isoDate(start) ? st.currentSession : null;
+    return {
+      v: 1,
+      generatedAt: new Date().toISOString(),
+      owner: (window.TsExport && TsExport.exporterName && TsExport.exporterName()) || 'Brandon',
+      weekStart: isoDate(start), weekEnd: isoDate(addDays(start, 6)),
+      display: { use24hr: s.use24hr !== false, otThresholdDay: Number(s.otThresholdDay) || 8, interactiveTimes: s.interactiveTimes !== false, lowVisColours: !!s.lowVisColours },
+      totals: { total: totals.total, ot: totals.ot, days: new Set(sessions.map(x => x.date)).size },
+      days,
+      onClock: cs ? { job: String(cs.job_name || 'Job').slice(0, 120), date: cs.date, on: cs.time_on || '', onRounded: cs.time_on_rounded || '' } : null
+    };
+  }
+  async function ensureTab(spreadsheetId) {
+    if (tabReady) return;
+    const meta = await gapi.client.sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties.title' });
+    const have = (meta.result.sheets || []).some(x => x.properties.title === TAB);
+    if (!have) await gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId, resource: { requests: [{ addSheet: { properties: { title: TAB } } }] } });
+    tabReady = true;
+  }
+  async function publish() {
+    if (busy) { again = true; return false; }
+    if (!navigator.onLine || !isPrimarySignedIn()) return false;
+    const snap = buildSnapshot();
+    const cmp = JSON.stringify(Object.assign({}, snap, { generatedAt: '' }));
+    if (localStorage.getItem(LAST_KEY) === cmp) return true;   // nothing changed since the last publish
+    busy = true;
+    try {
+      const spreadsheetId = TsSheets.spreadsheetId;
+      await ensureTab(spreadsheetId);
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId, range: `${TAB}!A1:D2`, valueInputOption: 'RAW',
+        resource: { values: [['snapshot_json', 'updated_at', 'week_start', 'note'], [JSON.stringify(snap), snap.generatedAt, snap.weekStart, 'Written by the Timesheet app for /timesheetlive. Do not edit.']] }
+      });
+      localStorage.setItem(LAST_KEY, cmp);
+      localStorage.setItem('ts_live_last_at_v1', JSON.stringify(snap.generatedAt));
+      return true;
+    } catch (e) { console.warn('timesheet live publish failed', e); tabReady = false; return false; }
+    finally { busy = false; if (again) { again = false; schedule(); } }
+  }
+  function schedule(delay) { clearTimeout(timer); timer = setTimeout(publish, delay == null ? DEBOUNCE_MS : delay); }
+  // Week rolls over / clocked-on shift ticks into a new week without a save → re-check every 10 min while open.
+  setInterval(() => { if (!document.hidden) publish(); }, 10 * 60 * 1000);
+  window.addEventListener('online', () => schedule(1500));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(1500); });
+  return { buildSnapshot, publish, schedule };
+})();
+window.TsLive = TsLive;
 
 /* ===== VIEW MODULES ===== */
 window.Views = {};
@@ -1936,15 +2139,14 @@ window.Views = {};
   function showManualPicker() {
     const st = getState();
     if (!st.jobs.length) { toast('No saved jobs yet — clock on once to create one.'); return; }
-    // §5.3: most-recent jobs first (falls back to visit count for old data)
-    const items = st.jobs.slice().sort((a, b) => (b.last_visit || '').localeCompare(a.last_visit || '') || (b.visit_count||0) - (a.visit_count||0)).map(j => `<div class="picker-item" data-job="${j.job_id}"><span class="pname">${escapeHtml(j.job_name)}</span><span class="paddr">${escapeHtml(j.address || '')}</span></div>`).join('');
-    openPicker('Choose a job', `<div class="picker-list">${items}</div>`);
-    $('picker-body').querySelectorAll('.picker-item').forEach(el => {
-      el.onclick = async () => {
-        const job = st.jobs.find(j => j.job_id === el.dataset.job); closePicker();
+    // §5.3: most-recent jobs first; now searchable, with a map-pin tab too.
+    TsLocPicker.open({
+      title: 'Choose a job', jobsOnly: true,
+      onPick: async (loc) => {
+        const job = getState().jobs.find(j => j.job_id === loc.job_id); if (!job) return;
         const pos = await TsGeo.getPositionResilient();
         doClockOn(job, pos ? pos.coords.latitude : job.lat, pos ? pos.coords.longitude : job.lng);
-      };
+      }
     });
   }
   async function handleClockOff() {
@@ -2249,6 +2451,168 @@ const TsTravel = (() => {
 })();
 window.TsTravel = TsTravel;
 
+/* ----- SAVED-LOCATION PICKER (map pins + searchable list) -----
+ * One bottom sheet, two ways to pick an existing location: a map of every
+ * saved location with coordinates (tap a pin → name card → Use this), or a
+ * type-to-filter list. "Saved locations" = Log book jobs + any past-shift
+ * location that never became a job, deduped by name/address/coords.
+ * Reuses TsGeo.loadMapsJs (same Maps key/loader as the day travel map); if
+ * Maps can't load, the list still works and the Map tab says so. */
+const TsLocPicker = (() => {
+  let map = null, markers = [], onPickCb = null, items = [], mode = 'list', selected = null, jobsOnly = false;
+  function $(id) { return document.getElementById(id); }
+  function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+  function num(v) { const n = (v === '' || v == null) ? NaN : Number(v); return Number.isFinite(n) ? n : null; }
+  function savedLocations(opts) {
+    const st = getState(); const out = []; const byKey = new Map();
+    const push = (loc) => {
+      const nk = norm(loc.name), ak = norm(loc.address);
+      let hit = (nk && byKey.get('n:' + nk)) || (ak && byKey.get('a:' + ak)) || null;
+      if (!hit && loc.lat != null && !loc.job_id) {
+        // a past-shift location within 60 m of a saved one is the same place
+        hit = out.find(o => o.lat != null && distanceMetres(o.lat, o.lng, loc.lat, loc.lng) <= 60) || null;
+      }
+      if (hit && (!loc.job_id || !hit.job_id || hit.job_id === loc.job_id || (nk && norm(hit.name) === nk && ak === norm(hit.address)))) {
+        if (hit.lat == null && loc.lat != null) { hit.lat = loc.lat; hit.lng = loc.lng; }
+        if (!hit.address && loc.address) hit.address = loc.address;
+        if (!hit.job_id && loc.job_id) { hit.job_id = loc.job_id; hit.name = loc.name || hit.name; hit.job_type = loc.job_type; }
+        if (!(hit.job_id && !loc.job_id)) hit.visits += loc.visits || 0;   // job visit_count already counts its shifts
+        if ((loc.last || '') > (hit.last || '')) hit.last = loc.last;
+        return;
+      }
+      const rec = Object.assign({ visits: 0, last: '' }, loc);
+      out.push(rec);
+      if (nk) byKey.set('n:' + nk, rec);
+      if (ak) byKey.set('a:' + ak, rec);
+    };
+    (st.jobs || []).forEach(j => push({
+      job_id: j.job_id, name: String(j.job_name || j.address || 'Job').trim(), address: String(j.address || '').trim(),
+      lat: num(j.lat), lng: num(j.lng), job_type: j.job_type || '', visits: Number(j.visit_count) || 0, last: j.last_visit || j.first_visit || ''
+    }));
+    if (!(opts && opts.jobsOnly)) {
+      (st.sessions || []).forEach(s => {
+        const bad = v => /^(undefined|null|nan)?$/i.test(String(v == null ? '' : v).trim());
+        const name = [s.job_name, s.address_confirmed].map(v => bad(v) ? '' : String(v).trim()).find(Boolean) || ''; if (!name) return;
+        const lat = num(s.lat_on), lng = num(s.lng_on);
+        push({ job_id: null, name, address: String(s.address_confirmed || '').trim(), lat: lat != null && lng != null ? lat : null, lng: lat != null && lng != null ? lng : null, job_type: s.job_type || '', visits: 1, last: s.date || '' });
+      });
+    }
+    // Only real job IDs survive — a session-derived location links to its job if one matched.
+    out.forEach(o => { if (o.job_id && !(st.jobs || []).some(j => j.job_id === o.job_id)) o.job_id = null; });
+    return out.sort((a, b) => (b.last || '').localeCompare(a.last || '') || b.visits - a.visits || a.name.localeCompare(b.name));
+  }
+  function filtered() {
+    const q = norm($('lp-search') && $('lp-search').value);
+    if (!q) return items;
+    const terms = q.split(' ');
+    return items.filter(it => { const hay = norm(it.name + ' ' + it.address); return terms.every(t => hay.includes(t)); });
+  }
+  function ensureDom() {
+    if ($('lp-backdrop')) return;
+    const el = document.createElement('div');
+    el.className = 'picker-modal-backdrop lp-backdrop'; el.id = 'lp-backdrop'; el.style.display = 'none';
+    el.innerHTML = `<div class="picker-modal lp-sheet" role="dialog" aria-modal="true" aria-labelledby="lp-title">
+      <div class="lp-head"><h3 id="lp-title" style="margin:0;">Saved locations</h3><button type="button" class="icon-x" id="lp-close" aria-label="Close">✕</button></div>
+      <input type="search" id="lp-search" class="lp-search" placeholder="Search saved locations" autocomplete="off" autocapitalize="off" enterkeyhint="search">
+      <div class="seg lp-seg"><button type="button" data-lp-mode="list">🔎 List</button><button type="button" data-lp-mode="map">🗺️ Map</button></div>
+      <div id="lp-list" class="lp-list"></div>
+      <div id="lp-mapwrap" class="lp-mapwrap" hidden>
+        <div id="lp-map" class="lp-map"></div>
+        <div id="lp-mapnote" class="lp-mapnote muted"></div>
+        <div id="lp-card" class="lp-card" hidden>
+          <div class="lp-card-main"><div class="lp-card-name" id="lp-card-name"></div><div class="lp-card-addr muted" id="lp-card-addr"></div></div>
+          <button type="button" class="btn btn-primary" id="lp-use">Use this</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', e => { if (e.target === el) close(); });
+    $('lp-close').addEventListener('click', close);
+    $('lp-search').addEventListener('input', () => { renderList(); if (mode === 'map') renderPins(); });
+    el.querySelectorAll('[data-lp-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.lpMode)));
+    $('lp-use').addEventListener('click', () => { if (selected) pick(selected); });
+    $('lp-list').addEventListener('click', e => {
+      const row = e.target.closest('[data-lp-idx]'); if (!row) return;
+      const it = filtered()[Number(row.dataset.lpIdx)]; if (it) pick(it);
+    });
+  }
+  function renderList() {
+    const list = filtered();
+    const wrap = $('lp-list');
+    if (!items.length) { wrap.innerHTML = '<div class="lp-empty">No saved locations yet — clock on once or add a shift with an address.</div>'; return; }
+    if (!list.length) { wrap.innerHTML = '<div class="lp-empty">No matches. Clear the search or type the address manually.</div>'; return; }
+    wrap.innerHTML = list.map((it, i) => `<button type="button" class="lp-item" data-lp-idx="${i}"><span class="pname">${escapeHtml(it.name)}</span>${it.address && norm(it.address) !== norm(it.name) ? `<span class="paddr">${escapeHtml(it.address)}</span>` : ''}<span class="lp-meta">${it.lat != null ? '📍' : '<span class="muted">no pin</span>'}${it.visits ? ` · ${it.visits} visit${it.visits === 1 ? '' : 's'}` : ''}</span></button>`).join('');
+  }
+  function showCard(it) {
+    selected = it;
+    $('lp-card-name').textContent = it.name;
+    $('lp-card-addr').textContent = (it.address && norm(it.address) !== norm(it.name)) ? it.address : '';
+    $('lp-card').hidden = false;
+  }
+  function renderPins() {
+    if (!map) return;
+    markers.forEach(m => m.setMap(null)); markers = [];
+    const list = filtered(); const pins = list.filter(it => it.lat != null && it.lng != null);
+    const noPin = list.length - pins.length;
+    $('lp-mapnote').textContent = pins.length
+      ? `${pins.length} location${pins.length === 1 ? '' : 's'} on the map — tap a pin.${noPin ? ` ${noPin} without coordinates are in the List.` : ''}`
+      : (list.length ? 'None of these have coordinates — use the List tab.' : 'No matches.');
+    if (!pins.length) return;
+    const bounds = new google.maps.LatLngBounds();
+    pins.forEach(it => {
+      const pos = { lat: it.lat, lng: it.lng };
+      const mk = new google.maps.Marker({ map, position: pos, title: it.name });
+      mk.addListener('click', () => { showCard(it); map.panTo(pos); });
+      markers.push(mk); bounds.extend(pos);
+    });
+    if (pins.length === 1) { map.setCenter(bounds.getCenter()); map.setZoom(15); }
+    else map.fitBounds(bounds, 40);
+  }
+  async function setMode(m) {
+    mode = m;
+    document.querySelectorAll('#lp-backdrop [data-lp-mode]').forEach(b => b.classList.toggle('active', b.dataset.lpMode === m));
+    $('lp-list').hidden = m !== 'list';
+    $('lp-mapwrap').hidden = m !== 'map';
+    if (m !== 'map') return;
+    $('lp-card').hidden = true; selected = null;
+    if (!map) {
+      $('lp-mapnote').textContent = 'Loading map…';
+      try {
+        await TsGeo.loadMapsJs();
+        if (!(window.google && google.maps && google.maps.Map)) throw new Error('Maps unavailable');
+        map = new google.maps.Map($('lp-map'), { mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy', zoom: 11, center: { lat: -38.2, lng: 145.05 } });
+      } catch (e) {
+        console.warn('location picker map failed', e);
+        $('lp-map').innerHTML = '<div class="lp-empty" style="padding:24px;">Map unavailable right now — use the List tab.</div>';
+        $('lp-mapnote').textContent = '';
+        return;
+      }
+    }
+    renderPins();
+  }
+  function pick(it) {
+    const cb = onPickCb; close();
+    if (cb) cb({ job_id: it.job_id || null, name: it.name, address: it.address || '', lat: it.lat, lng: it.lng, job_type: it.job_type || '' });
+  }
+  function open(opts) {
+    opts = opts || {};
+    ensureDom();
+    jobsOnly = !!opts.jobsOnly;
+    items = savedLocations({ jobsOnly });
+    onPickCb = opts.onPick || null;
+    $('lp-title').textContent = opts.title || 'Saved locations';
+    $('lp-search').value = opts.query || '';
+    $('lp-backdrop').style.display = 'flex';
+    renderList();
+    setMode(opts.mode === 'map' ? 'map' : 'list');
+    // Don't pop the iOS keyboard over the map; do focus the search in list mode on desktop.
+    if (opts.mode !== 'map' && !('ontouchstart' in window)) setTimeout(() => $('lp-search').focus(), 60);
+  }
+  function close() { const el = $('lp-backdrop'); if (el) el.style.display = 'none'; selected = null; onPickCb = null; }
+  return { open, close, savedLocations };
+})();
+window.TsLocPicker = TsLocPicker;
+
 /* HISTORY */
 (function () {
   let weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek);
@@ -2403,19 +2767,60 @@ window.TsTravel = TsTravel;
     const btn = $('d-here'), input = $('d-addr');
     if (window.NDHere && btn && input) NDHere.attachButton(btn, input, { region: 'au', busyLabel: 'Locating…', mapsKey: (window.TIMESHEET_CONFIG || {}).mapsKey });
   }
+  /* Feature: pick an existing saved location (map pins or searchable list)
+   * for a manual entry. Manual typing stays as the fallback — editing the
+   * name/address by hand after a pick drops the link to the saved location. */
+  const LOC_PICK_ROW = '<div class="lp-row"><button type="button" class="btn btn-ghost btn-sm" data-lp-open="list">🔎 Saved locations</button><button type="button" class="btn btn-ghost btn-sm" data-lp-open="map">🗺️ Pick on map</button></div><div class="lp-picked" id="d-picked" hidden></div>';
+  let pickedLoc = null;
+  function renderPicked() {
+    const el = $('d-picked'); if (!el) return;
+    if (!pickedLoc) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `📍 Saved location: <strong>${escapeHtml(pickedLoc.name)}</strong> <button type="button" class="lp-unpick" aria-label="Clear saved location">✕</button>`;
+    el.querySelector('.lp-unpick').onclick = () => { pickedLoc = null; renderPicked(); };
+  }
+  function wireLocPick() {
+    pickedLoc = null; renderPicked();
+    document.querySelectorAll('#detail-body [data-lp-open]').forEach(b => b.addEventListener('click', () => {
+      TsLocPicker.open({
+        mode: b.dataset.lpOpen,
+        title: b.dataset.lpOpen === 'map' ? 'Pick a saved location' : 'Saved locations',
+        onPick(loc) {
+          pickedLoc = loc;
+          $('d-job').value = loc.name;
+          $('d-addr').value = loc.address || '';
+          const typeSel = $('d-type');
+          if (typeSel && loc.job_type && [...typeSel.options].some(o => o.value === loc.job_type)) typeSel.value = loc.job_type;
+          renderPicked();
+          toast('Location set: ' + loc.name);
+        }
+      });
+    }));
+    ['d-job', 'd-addr'].forEach(id => { const el = $(id); if (el) el.addEventListener('input', () => { if (pickedLoc) { pickedLoc = null; renderPicked(); } }); });
+  }
+  // Job for a picked location: its own job if it has one, else reuse/mint one with the pin's coords.
+  function jobForPicked(loc, jobName, addr, jobType) {
+    if (!loc) return null;
+    const existing = loc.job_id && getState().jobs.find(j => j.job_id === loc.job_id);
+    if (existing) return existing;
+    return resolveOrCreateJob({ job_name: jobName || loc.name, address: addr || loc.address, lat: loc.lat, lng: loc.lng, job_type: jobType });
+  }
   function openDetail(sessionId) {
     const s = getState().sessions.find(s => s.session_id === sessionId); if (!s) return;
-    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${sessionBreakMinutes(s)}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Job / name</label><input id="d-job" value="${escapeHtml(s.job_name)}"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="${escapeHtml(s.address_confirmed || '')}"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div>${LOC_PICK_ROW}</div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${s.time_on_rounded}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${s.time_off_rounded || ''}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer"${s.job_type==='employer'?' selected':''}>Employer</option><option value="neill_data"${s.job_type==='neill_data'?' selected':''}>Neill Data</option><option value="unclassified"${s.job_type==='unclassified'?' selected':''}>Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="${sessionBreakMinutes(s)}" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes">${escapeHtml(s.notes || '')}</textarea></div><button class="btn btn-ghost btn-block" id="d-delete" style="color:#e0473f; margin-top:4px;">Delete session</button>`;
     $('detail-backdrop').style.display = 'flex';
     document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
-    wireDetailHere();
+    wireDetailHere(); wireLocPick();
     $('d-delete').onclick = () => {
       if (!confirm('Delete this session? It will be removed from your timesheet and the Google Sheet.')) return;
       removeSession(sessionId);
       $('detail-backdrop').style.display = 'none'; render(); toast('Session deleted');
     };
     $('detail-save').onclick = () => {
-      updateSession(sessionId, { job_name: $('d-job').value.trim(), address_confirmed: $('d-addr').value.trim(), time_on_rounded: $('d-on').value, time_off_rounded: $('d-off').value, job_type: $('d-type').value, break_minutes: Number($('d-breakmin').value) || 0, notes: $('d-notes').value.trim() });
+      const patch = { job_name: $('d-job').value.trim(), address_confirmed: $('d-addr').value.trim(), time_on_rounded: $('d-on').value, time_off_rounded: $('d-off').value, job_type: $('d-type').value, break_minutes: Number($('d-breakmin').value) || 0, notes: $('d-notes').value.trim() };
+      const pj = jobForPicked(pickedLoc, patch.job_name, patch.address_confirmed, patch.job_type);
+      if (pj) patch.job_id = pj.job_id;   // link the shift to the saved site (travel map + log book)
+      updateSession(sessionId, patch);
       $('detail-backdrop').style.display = 'none'; render(); toast('Session updated');
     };
   }
@@ -2425,10 +2830,10 @@ window.TsTravel = TsTravel;
   function openAddShift(dateIso) {
     const st = getState();
     const date = dateIso || isoDate(weekCursor <= new Date() ? new Date() : weekCursor);
-    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="" placeholder="Optional"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div></div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="" placeholder="Optional"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div>${LOC_PICK_ROW}</div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
     $('detail-backdrop').style.display = 'flex';
     document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
-    wireDetailHere();
+    wireDetailHere(); wireLocPick();
     $('d-delete') && ($('d-delete').style.display = 'none');
     $('detail-save').onclick = async () => {
       const jobName = $('d-job').value.trim();
@@ -2439,7 +2844,7 @@ window.TsTravel = TsTravel;
       const d = $('d-date').value || date;
       const addr = $('d-addr').value.trim();
       // §3.2c: manual entries always resolve or create a real job — never job_id:''
-      const job = resolveOrCreateJob({ job_name: jobName, address: addr, job_type: $('d-type').value });
+      const job = jobForPicked(pickedLoc, jobName, addr, $('d-type').value) || resolveOrCreateJob({ job_name: jobName, address: addr, job_type: $('d-type').value });
       // §3.2b: best-effort coords when the shift is "now" (today)
       let lat = null, lng = null;
       if (d === isoDate(new Date())) {
@@ -2636,7 +3041,13 @@ window.TsTravel = TsTravel;
     bindToggle('s-use24hr', () => s.use24hr, v => saveSettings({ use24hr: v }));
     bindToggle('s-interactiveTimes', () => s.interactiveTimes !== false, v => { saveSettings({ interactiveTimes: v }); refreshAllViews(); });
     bindToggle('s-lowVisColours', () => !!s.lowVisColours, v => { saveSettings({ lowVisColours: v }); refreshAllViews(); });
-    renderTemplates(); renderAccountStatus(); renderLastSynced();
+    renderTemplates(); renderAccountStatus(); renderLastSynced(); renderLivePubStatus();
+  }
+  function renderLivePubStatus() {
+    const el = $('live-pub-status'); if (!el) return;
+    let at = '';
+    try { at = (JSON.parse(localStorage.getItem('ts_live_last_at_v1') || 'null') || ''); } catch (e) {}
+    el.textContent = at ? 'Last published ' + fmtRelative(new Date(at).getTime()) : 'Not published from this device yet';
   }
   function renderTemplates() {
     const st = getState(); const list = $('tpl-list');
@@ -2704,6 +3115,12 @@ window.TsTravel = TsTravel;
     $('btn-nq-disconnect').addEventListener('click', () => { TsNeillQuote.disconnect(); renderNeillQuoteStatus(); });
     $('btn-notif-perm').addEventListener('click', async () => { const perm = await TsNotifications.requestPermission(); toast(perm === 'granted' ? 'Notifications enabled' : 'Notifications ' + perm); });
     $('btn-backup').addEventListener('click', () => runForceSync());
+    $('btn-live-publish').addEventListener('click', async () => {
+      localStorage.removeItem('ts_live_last_v1');   // force a write even if unchanged
+      const ok = await TsLive.publish();
+      toast(ok ? 'Live view updated' : 'Couldn’t publish — sign in with your main Google account');
+      renderLivePubStatus();
+    });
     $('btn-clear-cache').addEventListener('click', () => {
       if (!confirm('Clear local sync queue and device cache? Your sessions and settings are kept — this only clears the offline write queue and device fingerprint.')) return;
       localStorage.removeItem('ts_offline_queue_v1'); localStorage.removeItem('ts_device_fp_v1'); toast('Local cache cleared');
@@ -3083,7 +3500,7 @@ async function bootApp() {
       linkAccount();
       // Push local changes up, pull this user's rows down, refresh, then run the
       // once-a-day full sync check.
-      flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) { markSynced(); refreshAllViews(); } }).then(() => maybeDailyForceSync());
+      flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) { markSynced(); refreshAllViews(); } }).then(() => maybeDailyForceSync()).then(() => TsLive.schedule(500));
     }
     document.dispatchEvent(new CustomEvent('ts:auth-changed', { detail: status }));
   };
