@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="/quote/favicon.svg" />
     <link rel="manifest" href="manifest.json" />
 <link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-backend.js"></script>
 <script src="../shared/nd-cache.js"></script>
 <script src="../shared/nd-queue.js"></script>
 <script src="../shared/nd-ui.js"></script>
@@ -615,6 +616,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
     <div class="lock-mark">ND</div>
     <h1>Quote Tool</h1>
     <p>Enter your passcode</p>
+    <input type="text" id="username-input" class="lock-input" placeholder="Your name" autocomplete="username" style="display:none;margin-bottom:8px;" />
     <input type="password" inputmode="numeric" id="passcode-input" class="lock-input" autocomplete="off" />
     <div class="lock-err" id="lock-err"></div>
     <div class="btn-row" style="justify-content:center;">
@@ -1118,12 +1120,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
       <details class="card">
         <summary><h3>Security</h3></summary>
         <div class="card-body">
-          <div class="field">
-            <label>Passcode</label>
-            <input id="passcode-new" type="text" />
-            <div id="passcode-strength" class="tip" style="display:none;margin-top:6px;"></div>
-          </div>
-          <p class="panel-sub" style="margin:8px 0 0;font-size:0.78rem;">Passcodes must be unique across users. The default <b>1234</b> is fine for testing but <b>change it before sharing the URL with anyone</b>.</p>
+          <p class="panel-sub" style="margin:0;font-size:0.78rem;">Every login is checked by the server — there is no offline or default passcode. Change a user's passcode in the <b>Staff</b> tab (open the user → New passcode). Passcodes must be unique across users.</p>
         </div>
       </details>
 
@@ -1150,14 +1147,25 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
 const HARDCODED_MAPS_KEY        = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
 /* ▲▲▲ PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES ABOVE ▲▲▲ */
 
-const HARDCODED_SHEET_ID        = '1uxaEppfmUoC0l1nZXS3rvsvKsysDxH5m1AyBK2biUeE';
+// Legacy path only (shared/nd-backend.js endpoint empty): prices read straight
+// from the Quote spreadsheet. Once the Neill Data Backend is wired, prices come
+// from the separate public price sheet it reports, and users/quotes are only
+// ever reached through the backend.
+const LEGACY_SHEET_ID           = '1uxaEppfmUoC0l1nZXS3rvsvKsysDxH5m1AyBK2biUeE';
 const HARDCODED_BUSINESS_NAME   = 'Neill Data & Security';
 const HARDCODED_BUSINESS_ABN    = '73 761 986 361';
 const HARDCODED_BUSINESS_PHONE  = '0418 912 681';
 const HARDCODED_BUSINESS_EMAIL  = 'brandon.j.neill@gmail.com';
 const HARDCODED_HOME_ADDRESS    = '1/84 Mount Eliza Way, Mount Eliza VIC 3930';
-const HARDCODED_PASSCODE        = '';
-const HARDCODED_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
+const LEGACY_APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
+/* Feature switch (shared/nd-backend.js): a configured endpoint = the Neill Data
+ * Backend (code checked server-side, session token, public price sheet).
+ * Empty = the legacy Quote backend, unchanged, until Brandon deploys. */
+const ND_ENDPOINT     = String((window.ND_BACKEND && window.ND_BACKEND.endpoint) || '').trim();
+const USE_NEW_BACKEND = !!ND_ENDPOINT;
+const PRICE_SHEET_KEY = 'nq_price_sheet_v1';
+// Backend-owned tabs — never fetched by the price sync, whatever sheet it points at
+const PRIVATE_TABS = ['Users', 'Quotes', 'Invoices', 'Activity', 'Photos', 'Tags', 'TimesheetLive', 'TimesheetLiveLog'];
 
 // Tabs the parser treats as "system" (not extras subsections)
 const SYSTEM_TABS    = ['Cameras', 'Travel', 'Rates'];
@@ -1170,14 +1178,31 @@ const FALLBACK_EXTRAS_TABS = ['Cable', 'Conduit', 'Misc'];
 
 // Getters — user setting wins if set, else hardcoded
 function getMapsKey()      { return (settings.mapsKey && settings.mapsKey.trim())                                   || HARDCODED_MAPS_KEY        || ''; }
-function getSheetId()      { return (settings.sheetId && settings.sheetId.trim())                                   || HARDCODED_SHEET_ID        || ''; }
+function getSheetId() {
+  const own = (settings.sheetId && settings.sheetId.trim()) || '';
+  if (!USE_NEW_BACKEND) return own || LEGACY_SHEET_ID;
+  if (own && own !== LEGACY_SHEET_ID) return own;          // explicit override (never the private Quote sheet)
+  try { return localStorage.getItem(PRICE_SHEET_KEY) || ''; } catch (e) { return ''; }
+}
+/* New backend: ask it (public get_config) where the price sheet is; cached for offline boots. */
+async function resolvePriceSheetId() {
+  if (!USE_NEW_BACKEND) return getSheetId();
+  try {
+    const r = await fetch(ND_ENDPOINT, { method: 'POST', body: JSON.stringify({ action: 'get_config' }), headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, redirect: 'follow' });
+    const d = r.ok ? await r.json() : null;
+    if (d && d.priceSheetId) localStorage.setItem(PRICE_SHEET_KEY, d.priceSheetId);
+  } catch (e) { /* offline: use the cached id */ }
+  return getSheetId();
+}
 function getBizName()      { return (settings.business.name && settings.business.name.trim())                       || HARDCODED_BUSINESS_NAME   || ''; }
 function getBizAbn()       { return (settings.business.abn && settings.business.abn.trim())                         || HARDCODED_BUSINESS_ABN    || ''; }
 function getBizPhone()     { return (settings.business.phone && settings.business.phone.trim())                     || HARDCODED_BUSINESS_PHONE  || ''; }
 function getBizEmail()     { return (settings.business.email && settings.business.email.trim())                     || HARDCODED_BUSINESS_EMAIL  || ''; }
 function getHomeAddress()  { return (settings.business.homeAddress && settings.business.homeAddress.trim())         || HARDCODED_HOME_ADDRESS    || ''; }
-function getPasscode()     { return settings.passcode || HARDCODED_PASSCODE || '1234'; }
-function getBackendUrl()   { return (settings.backendUrl && settings.backendUrl.trim()) || HARDCODED_APPS_SCRIPT_URL || ''; }
+function getBackendUrl()   { if (USE_NEW_BACKEND) return ND_ENDPOINT; return (settings.backendUrl && settings.backendUrl.trim()) || LEGACY_APPS_SCRIPT_URL || ''; }
+/* The credential the current session carries: a server session token on the new
+ * backend; on the legacy backend (until the switch) the old stored hash. */
+function hasAuth() { return !!(currentUser && (USE_NEW_BACKEND ? currentUser.token : currentUser.passwordHash)); }
 
 /* =====================================================
    STATE
@@ -1188,7 +1213,6 @@ const FAVS_KEY    = 'nd_user_favs_v3';
 const WEATHER_CACHE_KEY = 'nd_weather_cache_v1';
 
 const defaultSettings = {
-  passcode: '',
   business: { name:'', abn:'', phone:'', email:'', homeAddress:'' },
   watermark: { address: true, datetime: true, business: true, clientName: false, quoteId: false, gps: false },
   weatherEnabled: true,
@@ -1302,7 +1326,7 @@ let jobsStatusFilter = 'all';
 
 let currentQuote = blankQuote();
 let activeExtrasSub = 'cable';
-let currentUser = null;   // { username, role, passwordHash, ... } set on successful unlock
+let currentUser = null;   // { username, role, token (new backend) | passwordHash (legacy), ... } set on successful unlock
 let backendOnline = false; // tracks whether last backend call succeeded
 let placesAutocomplete = null, homeAutocomplete = null, distanceMatrixSvc = null;
 
@@ -1413,14 +1437,19 @@ function saveUnlockSession() {
 function loadUnlockSession() {
   if (window.NDRemember) {
     const d = NDRemember.load(QUOTE_SESSION_KEY);
-    return (d && d.user && d.user.passwordHash) ? d : null;
+    if (d && !sessionUsable(d.user)) { clearUnlockSession(); return null; }   // drop a stale legacy (hash) session
+    return d || null;
   }
   try {
     const s = JSON.parse(localStorage.getItem(QUOTE_SESSION_KEY));
-    if (s && s.user && s.user.passwordHash && Date.now() - s.at < QUOTE_REMEMBER_HOURS * 3600 * 1000) return s;
+    if (s && sessionUsable(s.user) && Date.now() - s.at < QUOTE_REMEMBER_HOURS * 3600 * 1000) return s;
+    if (s) clearUnlockSession();
   } catch (e) {}
   return null;
 }
+// A remembered session only counts for the backend it came from (a legacy hash
+// session is ignored once the new backend is switched on, and vice versa).
+function sessionUsable(u) { return !!(u && (USE_NEW_BACKEND ? (u.token && !u.passwordHash) : u.passwordHash)); }
 function clearUnlockSession() {
   if (window.NDRemember) { NDRemember.clear(QUOTE_SESSION_KEY); return; }
   try { localStorage.removeItem(QUOTE_SESSION_KEY); } catch (e) {}
@@ -1434,25 +1463,49 @@ function tryRestoreSession() {
   document.getElementById('app').hidden = false;
   finishUnlock();
   // background re-verify — kicks the user out only if the account changed
-  backendCall('login', { passwordHash: currentUser.passwordHash })
+  const verify = USE_NEW_BACKEND
+    ? backendCall('whoami', {})
+    : backendCall('login', { passwordHash: currentUser.passwordHash });
+  verify
     .then(data => {
-      if (data && data.ok && data.user) { currentUser = Object.assign({}, data.user, { passwordHash: currentUser.passwordHash }); saveUnlockSession(); }
+      if (data && data.ok && data.user) {
+        const keep = USE_NEW_BACKEND ? { token: currentUser.token } : { passwordHash: currentUser.passwordHash };
+        currentUser = Object.assign({}, data.user, keep); saveUnlockSession();
+      }
     })
     .catch(err => {
       if (err && err.detail && err.detail.locked) {
         clearUnlockSession(); wipeLocalCache(); location.reload();
+      } else if (err && err.detail && err.detail.reauth) {
+        requireReauth();
       } /* network errors: stay unlocked — offline quoting is the point */
     });
   return true;
+}
+
+/* Session ended server-side (expired / code changed): back to the lock screen,
+ * keeping local quotes — only a LOCKED account wipes the device. */
+function requireReauth(msg) {
+  clearUnlockSession();
+  currentUser = null;
+  document.body.classList.remove('loading-skeleton');
+  document.getElementById('app').hidden = true;
+  lockScreen.style.display = 'grid';
+  lockErr.textContent = msg || 'Please enter your passcode again.';
+  passcodeInput.value = '';
 }
 
 async function tryUnlock() {
   const passcode = passcodeInput.value;
   if (!passcode) return;
   lockErr.textContent = '';
-  let hash;
-  try { hash = await sha256Hex(passcode); }
-  catch (e) { lockErr.textContent = 'Hash error: ' + e.message; return; }
+  const nameEl = document.getElementById('username-input');
+  const typedName = (nameEl && nameEl.offsetParent !== null) ? nameEl.value.trim() : '';
+  let hash = null;
+  if (!USE_NEW_BACKEND) {   // legacy backend (until the switch) still expects the old hash
+    try { hash = await sha256Hex(passcode); }
+    catch (e) { lockErr.textContent = 'Hash error: ' + e.message; return; }
+  }
 
   // Show the app shell IMMEDIATELY with a skeleton/shimmer state while we verify
   document.body.classList.add('loading-skeleton');
@@ -1462,17 +1515,22 @@ async function tryUnlock() {
   // Try backend login (with device fingerprint for rate limiting)
   let backendOk = false, locked = false, serverErr = null, serverData = null;
   try {
+    // New backend: the code itself goes over HTTPS and is checked server-side.
+    const loginBody = USE_NEW_BACKEND
+      ? { action: 'login', code: passcode, fingerprint: getDeviceFingerprint() }
+      : { action: 'login', passwordHash: hash, fingerprint: getDeviceFingerprint() };
+    if (USE_NEW_BACKEND && typedName) loginBody.username = typedName;
     const r = await fetch(getBackendUrl(), {
       method: 'POST',
-      body: JSON.stringify({ action: 'login', passwordHash: hash, fingerprint: getDeviceFingerprint() }),
+      body: JSON.stringify(loginBody),
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       redirect: 'follow'
     });
     if (r.ok) {
       const data = await r.json();
       serverData = data;
-      if (data.ok && data.user) {
-        currentUser = Object.assign({}, data.user, { passwordHash: hash });
+      if (data.ok && data.user && (!USE_NEW_BACKEND || data.token)) {
+        currentUser = Object.assign({}, data.user, USE_NEW_BACKEND ? { token: data.token } : { passwordHash: hash });
         backendOnline = true;
         backendOk = true;
       } else if (data && data.locked) {
@@ -1483,7 +1541,10 @@ async function tryUnlock() {
     }
   } catch (e) { backendOnline = false; }
 
-  if (backendOk) { saveUnlockSession(); finishUnlock(); return; }
+  if (backendOk) {
+    if (typedName) { try { localStorage.setItem('nq_last_username', currentUser.username || typedName); } catch (e) {} }
+    saveUnlockSession(); finishUnlock(); return;
+  }
   if (locked) {
     document.body.classList.remove('loading-skeleton');
     document.getElementById('app').hidden = true;
@@ -1503,11 +1564,11 @@ async function tryUnlock() {
     return;
   }
 
-  // Offline fallback (no network or backend down)
-  if (passcode === getPasscode()) {
-    currentUser = { username: 'local', role: 'master', passwordHash: hash };
-    finishUnlock();
-    return;
+  // No offline passcode fallback: a login always needs the backend. (A remembered
+  // session still opens the app offline — see tryRestoreSession.)
+  if (serverData && serverData.needUsername && nameEl) {
+    nameEl.style.display = '';
+    try { nameEl.value = nameEl.value || localStorage.getItem('nq_last_username') || ''; } catch (e) {}
   }
 
   // Kick back to lock screen with attempts-remaining if server told us
@@ -1515,7 +1576,9 @@ async function tryUnlock() {
   document.getElementById('app').hidden = true;
   lockScreen.style.display = 'grid';
   let msg = 'Wrong passcode';
-  if (serverData && typeof serverData.attemptsRemaining === 'number') {
+  if (!serverData) msg = "Can't reach the server — check your connection and try again.";
+  else if (serverData.needUsername) msg = 'Enter your name and passcode.';
+  else if (typeof serverData.attemptsRemaining === 'number') {
     msg += ' — ' + serverData.attemptsRemaining + ' attempt' + (serverData.attemptsRemaining === 1 ? '' : 's') + ' left before lockout';
   } else if (serverErr) {
     msg = serverErr;
@@ -1590,8 +1653,10 @@ function finishUnlock() {
       chip.hidden = false;
     }
   }
-  init();
+  // Re-unlocking after a server-side sign-out must not re-run boot (it would reset the open quote)
+  if (!appInitDone) { appInitDone = true; init(); } else { syncQuotesFromBackend(); }
 }
+let appInitDone = false;
 window.addEventListener('load', () => passcodeInput.focus());
 
 /* =====================================================
@@ -1637,7 +1702,7 @@ function getDeviceFingerprint() {
  * identical payloads. Reads and auth never queue. */
 const QUEUEABLE_ACTIONS = ['save_quote', 'delete_quote', 'set_status', 'set_favourites'];
 const quoteQueue = window.ND?.queueKit
-  ? ND.queueKit.createQueue({ name: 'quote', ready: () => !!(currentUser && currentUser.passwordHash) })
+  ? ND.queueKit.createQueue({ name: 'quote', ready: () => hasAuth() })
   : null;
 if (quoteQueue) {
   window.NDQueue = quoteQueue;   // sync chip convention (§1.6)
@@ -1676,8 +1741,11 @@ async function backendCallDirect(action, body) {
   const url = getBackendUrl();
   if (!url) throw new Error('No backend URL configured');
   body = Object.assign({}, body || {}, { action });
-  if (currentUser && currentUser.passwordHash && !body.passwordHash) body.passwordHash = currentUser.passwordHash;
-  if (!body.fingerprint) body.fingerprint = getDeviceFingerprint();
+  if (USE_NEW_BACKEND) {
+    delete body.passwordHash;                               // the new backend never takes a hash
+    if (currentUser && currentUser.token) body.token = currentUser.token;
+  } else if (currentUser && currentUser.passwordHash && !body.passwordHash) body.passwordHash = currentUser.passwordHash;
+  if (!body.fingerprint) body.fingerprint = getDeviceFingerprint();   // audit column only, not used for rate limiting
   // Use text/plain to avoid CORS preflight on Apps Script web apps
   const r = await fetch(url, {
     method: 'POST',
@@ -1691,6 +1759,7 @@ async function backendCallDirect(action, body) {
   if (data && data.error) {
     const err = new Error(data.error);
     err.detail = data;
+    if (USE_NEW_BACKEND && data.reauth && action !== 'whoami' && currentUser) setTimeout(() => requireReauth(), 0);
     throw err;
   }
   return data;
@@ -1705,7 +1774,7 @@ function wipeLocalCache() {
   userFavs = {};
 }
 async function syncQuotesFromBackend() {
-  if (!currentUser || !currentUser.passwordHash) return;
+  if (!hasAuth()) return;
   try {
     const r = await backendCall('get_quotes', {});
     const remoteQuotes = (r && r.quotes) || [];
@@ -1729,7 +1798,7 @@ async function syncQuotesFromBackend() {
   }
 }
 async function pushQuoteToBackend(quote) {
-  if (!currentUser || !currentUser.passwordHash) return;
+  if (!hasAuth()) return;
   try { await backendCall('save_quote', { quote: stripPhotosForBackend(quote) }); }
   catch (e) { console.warn('cloud push failed:', e.message); backendOnline = false; }
 }
@@ -1776,7 +1845,7 @@ let _favsSyncTimer = null;
 function pushFavouritesToBackend() {
   clearTimeout(_favsSyncTimer);
   _favsSyncTimer = setTimeout(async () => {
-    if (!currentUser || !currentUser.passwordHash) return;
+    if (!hasAuth()) return;
     try {
       await backendCall('set_favourites', { favourites: currentUser.favourites || {} });
     } catch (e) {
@@ -2465,15 +2534,18 @@ async function discoverTabs(id, key) {
   } catch(e) { return null; }
 }
 async function syncFromSheet(silent) {
-  const id = getSheetId();
-  if (!id) return;
+  const id = USE_NEW_BACKEND ? await resolvePriceSheetId() : getSheetId();
+  if (!id) {
+    if (!silent) { const st = document.getElementById('sheet-status'); if (st) { st.style.display = 'block'; st.className = 'tip warn'; st.innerHTML = '<b>!</b> Price sheet not available yet — the backend has not reported one.'; } }
+    return;
+  }
   const status = document.getElementById('sheet-status');
   if (status && !silent) { status.style.display='block'; status.className='tip'; status.innerHTML='Syncing…'; }
   try {
     // Discover all tabs
     const allTabs = await discoverTabs(id, getMapsKey());
     const tabsList = allTabs || [...SYSTEM_TABS, ...FALLBACK_EXTRAS_TABS];
-    const extrasTabNames = tabsList.filter(t => !SYSTEM_TABS.includes(t));
+    const extrasTabNames = tabsList.filter(t => !SYSTEM_TABS.includes(t) && !PRIVATE_TABS.includes(t));
 
     // Fetch all the tabs we need
     const fetches = {};
@@ -2531,7 +2603,7 @@ async function syncFromSheet(silent) {
     }
     // If Sheets API didn't work and the user listed extra_tabs in Rates, fetch those now and merge
     if (!allTabs && manualExtras && manualExtras.length) {
-      const newOnes = manualExtras.filter(t => !tabsList.includes(t));
+      const newOnes = manualExtras.filter(t => !tabsList.includes(t) && !PRIVATE_TABS.includes(t));
       if (newOnes.length) {
         const more = await Promise.all(newOnes.map(t => cachedCsvFetch(sheetCsvUrl(id, t))));
         newOnes.forEach((t, i) => {
@@ -3474,8 +3546,11 @@ document.getElementById('sd-save').onclick = async () => {
   updates.notes = document.getElementById('sd-notes').value;
   const newPasscode = document.getElementById('sd-newpasscode').value.trim();
   if (newPasscode) {
-    try { updates.passwordHash = await sha256Hex(newPasscode); }
-    catch (e) { alert('Hash error: ' + e.message); return; }
+    if (USE_NEW_BACKEND) updates.newCode = newPasscode;     // hashed + peppered server-side
+    else {
+      try { updates.passwordHash = await sha256Hex(newPasscode); }
+      catch (e) { alert('Hash error: ' + e.message); return; }
+    }
   }
   try {
     await backendCall('update_user', { target: selectedStaffUsername, updates });
@@ -3519,19 +3594,20 @@ document.getElementById('ns-submit').onclick = async () => {
   const username = document.getElementById('ns-name').value.trim();
   const passcode = document.getElementById('ns-passcode').value.trim();
   if (!username || !passcode) { alert('Display name and passcode are required.'); return; }
-  let hash;
-  try { hash = await sha256Hex(passcode); }
-  catch (e) { alert('Hash error: ' + e.message); return; }
-  const newUser = {
-    username,
-    passwordHash: hash,
+  const newUser = { username };
+  if (USE_NEW_BACKEND) newUser.code = passcode;             // hashed + peppered server-side
+  else {
+    try { newUser.passwordHash = await sha256Hex(passcode); }
+    catch (e) { alert('Hash error: ' + e.message); return; }
+  }
+  Object.assign(newUser, {
     role: document.getElementById('ns-role').value,
     phone: document.getElementById('ns-phone').value,
     email: document.getElementById('ns-email').value,
     startDate: document.getElementById('ns-startdate').value,
     address: document.getElementById('ns-address').value,
     notes: document.getElementById('ns-notes').value
-  };
+  });
   const cap = document.getElementById('ns-discountcap').value;
   if (cap !== '') newUser.discountCap = Number(cap);
   try {
@@ -3593,8 +3669,7 @@ function renderSettings() {
   setVal('biz-phone',    settings.business.phone,       HARDCODED_BUSINESS_PHONE);
   setVal('biz-email',    settings.business.email,       HARDCODED_BUSINESS_EMAIL);
   setVal('home-address', settings.business.homeAddress, HARDCODED_HOME_ADDRESS);
-  setVal('passcode-new', settings.passcode,             HARDCODED_PASSCODE || '1234');
-  setVal('sheet-id',     settings.sheetId,              HARDCODED_SHEET_ID);
+  setVal('sheet-id',     settings.sheetId,              getSheetId());
   loadWatermarkUI();
   loadLogoUI();
   setupQuoteGoogle();
@@ -3617,7 +3692,6 @@ document.getElementById('save-settings').onclick = () => {
   settings.business.phone = document.getElementById('biz-phone').value;
   settings.business.email = document.getElementById('biz-email').value;
   settings.business.homeAddress = document.getElementById('home-address').value;
-  settings.passcode = document.getElementById('passcode-new').value;
   settings.sheetId = extractSheetId(document.getElementById('sheet-id').value);
   saveWatermarkUI();
   saveSettings(); syncQuoteFromSettings(); renderTotals();
@@ -4837,21 +4911,26 @@ function scorePasscode(p) {
   return { score, label: labels[score], color: colors[score], sets, length };
 }
 (function wirePasscodeMeter() {
-  const inp = document.getElementById('passcode-new');
-  const out = document.getElementById('passcode-strength');
-  if (!inp || !out) return;
-  function refresh() {
-    const v = inp.value || '';
-    if (!v) { out.style.display = 'none'; return; }
-    const s = scorePasscode(v);
-    out.style.display = 'block';
-    out.className = 'tip ' + (s.score >= 3 ? 'ok' : s.score >= 2 ? 'warn' : '');
-    const dots = '●'.repeat(s.score) + '○'.repeat(5 - s.score);
-    let warning = '';
-    if (v === '1234' || v === '0000' || v === '1111') warning = ' — that is one of the most common passcodes in the world, please pick another.';
-    out.innerHTML = '<b style="color:' + s.color + ';">' + dots + '</b> ' + s.label + ' · ' + s.length + ' chars · ' + s.sets + ' char set(s)' + warning;
-  }
-  inp.addEventListener('input', refresh);
+  // Strength hint on the Staff tab's passcode fields (new user / change passcode)
+  ['ns-passcode', 'sd-newpasscode'].forEach(id => {
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    const out = document.createElement('div');
+    out.className = 'tip'; out.style.display = 'none'; out.style.marginTop = '6px';
+    inp.insertAdjacentElement('afterend', out);
+    function refresh() {
+      const v = inp.value || '';
+      if (!v) { out.style.display = 'none'; return; }
+      const s = scorePasscode(v);
+      out.style.display = 'block';
+      out.className = 'tip ' + (s.score >= 3 ? 'ok' : s.score >= 2 ? 'warn' : '');
+      const dots = '●'.repeat(s.score) + '○'.repeat(5 - s.score);
+      let warning = '';
+      if (v === '1234' || v === '0000' || v === '1111') warning = ' — that is one of the most common passcodes in the world, please pick another.';
+      out.innerHTML = '<b style="color:' + s.color + ';">' + dots + '</b> ' + s.label + ' · ' + s.length + ' chars · ' + s.sets + ' char set(s)' + warning;
+    }
+    inp.addEventListener('input', refresh);
+  });
 })();
 
 /* =====================================================
@@ -4909,7 +4988,7 @@ async function pushPhotoToBackend(photo) {
 }
 
 async function syncPhotoMetaFromBackend() {
-  if (!currentUser || !currentUser.passwordHash) return;
+  if (!hasAuth()) return;
   try {
     const r = await backendCall('get_photos_meta', {});
     allPhotoMeta = (r && r.photos) || [];
@@ -5020,7 +5099,7 @@ function loadGalleryOnce() {
   syncKnownTags().then(() => syncPhotoMetaFromBackend()).then(() => { renderGalleryFilters(); renderGalleryGrid(); }).catch(() => {});
 }
 async function syncKnownTags() {
-  if (!currentUser || !currentUser.passwordHash) return;
+  if (!hasAuth()) return;
   try {
     const r = await backendCall('list_tags', {});
     knownTags = (r && r.tags) || [];

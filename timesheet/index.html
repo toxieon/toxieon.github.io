@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="stylesheet" href="../shared/nd-core.css" />
 <script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-backend.js"></script>
 <script src="../assets/loading-bar.js"></script>
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
@@ -1684,7 +1685,11 @@ window.TsSheets = TsSheets;
 /* ----- NEILL QUOTE BRIDGE ----- */
 const TsNeillQuote = (() => {
   const cfg = window.TIMESHEET_CONFIG.neillQuote;
-  let sessionHash = null; let cachedJobs = []; let lastFetch = 0;
+  // Shared switch (shared/nd-backend.js): Neill Data Backend when configured
+  // (code checked server-side → session token), legacy Quote backend otherwise.
+  const ND_URL = String((window.ND_BACKEND && window.ND_BACKEND.endpoint) || '').trim();
+  const backendUrl = ND_URL || cfg.backendUrl;
+  let sessionHash = null; let cachedJobs = []; let lastFetch = 0;   // sessionHash = token on the new backend
   async function sha256Hex(str) {
     const buf = new TextEncoder().encode(String(str || ''));
     const hashBuf = await crypto.subtle.digest('SHA-256', buf);
@@ -1699,24 +1704,33 @@ const TsNeillQuote = (() => {
     return fp;
   }
   async function backendCall(action, body) {
-    if (!cfg.backendUrl) throw new Error('No Neill Quote backend configured');
+    if (!backendUrl) throw new Error('No Neill Quote backend configured');
     const payload = Object.assign({}, body || {}, { action, fingerprint: getFingerprint() });
-    const r = await fetch(cfg.backendUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, redirect: 'follow' });
+    const r = await fetch(backendUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, redirect: 'follow' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json(); if (data && data.error) throw new Error(data.error); return data;
   }
   async function connect(passcode) {
-    const hash = await sha256Hex(passcode);
-    const data = await backendCall('login', { passwordHash: hash });
-    if (!data || !data.ok) throw new Error('Quote login failed');
-    sessionHash = hash; saveSettings({ neillQuoteConnected: true }); linkAccount(); refreshJobs().catch(() => {}); return true;
+    let cred;
+    if (ND_URL) {
+      const data = await backendCall('login', { code: passcode });
+      if (!data || !data.ok || !data.token) throw new Error('Quote login failed');
+      cred = data.token;
+    } else {
+      const hash = await sha256Hex(passcode);
+      const data = await backendCall('login', { passwordHash: hash });
+      if (!data || !data.ok) throw new Error('Quote login failed');
+      cred = hash;
+    }
+    sessionHash = cred; saveSettings({ neillQuoteConnected: true }); linkAccount(); refreshJobs().catch(() => {}); return true;
   }
-  function disconnect() { sessionHash = null; saveSettings({ neillQuoteConnected: false }); }
+  function auth() { return ND_URL ? { token: sessionHash } : { passwordHash: sessionHash }; }
+  function disconnect() { if (ND_URL && sessionHash) backendCall('logout', { token: sessionHash }).catch(() => {}); sessionHash = null; saveSettings({ neillQuoteConnected: false }); }
   function isConnected() { return !!sessionHash; }
   function mapStatus(status) { if (status === 'quote') return 'quoting'; if (status === 'in_progress') return 'working'; return null; }
   async function refreshJobs() {
     if (!sessionHash) return [];
-    try { const data = await backendCall('get_quotes', { passwordHash: sessionHash }); cachedJobs = (data.quotes || []).filter(q => q.clientLat && q.clientLng); lastFetch = Date.now(); }
+    try { const data = await backendCall('get_quotes', auth()); cachedJobs = (data.quotes || []).filter(q => q.clientLat && q.clientLng); lastFetch = Date.now(); }
     catch (e) { console.warn('Neill Quote refresh failed', e); }
     return cachedJobs;
   }
@@ -1733,7 +1747,7 @@ const TsNeillQuote = (() => {
   }
   async function flagProject(quoteId, target) {
     const st = getState(); if (!st.settings.autoFlagProjects) return; if (!sessionHash) return;
-    try { await backendCall('change_status', { passwordHash: sessionHash, id: quoteId, status: target }); }
+    try { await backendCall(ND_URL ? 'set_status' : 'change_status', Object.assign(auth(), { id: quoteId, status: target })); }
     catch (e) { console.warn('Neill Quote write-back skipped:', e.message); }
   }
   return { connect, disconnect, isConnected, refreshJobs, matchLocation, flagProject, get cachedJobs() { return cachedJobs; } };
@@ -1926,7 +1940,7 @@ window.TsExport = TsExport;
  * sanitized snapshot of the CURRENT week into the `live_snapshot` tab of its
  * own private Timesheet-Data spreadsheet, using the Google sign-in it already
  * has. The public /timesheetlive page never touches Google directly: it asks
- * the Timesheet Live Apps Script (timesheetlive/apps-script/Code.gs), which
+ * the Neill Data Backend Apps Script (apps-script/neill-data-backend/TimesheetLive.gs), which
  * checks the passcode server-side and returns only this snapshot.
  * Payload = display fields only: job names, rounded times, hours, OT, break
  * minutes, static-day names, week totals, in-progress shift start. No

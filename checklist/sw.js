@@ -9,9 +9,10 @@
  *   - install precaches with {cache:'reload'} to bypass the HTTP cache
  */
 
-const CACHE_VERSION = 'checklist-v1';
+const CACHE_VERSION = 'checklist-v2';
 const SHELL_ASSETS = [
   "./",
+  "../shared/nd-backend.js",
   "./index.html",
   "./manifest.json",
   "./favicon.svg",

@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Checklist">
+<script src="../shared/nd-backend.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -683,7 +684,10 @@ ND.records.define('job',     { expiresDays: null, label: 'Install job' });
    No job data is ever sent to the shared backend.
    ============================================================ */
 const SuiteAuth = (function () {
-  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
+  // Shared switch (shared/nd-backend.js): the Neill Data Backend checks the code
+  // server-side once configured; until then, the legacy Quote backend as before.
+  const ND_URL = String((window.ND_BACKEND && window.ND_BACKEND.endpoint) || '').trim();
+  const BACKEND_URL = ND_URL || 'https://script.google.com/macros/s/AKfycbzkrnzibo7guyNhzWXmjJWNCkyx0j_5aoILnEnBYq4jK0EodqrxIevaSwyRThRqnPxM/exec';
   const FP_KEY   = 'nd_device_fp_v1';        // shared convention with the suite
   const CACHE_KEY = 'nd:checklist:knownLogins'; // {hash:{username,role,at}} for offline unlock
 
@@ -722,7 +726,7 @@ const SuiteAuth = (function () {
     try {
       const r = await fetch(BACKEND_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'login', passwordHash: hash, fingerprint: fingerprint() }),
+        body: JSON.stringify(ND_URL ? { action: 'login', code: passcode, fingerprint: fingerprint() } : { action: 'login', passwordHash: hash, fingerprint: fingerprint() }),
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         redirect: 'follow'
       });
@@ -731,7 +735,12 @@ const SuiteAuth = (function () {
     } catch (e) { networkFailed = true; }
 
     if (data) {
-      if (data.ok && data.user) { remember(hash, data.user); return { ok: true, user: data.user }; }
+      if (data.ok && data.user) {
+        remember(hash, data.user);
+        // Checklist only needs "who is this" — end the server session straight away.
+        if (ND_URL && data.token) fetch(BACKEND_URL, { method: 'POST', body: JSON.stringify({ action: 'logout', token: data.token }), headers: { 'Content-Type': 'text/plain;charset=UTF-8' } }).catch(() => {});
+        return { ok: true, user: data.user };
+      }
       if (data.locked)   return { locked: true };
       if (data.cooldownMs) return { cooldownMs: data.cooldownMs };
       return { ok: false, attemptsRemaining: data.attemptsRemaining, error: data.error };
