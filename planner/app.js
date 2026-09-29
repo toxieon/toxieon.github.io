@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.12.1";
+const APP_VERSION = "0.12.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -593,13 +593,25 @@ function nodeColor(node) {
   }
   return tab.color || hashColor(node.category);
 }
+function categoryMatchKey(value) { return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-AU'); }
 function nodeShorthand(node) {
-  if (!node || !node.category) return "";
-  const tab = state.categoriesData?.[node.category];
-  if (!tab || !node.lineItem) return "";
-  const it = tab.items?.find((i) => i.item === node.lineItem);
-  return it?.shorthand || "";
+  if (!node?.category || !node.lineItem) return '';
+  const categories = state.categoriesData || {};
+  let tab = categories[node.category];
+  if (!tab) {
+    const matches = Object.keys(categories).filter(k => categoryMatchKey(k) === categoryMatchKey(node.category));
+    if (matches.length !== 1) return ''; // Never guess between ambiguous categories.
+    tab = categories[matches[0]];
+  }
+  let item = tab.items?.find(i => i.item === node.lineItem);
+  if (!item) {
+    const matches = (tab.items || []).filter(i => categoryMatchKey(i.item) === categoryMatchKey(node.lineItem));
+    if (matches.length !== 1) return '';
+    item = matches[0];
+  }
+  return String(item.shorthand || '').trim().slice(0,4);
 }
+function categorySheetRange(tab, cells) { return "'" + String(tab).replace(/'/g, "''") + "'!" + cells; }
 function autoSuggestName(lineItem, floorId = state.selectedFloorId) {
   if (!lineItem || !floorId) return lineItem || "";
   const escaped = lineItem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1872,12 +1884,12 @@ async function refreshCategories() {
     const sheetProps = (meta.result.sheets || []).map((s) => s.properties);
     const tabs = sheetProps.map((s) => s.title);
     if (!tabs.length) return;
-    const vr = await gapi.client.sheets.spreadsheets.values.batchGet({ spreadsheetId: state.drive.categoriesSheetId, ranges: tabs.map((t) => `${t}!A2:E`) });
+    const vr = await gapi.client.sheets.spreadsheets.values.batchGet({ spreadsheetId: state.drive.categoriesSheetId, ranges: tabs.map((t) => categorySheetRange(t, "A2:E")) });
     const data = {};
     (vr.result.valueRanges || []).forEach((v, idx) => {
       const tabName = tabs[idx];
       const tabHex = rgbColorToHex(sheetProps[idx]?.tabColor);
-      const rows = (v.values || []).filter((r) => r && r[0] && r[0].trim());
+      const rows = (v.values || []).filter((r) => r && r[0] != null && String(r[0]).trim());
       const items = rows.map((r) => ({ item: (r[0]||"").toString().trim(), code: (r[1]||"").toString().trim(), description: (r[2]||"").toString().trim(), color: (r[3]||"").toString().trim() || null, shorthand: (r[4]||"").toString().trim().slice(0, 4) }));
       const tabColor = tabHex || DEFAULT_CATEGORY_TABS.find((t) => t.name === tabName)?.color || items.find((i) => i.color)?.color || hashColor(tabName);
       data[tabName] = { color: tabColor, items };
@@ -3037,15 +3049,21 @@ async function saveCategoryCsvFromSettings() {
     }
     await gapi.client.sheets.spreadsheets.values.clear({
       spreadsheetId: state.drive.categoriesSheetId,
-      range: `${tabName}!A:E`
+      range: categorySheetRange(tabName, "A:E")
     });
     await gapi.client.sheets.spreadsheets.values.update({
       spreadsheetId: state.drive.categoriesSheetId,
-      range: `${tabName}!A1:E${rows.length + 1}`,
+      range: categorySheetRange(tabName, `A1:E${rows.length + 1}`),
       valueInputOption: "RAW",
       resource: { values: [CATEGORIES_HEADER, ...rows.map((r) => [r.item, r.code, r.description, r.color, r.shorthand])] }
     });
+    // Publish the successful write immediately. A failed subsequent read must
+    // not leave the editor's new shorthand hidden behind the previous cache.
+    if (selectedTab && selectedTab !== tabName) delete state.categoriesData[selectedTab];
+    state.categoriesData[tabName] = { color, items: rows.map(r => ({...r})) };
+    state.categoriesLoadedAt = nowStamp();
     state.ui.categoryEditorTab = tabName;
+    persist(); render();
     await refreshCategories();
     toast(`${tabName} saved`);
   } catch (e) {

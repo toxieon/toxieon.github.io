@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const {section,context}=require('./test-utils.cjs');
+const ctx=context(section('function categoryMatchKey','function autoSuggestName'),{state:{categoriesData:{'New Category':{items:[{item:'Data Outlet',shorthand:'DATA'}]}}}});
+assert.equal(ctx.nodeShorthand({category:'New Category',lineItem:'Data Outlet'}),'DATA');
+assert.equal(ctx.nodeShorthand({category:' new category ',lineItem:' data  outlet '}),'DATA');
+assert.equal(ctx.nodeShorthand({category:'New Category',lineItem:'unknown'}),'');
+assert.equal(ctx.nodeShorthand({category:'New Category'}),'');
+ctx.state.categoriesData['New Category'].items.push({item:'data outlet',shorthand:'DUP'});
+assert.equal(ctx.nodeShorthand({category:'New Category',lineItem:'DATA OUTLET'}),'');
+assert.equal(ctx.nodeShorthand({category:'New Category',lineItem:'Data Outlet'}),'DATA');
+assert.equal(ctx.categorySheetRange("Ray's Data",'A2:E'),"'Ray''s Data'!A2:E");
+console.log('Shorthand tests passed: exact, normalized, missing, ambiguous and quoted sheet names');
