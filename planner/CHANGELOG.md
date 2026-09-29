@@ -1,3 +1,5 @@
+## 0.15.1 · 2026-09-29 · pdf-export · Add direct device PDF saving, iOS sharing and printable report isolation
+
 ## 0.14.1 · 2026-09-29 · report-viewing · Preserve compact cards, expose full-size photos and add full-screen browsing
 
 ## 0.13.1 · 2026-09-29 · report-layout · Add cover, bare and annotated floor pages, and individual node thumbnails
@@ -11,4 +13,3 @@
 ## 0.10.1 · 2026-09-29 · stable-login · Add optional server-held Google refresh tokens and device sessions
 
 ## 0.9.4 · 2026-09-29 · baseline · Record the existing Planner version
-

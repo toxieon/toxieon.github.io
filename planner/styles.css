@@ -3453,7 +3453,7 @@ button[disabled],
 .print-node-location { width:180px; max-width:100%; margin:0 0 10px; }
 .print-node-location h2 { font-size:11px; margin:0 0 4px; }
 .print-node-location .print-plan { margin:0; width:100%; }
-.print-node-location .print-marker { width:18px; height:18px; font-size:6px; }
+.print-node-location .print-marker { width:20px; height:20px; font-size:6px; white-space:nowrap; overflow-wrap:normal; }
 .print-node-card { overflow-wrap:anywhere; }
 .pdf-render-page .print-cover { min-height:1030px; }
 .pdf-render-page .print-hero[data-report-page] { min-height:1000px; }
@@ -3481,4 +3481,23 @@ body.report-fullscreen { overflow:hidden; }
   .print-mode-tabs button { padding:7px; font-size:12px; }
   .print-modal-actions { display:grid; grid-template-columns:1fr 1fr; }
   .print-modal-actions button { min-height:44px; }
+}
+
+.pdf-ready { padding:8px 16px; border-top:1px solid var(--line); font-size:12px; flex-shrink:0; }
+.pdf-ready .button-row { margin-top:6px; }
+#plannerPrintRoot { position:fixed; left:-12000px; top:0; width:794px; }
+@page { size:A4; margin:10mm; }
+@media print {
+  :root { color-scheme:light !important; }
+  html, body, body.report-fullscreen { background:white !important; color:#111 !important; height:auto !important; overflow:visible !important; }
+  body > :not(#app):not(#plannerPrintRoot), #app > :not(.print-modal) { display:none !important; }
+  #app, #app .print-modal, #app .print-modal .modal-body { display:block !important; position:static !important; transform:none !important; width:auto !important; height:auto !important; min-height:0 !important; max-width:none !important; max-height:none !important; overflow:visible !important; padding:0 !important; margin:0 !important; border:0 !important; box-shadow:none !important; background:white !important; }
+  .print-modal > :not(.modal-body) { display:none !important; }
+  .print-page, #plannerPrintRoot { display:block !important; position:static !important; inset:auto !important; width:auto !important; min-height:0 !important; padding:0 !important; margin:0 !important; box-shadow:none !important; background:white !important; }
+  .print-page, .print-page *, #plannerPrintRoot, #plannerPrintRoot * { visibility:visible !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body.is-report-printing #app { display:none !important; }
+  .print-node-card { break-inside:avoid; }
+  .print-room > h3 { break-after:avoid; page-break-after:avoid; }
+  .print-page.report-full-images .print-node-card { break-inside:auto; page-break-inside:auto; }
+  .print-page.report-full-images .print-photo { break-inside:avoid; }
 }

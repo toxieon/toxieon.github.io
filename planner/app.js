@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.14.1";
+const APP_VERSION = "0.15.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -24,6 +24,7 @@ const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
 const DRIVE_PDF_HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
 const DRIVE_PDF_JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 let _drivePdfBusy = false;
+let _downloadPdf = null;
 
 const statusMeta = {
   "Not Started": { color: "#2563eb", key: "not-started" },
@@ -709,6 +710,7 @@ function handleAuthEvent(ev) {
     if (ev.type !== "signin") { render(); return; }   // silent renewals never re-bootstrap
     bootstrapDrive();
   } else if (ev.type === "signout") {
+    if (_downloadPdf) { URL.revokeObjectURL(_downloadPdf.url); _downloadPdf = null; }
     if (window.gapi?.client) gapi.client.setToken(null);
     if (window.NDDriveImage) NDDriveImage.clearCache();   // don't leak one account's photos to the next
     stopMasterPhotoImportLoop();
@@ -3380,8 +3382,9 @@ function renderPrintPreviewModal() {
       <div class="modal-body">
         <div class="print-page ${state.modal?.fullImages ? "report-full-images" : ""}" id="printPage">${body}</div>
       </div>
-      ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Photo-heavy jobs: use <strong>Save PDF to Drive</strong> (capped) — browser Print can choke on large reports.</p>` : ""}
-      <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
+      ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Download and Drive PDFs include up to 3 photos per node and 48 overall. Use Print for all photos.</p>` : ""}
+      ${renderReadyPdf()}
+      <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="download-pdf" ${_drivePdfBusy || state.modal?.loading ? "disabled" : ""}>${icon("download")}Download PDF</button><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
     </div>`;
 }
 
@@ -3808,7 +3811,9 @@ function handleAction(event) {
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
     case "report-fullscreen": return toggleReportView('fullscreen');
     case "report-photo-view": return toggleReportView('fullImages');
-    case "print-now": return window.print();
+    case "print-now": return printPlannerReport();
+    case "download-pdf": return downloadPlannerPdf();
+    case "share-pdf": return sharePlannerPdf();
     case "save-pdf-drive": return savePrintPdfToDrive();
     case "bulk-size": return setBulkNodeSize(false);
     case "floor-size": return setBulkNodeSize(true);
@@ -4849,8 +4854,10 @@ function applyDrivePdfPhotoCaps(root) {
     banner.className = "print-muted";
     banner.style.cssText = "margin:8px 0 16px;padding:8px 10px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#92400e;";
     banner.textContent = `Lean Drive PDF: omitted ${totalDropped} photo(s) across ${nodesCapped} node(s) to keep file size manageable. Use Print / Save as PDF for the full set.`;
+    const cover = root.querySelector(".print-cover");
     const header = root.querySelector(".print-header");
-    if (header && header.nextSibling) header.parentNode.insertBefore(banner, header.nextSibling);
+    if (cover) cover.appendChild(banner);
+    else if (header) header.appendChild(banner);
     else root.insertBefore(banner, root.firstChild);
   }
   return { totalKept, totalDropped, nodesCapped };
@@ -4888,6 +4895,7 @@ async function buildPdfBlobFromPrintElement(sourceEl) {
   const pdf = new jsPDF({orientation:'p', unit:'mm', format:'a4', compress:true});
   let pages = 0;
   try {
+    await hydrateReportImages(clone);
     await waitForPrintImages(clone);
     const failed = [...clone.querySelectorAll('img')].filter(img => !img.complete || !img.naturalWidth);
     if (failed.length) throw new Error(`${failed.length} report image(s) unavailable. Wait for images or reconnect and retry.`);
@@ -4937,6 +4945,71 @@ async function buildPdfBlobFromPrintElement(sourceEl) {
     if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) throw new Error('PDF exceeds 18 MB. Use Print for this report.');
     return {blob,pages,caps};
   } finally { host.remove(); }
+}
+
+
+async function hydrateReportImages(root) {
+  for (const img of root.querySelectorAll('img[data-fileid]')) {
+    img.loading = 'eager';
+    if (/^(blob:|data:)/.test(img.src)) continue;
+    if (!window.NDDriveImage) throw new Error('Photo loader unavailable. Reload and retry.');
+    let token = await NDAuth.ensureToken();
+    try { img.src = await NDDriveImage.url(img.dataset.fileid, token); }
+    catch (e) {
+      if (!/401/.test(String(e.message))) throw e;
+      token = await NDAuth.ensureToken({force:true});
+      img.src = await NDDriveImage.url(img.dataset.fileid, token);
+    }
+    img.classList.remove('is-broken', 'img-failed');
+  }
+}
+function plannerPdfName() {
+  const name = (project()?.name || 'project').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);
+  return name + ' - ' + (state.modal?.reportMode === 'full' ? 'Full report' : 'Overview') + '.pdf';
+}
+function renderReadyPdf() {
+  if (!_downloadPdf) return '';
+  return `<div class="pdf-ready"><span>Ready: ${escapeHtml(_downloadPdf.file.name)} (${_downloadPdf.pages} pages${_downloadPdf.dropped ? ', ' + _downloadPdf.dropped + ' photos omitted' : ''})</span><div class="button-row"><button class="ghost-button" data-action="share-pdf">Save / Share PDF</button><a class="ghost-button" href="${escapeHtml(_downloadPdf.url)}" target="_blank" rel="noopener">Open PDF</a><a class="ghost-button" href="${escapeHtml(_downloadPdf.url)}" download="${escapeHtml(_downloadPdf.file.name)}">Save file</a></div></div>`;
+}
+async function downloadPlannerPdf() {
+  if (_drivePdfBusy || state.modal?.loading) return;
+  const page = document.getElementById('printPage'); if (!page) return;
+  const snapshot = page.cloneNode(true), name = plannerPdfName();
+  _drivePdfBusy = true; toast('Building PDF…'); render();
+  try {
+    const {blob,pages,caps} = await buildPdfBlobFromPrintElement(snapshot);
+    if (_downloadPdf) URL.revokeObjectURL(_downloadPdf.url);
+    _downloadPdf = {file:new File([blob],name,{type:'application/pdf'}),url:URL.createObjectURL(blob),pages,dropped:caps.totalDropped};
+    const mobile = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!mobile) { const a = document.createElement('a'); a.href = _downloadPdf.url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+    toast(mobile ? 'PDF ready. Tap Save / Share PDF, then Save to Files.' : 'PDF downloaded. A saved copy is also ready below.');
+  } catch (e) { toast('PDF failed: ' + describeError(e)); }
+  finally { _drivePdfBusy = false; render(); }
+}
+async function sharePlannerPdf() {
+  if (!_downloadPdf) return;
+  // Separate tap preserves user activation on iOS after PDF generation.
+  const data = {files:[_downloadPdf.file]};
+  if (navigator.canShare?.(data) && navigator.share) {
+    try { await navigator.share(data); }
+    catch (e) { if (e.name !== 'AbortError') toast('Sharing unavailable. Tap Open PDF, then use the browser Share menu.'); }
+  } else toast('Tap Open PDF, then use the browser Share or Save command.');
+}
+async function printPlannerReport() {
+  if (state.modal?.loading || _drivePdfBusy) return;
+  const page = document.getElementById('printPage'); if (!page) return;
+  const copy = page.cloneNode(true); copy.id = 'plannerPrintRoot';
+  copy.querySelectorAll('img').forEach(img => {img.loading='eager';});
+  try {
+    document.getElementById('plannerPrintRoot')?.remove();
+    document.body.appendChild(copy);
+    await hydrateReportImages(copy); await waitForPrintImages(copy);
+    if ([...copy.querySelectorAll('img')].some(img => !img.complete || !img.naturalWidth)) throw new Error('Report images are still unavailable. Reconnect and retry.');
+    document.body.classList.add('is-report-printing');
+    const clean = () => {copy.remove();document.body.classList.remove('is-report-printing');};
+    window.addEventListener('afterprint',clean,{once:true});
+    window.print();
+  } catch (e) { copy.remove();document.body.classList.remove('is-report-printing');toast('Print failed: ' + describeError(e)); }
 }
 
 async function savePrintPdfToDrive() {
