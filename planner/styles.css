@@ -3439,3 +3439,6 @@ button[disabled],
 .photo-jobs { position:fixed; right:12px; bottom:12px; z-index:500; max-width:min(400px,calc(100vw - 24px)); max-height:36vh; overflow:auto; padding:12px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px; font-size:12px; }
 .photo-jobs details > div { padding:8px 0; border-top:1px solid var(--line); overflow-wrap:anywhere; }
 .photo-jobs button { margin:4px; min-height:36px; }
+
+.node-hit-area { position:absolute; left:50%; top:50%; width:max(28px,calc(28px / var(--size,1))); height:max(28px,calc(28px / var(--size,1))); transform:translate(-50%,-50%); border-radius:50%; background:transparent; }
+.bulk-bar input, .size-control input[type=number] { width:70px; }

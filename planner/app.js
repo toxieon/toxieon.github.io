@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.11.1";
+const APP_VERSION = "0.12.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -2295,10 +2295,21 @@ function renderMassBanner() {
   return `<div class="mass-banner" role="status">${icon("mass")}<span>Mass placing: <strong>${escapeHtml(m.category)} / ${escapeHtml(m.lineItem)}</strong> &middot; ${m.count} placed</span><span class="hint">Click the plan to drop. <kbd>Esc</kbd> to stop.</span><button class="ghost-button" data-action="mass-stop">${icon("close")}Stop</button></div>`;
 }
 
+function setBulkNodeSize(allFloor) {
+  const input = document.querySelector(allFloor ? '[data-floor-size]' : '[data-bulk-size]');
+  const value = Number(input?.value) / 100;
+  if (!Number.isFinite(value) || value < 0.05 || value > 3) { toast('Choose a size from 5% to 300%'); return; }
+  const nodes = allFloor ? floorNodes() : state.nodes.filter(n => state.bulkSelection.includes(n.id));
+  nodes.forEach(n => { n.size = value; n.updatedAt = nowStamp(); });
+  persist(); render(); toast('Resized ' + nodes.length + ' node(s)');
+  logAudit('Bulk Marker Size', {details: nodes.length + ' nodes to ' + Math.round(value*100) + '%'});
+}
+
 function renderBulkBar() {
   const count = state.bulkSelection.length;
   return `<div class="bulk-bar" role="status">
     <strong>${count} selected</strong>
+    <label>Size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.bulkSizePercent ?? 100}" data-bulk-size aria-label="Selected marker size percent" /></label><button data-action="bulk-size">Apply size</button>
     <label>Status <select data-bulk-status><option value="">—</option>${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}</select></label>
     <label>Category <select data-bulk-category><option value="">—</option>${categoryNames().map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select></label>
     <button class="danger-button" data-action="bulk-delete">${icon("trash")}Delete</button>
@@ -2436,7 +2447,7 @@ function renderMapView() {
           <button class="right-tab ${rightTab === "plan" ? "is-active" : ""}" data-right-tab="plan">${icon("settings")}Plan</button>
         </div>
         ${rightTab === "plan" ? renderPlanSettings(floor) : `
-        <div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
+        <div class="size-control"><label>All floor nodes size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.floorSizePercent ?? 100}" data-floor-size /></label><button class="ghost-button" data-action="floor-size">Apply to floor</button></div><div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
         <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>
         ${renderBatchNodesPanel(proj)}`}
@@ -2540,7 +2551,7 @@ function renderMarker(node) {
   const innerIcon = isPortal ? icon("portal") : isSwitchboard ? icon("switchboard") : isSubboard ? icon("subboard") : "";
   const swbBadge = (isSwitchboard || isSubboard) && node.swbProjectId
     ? `<span class="swb-linked-dot" title="Linked to SWB project"></span>` : "";
-  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}">${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
+  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}"><span class="node-hit-area" aria-hidden="true"></span>${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
 }
 
 function renderNodeSummary(node) {
@@ -3110,7 +3121,7 @@ function renderDrawer(node) {
         <div class="drawer-actions">${statusPill(node.status)}${isPortal && linkedProject ? `<button class="primary-button" data-action="follow-portal">${icon("arrowRight")}Walk to ${escapeHtml(linkedLabel || linkedProject.name)}</button>` : ""}<button class="icon-button" data-action="share-node" title="Share">${icon("share")}</button><button class="icon-button" data-action="edit-node" title="Edit">${icon("edit")}</button>${!isPortal ? `<button class="icon-button" data-action="clone-node" title="Duplicate">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="delete-node" title="Delete">${icon("trash")}</button></div>
         ${!isPortal ? `
         <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload existing photos</span><input type="file" accept="image/*,.heic,.heif" multiple data-photo-upload="${node.id}" style="display:none" /></label><button class="ghost-button" data-camera-node="${node.id}">${icon("camera")}Take photo</button>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
-        <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
+        <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.05" max="3" step="0.05" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
         <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => { const did = image.driveFileId || image.id || ""; const tsrc = image.thumbnailLink || driveThumb(did, 400); return `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${(tsrc || did) ? `<img ${did ? `data-fileid="${escapeHtml(did)}"` : ""} src="${escapeHtml(tsrc || "")}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`; }).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
@@ -3212,7 +3223,7 @@ function renderMassPickModal() {
   const cats = categoryNames();
   const initialCategory = state.modal.category || cats[0];
   const items = categoryItems(initialCategory);
-  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="massForm" role="dialog"><div class="modal-header"><div><h3>Mass place nodes</h3><p>Pick what to drop. Click the plan to place. ESC to stop.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="massCategory">Category</label><select id="massCategory" name="category" data-node-category>${cats.map((c) => `<option value="${escapeHtml(c)}" ${initialCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></div><div class="field"><label for="massItem">Line item</label><select id="massItem" name="lineItem" data-node-item>${items.length ? items.map((i) => `<option value="${escapeHtml(i.item)}">${escapeHtml(i.item)}${i.code ? ` (${escapeHtml(i.code)})` : ""}</option>`).join("") : `<option value="">No line items in this tab</option>`}</select></div><div class="field"><label for="massStatus">Status</label><select id="massStatus" name="status">${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}" ${s === "Not Started" ? "selected" : ""}>${escapeHtml(s)}</option>`).join("")}</select></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("mass")}Start placing</button></div></form>`;
+  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="massForm" role="dialog"><div class="modal-header"><div><h3>Mass place nodes</h3><p>Pick what to drop. Click the plan to place. ESC to stop.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="massCategory">Category</label><select id="massCategory" name="category" data-node-category>${cats.map((c) => `<option value="${escapeHtml(c)}" ${initialCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></div><div class="field"><label for="massItem">Line item</label><select id="massItem" name="lineItem" data-node-item>${items.length ? items.map((i) => `<option value="${escapeHtml(i.item)}">${escapeHtml(i.item)}${i.code ? ` (${escapeHtml(i.code)})` : ""}</option>`).join("") : `<option value="">No line items in this tab</option>`}</select></div><div class="field"><label for="massSize">Marker size (%)</label><input id="massSize" name="size" type="number" min="5" max="300" step="5" value="${state.modal.sizePercent ?? 100}" required /></div><div class="field"><label for="massStatus">Status</label><select id="massStatus" name="status">${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}" ${s === "Not Started" ? "selected" : ""}>${escapeHtml(s)}</option>`).join("")}</select></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("mass")}Start placing</button></div></form>`;
 }
 
 function renderPortalCreateModal() {
@@ -3534,6 +3545,11 @@ function bindEvents() {
     const addrInput = projectForm.querySelector("[data-project-address]");
     if (window.NDHere && hereBtn && addrInput) NDHere.attachButton(hereBtn, addrInput, { region: ADDRESS_COUNTRY, busyLabel: "Locating…", mapsKey: googleConfig.googleApiKey, onResult: () => addrInput.setCustomValidity("") });
   }
+  // Toast expiry and background sync can re-render while the user is typing.
+  // Retain size drafts so those renders cannot silently reset the chosen size.
+  document.querySelector('[data-bulk-size]')?.addEventListener('input', e => { state.ui.bulkSizePercent = e.target.value; });
+  document.querySelector('[data-floor-size]')?.addEventListener('input', e => { state.ui.floorSizePercent = e.target.value; });
+  document.getElementById('massSize')?.addEventListener('input', e => { if (state.modal) state.modal.sizePercent = e.target.value; });
   const massForm = document.getElementById("massForm"); if (massForm) massForm.addEventListener("submit", handleMassForm);
   const portalForm = document.getElementById("portalForm"); if (portalForm) portalForm.addEventListener("submit", handlePortalForm);
   const floorForm = document.getElementById("floorForm"); if (floorForm) floorForm.addEventListener("submit", handleFloorForm);
@@ -3750,6 +3766,8 @@ function handleAction(event) {
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
     case "print-now": return window.print();
     case "save-pdf-drive": return savePrintPdfToDrive();
+    case "bulk-size": return setBulkNodeSize(false);
+    case "floor-size": return setBulkNodeSize(true);
     case "bulk-delete": return bulkDelete();
     case "bulk-clear": state.bulkSelection = []; return render();
     case "wipe-local": return confirmWipeLocal();
@@ -4162,7 +4180,9 @@ function handleMassForm(event) {
   const lineItem = (form.get("lineItem") || "").toString();
   const status = (form.get("status") || "Not Started").toString();
   if (!category || !lineItem) { toast("Pick a category and line item"); return; }
-  state.massMode = { active: true, category, lineItem, status, count: 0 };
+  const size = Number(form.get("size")) / 100;
+  if (!Number.isFinite(size) || size < 0.05 || size > 3) { toast("Choose a size from 5% to 300%"); return; }
+  state.massMode = { active: true, category, lineItem, status, size, count: 0 };
   state.modal = null; render();
   toast(`Mass placing ${category} / ${lineItem}. ESC to stop.`);
 }
@@ -4175,7 +4195,7 @@ function placeMassNode(position) {
   const node = {
     id: uid("node"), projectId: proj.id, floorId: floor.id, type: "marker",
     category: m.category, lineItem: m.lineItem, customTitle: autoName,
-    status: m.status || "Not Started",
+    status: m.status || "Not Started", size: m.size ?? 1,
     roomId: resolveInitialRoomId(position) || null,
     assignedTo: "", tags: [], description: "", position,
     createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local",
