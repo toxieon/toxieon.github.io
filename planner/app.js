@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.9.4";
+const APP_VERSION = "0.15.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -24,6 +24,7 @@ const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
 const DRIVE_PDF_HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
 const DRIVE_PDF_JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 let _drivePdfBusy = false;
+let _downloadPdf = null;
 
 const statusMeta = {
   "Not Started": { color: "#2563eb", key: "not-started" },
@@ -593,13 +594,25 @@ function nodeColor(node) {
   }
   return tab.color || hashColor(node.category);
 }
+function categoryMatchKey(value) { return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-AU'); }
 function nodeShorthand(node) {
-  if (!node || !node.category) return "";
-  const tab = state.categoriesData?.[node.category];
-  if (!tab || !node.lineItem) return "";
-  const it = tab.items?.find((i) => i.item === node.lineItem);
-  return it?.shorthand || "";
+  if (!node?.category || !node.lineItem) return '';
+  const categories = state.categoriesData || {};
+  let tab = categories[node.category];
+  if (!tab) {
+    const matches = Object.keys(categories).filter(k => categoryMatchKey(k) === categoryMatchKey(node.category));
+    if (matches.length !== 1) return ''; // Never guess between ambiguous categories.
+    tab = categories[matches[0]];
+  }
+  let item = tab.items?.find(i => i.item === node.lineItem);
+  if (!item) {
+    const matches = (tab.items || []).filter(i => categoryMatchKey(i.item) === categoryMatchKey(node.lineItem));
+    if (matches.length !== 1) return '';
+    item = matches[0];
+  }
+  return String(item.shorthand || '').trim().slice(0,4);
 }
+function categorySheetRange(tab, cells) { return "'" + String(tab).replace(/'/g, "''") + "'!" + cells; }
 function autoSuggestName(lineItem, floorId = state.selectedFloorId) {
   if (!lineItem || !floorId) return lineItem || "";
   const escaped = lineItem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -673,7 +686,7 @@ async function bootGoogle() {
   try {
     await waitFor("google");
     NDAuth.onAuthChange(handleAuthEvent);
-    NDAuth.init({ clientId: googleConfig.googleClientId, scopes: googleConfig.scopes || googleScopes.split(" ") });
+    NDAuth.init({ serverEndpoint: window.ND_BACKEND?.plannerOAuth ? window.ND_BACKEND.endpoint : "", clientId: googleConfig.googleClientId, scopes: googleConfig.scopes || googleScopes.split(" ") });
     _gisReady = true;
   } catch (e) { state.googleAuth.lastError = "GIS: " + (e.message || e); render(); return; }
   state.googleAuth.librariesReady = true;
@@ -697,6 +710,7 @@ function handleAuthEvent(ev) {
     if (ev.type !== "signin") { render(); return; }   // silent renewals never re-bootstrap
     bootstrapDrive();
   } else if (ev.type === "signout") {
+    if (_downloadPdf) { URL.revokeObjectURL(_downloadPdf.url); _downloadPdf = null; }
     if (window.gapi?.client) gapi.client.setToken(null);
     if (window.NDDriveImage) NDDriveImage.clearCache();   // don't leak one account's photos to the next
     stopMasterPhotoImportLoop();
@@ -715,7 +729,7 @@ function signIn() {
   state.googleAuth.bootstrapping = true; render();
   NDAuth.ensureToken({ interactive: true }).catch((e) => { state.googleAuth.lastError = e?.message || "Sign-in failed"; state.googleAuth.bootstrapping = false; render(); });
 }
-function signOut() { NDAuth.signOut(); }
+async function signOut() { try { await NDAuth.signOut(); } catch (e) { toast("Sign-out could not reach the server. Please retry: " + describeError(e)); } }
 function isTokenValid() { return state.googleAuth.signedIn && state.googleAuth.accessToken && state.googleAuth.expiresAt && Date.now() < state.googleAuth.expiresAt - 30000; }
 function requireAuth(label) { if (isTokenValid()) return true; toast(`Sign in to Google first (${label})`); return false; }
 
@@ -779,7 +793,7 @@ function sleep(ms) { return new Promise((resolve) => window.setTimeout(resolve, 
 function isRetryableGoogleError(e) {
   const status = Number(e?.status || e?.result?.error?.code || 0);
   const message = describeError(e).toLowerCase();
-  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || (status === 403 && /rate|quota|user.?limit|backend/i.test(message));
+  return (e instanceof TypeError) || status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || (status === 403 && /rate|quota|user.?limit|backend/i.test(message));
 }
 function isUnauthorizedGoogleError(e) {
   const status = Number(e?.status || e?.result?.error?.code || 0);
@@ -837,7 +851,13 @@ async function findChildFolder(name, parentId) {
   return list.result.files?.[0]?.id || null;
 }
 
-async function findOrCreateChildFolder(name, parentId) {
+const folderRequests = new Map();
+function findOrCreateChildFolder(name, parentId) {
+  const key = JSON.stringify([parentId, name]);
+  if (!folderRequests.has(key)) folderRequests.set(key, findOrCreateChildFolderOnce(name, parentId).finally(() => folderRequests.delete(key)));
+  return folderRequests.get(key);
+}
+async function findOrCreateChildFolderOnce(name, parentId) {
   const existing = await findChildFolder(name, parentId);
   if (existing) return existing;
   const create = await gapi.client.drive.files.create({
@@ -858,10 +878,11 @@ async function findSheetInFolder(name, parentId) {
 async function driveFileExists(fileId) {
   if (!fileId || !isTokenValid()) return false;
   try {
-    const r = await gapi.client.drive.files.get({ fileId, fields: "id,trashed" });
+    const r = await googleCall(() => gapi.client.drive.files.get({ fileId, fields: "id,trashed" }));
     return Boolean(r.result.id && !r.result.trashed);
   } catch (e) {
-    return false;
+    if (Number(e?.status || e?.result?.error?.code) === 404) return false;
+    throw e; // Transient auth/network errors must not discard the existing folder map.
   }
 }
 
@@ -1153,45 +1174,11 @@ async function renameDriveFile(fileId, name) {
 
 function uploadBulkPhotos() {
   if (!requireAuth("upload photos") || !requirePlannerDrive("upload photos")) return;
+  const proj = project();
+  if (!proj) { toast("Select a job first so photos include its name."); return; }
   const input = document.createElement("input");
-  input.type = "file"; input.accept = "image/*"; input.multiple = true;
-  input.onchange = async () => {
-    const files = Array.from(input.files || []); if (!files.length) return;
-    const api = getPlannerInboxApi();
-    if (!api) { toast("Inbox not ready yet"); return; }
-    // One pipeline (v1.0 §3.1): inside a project -> straight to the project's
-    // tray (FILED_TO_PROJECT); otherwise -> Batch as UNFILED.
-    const proj = project();
-    const floor = proj ? (currentFloor() || proj.floors?.[0]) : null;
-    let parentId = null;
-    if (proj) { try { parentId = await ensureProjectDriveFolder(proj); } catch (e) {} }
-    if (!parentId) { try { parentId = await ensureBatchFolderId(); } catch (e) {} }
-    if (!parentId) { toast("Drive folders not ready"); return; }
-    toast(`Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`);
-    let ok = 0;
-    for (const file of files) {
-      try {
-        const uploaded = await uploadFileToDrive(file, parentId);
-        const rec = {
-          driveFileId: uploaded.id, name: uploaded.name,
-          status: proj ? NDInbox.STATUS.FILED_TO_PROJECT : NDInbox.STATUS.UNFILED,
-          address: proj?.address || "", addressSource: "manual",
-          projectId: proj?.id || "", floorId: proj ? (floor?.id || "") : "",
-          uploader: state.googleAuth.profile?.email || "",
-          uploadedAt: new Date().toISOString(),
-          mimeType: uploaded.mimeType || file.type || "",
-          webViewLink: uploaded.webViewLink || "", thumbnailLink: uploaded.thumbnailLink || ""
-        };
-        await api.upsert(rec);
-        _inboxRecords.push(rec);
-        ok++;
-      } catch (e) { console.warn("Photo upload failed", file.name, e); }
-    }
-    persist({ skipSync: true }); render();
-    logAudit("Photos Uploaded", { details: `${ok} file(s) via unified inbox${proj ? ` -> ${proj.name}` : ""}` });
-    toast(ok ? `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${proj ? " — in the To sort tray" : ""}` : "No photos uploaded");
-    if (ok && proj) { state.modal = { mode: "sort-tray", projectId: proj.id }; render(); }
-  };
+  input.type = "file"; input.accept = "image/*,.heic,.heif"; input.multiple = true;
+  input.onchange = () => enqueuePlannerPhotos(Array.from(input.files || []), {projectId: proj.id});
   input.click();
 }
 
@@ -1899,12 +1886,12 @@ async function refreshCategories() {
     const sheetProps = (meta.result.sheets || []).map((s) => s.properties);
     const tabs = sheetProps.map((s) => s.title);
     if (!tabs.length) return;
-    const vr = await gapi.client.sheets.spreadsheets.values.batchGet({ spreadsheetId: state.drive.categoriesSheetId, ranges: tabs.map((t) => `${t}!A2:E`) });
+    const vr = await gapi.client.sheets.spreadsheets.values.batchGet({ spreadsheetId: state.drive.categoriesSheetId, ranges: tabs.map((t) => categorySheetRange(t, "A2:E")) });
     const data = {};
     (vr.result.valueRanges || []).forEach((v, idx) => {
       const tabName = tabs[idx];
       const tabHex = rgbColorToHex(sheetProps[idx]?.tabColor);
-      const rows = (v.values || []).filter((r) => r && r[0] && r[0].trim());
+      const rows = (v.values || []).filter((r) => r && r[0] != null && String(r[0]).trim());
       const items = rows.map((r) => ({ item: (r[0]||"").toString().trim(), code: (r[1]||"").toString().trim(), description: (r[2]||"").toString().trim(), color: (r[3]||"").toString().trim() || null, shorthand: (r[4]||"").toString().trim().slice(0, 4) }));
       const tabColor = tabHex || DEFAULT_CATEGORY_TABS.find((t) => t.name === tabName)?.color || items.find((i) => i.color)?.color || hashColor(tabName);
       data[tabName] = { color: tabColor, items };
@@ -2030,7 +2017,12 @@ async function syncAllDriveFolders(opts = {}) {
   render();
 }
 
-async function ensureNodeDriveFolder(node) {
+const nodeFolderRequests = new Map();
+function ensureNodeDriveFolder(node) {
+  if (!nodeFolderRequests.has(node.id)) nodeFolderRequests.set(node.id, ensureNodeDriveFolderOnce(node).finally(() => nodeFolderRequests.delete(node.id)));
+  return nodeFolderRequests.get(node.id);
+}
+async function ensureNodeDriveFolderOnce(node) {
   if (!isTokenValid()) return null;
   if (state.drive.nodeFolderMap[node.id]) {
     if (await driveFileExists(state.drive.nodeFolderMap[node.id])) return state.drive.nodeFolderMap[node.id];
@@ -2051,19 +2043,26 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+const uploadFileIds = new WeakMap();
 async function uploadFileToDrive(file, parentFolderId, overrideName) {
   if (!parentFolderId) throw new Error("No parent folder");
-  const base64 = arrayBufferToBase64(await file.arrayBuffer());
-  const boundary = "neillp-" + Math.random().toString(36).slice(2);
-  const metadata = { name: overrideName || file.name, parents: [parentFolderId] };
-  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--${boundary}--`;
-  const resp = await gapi.client.request({
-    path: "/upload/drive/v3/files", method: "POST",
-    params: { uploadType: "multipart", fields: "id,name,webViewLink,thumbnailLink,mimeType,iconLink" },
-    headers: { "Content-Type": `multipart/related; boundary="${boundary}"` },
-    body
+  await NDAuth.ensureToken();
+  if (!uploadFileIds.has(file)) {
+    const ids = await googleCall(() => gapi.client.drive.files.generateIds({count:1, space:'drive'}));
+    uploadFileIds.set(file, ids.result.ids[0]);
+  }
+  const id = uploadFileIds.get(file), boundary = 'neillp-' + id;
+  const metadata = {id, name: overrideName || file.name, parents:[parentFolderId]};
+  const body = new Blob(['--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(metadata)+'\r\n--'+boundary+'\r\nContent-Type: '+(file.type || 'application/octet-stream')+'\r\n\r\n', file, '\r\n--'+boundary+'--\r\n'], {type:'multipart/related; boundary='+boundary});
+  const fields = 'id,name,webViewLink,thumbnailLink,mimeType,iconLink';
+  return googleCall(async () => {
+    const token = await NDAuth.ensureToken();
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields='+encodeURIComponent(fields), {method:'POST', headers:{Authorization:'Bearer '+token}, body});
+    if (response.status === 409) return (await gapi.client.drive.files.get({fileId:id, fields})).result;
+    const data = await response.json();
+    if (!response.ok) { const error = new Error(data.error?.message || 'Drive upload failed'); error.status = response.status; throw error; }
+    return data;
   });
-  return resp.result;
 }
 
 async function updateFileBytes(fileId, file) {
@@ -2187,6 +2186,7 @@ function downloadAuditCsv(rows) {
 /* ============================================================ RENDER */
 
 function render() {
+  document.body.classList.toggle("report-fullscreen", !!(state.modal?.mode === "print-preview" && state.modal.fullscreen));
   const app = document.getElementById("app"); if (!app) return;
   // Returning user — silent re-auth in flight, show reconnecting screen
   if (state.googleAuth.bootstrapped && !state.googleAuth.signedIn && state.googleAuth.bootstrapping) {
@@ -2206,6 +2206,7 @@ function render() {
     ${state.drawerOpen && selectedNode() ? renderDrawer(selectedNode()) : ""}
     ${state.modal ? renderModal() : ""}
     ${state.lightbox ? renderLightbox() : ""}
+    ${renderPhotoJobs()}
     ${(state.googleAuth.bootstrapping || state.googleAuth.hydrating) ? renderLoadingOverlay(state.googleAuth.hydrating && !state.googleAuth.bootstrapping ? "Loading from cloud..." : "Loading planner data...") : ""}
     ${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}
   `;
@@ -2213,6 +2214,7 @@ function render() {
   // isn't pinned in front of that content.
   document.body.classList.toggle("np-overlay", !!((state.drawerOpen && selectedNode()) || state.modal || state.lightbox));
   bindEvents();
+  bindPlannerCamera();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
   if (window.NDUI && NDUI.skeletonOverlay) {
@@ -2308,10 +2310,21 @@ function renderMassBanner() {
   return `<div class="mass-banner" role="status">${icon("mass")}<span>Mass placing: <strong>${escapeHtml(m.category)} / ${escapeHtml(m.lineItem)}</strong> &middot; ${m.count} placed</span><span class="hint">Click the plan to drop. <kbd>Esc</kbd> to stop.</span><button class="ghost-button" data-action="mass-stop">${icon("close")}Stop</button></div>`;
 }
 
+function setBulkNodeSize(allFloor) {
+  const input = document.querySelector(allFloor ? '[data-floor-size]' : '[data-bulk-size]');
+  const value = Number(input?.value) / 100;
+  if (!Number.isFinite(value) || value < 0.05 || value > 3) { toast('Choose a size from 5% to 300%'); return; }
+  const nodes = allFloor ? floorNodes() : state.nodes.filter(n => state.bulkSelection.includes(n.id));
+  nodes.forEach(n => { n.size = value; n.updatedAt = nowStamp(); });
+  persist(); render(); toast('Resized ' + nodes.length + ' node(s)');
+  logAudit('Bulk Marker Size', {details: nodes.length + ' nodes to ' + Math.round(value*100) + '%'});
+}
+
 function renderBulkBar() {
   const count = state.bulkSelection.length;
   return `<div class="bulk-bar" role="status">
     <strong>${count} selected</strong>
+    <label>Size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.bulkSizePercent ?? 100}" data-bulk-size aria-label="Selected marker size percent" /></label><button data-action="bulk-size">Apply size</button>
     <label>Status <select data-bulk-status><option value="">—</option>${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}</select></label>
     <label>Category <select data-bulk-category><option value="">—</option>${categoryNames().map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select></label>
     <button class="danger-button" data-action="bulk-delete">${icon("trash")}Delete</button>
@@ -2449,7 +2462,7 @@ function renderMapView() {
           <button class="right-tab ${rightTab === "plan" ? "is-active" : ""}" data-right-tab="plan">${icon("settings")}Plan</button>
         </div>
         ${rightTab === "plan" ? renderPlanSettings(floor) : `
-        <div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
+        <div class="size-control"><label>All floor nodes size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.floorSizePercent ?? 100}" data-floor-size /></label><button class="ghost-button" data-action="floor-size">Apply to floor</button></div><div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
         <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>
         ${renderBatchNodesPanel(proj)}`}
@@ -2553,7 +2566,7 @@ function renderMarker(node) {
   const innerIcon = isPortal ? icon("portal") : isSwitchboard ? icon("switchboard") : isSubboard ? icon("subboard") : "";
   const swbBadge = (isSwitchboard || isSubboard) && node.swbProjectId
     ? `<span class="swb-linked-dot" title="Linked to SWB project"></span>` : "";
-  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}">${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
+  return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}"><span class="node-hit-area" aria-hidden="true"></span>${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
 }
 
 function renderNodeSummary(node) {
@@ -3039,15 +3052,21 @@ async function saveCategoryCsvFromSettings() {
     }
     await gapi.client.sheets.spreadsheets.values.clear({
       spreadsheetId: state.drive.categoriesSheetId,
-      range: `${tabName}!A:E`
+      range: categorySheetRange(tabName, "A:E")
     });
     await gapi.client.sheets.spreadsheets.values.update({
       spreadsheetId: state.drive.categoriesSheetId,
-      range: `${tabName}!A1:E${rows.length + 1}`,
+      range: categorySheetRange(tabName, `A1:E${rows.length + 1}`),
       valueInputOption: "RAW",
       resource: { values: [CATEGORIES_HEADER, ...rows.map((r) => [r.item, r.code, r.description, r.color, r.shorthand])] }
     });
+    // Publish the successful write immediately. A failed subsequent read must
+    // not leave the editor's new shorthand hidden behind the previous cache.
+    if (selectedTab && selectedTab !== tabName) delete state.categoriesData[selectedTab];
+    state.categoriesData[tabName] = { color, items: rows.map(r => ({...r})) };
+    state.categoriesLoadedAt = nowStamp();
     state.ui.categoryEditorTab = tabName;
+    persist(); render();
     await refreshCategories();
     toast(`${tabName} saved`);
   } catch (e) {
@@ -3122,8 +3141,8 @@ function renderDrawer(node) {
       <div class="drawer-body">
         <div class="drawer-actions">${statusPill(node.status)}${isPortal && linkedProject ? `<button class="primary-button" data-action="follow-portal">${icon("arrowRight")}Walk to ${escapeHtml(linkedLabel || linkedProject.name)}</button>` : ""}<button class="icon-button" data-action="share-node" title="Share">${icon("share")}</button><button class="icon-button" data-action="edit-node" title="Edit">${icon("edit")}</button>${!isPortal ? `<button class="icon-button" data-action="clone-node" title="Duplicate">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="delete-node" title="Delete">${icon("trash")}</button></div>
         ${!isPortal ? `
-        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload photos</span><input type="file" accept="image/*" multiple capture="environment" data-photo-upload="${node.id}" style="display:none" /></label>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
-        <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
+        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload existing photos</span><input type="file" accept="image/*,.heic,.heif" multiple data-photo-upload="${node.id}" style="display:none" /></label><button class="ghost-button" data-camera-node="${node.id}">${icon("camera")}Take photo</button>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
+        <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.05" max="3" step="0.05" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
         <div><h3 class="section-title">Gallery</h3>${node.imageRefs.length ? `<div class="gallery-grid">${node.imageRefs.map((image, index) => { const did = image.driveFileId || image.id || ""; const tsrc = image.thumbnailLink || driveThumb(did, 400); return `<button class="image-tile" style="--thumb:linear-gradient(135deg,#1e293b,#334155)" data-lightbox="${index}" aria-label="${escapeHtml(image.name)}">${(tsrc || did) ? `<img ${did ? `data-fileid="${escapeHtml(did)}"` : ""} src="${escapeHtml(tsrc || "")}" alt="${escapeHtml(image.name)}" loading="lazy" referrerpolicy="no-referrer" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />` : ""}<span>${escapeHtml(image.name)}</span></button>`; }).join("")}</div>` : `<div class="empty-state">No images. Use "Upload photos" above.</div>`}</div>
@@ -3145,6 +3164,7 @@ function renderModal() {
   if (m.mode === "new-room" || m.mode === "rename-room") return renderRoomModal();
   if (m.mode === "bulk-photo-picker") return renderBulkPhotoPickerModal();
   if (m.mode === "help") return renderHelpModal();
+  if (m.mode === "camera") return renderPlannerCamera();
   if (m.mode === "print-preview") return renderPrintPreviewModal();
   return "";
 }
@@ -3224,7 +3244,7 @@ function renderMassPickModal() {
   const cats = categoryNames();
   const initialCategory = state.modal.category || cats[0];
   const items = categoryItems(initialCategory);
-  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="massForm" role="dialog"><div class="modal-header"><div><h3>Mass place nodes</h3><p>Pick what to drop. Click the plan to place. ESC to stop.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="massCategory">Category</label><select id="massCategory" name="category" data-node-category>${cats.map((c) => `<option value="${escapeHtml(c)}" ${initialCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></div><div class="field"><label for="massItem">Line item</label><select id="massItem" name="lineItem" data-node-item>${items.length ? items.map((i) => `<option value="${escapeHtml(i.item)}">${escapeHtml(i.item)}${i.code ? ` (${escapeHtml(i.code)})` : ""}</option>`).join("") : `<option value="">No line items in this tab</option>`}</select></div><div class="field"><label for="massStatus">Status</label><select id="massStatus" name="status">${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}" ${s === "Not Started" ? "selected" : ""}>${escapeHtml(s)}</option>`).join("")}</select></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("mass")}Start placing</button></div></form>`;
+  return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="massForm" role="dialog"><div class="modal-header"><div><h3>Mass place nodes</h3><p>Pick what to drop. Click the plan to place. ESC to stop.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="massCategory">Category</label><select id="massCategory" name="category" data-node-category>${cats.map((c) => `<option value="${escapeHtml(c)}" ${initialCategory === c ? "selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></div><div class="field"><label for="massItem">Line item</label><select id="massItem" name="lineItem" data-node-item>${items.length ? items.map((i) => `<option value="${escapeHtml(i.item)}">${escapeHtml(i.item)}${i.code ? ` (${escapeHtml(i.code)})` : ""}</option>`).join("") : `<option value="">No line items in this tab</option>`}</select></div><div class="field"><label for="massSize">Marker size (%)</label><input id="massSize" name="size" type="number" min="5" max="300" step="5" value="${state.modal.sizePercent ?? 100}" required /></div><div class="field"><label for="massStatus">Status</label><select id="massStatus" name="status">${Object.keys(statusMeta).map((s) => `<option value="${escapeHtml(s)}" ${s === "Not Started" ? "selected" : ""}>${escapeHtml(s)}</option>`).join("")}</select></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("mass")}Start placing</button></div></form>`;
 }
 
 function renderPortalCreateModal() {
@@ -3237,16 +3257,19 @@ function renderPortalCreateModal() {
   return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="portalForm" role="dialog"><div class="modal-header"><div><h3>Add door / stairs</h3><p>Link floors or rooms. A matching return door is created automatically.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="portalLabel">Label</label><input id="portalLabel" name="label" required placeholder="Door to Store Room" /></div><div class="field"><label for="portalSourceRoom">From room</label><select id="portalSourceRoom" name="sourceRoomId"><option value="">No room</option>${currentRooms.map((r) => `<option value="${escapeHtml(r.id)}" ${state.selectedRoomId === r.id ? "selected" : ""}>${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field"><label for="portalTarget">Links to project</label><select id="portalTarget" name="targetProjectId" required data-portal-target>${others.length ? others.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("") : `<option value="">No projects exist yet</option>`}</select></div><div class="field"><label for="portalFloor">Target floor</label><select id="portalFloor" name="targetFloorId" data-portal-floor>${initialTarget ? (initialTarget.floors || []).map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("") : `<option value="">No floors</option>`}</select></div><div class="field"><label for="portalTargetRoom">Target room</label><select id="portalTargetRoom" name="targetRoomId"><option value="">No room</option>${initialTargetRooms.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field full"><label for="portalReturn">Return door label</label><input id="portalReturn" name="returnLabel" placeholder="Door back" /></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit" ${state.projects.length ? "" : "disabled"}>${icon("check")}Create door</button></div></form>`;
 }
 
-function renderPrintPlanHero(floor, nodes, heading) {
+function renderPrintPlanHero(floor, nodes, heading, thumbnail = false) {
   if (!floor) return "<p>(No floor.)</p>";
   const planUrl = state.floorPlans[floor.id];
   const planAspect = Number(floor.planAspectRatio) || 1.6;
   const title = heading || floor.name;
   return `
-    <section class="print-hero">
+    <section class="print-hero" ${thumbnail ? "" : "data-report-page"}>
       <h2>${escapeHtml(title)}</h2>
-      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : "<p>(No floor plan uploaded.)</p>"}
+      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.filter(n => n.position && Number.isFinite(Number(n.position.x)) && Number.isFinite(Number(n.position.y))).map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : `<p>${floor.planDriveFileId ? "Floor plan unavailable. Reopen the report online to retry." : "No floor plan uploaded."}</p>`}
     </section>`;
+}
+function renderReportCover(proj) {
+  return `<section class="print-cover" data-report-page><img src="../logo.png" alt="Neill Data" /><h1>Neill Planner</h1><h2>${escapeHtml(proj.name)}</h2><p>${escapeHtml(proj.address || '')}</p><p class="print-muted">Generated ${escapeHtml(nowStamp())}</p></section>`;
 }
 function renderPrintNodeCard(n) {
   const photos = n.imageRefs || [];
@@ -3262,6 +3285,7 @@ function renderPrintNodeCard(n) {
     ? `<ul class="print-comments">${comments.map((c) => `<li><strong>${escapeHtml(c.author || "")}</strong> <span>${escapeHtml(c.time || "")}</span><br>${escapeHtml(c.text || "")}</li>`).join("")}</ul>`
     : "";
   return `<article class="print-node-card">
+    <div class="print-node-location">${renderPrintPlanHero(floorById(projectById(n.projectId), n.floorId), [n], "Node location", true)}</div>
     <header><h4>${escapeHtml(nodeDisplayTitle(n))}</h4><p>${escapeHtml(n.category || "-")} / ${escapeHtml(n.lineItem || "-")} &middot; <strong>${escapeHtml(n.status || "")}</strong>${n.assignedTo ? " &middot; " + escapeHtml(n.assignedTo) : ""}</p></header>
     ${n.description ? `<p class="print-notes">${escapeHtml(n.description)}</p>` : ""}
     ${(n.tags || []).length ? `<p class="print-muted">Tags: ${escapeHtml(n.tags.join(", "))}</p>` : ""}
@@ -3272,12 +3296,14 @@ function renderPrintNodeCard(n) {
 function renderPrintOverviewBody(proj, floor) {
   const nodes = floor ? floorNodes(floor.id) : [];
   return `
+    ${renderReportCover(proj)}
+    ${renderPrintPlanHero(floor, [], `${floor?.name || "Plan"} — bare plan`)}
+    ${renderPrintPlanHero(floor, nodes, `${floor?.name || "Plan"} — all nodes`)}
     <header class="print-header">
       <h1>${escapeHtml(proj.name)}</h1>
       <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(nowStamp())}</p>
       <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; Total nodes (this floor): ${nodes.length}</p>
     </header>
-    ${renderPrintPlanHero(floor, nodes, floor?.name || "Plan")}
     <h2>Node Schedule</h2>
     <table class="print-table">
       <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Line item</th><th>Status</th><th>Assignee</th><th>Room</th><th>Updated</th></tr></thead>
@@ -3286,8 +3312,7 @@ function renderPrintOverviewBody(proj, floor) {
 }
 function renderPrintFullBody(proj) {
   const floors = [...(proj.floors || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
-  const current = currentFloor();
-  const coverNodes = current ? floorNodes(current.id) : [];
+
   const sections = floors.map((fl, idx) => {
     const nodes = floorNodes(fl.id).filter((n) => n.type !== "portal");
     const rooms = floorRooms(fl.id);
@@ -3307,40 +3332,59 @@ function renderPrintFullBody(proj) {
       unassigned.length ? `<section class="print-room"><h3>No room <span class="print-muted">(${unassigned.length})</span></h3>${unassigned.map(renderPrintNodeCard).join("")}</section>` : ""
     ].join("");
     return `<section class="print-floor-section ${idx ? "print-break" : ""}">
-      ${renderPrintPlanHero(fl, floorNodes(fl.id), `Floor: ${fl.name}`)}
+      ${renderPrintPlanHero(fl, [], `Floor: ${fl.name} — bare plan`)}
+      ${renderPrintPlanHero(fl, floorNodes(fl.id), `Floor: ${fl.name} — all nodes`)}
       ${roomBlocks || `<p class="print-muted">No nodes on this floor.</p>`}
     </section>`;
   }).join("");
-  return `
-    <header class="print-header">
-      <h1>${escapeHtml(proj.name)} — Full project report</h1>
-      <p>${escapeHtml(proj.address || "")} &middot; Generated ${escapeHtml(nowStamp())}</p>
-      <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; ${floors.length} floor(s) &middot; ${projectNodes(proj.id).length} nodes</p>
-    </header>
-    ${current ? `<section class="print-cover print-break-after">${renderPrintPlanHero(current, coverNodes, `Cover — ${current.name}`)}</section>` : ""}
-    ${sections}`;
+  return `${renderReportCover(proj)}${sections}`;
+}
+function toggleReportView(key) {
+  if (state.modal?.mode !== 'print-preview') return;
+  const scrollTop = document.querySelector('.print-modal .modal-body')?.scrollTop || 0;
+  state.modal[key] = !state.modal[key]; render();
+  const body = document.querySelector('.print-modal .modal-body'); if (body) body.scrollTop = scrollTop;
+  document.querySelector(key === 'fullscreen' ? '[data-action="report-fullscreen"]' : '[data-action="report-photo-view"]')?.focus();
+}
+async function openPlannerReport(reportMode) {
+  const proj = project(); if (!proj) return;
+  const modal = {mode:'print-preview', reportMode, loading:true};
+  state.modal = modal; render();
+  // Fetch every floor before rendering, not just the floor open on the map.
+  for (const floor of (proj.floors || [])) {
+    if (!state.floorPlans[floor.id] && floor.planDriveFileId) {
+      try {
+        await NDAuth.ensureToken();
+        const url = await fetchDriveFileAsDataUrl(floor.planPngFileId || floor.planDriveFileId);
+        if (url) { await cacheFloorPlan(floor.id, url); floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || floor.planAspectRatio; }
+      } catch (e) { console.warn('Report floor plan unavailable', floor.id); }
+    }
+  }
+  if (state.modal === modal) { modal.loading = false; render(); }
 }
 function renderPrintPreviewModal() {
   const proj = project(); if (!proj) return "";
   const floor = currentFloor();
   const reportMode = state.modal?.reportMode === "full" ? "full" : "overview";
-  const body = reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
+  const body = state.modal?.loading ? "<p>Loading report plans…</p>" : reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
   return `
     <div class="modal-backdrop" data-action="close-modal"></div>
-    <div class="modal print-modal" role="dialog">
+    <div class="modal print-modal ${state.modal?.fullscreen ? "is-fullscreen" : ""}" role="dialog" aria-modal="true" aria-label="Planner report">
       <div class="modal-header">
         <div><h3>${reportMode === "full" ? "Full project report" : "Print overview"}</h3><p>${escapeHtml(proj.name)}${reportMode === "overview" ? " / " + escapeHtml(floor?.name || "") : ""}</p></div>
-        <button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button>
+        <button type="button" class="ghost-button" data-action="report-fullscreen">${state.modal?.fullscreen ? "Exit full screen" : "Full screen"}</button><button type="button" class="icon-button" data-action="close-modal" aria-label="Close report">${icon("close")}</button>
       </div>
       <div class="print-mode-tabs">
         <button type="button" class="ghost-button ${reportMode === "overview" ? "is-active" : ""}" data-action="print-mode-overview">${icon("printer")}Overview</button>
         <button type="button" class="ghost-button ${reportMode === "full" ? "is-active" : ""}" data-action="print-mode-full">${icon("download")}Full report</button>
+        <button type="button" class="ghost-button" data-action="report-photo-view">${state.modal?.fullImages ? "Compact photos" : "Full-size photos"}</button>
       </div>
       <div class="modal-body">
-        <div class="print-page" id="printPage">${body}</div>
+        <div class="print-page ${state.modal?.fullImages ? "report-full-images" : ""}" id="printPage">${body}</div>
       </div>
-      ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Photo-heavy jobs: use <strong>Save PDF to Drive</strong> (capped) — browser Print can choke on large reports.</p>` : ""}
-      <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
+      ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Download and Drive PDFs include up to 3 photos per node and 48 overall. Use Print for all photos.</p>` : ""}
+      ${renderReadyPdf()}
+      <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="download-pdf" ${_drivePdfBusy || state.modal?.loading ? "disabled" : ""}>${icon("download")}Download PDF</button><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
     </div>`;
 }
 
@@ -3546,6 +3590,11 @@ function bindEvents() {
     const addrInput = projectForm.querySelector("[data-project-address]");
     if (window.NDHere && hereBtn && addrInput) NDHere.attachButton(hereBtn, addrInput, { region: ADDRESS_COUNTRY, busyLabel: "Locating…", mapsKey: googleConfig.googleApiKey, onResult: () => addrInput.setCustomValidity("") });
   }
+  // Toast expiry and background sync can re-render while the user is typing.
+  // Retain size drafts so those renders cannot silently reset the chosen size.
+  document.querySelector('[data-bulk-size]')?.addEventListener('input', e => { state.ui.bulkSizePercent = e.target.value; });
+  document.querySelector('[data-floor-size]')?.addEventListener('input', e => { state.ui.floorSizePercent = e.target.value; });
+  document.getElementById('massSize')?.addEventListener('input', e => { if (state.modal) state.modal.sizePercent = e.target.value; });
   const massForm = document.getElementById("massForm"); if (massForm) massForm.addEventListener("submit", handleMassForm);
   const portalForm = document.getElementById("portalForm"); if (portalForm) portalForm.addEventListener("submit", handlePortalForm);
   const floorForm = document.getElementById("floorForm"); if (floorForm) floorForm.addEventListener("submit", handleFloorForm);
@@ -3756,12 +3805,18 @@ function handleAction(event) {
     case "hours-range": { _hoursUI.range = event.currentTarget.dataset.range || "all"; return render(); }
     case "audit-download": return downloadAuditCsv(filteredAuditRows());
     case "audit-clear-filters": state.auditView.filters = freshState().auditView.filters; persist(); return render();
-    case "print-report": state.modal = { mode: "print-preview", reportMode: "overview" }; return render();
-    case "print-full-report": state.modal = { mode: "print-preview", reportMode: "full" }; return render();
+    case "print-report": return openPlannerReport("overview");
+    case "print-full-report": return openPlannerReport("full");
     case "print-mode-overview": if (state.modal) state.modal.reportMode = "overview"; return render();
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
-    case "print-now": return window.print();
+    case "report-fullscreen": return toggleReportView('fullscreen');
+    case "report-photo-view": return toggleReportView('fullImages');
+    case "print-now": return printPlannerReport();
+    case "download-pdf": return downloadPlannerPdf();
+    case "share-pdf": return sharePlannerPdf();
     case "save-pdf-drive": return savePrintPdfToDrive();
+    case "bulk-size": return setBulkNodeSize(false);
+    case "floor-size": return setBulkNodeSize(true);
     case "bulk-delete": return bulkDelete();
     case "bulk-clear": state.bulkSelection = []; return render();
     case "wipe-local": return confirmWipeLocal();
@@ -4174,7 +4229,9 @@ function handleMassForm(event) {
   const lineItem = (form.get("lineItem") || "").toString();
   const status = (form.get("status") || "Not Started").toString();
   if (!category || !lineItem) { toast("Pick a category and line item"); return; }
-  state.massMode = { active: true, category, lineItem, status, count: 0 };
+  const size = Number(form.get("size")) / 100;
+  if (!Number.isFinite(size) || size < 0.05 || size > 3) { toast("Choose a size from 5% to 300%"); return; }
+  state.massMode = { active: true, category, lineItem, status, size, count: 0 };
   state.modal = null; render();
   toast(`Mass placing ${category} / ${lineItem}. ESC to stop.`);
 }
@@ -4187,7 +4244,7 @@ function placeMassNode(position) {
   const node = {
     id: uid("node"), projectId: proj.id, floorId: floor.id, type: "marker",
     category: m.category, lineItem: m.lineItem, customTitle: autoName,
-    status: m.status || "Not Started",
+    status: m.status || "Not Started", size: m.size ?? 1,
     roomId: resolveInitialRoomId(position) || null,
     assignedTo: "", tags: [], description: "", position,
     createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local",
@@ -4726,26 +4783,10 @@ function uploadFloorPlan() {
   input.click();
 }
 
-async function uploadPhotosToNode(nodeId, files) {
-  const node = state.nodes.find((n) => n.id === nodeId); if (!node) return;
-  if (!requireAuth("upload photos")) return;
-  if (!requirePlannerDrive("upload photos")) return;
-  toast(`Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`);
-  try {
-    const nodeFolderId = await ensureNodeDriveFolder(node);
-    if (!nodeFolderId) { toast("Could not find/create node folder"); return; }
-    const uploaderName = state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local";
-    for (const file of files) {
-      try {
-        const result = await uploadFileToDrive(file, nodeFolderId);
-        node.imageRefs.push({ id: result.id, name: result.name, driveFileId: result.id, webViewLink: result.webViewLink, thumbnailLink: result.thumbnailLink, mimeType: result.mimeType, uploader: uploaderName, uploadedAt: nowStamp() });
-      } catch (e) { console.error(e); toast(`Failed: ${file.name}`); }
-    }
-    node.updatedAt = nowStamp();
-    persist(); render();
-    toast(`Uploaded ${files.length}`);
-    logAudit("Photos Uploaded", { nodeId: node.id, details: `${files.length} file(s)` });
-  } catch (e) { console.error(e); toast("Upload failed: " + describeError(e)); }
+async function uploadPhotosToNode(nodeId, files, options = {}) {
+  const node = state.nodes.find(n => n.id === nodeId); if (!node) return;
+  if (!requireAuth("upload photos") || !requirePlannerDrive("upload photos")) return;
+  enqueuePlannerPhotos(files, {nodeId, projectId: node.projectId, ...options});
 }
 
 
@@ -4768,7 +4809,7 @@ function loadScriptOnce(src) {
     s.async = true;
     s.dataset.npCdn = src;
     s.onload = () => { s.dataset.loaded = "1"; resolve(); };
-    s.onerror = () => reject(new Error("Failed to load " + src));
+    s.onerror = () => { s.remove(); reject(new Error("Failed to load " + src + ". Check your connection and retry.")); };
     document.head.appendChild(s);
   });
 }
@@ -4813,8 +4854,10 @@ function applyDrivePdfPhotoCaps(root) {
     banner.className = "print-muted";
     banner.style.cssText = "margin:8px 0 16px;padding:8px 10px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#92400e;";
     banner.textContent = `Lean Drive PDF: omitted ${totalDropped} photo(s) across ${nodesCapped} node(s) to keep file size manageable. Use Print / Save as PDF for the full set.`;
+    const cover = root.querySelector(".print-cover");
     const header = root.querySelector(".print-header");
-    if (header && header.nextSibling) header.parentNode.insertBefore(banner, header.nextSibling);
+    if (cover) cover.appendChild(banner);
+    else if (header) header.appendChild(banner);
     else root.insertBefore(banner, root.firstChild);
   }
   return { totalKept, totalDropped, nodesCapped };
@@ -4838,85 +4881,139 @@ function waitForPrintImages(root, timeoutMs = 12000) {
 
 async function buildPdfBlobFromPrintElement(sourceEl) {
   const { html2canvas, jsPDF } = await loadDrivePdfLibs();
-  const host = document.createElement("div");
-  host.setAttribute("aria-hidden", "true");
-  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;pointer-events:none;";
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:absolute;left:-12000px;top:0;width:794px;background:#fff;pointer-events:none;';
   const clone = sourceEl.cloneNode(true);
-  clone.id = "printPageDriveClone";
-  clone.style.width = "794px";
-  clone.style.maxWidth = "794px";
-  clone.style.background = "#fff";
-  clone.style.color = "#111";
-  host.appendChild(clone);
-  document.body.appendChild(host);
-
+  clone.removeAttribute('id');
+  clone.style.cssText = 'width:794px;max-width:794px;background:white;color:#111;';
+  // Snapshot image URLs BEFORE removing capped figures; index-based remapping
+  // after removal used to assign the wrong image to later cards.
+  clone.querySelectorAll('img').forEach(img => { img.loading = 'eager'; });
   const caps = applyDrivePdfPhotoCaps(clone);
-  // Prefer already-hydrated blob/data URLs from the live preview when present.
-  const liveImgs = sourceEl.querySelectorAll("img");
-  clone.querySelectorAll("img").forEach((img, i) => {
-    const live = liveImgs[i];
-    if (live && live.src && (live.src.startsWith("blob:") || live.src.startsWith("data:"))) {
-      img.src = live.src;
-      img.removeAttribute("data-fileid");
-    }
-  });
-  await waitForPrintImages(clone);
-
-  let canvas;
+  host.appendChild(clone); document.body.appendChild(host);
+  const pdf = new jsPDF({orientation:'p', unit:'mm', format:'a4', compress:true});
+  let pages = 0;
   try {
-    canvas = await html2canvas(clone, {
-      scale: 1.35,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      imageTimeout: 8000,
-      windowWidth: 794
-    });
-  } finally {
-    host.remove();
-  }
+    await hydrateReportImages(clone);
+    await waitForPrintImages(clone);
+    const failed = [...clone.querySelectorAll('img')].filter(img => !img.complete || !img.naturalWidth);
+    if (failed.length) throw new Error(`${failed.length} report image(s) unavailable. Wait for images or reconnect and retry.`);
+    const units = [];
+    function collect(parent) {
+      for (const child of [...parent.children]) {
+        if (child.matches('.print-floor-section,.print-room')) collect(child);
+        else units.push(child);
+      }
+    }
+    collect(clone);
+    clone.remove();
+    const page = document.createElement('div');
+    page.className = clone.className + ' pdf-render-page';
+    page.style.cssText = 'box-sizing:border-box;width:794px;min-height:1123px;padding:32px;margin:0;background:white;color:#111;display:flow-root;';
+    host.appendChild(page);
+    async function flush() {
+      if (!page.children.length) return;
+      if (++pages > DRIVE_PDF_MAX_PAGES) throw new Error(`Report exceeds ${DRIVE_PDF_MAX_PAGES} PDF pages. Use Print for the full report.`);
+      const height = Math.ceil(page.getBoundingClientRect().height);
+      if (height > 3500) throw new Error('One report card is too long for image export. Use Print for this report.');
+      const canvas = await html2canvas(page, {scale:1.35,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,imageTimeout:12000,windowWidth:794});
+      try {
+        if (pages > 1) pdf.addPage();
+        // One bounded canvas per page prevents whole-report iOS canvas limits.
+        const w = Math.min(210, 297 * canvas.width / canvas.height);
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.88),'JPEG',(210-w)/2,0,w,canvas.height*w/canvas.width,undefined,'FAST');
+      } finally { canvas.width = canvas.height = 1; }
+      page.replaceChildren();
+    }
+    for (const unit of units) {
+      const ownPage = unit.hasAttribute('data-report-page');
+      if (ownPage) await flush();
+      page.appendChild(unit);
+      if (!ownPage && page.getBoundingClientRect().height > 1124 && page.children.length > 1) {
+        unit.remove();
+        // Keep a room heading with its first card when a page fills.
+        let heading = null;
+        if (page.lastElementChild?.matches('h2,h3')) { heading = page.lastElementChild; heading.remove(); }
+        await flush(); if (heading) page.appendChild(heading); page.appendChild(unit);
+      }
+      if (ownPage) await flush();
+    }
+    await flush();
+    const blob = pdf.output('blob');
+    if (!blob || blob.size < 64) throw new Error('PDF generation produced an empty file');
+    if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) throw new Error('PDF exceeds 18 MB. Use Print for this report.');
+    return {blob,pages,caps};
+  } finally { host.remove(); }
+}
 
-  const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 8;
-  const usableW = pageW - margin * 2;
-  const usableH = pageH - margin * 2;
-  const imgW = usableW;
-  const imgH = (canvas.height * usableW) / canvas.width;
-  const pageCount = Math.max(1, Math.ceil(imgH / usableH));
-  if (pageCount > DRIVE_PDF_MAX_PAGES) {
-    throw new Error(`Report would be ~${pageCount} pages (cap ${DRIVE_PDF_MAX_PAGES}). Narrow the project or use Print.`);
-  }
 
-  const imgData = canvas.toDataURL("image/jpeg", 0.82);
-  let heightLeft = imgH;
-  let y = margin;
-  pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
-  heightLeft -= usableH;
-  let pages = 1;
-  while (heightLeft > 2 && pages < DRIVE_PDF_MAX_PAGES) {
-    y = margin - pages * usableH;
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
-    heightLeft -= usableH;
-    pages++;
+async function hydrateReportImages(root) {
+  for (const img of root.querySelectorAll('img[data-fileid]')) {
+    img.loading = 'eager';
+    if (/^(blob:|data:)/.test(img.src)) continue;
+    if (!window.NDDriveImage) throw new Error('Photo loader unavailable. Reload and retry.');
+    let token = await NDAuth.ensureToken();
+    try { img.src = await NDDriveImage.url(img.dataset.fileid, token); }
+    catch (e) {
+      if (!/401/.test(String(e.message))) throw e;
+      token = await NDAuth.ensureToken({force:true});
+      img.src = await NDDriveImage.url(img.dataset.fileid, token);
+    }
+    img.classList.remove('is-broken', 'img-failed');
   }
-  if (heightLeft > 2) {
-    throw new Error(`PDF exceeded ${DRIVE_PDF_MAX_PAGES} pages after photo caps`);
-  }
-
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 64) throw new Error("PDF generation produced an empty file");
-  if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) {
-    throw new Error(`PDF is ${(blob.size / (1024 * 1024)).toFixed(1)} MB (cap ${DRIVE_PDF_MAX_BLOB_BYTES / (1024 * 1024)} MB)`);
-  }
-  return { blob, pages, caps };
+}
+function plannerPdfName() {
+  const name = (project()?.name || 'project').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);
+  return name + ' - ' + (state.modal?.reportMode === 'full' ? 'Full report' : 'Overview') + '.pdf';
+}
+function renderReadyPdf() {
+  if (!_downloadPdf) return '';
+  return `<div class="pdf-ready"><span>Ready: ${escapeHtml(_downloadPdf.file.name)} (${_downloadPdf.pages} pages${_downloadPdf.dropped ? ', ' + _downloadPdf.dropped + ' photos omitted' : ''})</span><div class="button-row"><button class="ghost-button" data-action="share-pdf">Save / Share PDF</button><a class="ghost-button" href="${escapeHtml(_downloadPdf.url)}" target="_blank" rel="noopener">Open PDF</a><a class="ghost-button" href="${escapeHtml(_downloadPdf.url)}" download="${escapeHtml(_downloadPdf.file.name)}">Save file</a></div></div>`;
+}
+async function downloadPlannerPdf() {
+  if (_drivePdfBusy || state.modal?.loading) return;
+  const page = document.getElementById('printPage'); if (!page) return;
+  const snapshot = page.cloneNode(true), name = plannerPdfName();
+  _drivePdfBusy = true; toast('Building PDF…'); render();
+  try {
+    const {blob,pages,caps} = await buildPdfBlobFromPrintElement(snapshot);
+    if (_downloadPdf) URL.revokeObjectURL(_downloadPdf.url);
+    _downloadPdf = {file:new File([blob],name,{type:'application/pdf'}),url:URL.createObjectURL(blob),pages,dropped:caps.totalDropped};
+    const mobile = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!mobile) { const a = document.createElement('a'); a.href = _downloadPdf.url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+    toast(mobile ? 'PDF ready. Tap Save / Share PDF, then Save to Files.' : 'PDF downloaded. A saved copy is also ready below.');
+  } catch (e) { toast('PDF failed: ' + describeError(e)); }
+  finally { _drivePdfBusy = false; render(); }
+}
+async function sharePlannerPdf() {
+  if (!_downloadPdf) return;
+  // Separate tap preserves user activation on iOS after PDF generation.
+  const data = {files:[_downloadPdf.file]};
+  if (navigator.canShare?.(data) && navigator.share) {
+    try { await navigator.share(data); }
+    catch (e) { if (e.name !== 'AbortError') toast('Sharing unavailable. Tap Open PDF, then use the browser Share menu.'); }
+  } else toast('Tap Open PDF, then use the browser Share or Save command.');
+}
+async function printPlannerReport() {
+  if (state.modal?.loading || _drivePdfBusy) return;
+  const page = document.getElementById('printPage'); if (!page) return;
+  const copy = page.cloneNode(true); copy.id = 'plannerPrintRoot';
+  copy.querySelectorAll('img').forEach(img => {img.loading='eager';});
+  try {
+    document.getElementById('plannerPrintRoot')?.remove();
+    document.body.appendChild(copy);
+    await hydrateReportImages(copy); await waitForPrintImages(copy);
+    if ([...copy.querySelectorAll('img')].some(img => !img.complete || !img.naturalWidth)) throw new Error('Report images are still unavailable. Reconnect and retry.');
+    document.body.classList.add('is-report-printing');
+    const clean = () => {copy.remove();document.body.classList.remove('is-report-printing');};
+    window.addEventListener('afterprint',clean,{once:true});
+    window.print();
+  } catch (e) { copy.remove();document.body.classList.remove('is-report-printing');toast('Print failed: ' + describeError(e)); }
 }
 
 async function savePrintPdfToDrive() {
-  if (_drivePdfBusy) return;
+  if (_drivePdfBusy || state.modal?.loading) return;
   const page = document.getElementById("printPage");
   if (!page) { toast("Open Overview or Full report first"); return; }
   if (!isTokenValid()) { toast("Sign in required to save to Drive"); return; }

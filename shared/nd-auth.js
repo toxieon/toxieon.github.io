@@ -354,6 +354,105 @@
     return api;
   }
 
+  // Optional server flow. Legacy suite pages retain the GIS token implementation.
+  function createServerAuth(deps) {
+    const SESSION = 'nd.auth.planner.session.v1', LOGIN = 'nd.auth.planner.login.v1';
+    let cfg, token = null, listeners = [], pending = null, timer = null, generation = 0;
+    function emit(type, extra) { listeners.forEach(cb => { try { cb(Object.assign({ type, token: token?.access_token || null, profile: token?.profile || null, signedIn: api.isSignedIn() }, extra)); } catch (_) {} }); }
+    function stored(key) { try { return JSON.parse(deps.storage.get(key) || 'null'); } catch (_) { return null; } }
+    async function call(action, body) {
+      const result = await deps.serverPost(cfg.serverEndpoint, Object.assign({ action }, body));
+      if (result.error) throw new Error(result.error);
+      return result;
+    }
+    function schedule() {
+      if (timer) deps.clearTimer(timer);
+      if (token) timer = deps.setTimer(() => { timer = null; api.ensureToken({ force: true }).catch(() => {}); }, Math.max(1000, token.expiry - deps.now() - REFRESH_LEAD_MS));
+    }
+    const api = {
+      init(config) {
+        cfg = config;
+        // Always validate the server session at boot, including revocation.
+        if (deps.onVisibility) deps.onVisibility(() => api.ensureToken().catch(() => {}));
+        if (deps.onSessionStorage) deps.onSessionStorage(() => {
+          generation++; token = null;
+          if (timer) deps.clearTimer(timer);
+          if (!deps.storage.get(SESSION)) emit('signout');
+          else api.ensureToken({ force: true }).catch(() => {});
+        });
+        return api;
+      },
+      ensureToken(opts = {}) {
+        if (pending) return pending;
+        if (!opts.force && isValid(token, deps.now()) && !needsProactiveRefresh(token, deps.now())) return Promise.resolve(token.access_token);
+        const run = generation;
+        // Open synchronously inside the user's tap, before the network request.
+        const login = stored(LOGIN);
+        const popup = opts.interactive && !deps.storage.get(SESSION) && !login ? deps.openAuth() : null;
+        pending = (async () => {
+          let session = deps.storage.get(SESSION), activeLogin = login;
+          if (!session) {
+            if (!activeLogin) {
+              if (!opts.interactive) throw new Error('Sign in to continue');
+              const verifier = deps.randomSecret();
+              const started = await call('planner_oauth_start', { challenge: await deps.digest(verifier) });
+              activeLogin = { state: started.state, verifier, exp: deps.now() + 600000 };
+              if (deps.storage.set(LOGIN, JSON.stringify(activeLogin)) === false) throw new Error('Device storage unavailable');
+              deps.navigateAuth(popup, started.url);
+            }
+            while (run === generation && deps.now() < activeLogin.exp) {
+              const claimed = await call('planner_oauth_claim', activeLogin);
+              if (claimed.session) { session = claimed.session; break; }
+              await new Promise(resolve => deps.setTimer(resolve, 2500));
+            }
+            if (run !== generation) throw new Error('Sign-in cancelled');
+            if (!session) { deps.storage.remove(LOGIN); throw new Error('Sign-in timed out. Try again.'); }
+            if (deps.storage.set(SESSION, session) === false) throw new Error('Device storage unavailable');
+            deps.storage.remove(LOGIN);
+            if (popup && !popup.closed) popup.close();
+          }
+          const result = await call('planner_oauth_token', { session, force: !!opts.force });
+          if (run !== generation) throw new Error('Sign-in cancelled');
+          const first = !token;
+          token = { access_token: result.access_token, expiry: result.expiry, scopes: result.scopes, profile: result.profile, email: result.email };
+          deps.storage.set(STORAGE_KEY, JSON.stringify(token));
+          deps.storage.set(IDENTITY_KEY, JSON.stringify({ email: token.email, profile: token.profile }));
+          schedule(); emit(first ? 'signin' : 'refresh');
+          return token.access_token;
+        })().catch(err => {
+          if (run === generation) {
+            if (err.message === 'session_expired') { deps.storage.remove(SESSION); token = null; }
+            if (/login_expired|sign_in_failed/.test(err.message)) deps.storage.remove(LOGIN);
+            if (popup && !popup.closed) popup.close();
+            emit('error', { error: err.message });
+          }
+          throw err;
+        }).finally(() => { pending = null; });
+        return pending;
+      },
+      async signOut() {
+        const session = deps.storage.get(SESSION);
+        // Keep the credential if revocation fails, so the user can retry.
+        generation++;
+        if (timer) deps.clearTimer(timer);
+        if (session) await call('planner_oauth_logout', { session });
+        token = null;
+        for (const k of [SESSION, LOGIN, STORAGE_KEY, IDENTITY_KEY]) { deps.storage.remove(k); if (deps.idb) await deps.idb.remove(k); }
+        emit('signout');
+      },
+      onAuthChange(cb) { listeners.push(cb); return () => { listeners = listeners.filter(x => x !== cb); }; },
+      getToken: () => token?.access_token || null,
+      getExpiry: () => token?.expiry || null,
+      getProfile: () => token?.profile || stored(IDENTITY_KEY)?.profile || null,
+      getEmail: () => token?.email || stored(IDENTITY_KEY)?.email || null,
+      getResumeEmail: () => api.getEmail(),
+      hasPriorSession: () => !!deps.storage.get(SESSION),
+      isSignedIn: () => isValid(token, deps.now()),
+      pendingRequest: () => !!pending
+    };
+    return api;
+  }
+
   /* ── IndexedDB tiny kv helper ─────────────────────────────────────── */
   function openIdb() {
     return new Promise(function (resolve, reject) {
@@ -398,6 +497,16 @@
   function browserDeps() {
     const idb = idbOps();
     return {
+      serverPost: async function (endpoint, body) {
+        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(30000) });
+        if (!response.ok) throw new Error('Login server unavailable');
+        return response.json();
+      },
+      randomSecret: () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''),
+      digest: async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join(''),
+      openAuth: () => window.open('about:blank', '_blank'),
+      navigateAuth: (popup, url) => { if (popup && !popup.closed) popup.location.replace(url); else window.location.assign(url); },
+      onSessionStorage: cb => window.addEventListener('storage', e => { if (e.key === 'nd.auth.planner.session.v1') cb(); }),
       now: function () { return Date.now(); },
       storage: {
         get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -455,7 +564,7 @@
   const API = {
     STORAGE_KEY, IDENTITY_KEY, REFRESH_LEAD_MS, VALIDITY_SKEW_MS,
     isValid, needsProactiveRefresh, scopesCover, parseStored, parseIdentity,
-    createAuth, browserDeps
+    createAuth, createServerAuth, browserDeps
   };
 
   if (typeof module !== "undefined" && module.exports) {
@@ -463,6 +572,22 @@
   } else {
     root.ND = root.ND || {};
     root.ND.authKit = API;
-    root.NDAuth = createAuth(browserDeps());   // ready-to-init singleton
+    const deps = browserDeps();
+    let active = createAuth(deps), listeners = [];
+    root.NDAuth = {};
+    Object.keys(active).forEach(key => { root.NDAuth[key] = (...args) => active[key](...args); });
+    root.NDAuth.onAuthChange = cb => {
+      const subscription = {cb, off: active.onAuthChange(cb)};
+      listeners.push(subscription);
+      return () => { listeners = listeners.filter(x => x !== subscription); subscription.off(); };
+    };
+    root.NDAuth.init = config => {
+      if (config.serverEndpoint) {
+        listeners.forEach(s => s.off());
+        active = createServerAuth(deps);
+        listeners.forEach(s => { s.off = active.onAuthChange(s.cb); });
+      }
+      return active.init(config);
+    };
   }
 })(typeof window !== "undefined" ? window : globalThis);

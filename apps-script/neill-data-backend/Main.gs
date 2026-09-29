@@ -1,6 +1,7 @@
 /* Router. Every request is POST text/plain JSON (no CORS preflight). */
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.state) return plannerOAuthCallback_(e.parameter);
   return json_({ ok: true, msg: 'Neill Data backend. POST to use.' });
 }
 
@@ -19,6 +20,10 @@ function doPost(e) {
 function route_(body) {
   const action = String(body.action || '');
   switch (action) {
+    case 'planner_oauth_start': return plannerOAuthStart_(body);
+    case 'planner_oauth_claim': return plannerOAuthClaim_(body);
+    case 'planner_oauth_token': return plannerOAuthToken_(body);
+    case 'planner_oauth_logout': return plannerOAuthLogout_(body);
     // public
     case 'get_config': return getConfig_();
     case 'login':      return quoteLogin_(body);
