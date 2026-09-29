@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.10.1";
+const APP_VERSION = "0.11.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -779,7 +779,7 @@ function sleep(ms) { return new Promise((resolve) => window.setTimeout(resolve, 
 function isRetryableGoogleError(e) {
   const status = Number(e?.status || e?.result?.error?.code || 0);
   const message = describeError(e).toLowerCase();
-  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || (status === 403 && /rate|quota|user.?limit|backend/i.test(message));
+  return (e instanceof TypeError) || status === 429 || status === 500 || status === 502 || status === 503 || status === 504 || (status === 403 && /rate|quota|user.?limit|backend/i.test(message));
 }
 function isUnauthorizedGoogleError(e) {
   const status = Number(e?.status || e?.result?.error?.code || 0);
@@ -837,7 +837,13 @@ async function findChildFolder(name, parentId) {
   return list.result.files?.[0]?.id || null;
 }
 
-async function findOrCreateChildFolder(name, parentId) {
+const folderRequests = new Map();
+function findOrCreateChildFolder(name, parentId) {
+  const key = JSON.stringify([parentId, name]);
+  if (!folderRequests.has(key)) folderRequests.set(key, findOrCreateChildFolderOnce(name, parentId).finally(() => folderRequests.delete(key)));
+  return folderRequests.get(key);
+}
+async function findOrCreateChildFolderOnce(name, parentId) {
   const existing = await findChildFolder(name, parentId);
   if (existing) return existing;
   const create = await gapi.client.drive.files.create({
@@ -858,10 +864,11 @@ async function findSheetInFolder(name, parentId) {
 async function driveFileExists(fileId) {
   if (!fileId || !isTokenValid()) return false;
   try {
-    const r = await gapi.client.drive.files.get({ fileId, fields: "id,trashed" });
+    const r = await googleCall(() => gapi.client.drive.files.get({ fileId, fields: "id,trashed" }));
     return Boolean(r.result.id && !r.result.trashed);
   } catch (e) {
-    return false;
+    if (Number(e?.status || e?.result?.error?.code) === 404) return false;
+    throw e; // Transient auth/network errors must not discard the existing folder map.
   }
 }
 
@@ -1153,45 +1160,11 @@ async function renameDriveFile(fileId, name) {
 
 function uploadBulkPhotos() {
   if (!requireAuth("upload photos") || !requirePlannerDrive("upload photos")) return;
+  const proj = project();
+  if (!proj) { toast("Select a job first so photos include its name."); return; }
   const input = document.createElement("input");
-  input.type = "file"; input.accept = "image/*"; input.multiple = true;
-  input.onchange = async () => {
-    const files = Array.from(input.files || []); if (!files.length) return;
-    const api = getPlannerInboxApi();
-    if (!api) { toast("Inbox not ready yet"); return; }
-    // One pipeline (v1.0 §3.1): inside a project -> straight to the project's
-    // tray (FILED_TO_PROJECT); otherwise -> Batch as UNFILED.
-    const proj = project();
-    const floor = proj ? (currentFloor() || proj.floors?.[0]) : null;
-    let parentId = null;
-    if (proj) { try { parentId = await ensureProjectDriveFolder(proj); } catch (e) {} }
-    if (!parentId) { try { parentId = await ensureBatchFolderId(); } catch (e) {} }
-    if (!parentId) { toast("Drive folders not ready"); return; }
-    toast(`Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`);
-    let ok = 0;
-    for (const file of files) {
-      try {
-        const uploaded = await uploadFileToDrive(file, parentId);
-        const rec = {
-          driveFileId: uploaded.id, name: uploaded.name,
-          status: proj ? NDInbox.STATUS.FILED_TO_PROJECT : NDInbox.STATUS.UNFILED,
-          address: proj?.address || "", addressSource: "manual",
-          projectId: proj?.id || "", floorId: proj ? (floor?.id || "") : "",
-          uploader: state.googleAuth.profile?.email || "",
-          uploadedAt: new Date().toISOString(),
-          mimeType: uploaded.mimeType || file.type || "",
-          webViewLink: uploaded.webViewLink || "", thumbnailLink: uploaded.thumbnailLink || ""
-        };
-        await api.upsert(rec);
-        _inboxRecords.push(rec);
-        ok++;
-      } catch (e) { console.warn("Photo upload failed", file.name, e); }
-    }
-    persist({ skipSync: true }); render();
-    logAudit("Photos Uploaded", { details: `${ok} file(s) via unified inbox${proj ? ` -> ${proj.name}` : ""}` });
-    toast(ok ? `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${proj ? " — in the To sort tray" : ""}` : "No photos uploaded");
-    if (ok && proj) { state.modal = { mode: "sort-tray", projectId: proj.id }; render(); }
-  };
+  input.type = "file"; input.accept = "image/*,.heic,.heif"; input.multiple = true;
+  input.onchange = () => enqueuePlannerPhotos(Array.from(input.files || []), {projectId: proj.id});
   input.click();
 }
 
@@ -2030,7 +2003,12 @@ async function syncAllDriveFolders(opts = {}) {
   render();
 }
 
-async function ensureNodeDriveFolder(node) {
+const nodeFolderRequests = new Map();
+function ensureNodeDriveFolder(node) {
+  if (!nodeFolderRequests.has(node.id)) nodeFolderRequests.set(node.id, ensureNodeDriveFolderOnce(node).finally(() => nodeFolderRequests.delete(node.id)));
+  return nodeFolderRequests.get(node.id);
+}
+async function ensureNodeDriveFolderOnce(node) {
   if (!isTokenValid()) return null;
   if (state.drive.nodeFolderMap[node.id]) {
     if (await driveFileExists(state.drive.nodeFolderMap[node.id])) return state.drive.nodeFolderMap[node.id];
@@ -2051,19 +2029,26 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+const uploadFileIds = new WeakMap();
 async function uploadFileToDrive(file, parentFolderId, overrideName) {
   if (!parentFolderId) throw new Error("No parent folder");
-  const base64 = arrayBufferToBase64(await file.arrayBuffer());
-  const boundary = "neillp-" + Math.random().toString(36).slice(2);
-  const metadata = { name: overrideName || file.name, parents: [parentFolderId] };
-  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--${boundary}--`;
-  const resp = await gapi.client.request({
-    path: "/upload/drive/v3/files", method: "POST",
-    params: { uploadType: "multipart", fields: "id,name,webViewLink,thumbnailLink,mimeType,iconLink" },
-    headers: { "Content-Type": `multipart/related; boundary="${boundary}"` },
-    body
+  await NDAuth.ensureToken();
+  if (!uploadFileIds.has(file)) {
+    const ids = await googleCall(() => gapi.client.drive.files.generateIds({count:1, space:'drive'}));
+    uploadFileIds.set(file, ids.result.ids[0]);
+  }
+  const id = uploadFileIds.get(file), boundary = 'neillp-' + id;
+  const metadata = {id, name: overrideName || file.name, parents:[parentFolderId]};
+  const body = new Blob(['--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(metadata)+'\r\n--'+boundary+'\r\nContent-Type: '+(file.type || 'application/octet-stream')+'\r\n\r\n', file, '\r\n--'+boundary+'--\r\n'], {type:'multipart/related; boundary='+boundary});
+  const fields = 'id,name,webViewLink,thumbnailLink,mimeType,iconLink';
+  return googleCall(async () => {
+    const token = await NDAuth.ensureToken();
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields='+encodeURIComponent(fields), {method:'POST', headers:{Authorization:'Bearer '+token}, body});
+    if (response.status === 409) return (await gapi.client.drive.files.get({fileId:id, fields})).result;
+    const data = await response.json();
+    if (!response.ok) { const error = new Error(data.error?.message || 'Drive upload failed'); error.status = response.status; throw error; }
+    return data;
   });
-  return resp.result;
 }
 
 async function updateFileBytes(fileId, file) {
@@ -2206,6 +2191,7 @@ function render() {
     ${state.drawerOpen && selectedNode() ? renderDrawer(selectedNode()) : ""}
     ${state.modal ? renderModal() : ""}
     ${state.lightbox ? renderLightbox() : ""}
+    ${renderPhotoJobs()}
     ${(state.googleAuth.bootstrapping || state.googleAuth.hydrating) ? renderLoadingOverlay(state.googleAuth.hydrating && !state.googleAuth.bootstrapping ? "Loading from cloud..." : "Loading planner data...") : ""}
     ${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}
   `;
@@ -2213,6 +2199,7 @@ function render() {
   // isn't pinned in front of that content.
   document.body.classList.toggle("np-overlay", !!((state.drawerOpen && selectedNode()) || state.modal || state.lightbox));
   bindEvents();
+  bindPlannerCamera();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
   if (window.NDUI && NDUI.skeletonOverlay) {
@@ -3122,7 +3109,7 @@ function renderDrawer(node) {
       <div class="drawer-body">
         <div class="drawer-actions">${statusPill(node.status)}${isPortal && linkedProject ? `<button class="primary-button" data-action="follow-portal">${icon("arrowRight")}Walk to ${escapeHtml(linkedLabel || linkedProject.name)}</button>` : ""}<button class="icon-button" data-action="share-node" title="Share">${icon("share")}</button><button class="icon-button" data-action="edit-node" title="Edit">${icon("edit")}</button>${!isPortal ? `<button class="icon-button" data-action="clone-node" title="Duplicate">${icon("copy")}</button>` : ""}<button class="icon-button" data-action="delete-node" title="Delete">${icon("trash")}</button></div>
         ${!isPortal ? `
-        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload photos</span><input type="file" accept="image/*" multiple capture="environment" data-photo-upload="${node.id}" style="display:none" /></label>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
+        <div class="quick-edit">${renderSelect("quick-status", Object.keys(statusMeta), node.status).replace('data-filter="quick-status"', 'data-quick-status="true"')}<label class="ghost-button drawer-photo-upload" style="cursor:pointer">${icon("camera")}<span>Upload existing photos</span><input type="file" accept="image/*,.heic,.heif" multiple data-photo-upload="${node.id}" style="display:none" /></label><button class="ghost-button" data-camera-node="${node.id}">${icon("camera")}Take photo</button>${isAdmin() ? `<button class="ghost-button" data-action="bulk-photo-picker">${icon("folder")}Pick bulk photo</button>` : ""}</div>
         <div class="size-control"><label>Marker size: <strong>${Math.round((node.size || 1) * 100)}%</strong></label><input type="range" min="0.5" max="3" step="0.1" value="${node.size || 1}" data-node-size="${node.id}" aria-label="Marker size" /></div>
         <div class="info-grid"><div class="info-box"><span>Images</span><strong>${node.imageRefs.length}</strong></div><div class="info-box"><span>Room</span><strong>${escapeHtml(roomLabel(node.roomId))}</strong></div><div class="info-box"><span>Category</span><strong>${escapeHtml(node.category || "-")}</strong></div><div class="info-box"><span>Updated</span><strong>${escapeHtml(node.updatedAt)}</strong></div></div>
         <div><h3 class="section-title">Notes</h3><textarea data-notes="${node.id}" aria-label="Node notes">${escapeHtml(node.description || "")}</textarea></div>
@@ -3145,6 +3132,7 @@ function renderModal() {
   if (m.mode === "new-room" || m.mode === "rename-room") return renderRoomModal();
   if (m.mode === "bulk-photo-picker") return renderBulkPhotoPickerModal();
   if (m.mode === "help") return renderHelpModal();
+  if (m.mode === "camera") return renderPlannerCamera();
   if (m.mode === "print-preview") return renderPrintPreviewModal();
   return "";
 }
@@ -4726,26 +4714,10 @@ function uploadFloorPlan() {
   input.click();
 }
 
-async function uploadPhotosToNode(nodeId, files) {
-  const node = state.nodes.find((n) => n.id === nodeId); if (!node) return;
-  if (!requireAuth("upload photos")) return;
-  if (!requirePlannerDrive("upload photos")) return;
-  toast(`Uploading ${files.length} photo${files.length === 1 ? "" : "s"}...`);
-  try {
-    const nodeFolderId = await ensureNodeDriveFolder(node);
-    if (!nodeFolderId) { toast("Could not find/create node folder"); return; }
-    const uploaderName = state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local";
-    for (const file of files) {
-      try {
-        const result = await uploadFileToDrive(file, nodeFolderId);
-        node.imageRefs.push({ id: result.id, name: result.name, driveFileId: result.id, webViewLink: result.webViewLink, thumbnailLink: result.thumbnailLink, mimeType: result.mimeType, uploader: uploaderName, uploadedAt: nowStamp() });
-      } catch (e) { console.error(e); toast(`Failed: ${file.name}`); }
-    }
-    node.updatedAt = nowStamp();
-    persist(); render();
-    toast(`Uploaded ${files.length}`);
-    logAudit("Photos Uploaded", { nodeId: node.id, details: `${files.length} file(s)` });
-  } catch (e) { console.error(e); toast("Upload failed: " + describeError(e)); }
+async function uploadPhotosToNode(nodeId, files, options = {}) {
+  const node = state.nodes.find(n => n.id === nodeId); if (!node) return;
+  if (!requireAuth("upload photos") || !requirePlannerDrive("upload photos")) return;
+  enqueuePlannerPhotos(files, {nodeId, projectId: node.projectId, ...options});
 }
 
 
@@ -4768,7 +4740,7 @@ function loadScriptOnce(src) {
     s.async = true;
     s.dataset.npCdn = src;
     s.onload = () => { s.dataset.loaded = "1"; resolve(); };
-    s.onerror = () => reject(new Error("Failed to load " + src));
+    s.onerror = () => { s.remove(); reject(new Error("Failed to load " + src + ". Check your connection and retry.")); };
     document.head.appendChild(s);
   });
 }
