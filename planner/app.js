@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.9.4";
+const APP_VERSION = "0.10.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -673,7 +673,7 @@ async function bootGoogle() {
   try {
     await waitFor("google");
     NDAuth.onAuthChange(handleAuthEvent);
-    NDAuth.init({ clientId: googleConfig.googleClientId, scopes: googleConfig.scopes || googleScopes.split(" ") });
+    NDAuth.init({ serverEndpoint: window.ND_BACKEND?.plannerOAuth ? window.ND_BACKEND.endpoint : "", clientId: googleConfig.googleClientId, scopes: googleConfig.scopes || googleScopes.split(" ") });
     _gisReady = true;
   } catch (e) { state.googleAuth.lastError = "GIS: " + (e.message || e); render(); return; }
   state.googleAuth.librariesReady = true;
@@ -715,7 +715,7 @@ function signIn() {
   state.googleAuth.bootstrapping = true; render();
   NDAuth.ensureToken({ interactive: true }).catch((e) => { state.googleAuth.lastError = e?.message || "Sign-in failed"; state.googleAuth.bootstrapping = false; render(); });
 }
-function signOut() { NDAuth.signOut(); }
+async function signOut() { try { await NDAuth.signOut(); } catch (e) { toast("Sign-out could not reach the server. Please retry: " + describeError(e)); } }
 function isTokenValid() { return state.googleAuth.signedIn && state.googleAuth.accessToken && state.googleAuth.expiresAt && Date.now() < state.googleAuth.expiresAt - 30000; }
 function requireAuth(label) { if (isTokenValid()) return true; toast(`Sign in to Google first (${label})`); return false; }
 

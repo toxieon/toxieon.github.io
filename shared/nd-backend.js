@@ -12,5 +12,7 @@
  *                  server-side, session tokens, prices from the public price sheet.
  */
 window.ND_BACKEND = Object.freeze({
-  endpoint: ''
+  endpoint: '',
+  // Enable only after deploying PlannerOAuth.gs and configuring Script Properties.
+  plannerOAuth: false
 });

@@ -79,3 +79,33 @@ user → **New passcode** (master only).
 Where to edit prices after the switch: the **price sheet** (Quote reads prices
 only from there), unless you install the hourly sync — then keep editing the
 Quote spreadsheet and don't edit the price sheet.
+
+
+## Planner long-lived Google login (deployment required)
+
+The optional Planner flow uses an Apps Script OAuth callback and a separate,
+browser-generated claim secret. Refresh tokens live only in Script Properties;
+28-day sliding device sessions retrieve short-lived access tokens. Logout deletes
+only that device session, without revoking Google's grant for other devices.
+Existing suite login paths are unchanged. No Sheet/Drive migration is needed.
+
+1. Google Cloud console: create/edit the OAuth **Web** client, add the authorized redirect URI(s) your flow uses, and confirm the Drive + Sheets scopes on the consent screen. Publish the consent screen to "In production" so refresh tokens don't expire after 7 days (Testing mode).
+   The redirect URI is exactly your deployed backend URL, https://script.google.com/macros/s/DEPLOYMENT_ID/exec. Use the same Google Cloud project as your existing OAuth client. Scopes: openid, email, profile, https://www.googleapis.com/auth/drive and https://www.googleapis.com/auth/spreadsheets. Google may require verification for these scopes.
+2. Put the client ID/secret into Script Properties (names you choose, documented in the backend README).
+   Names: PLANNER_OAUTH_CLIENT_ID, PLANNER_OAUTH_CLIENT_SECRET, PLANNER_OAUTH_REDIRECT_URI. The redirect property must equal the authorized URI. Do not put the secret in frontend config or Git.
+3. Apps Script: paste the updated .gs files, run any setup function, and **redeploy the web app as a new version**; update shared/nd-backend.js endpoint if the URL changes.
+   Include PlannerOAuth.gs, updated Main.gs and appsscript.json (external_request scope). Retain all other .gs files. No new setup/migration is required; existing backend setup applies. Redeploy executing as the owner, accessible to Anyone. Set endpoint to the /exec URL and plannerOAuth: true only when ready. This shared endpoint also affects existing suite consumers: retain the existing backend's configuration and test those apps.
+
+First sign-in opens Google. After consent, return to the original Planner window;
+the app claims the session automatically. If iOS opens Safari from the PWA,
+return to the PWA; its pending login secret is saved for ten minutes. Thereafter
+renewal needs no popup. Storage clearing, consent revocation or 28 days without
+use requires sign-in again. Offline sign-out reports failure and must be retried
+online to revoke the server session. Do not log request bodies or property dumps.
+
+Deployment checks: desktop and actual iPhone PWA initial login, reopen after days,
+refresh after one hour, denial/cancellation, and device-only logout. Script Properties
+are suitable for this small suite, not an unbounded public auth service. The login
+queue is capped at 100 pending requests; monitor Apps Script quota errors.
+
+Protocol reference: https://developers.google.com/identity/protocols/oauth2/web-server
