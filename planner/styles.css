@@ -3462,3 +3462,23 @@ button[disabled],
   .print-hero[data-report-page] { min-height:0; break-after:page; }
   .print-hero[data-report-page] .print-plan { width:min(100%,calc(235mm * var(--plan-ar))); }
 }
+
+/* CSS full-screen works in Safari and standalone PWAs without Fullscreen API. */
+body.report-fullscreen { overflow:hidden; }
+.print-mode-tabs { flex-wrap:wrap; flex-shrink:0; }
+.print-modal.is-fullscreen { position:fixed; inset:0; transform:none; width:100%; max-width:none; height:100vh; height:100dvh; max-height:none; border-radius:0; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); box-sizing:border-box; }
+.print-modal.is-fullscreen .modal-body { max-height:none; min-height:0; flex:1 1 auto; overscroll-behavior:contain; }
+.print-modal .modal-header { flex-shrink:0; }
+.print-modal .modal-header > div { min-width:0; flex:1; }
+.print-modal .modal-header .ghost-button { min-height:44px; }
+.print-page.report-full-images .print-photos { grid-template-columns:1fr; }
+.print-page.report-full-images .print-photo img { height:auto; max-height:none; object-fit:contain; }
+@media (max-width:720px) {
+  .print-modal .modal-header { gap:6px; padding:10px; }
+  .print-modal .modal-header h3 { font-size:16px; }
+  .print-modal .modal-header .ghost-button { max-width:100px; padding:6px 8px; }
+  .print-mode-tabs { gap:4px; padding:6px; }
+  .print-mode-tabs button { padding:7px; font-size:12px; }
+  .print-modal-actions { display:grid; grid-template-columns:1fr 1fr; }
+  .print-modal-actions button { min-height:44px; }
+}

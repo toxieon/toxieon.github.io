@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.13.1";
+const APP_VERSION = "0.14.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -2184,6 +2184,7 @@ function downloadAuditCsv(rows) {
 /* ============================================================ RENDER */
 
 function render() {
+  document.body.classList.toggle("report-fullscreen", !!(state.modal?.mode === "print-preview" && state.modal.fullscreen));
   const app = document.getElementById("app"); if (!app) return;
   // Returning user — silent re-auth in flight, show reconnecting screen
   if (state.googleAuth.bootstrapped && !state.googleAuth.signedIn && state.googleAuth.bootstrapping) {
@@ -3336,6 +3337,13 @@ function renderPrintFullBody(proj) {
   }).join("");
   return `${renderReportCover(proj)}${sections}`;
 }
+function toggleReportView(key) {
+  if (state.modal?.mode !== 'print-preview') return;
+  const scrollTop = document.querySelector('.print-modal .modal-body')?.scrollTop || 0;
+  state.modal[key] = !state.modal[key]; render();
+  const body = document.querySelector('.print-modal .modal-body'); if (body) body.scrollTop = scrollTop;
+  document.querySelector(key === 'fullscreen' ? '[data-action="report-fullscreen"]' : '[data-action="report-photo-view"]')?.focus();
+}
 async function openPlannerReport(reportMode) {
   const proj = project(); if (!proj) return;
   const modal = {mode:'print-preview', reportMode, loading:true};
@@ -3359,17 +3367,18 @@ function renderPrintPreviewModal() {
   const body = state.modal?.loading ? "<p>Loading report plans…</p>" : reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
   return `
     <div class="modal-backdrop" data-action="close-modal"></div>
-    <div class="modal print-modal" role="dialog">
+    <div class="modal print-modal ${state.modal?.fullscreen ? "is-fullscreen" : ""}" role="dialog" aria-modal="true" aria-label="Planner report">
       <div class="modal-header">
         <div><h3>${reportMode === "full" ? "Full project report" : "Print overview"}</h3><p>${escapeHtml(proj.name)}${reportMode === "overview" ? " / " + escapeHtml(floor?.name || "") : ""}</p></div>
-        <button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button>
+        <button type="button" class="ghost-button" data-action="report-fullscreen">${state.modal?.fullscreen ? "Exit full screen" : "Full screen"}</button><button type="button" class="icon-button" data-action="close-modal" aria-label="Close report">${icon("close")}</button>
       </div>
       <div class="print-mode-tabs">
         <button type="button" class="ghost-button ${reportMode === "overview" ? "is-active" : ""}" data-action="print-mode-overview">${icon("printer")}Overview</button>
         <button type="button" class="ghost-button ${reportMode === "full" ? "is-active" : ""}" data-action="print-mode-full">${icon("download")}Full report</button>
+        <button type="button" class="ghost-button" data-action="report-photo-view">${state.modal?.fullImages ? "Compact photos" : "Full-size photos"}</button>
       </div>
       <div class="modal-body">
-        <div class="print-page" id="printPage">${body}</div>
+        <div class="print-page ${state.modal?.fullImages ? "report-full-images" : ""}" id="printPage">${body}</div>
       </div>
       ${reportMode === "full" ? `<p class="print-muted" style="margin:0 16px 10px">Photo-heavy jobs: use <strong>Save PDF to Drive</strong> (capped) — browser Print can choke on large reports.</p>` : ""}
       <div class="modal-actions print-modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Close</button><button type="button" class="ghost-button" data-action="save-pdf-drive" ${_drivePdfBusy ? "disabled" : ""}>${icon("download")}Save PDF to Drive</button><button class="primary-button" data-action="print-now">${icon("printer")}Print / Save as PDF</button></div>
@@ -3797,6 +3806,8 @@ function handleAction(event) {
     case "print-full-report": return openPlannerReport("full");
     case "print-mode-overview": if (state.modal) state.modal.reportMode = "overview"; return render();
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
+    case "report-fullscreen": return toggleReportView('fullscreen');
+    case "report-photo-view": return toggleReportView('fullImages');
     case "print-now": return window.print();
     case "save-pdf-drive": return savePrintPdfToDrive();
     case "bulk-size": return setBulkNodeSize(false);

@@ -1,3 +1,5 @@
+## 0.14.1 · 2026-09-29 · report-viewing · Preserve compact cards, expose full-size photos and add full-screen browsing
+
 ## 0.13.1 · 2026-09-29 · report-layout · Add cover, bare and annotated floor pages, and individual node thumbnails
 
 ## 0.12.2 · 2026-09-29 · report-shorthand · Normalize category/item matching and publish editor changes immediately
