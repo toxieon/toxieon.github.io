@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.12.2";
+const APP_VERSION = "0.13.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -3254,16 +3254,19 @@ function renderPortalCreateModal() {
   return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="portalForm" role="dialog"><div class="modal-header"><div><h3>Add door / stairs</h3><p>Link floors or rooms. A matching return door is created automatically.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="portalLabel">Label</label><input id="portalLabel" name="label" required placeholder="Door to Store Room" /></div><div class="field"><label for="portalSourceRoom">From room</label><select id="portalSourceRoom" name="sourceRoomId"><option value="">No room</option>${currentRooms.map((r) => `<option value="${escapeHtml(r.id)}" ${state.selectedRoomId === r.id ? "selected" : ""}>${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field"><label for="portalTarget">Links to project</label><select id="portalTarget" name="targetProjectId" required data-portal-target>${others.length ? others.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("") : `<option value="">No projects exist yet</option>`}</select></div><div class="field"><label for="portalFloor">Target floor</label><select id="portalFloor" name="targetFloorId" data-portal-floor>${initialTarget ? (initialTarget.floors || []).map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("") : `<option value="">No floors</option>`}</select></div><div class="field"><label for="portalTargetRoom">Target room</label><select id="portalTargetRoom" name="targetRoomId"><option value="">No room</option>${initialTargetRooms.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("")}</select></div><div class="field full"><label for="portalReturn">Return door label</label><input id="portalReturn" name="returnLabel" placeholder="Door back" /></div></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit" ${state.projects.length ? "" : "disabled"}>${icon("check")}Create door</button></div></form>`;
 }
 
-function renderPrintPlanHero(floor, nodes, heading) {
+function renderPrintPlanHero(floor, nodes, heading, thumbnail = false) {
   if (!floor) return "<p>(No floor.)</p>";
   const planUrl = state.floorPlans[floor.id];
   const planAspect = Number(floor.planAspectRatio) || 1.6;
   const title = heading || floor.name;
   return `
-    <section class="print-hero">
+    <section class="print-hero" ${thumbnail ? "" : "data-report-page"}>
       <h2>${escapeHtml(title)}</h2>
-      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : "<p>(No floor plan uploaded.)</p>"}
+      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.filter(n => n.position && Number.isFinite(Number(n.position.x)) && Number.isFinite(Number(n.position.y))).map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : `<p>${floor.planDriveFileId ? "Floor plan unavailable. Reopen the report online to retry." : "No floor plan uploaded."}</p>`}
     </section>`;
+}
+function renderReportCover(proj) {
+  return `<section class="print-cover" data-report-page><img src="../logo.png" alt="Neill Data" /><h1>Neill Planner</h1><h2>${escapeHtml(proj.name)}</h2><p>${escapeHtml(proj.address || '')}</p><p class="print-muted">Generated ${escapeHtml(nowStamp())}</p></section>`;
 }
 function renderPrintNodeCard(n) {
   const photos = n.imageRefs || [];
@@ -3279,6 +3282,7 @@ function renderPrintNodeCard(n) {
     ? `<ul class="print-comments">${comments.map((c) => `<li><strong>${escapeHtml(c.author || "")}</strong> <span>${escapeHtml(c.time || "")}</span><br>${escapeHtml(c.text || "")}</li>`).join("")}</ul>`
     : "";
   return `<article class="print-node-card">
+    <div class="print-node-location">${renderPrintPlanHero(floorById(projectById(n.projectId), n.floorId), [n], "Node location", true)}</div>
     <header><h4>${escapeHtml(nodeDisplayTitle(n))}</h4><p>${escapeHtml(n.category || "-")} / ${escapeHtml(n.lineItem || "-")} &middot; <strong>${escapeHtml(n.status || "")}</strong>${n.assignedTo ? " &middot; " + escapeHtml(n.assignedTo) : ""}</p></header>
     ${n.description ? `<p class="print-notes">${escapeHtml(n.description)}</p>` : ""}
     ${(n.tags || []).length ? `<p class="print-muted">Tags: ${escapeHtml(n.tags.join(", "))}</p>` : ""}
@@ -3289,12 +3293,14 @@ function renderPrintNodeCard(n) {
 function renderPrintOverviewBody(proj, floor) {
   const nodes = floor ? floorNodes(floor.id) : [];
   return `
+    ${renderReportCover(proj)}
+    ${renderPrintPlanHero(floor, [], `${floor?.name || "Plan"} — bare plan`)}
+    ${renderPrintPlanHero(floor, nodes, `${floor?.name || "Plan"} — all nodes`)}
     <header class="print-header">
       <h1>${escapeHtml(proj.name)}</h1>
       <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(nowStamp())}</p>
       <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; Total nodes (this floor): ${nodes.length}</p>
     </header>
-    ${renderPrintPlanHero(floor, nodes, floor?.name || "Plan")}
     <h2>Node Schedule</h2>
     <table class="print-table">
       <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Line item</th><th>Status</th><th>Assignee</th><th>Room</th><th>Updated</th></tr></thead>
@@ -3303,8 +3309,7 @@ function renderPrintOverviewBody(proj, floor) {
 }
 function renderPrintFullBody(proj) {
   const floors = [...(proj.floors || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
-  const current = currentFloor();
-  const coverNodes = current ? floorNodes(current.id) : [];
+
   const sections = floors.map((fl, idx) => {
     const nodes = floorNodes(fl.id).filter((n) => n.type !== "portal");
     const rooms = floorRooms(fl.id);
@@ -3324,24 +3329,34 @@ function renderPrintFullBody(proj) {
       unassigned.length ? `<section class="print-room"><h3>No room <span class="print-muted">(${unassigned.length})</span></h3>${unassigned.map(renderPrintNodeCard).join("")}</section>` : ""
     ].join("");
     return `<section class="print-floor-section ${idx ? "print-break" : ""}">
-      ${renderPrintPlanHero(fl, floorNodes(fl.id), `Floor: ${fl.name}`)}
+      ${renderPrintPlanHero(fl, [], `Floor: ${fl.name} — bare plan`)}
+      ${renderPrintPlanHero(fl, floorNodes(fl.id), `Floor: ${fl.name} — all nodes`)}
       ${roomBlocks || `<p class="print-muted">No nodes on this floor.</p>`}
     </section>`;
   }).join("");
-  return `
-    <header class="print-header">
-      <h1>${escapeHtml(proj.name)} — Full project report</h1>
-      <p>${escapeHtml(proj.address || "")} &middot; Generated ${escapeHtml(nowStamp())}</p>
-      <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; ${floors.length} floor(s) &middot; ${projectNodes(proj.id).length} nodes</p>
-    </header>
-    ${current ? `<section class="print-cover print-break-after">${renderPrintPlanHero(current, coverNodes, `Cover — ${current.name}`)}</section>` : ""}
-    ${sections}`;
+  return `${renderReportCover(proj)}${sections}`;
+}
+async function openPlannerReport(reportMode) {
+  const proj = project(); if (!proj) return;
+  const modal = {mode:'print-preview', reportMode, loading:true};
+  state.modal = modal; render();
+  // Fetch every floor before rendering, not just the floor open on the map.
+  for (const floor of (proj.floors || [])) {
+    if (!state.floorPlans[floor.id] && floor.planDriveFileId) {
+      try {
+        await NDAuth.ensureToken();
+        const url = await fetchDriveFileAsDataUrl(floor.planPngFileId || floor.planDriveFileId);
+        if (url) { await cacheFloorPlan(floor.id, url); floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || floor.planAspectRatio; }
+      } catch (e) { console.warn('Report floor plan unavailable', floor.id); }
+    }
+  }
+  if (state.modal === modal) { modal.loading = false; render(); }
 }
 function renderPrintPreviewModal() {
   const proj = project(); if (!proj) return "";
   const floor = currentFloor();
   const reportMode = state.modal?.reportMode === "full" ? "full" : "overview";
-  const body = reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
+  const body = state.modal?.loading ? "<p>Loading report plans…</p>" : reportMode === "full" ? renderPrintFullBody(proj) : renderPrintOverviewBody(proj, floor);
   return `
     <div class="modal-backdrop" data-action="close-modal"></div>
     <div class="modal print-modal" role="dialog">
@@ -3778,8 +3793,8 @@ function handleAction(event) {
     case "hours-range": { _hoursUI.range = event.currentTarget.dataset.range || "all"; return render(); }
     case "audit-download": return downloadAuditCsv(filteredAuditRows());
     case "audit-clear-filters": state.auditView.filters = freshState().auditView.filters; persist(); return render();
-    case "print-report": state.modal = { mode: "print-preview", reportMode: "overview" }; return render();
-    case "print-full-report": state.modal = { mode: "print-preview", reportMode: "full" }; return render();
+    case "print-report": return openPlannerReport("overview");
+    case "print-full-report": return openPlannerReport("full");
     case "print-mode-overview": if (state.modal) state.modal.reportMode = "overview"; return render();
     case "print-mode-full": if (state.modal) state.modal.reportMode = "full"; return render();
     case "print-now": return window.print();
@@ -4848,85 +4863,73 @@ function waitForPrintImages(root, timeoutMs = 12000) {
 
 async function buildPdfBlobFromPrintElement(sourceEl) {
   const { html2canvas, jsPDF } = await loadDrivePdfLibs();
-  const host = document.createElement("div");
-  host.setAttribute("aria-hidden", "true");
-  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;background:#fff;z-index:-1;pointer-events:none;";
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:absolute;left:-12000px;top:0;width:794px;background:#fff;pointer-events:none;';
   const clone = sourceEl.cloneNode(true);
-  clone.id = "printPageDriveClone";
-  clone.style.width = "794px";
-  clone.style.maxWidth = "794px";
-  clone.style.background = "#fff";
-  clone.style.color = "#111";
-  host.appendChild(clone);
-  document.body.appendChild(host);
-
+  clone.removeAttribute('id');
+  clone.style.cssText = 'width:794px;max-width:794px;background:white;color:#111;';
+  // Snapshot image URLs BEFORE removing capped figures; index-based remapping
+  // after removal used to assign the wrong image to later cards.
+  clone.querySelectorAll('img').forEach(img => { img.loading = 'eager'; });
   const caps = applyDrivePdfPhotoCaps(clone);
-  // Prefer already-hydrated blob/data URLs from the live preview when present.
-  const liveImgs = sourceEl.querySelectorAll("img");
-  clone.querySelectorAll("img").forEach((img, i) => {
-    const live = liveImgs[i];
-    if (live && live.src && (live.src.startsWith("blob:") || live.src.startsWith("data:"))) {
-      img.src = live.src;
-      img.removeAttribute("data-fileid");
-    }
-  });
-  await waitForPrintImages(clone);
-
-  let canvas;
+  host.appendChild(clone); document.body.appendChild(host);
+  const pdf = new jsPDF({orientation:'p', unit:'mm', format:'a4', compress:true});
+  let pages = 0;
   try {
-    canvas = await html2canvas(clone, {
-      scale: 1.35,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      imageTimeout: 8000,
-      windowWidth: 794
-    });
-  } finally {
-    host.remove();
-  }
-
-  const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 8;
-  const usableW = pageW - margin * 2;
-  const usableH = pageH - margin * 2;
-  const imgW = usableW;
-  const imgH = (canvas.height * usableW) / canvas.width;
-  const pageCount = Math.max(1, Math.ceil(imgH / usableH));
-  if (pageCount > DRIVE_PDF_MAX_PAGES) {
-    throw new Error(`Report would be ~${pageCount} pages (cap ${DRIVE_PDF_MAX_PAGES}). Narrow the project or use Print.`);
-  }
-
-  const imgData = canvas.toDataURL("image/jpeg", 0.82);
-  let heightLeft = imgH;
-  let y = margin;
-  pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
-  heightLeft -= usableH;
-  let pages = 1;
-  while (heightLeft > 2 && pages < DRIVE_PDF_MAX_PAGES) {
-    y = margin - pages * usableH;
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", margin, y, imgW, imgH, undefined, "FAST");
-    heightLeft -= usableH;
-    pages++;
-  }
-  if (heightLeft > 2) {
-    throw new Error(`PDF exceeded ${DRIVE_PDF_MAX_PAGES} pages after photo caps`);
-  }
-
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 64) throw new Error("PDF generation produced an empty file");
-  if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) {
-    throw new Error(`PDF is ${(blob.size / (1024 * 1024)).toFixed(1)} MB (cap ${DRIVE_PDF_MAX_BLOB_BYTES / (1024 * 1024)} MB)`);
-  }
-  return { blob, pages, caps };
+    await waitForPrintImages(clone);
+    const failed = [...clone.querySelectorAll('img')].filter(img => !img.complete || !img.naturalWidth);
+    if (failed.length) throw new Error(`${failed.length} report image(s) unavailable. Wait for images or reconnect and retry.`);
+    const units = [];
+    function collect(parent) {
+      for (const child of [...parent.children]) {
+        if (child.matches('.print-floor-section,.print-room')) collect(child);
+        else units.push(child);
+      }
+    }
+    collect(clone);
+    clone.remove();
+    const page = document.createElement('div');
+    page.className = clone.className + ' pdf-render-page';
+    page.style.cssText = 'box-sizing:border-box;width:794px;min-height:1123px;padding:32px;margin:0;background:white;color:#111;display:flow-root;';
+    host.appendChild(page);
+    async function flush() {
+      if (!page.children.length) return;
+      if (++pages > DRIVE_PDF_MAX_PAGES) throw new Error(`Report exceeds ${DRIVE_PDF_MAX_PAGES} PDF pages. Use Print for the full report.`);
+      const height = Math.ceil(page.getBoundingClientRect().height);
+      if (height > 3500) throw new Error('One report card is too long for image export. Use Print for this report.');
+      const canvas = await html2canvas(page, {scale:1.35,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,imageTimeout:12000,windowWidth:794});
+      try {
+        if (pages > 1) pdf.addPage();
+        // One bounded canvas per page prevents whole-report iOS canvas limits.
+        const w = Math.min(210, 297 * canvas.width / canvas.height);
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.88),'JPEG',(210-w)/2,0,w,canvas.height*w/canvas.width,undefined,'FAST');
+      } finally { canvas.width = canvas.height = 1; }
+      page.replaceChildren();
+    }
+    for (const unit of units) {
+      const ownPage = unit.hasAttribute('data-report-page');
+      if (ownPage) await flush();
+      page.appendChild(unit);
+      if (!ownPage && page.getBoundingClientRect().height > 1124 && page.children.length > 1) {
+        unit.remove();
+        // Keep a room heading with its first card when a page fills.
+        let heading = null;
+        if (page.lastElementChild?.matches('h2,h3')) { heading = page.lastElementChild; heading.remove(); }
+        await flush(); if (heading) page.appendChild(heading); page.appendChild(unit);
+      }
+      if (ownPage) await flush();
+    }
+    await flush();
+    const blob = pdf.output('blob');
+    if (!blob || blob.size < 64) throw new Error('PDF generation produced an empty file');
+    if (blob.size > DRIVE_PDF_MAX_BLOB_BYTES) throw new Error('PDF exceeds 18 MB. Use Print for this report.');
+    return {blob,pages,caps};
+  } finally { host.remove(); }
 }
 
 async function savePrintPdfToDrive() {
-  if (_drivePdfBusy) return;
+  if (_drivePdfBusy || state.modal?.loading) return;
   const page = document.getElementById("printPage");
   if (!page) { toast("Open Overview or Full report first"); return; }
   if (!isTokenValid()) { toast("Sign in required to save to Drive"); return; }

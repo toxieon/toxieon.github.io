@@ -3442,3 +3442,23 @@ button[disabled],
 
 .node-hit-area { position:absolute; left:50%; top:50%; width:max(28px,calc(28px / var(--size,1))); height:max(28px,calc(28px / var(--size,1))); transform:translate(-50%,-50%); border-radius:50%; background:transparent; }
 .bulk-bar input, .size-control input[type=number] { width:70px; }
+
+/* Report pages: one logo cover, then bare/annotated plans, then node cards. */
+.print-cover { min-height:850px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#111; break-after:page; }
+.print-cover > img { width:min(360px,80%); max-height:300px; object-fit:contain; }
+.print-cover h1 { font-size:36px; margin:32px 0 12px; color:#111; }
+.print-cover h2 { font-size:26px; color:#111; overflow-wrap:anywhere; }
+.print-hero[data-report-page] { break-after:page; min-height:600px; }
+.print-hero[data-report-page] .print-plan { width:min(100%,calc(850px * var(--plan-ar))); margin-left:auto; margin-right:auto; }
+.print-node-location { width:180px; max-width:100%; margin:0 0 10px; }
+.print-node-location h2 { font-size:11px; margin:0 0 4px; }
+.print-node-location .print-plan { margin:0; width:100%; }
+.print-node-location .print-marker { width:18px; height:18px; font-size:6px; }
+.print-node-card { overflow-wrap:anywhere; }
+.pdf-render-page .print-cover { min-height:1030px; }
+.pdf-render-page .print-hero[data-report-page] { min-height:1000px; }
+@media print {
+  .print-cover { min-height:240mm; }
+  .print-hero[data-report-page] { min-height:0; break-after:page; }
+  .print-hero[data-report-page] .print-plan { width:min(100%,calc(235mm * var(--plan-ar))); }
+}

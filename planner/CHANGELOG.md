@@ -1,3 +1,5 @@
+## 0.13.1 · 2026-09-29 · report-layout · Add cover, bare and annotated floor pages, and individual node thumbnails
+
 ## 0.12.2 · 2026-09-29 · report-shorthand · Normalize category/item matching and publish editor changes immediately
 
 ## 0.12.1 · 2026-09-29 · node-sizing · Add bulk and mass-placement sizing down to 5 percent
