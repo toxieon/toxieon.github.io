@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.15.2";
+const APP_VERSION = "0.15.3";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -227,7 +227,7 @@ function migrateState(s) {
 
 function persist(opts = {}) {
   const saveable = {
-    ...state, modal: null, lightbox: null, toast: "",
+    ...state, modal: null, lightbox: null, toast: "", planUpload: null,
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
     roomDraw: { mode: null, points: [], roomId: null },
     bulkSelection: [],
@@ -252,10 +252,12 @@ const HIRES_MAX_SIDE = 4096;
 const HIRES_MAX_PIXELS = 16000000;
 const PLAN_PDF_CACHE_PREFIX = "planpdf:";
 const _planPdfSrc = {};        // floorId -> PDF data URL
-const _planPdfState = {};      // floorId -> "loading" | "none"
+const _planPdfStatus = {};     // floorId -> { kind: pdf|png|image|unknown, reason, retryAt? }
+const _planPdfLoading = {};    // floorId -> in-flight source promise
 let _planPdfDoc = null;        // { floorId, src, promise }
 let _hires = null;             // { floorId, key, canvas }
-let _hiresTimer = null, _hiresTask = null, _hiresSeq = 0;
+let _hiresTimer = null, _hiresTask = null, _hiresSeq = 0, _hiresInflightKey = null;
+let _hiresDebug = null;        // last re-render status for the on-device debug line
 
 function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   return new Promise((resolve) => {
@@ -317,6 +319,7 @@ async function planDisplayUrl(dataUrl) {
 }
 
 async function cacheFloorPlan(floorId, dataUrl, meta) {
+  dataUrl = normalizePdfDataUrl(dataUrl);
   rememberPlanPdf(floorId, dataUrl);   // 0.15.2 — keep the vector PDF for sharp zoom re-renders
   dataUrl = await planDisplayUrl(dataUrl);   // PDF → PNG so <img> can show it
   const working = await downscaleDataUrl(dataUrl);
@@ -327,7 +330,7 @@ async function cacheFloorPlan(floorId, dataUrl, meta) {
 
 function evictFloorPlan(floorId) {
   delete state.floorPlans[floorId];
-  delete _planPdfSrc[floorId]; delete _planPdfState[floorId];
+  delete _planPdfSrc[floorId]; delete _planPdfStatus[floorId];
   if (_hires && _hires.floorId === floorId) dropHiresCanvas();
   if (window.NDCache) NDCache.remove(PLAN_PDF_CACHE_PREFIX + floorId).catch(() => {});
   if (window.NDCache) NDCache.remove(PLAN_CACHE_PREFIX + floorId).catch(() => {});
@@ -2080,18 +2083,28 @@ async function uploadFileToDrive(file, parentFolderId, overrideName) {
 }
 
 async function updateFileBytes(fileId, file) {
-  const arr = new Uint8Array(await file.arrayBuffer());
-  const resp = await gapi.client.request({
-    path: `/upload/drive/v3/files/${fileId}`, method: "PATCH",
-    params: { uploadType: "media", fields: "id,name,webViewLink,thumbnailLink,mimeType" },
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: arr
+  // 0.15.3 — send the File itself; gapi.client.request would serialise a Uint8Array body as JSON.
+  const token = await NDAuth.ensureToken();
+  const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media&fields=id,name,webViewLink,thumbnailLink,mimeType`, {
+    method: "PATCH", headers: { Authorization: "Bearer " + token, "Content-Type": file.type || "application/octet-stream" }, body: file
   });
-  return resp.result;
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const err = new Error(data.error?.message || "Drive update failed"); err.status = r.status; throw err; }
+  return data;
 }
 
 async function fetchDriveFileAsDataUrl(fileId) {
   if (!isTokenValid()) return null;
+  // 0.15.3 — raw bytes via fetch: gapi.client.request returns the body as decoded text, which can
+  // mangle binary (PDF) bytes. Falls back to the old path if fetch fails.
+  try {
+    const token = await NDAuth.ensureToken();
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("Drive download " + r.status);
+    const blob = await r.blob();
+    const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
+    return normalizePdfDataUrl(url);
+  } catch (e) { console.warn("Drive fetch download failed, trying gapi", e); }
   let meta;
   try { meta = await gapi.client.drive.files.get({ fileId, fields: "mimeType,name" }); }
   catch (e) { meta = { result: { mimeType: "application/octet-stream" } }; }
@@ -2100,7 +2113,7 @@ async function fetchDriveFileAsDataUrl(fileId) {
   const bin = resp.body;
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i) & 0xff;
-  return `data:${mime};base64,${arrayBufferToBase64(arr.buffer)}`;
+  return normalizePdfDataUrl(`data:${mime};base64,${arrayBufferToBase64(arr.buffer)}`);
 }
 
 // #37 — Drive thumbnail URLs need Google session cookies this app doesn't have,
@@ -2221,6 +2234,7 @@ function render() {
     ${state.modal ? renderModal() : ""}
     ${state.lightbox ? renderLightbox() : ""}
     ${renderPhotoJobs()}
+    ${state.planUpload ? renderLoadingOverlay(`${state.planUpload.step} ${state.planUpload.pct}%`) : ""}
     ${(state.googleAuth.bootstrapping || state.googleAuth.hydrating) ? renderLoadingOverlay(state.googleAuth.hydrating && !state.googleAuth.bootstrapping ? "Loading from cloud..." : "Loading planner data...") : ""}
     ${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}
   `;
@@ -2465,7 +2479,9 @@ function renderMapView() {
             </div>
           </div>
           <div class="canvas-tools" aria-label="Canvas tools"><button class="icon-button ${state.ui.planLocked ? "is-active" : ""}" data-action="toggle-plan-lock" title="${state.ui.planLocked ? "Plan locked — tap to allow panning" : "Lock plan (stops panning so you can place/move nodes)"}">${icon(state.ui.planLocked ? "lock" : "unlock")}</button><button class="icon-button" data-action="zoom-in" title="Zoom in">${icon("zoomIn")}</button><button class="icon-button" data-action="zoom-out" title="Zoom out">${icon("zoomOut")}</button><button class="icon-button" data-action="reset-view" title="Recenter">${icon("target")}</button></div>
-          <div class="scale-readout"><span class="scale-bar"></span><span>${Math.round(state.canvas.zoom * 100)}%</span></div>
+          <div class="scale-readout" data-action="plan-debug" role="button" title="Tap for plan debug info"><span class="scale-bar"></span><span>${Math.round(state.canvas.zoom * 100)}%</span></div>
+          ${hasPlan && state.ui.planDebug ? `<div class="plan-debug" id="planDebug">${escapeHtml(planDebugLine())}</div>` : ""}
+          ${hasPlan && planIsFlat(floor) ? `<div class="plan-flat-notice" role="status"><span>This plan is a flat image; re-upload the PDF for sharp zoom.</span><button class="ghost-button" data-action="upload-plan">${icon("upload")}Re-upload PDF</button></div>` : ""}
         </div>
         
       </div>
@@ -2934,7 +2950,7 @@ function renderSettingsViewMobile() {
       ${settingsSection("Categories From Sheet", renderCategoryEditor(), true)}
       ${settingsSection("Audit", renderAuditSettingsBody())}
       ${settingsSection("Current Project", projectBody)}
-      ${settingsSection("About", `<div class="integration-list"><div class="integration-row"><span><strong>Version</strong><span>v${APP_VERSION}</span></span>${statusPill("Complete")}</div><div class="integration-row"><span><strong>Data owner</strong><span>${escapeHtml(PRIMARY_OWNER_EMAIL)}</span></span>${statusPill(owner ? "You" : "Shared")}</div></div><div class="settings-action-strip"><button class="ghost-button" data-action="wipe-local">${icon("trash")}Wipe local cache</button></div>`)}
+      ${settingsSection("About", `<div class="integration-list"><div class="integration-row"><span><strong>Version</strong><span>v${APP_VERSION}</span></span>${statusPill("Complete")}</div><div class="integration-row"><span><strong>Plan debug</strong><span class="plan-debug-inline">${escapeHtml(planDebugLine())}</span></span></div><div class="integration-row"><span><strong>Data owner</strong><span>${escapeHtml(PRIMARY_OWNER_EMAIL)}</span></span>${statusPill(owner ? "You" : "Shared")}</div></div><div class="settings-action-strip"><button class="ghost-button" data-action="wipe-local">${icon("trash")}Wipe local cache</button></div>`)}
     </section>`;
 }
 
@@ -3796,6 +3812,7 @@ function handleAction(event) {
     case "mass-stop": return stopMassMode();
     case "add-portal": state.modal = { mode: "portal-create" }; return render();
     case "follow-portal": return followPortal();
+    case "plan-debug": state.ui.planDebug = !state.ui.planDebug; return render();
     case "zoom-in": return setZoom(state.canvas.zoom + 0.15, false, { animate: true });
     case "zoom-out": return setZoom(state.canvas.zoom - 0.15, false, { animate: true });
     case "reset-view":
@@ -4060,10 +4077,49 @@ function rememberPlanPdf(floorId, dataUrl) {
   if (!floorId || typeof dataUrl !== "string" || !dataUrl.startsWith("data:application/pdf")) return;
   if (_planPdfSrc[floorId] === dataUrl) return;
   _planPdfSrc[floorId] = dataUrl;
-  delete _planPdfState[floorId];
+  delete _planPdfLoading[floorId];
+  setPlanPdfStatus(floorId, "pdf", "original PDF stored");
   if (_planPdfDoc && _planPdfDoc.floorId === floorId) { releasePlanPdfDoc(); }
   if (_hires && _hires.floorId === floorId) dropHiresCanvas();
-  if (window.NDCache) NDCache.put(PLAN_PDF_CACHE_PREFIX + floorId, dataUrl, null).catch(() => {});
+  if (window.NDCache) NDCache.put(PLAN_PDF_CACHE_PREFIX + floorId, dataUrl, null).catch((e) => console.warn("PDF plan cache put failed", e));
+}
+
+// 0.15.3 — sniff "%PDF" so a PDF labelled application/octet-stream (iOS Files, Drive) is still treated as a PDF.
+function normalizePdfDataUrl(dataUrl) {
+  if (typeof dataUrl !== "string" || dataUrl.startsWith("data:application/pdf")) return dataUrl;
+  const m = /^data:[^,]*;base64,/.exec(dataUrl);
+  if (m && dataUrl.startsWith("JVBER", m[0].length)) return "data:application/pdf;base64," + dataUrl.slice(m[0].length);
+  return dataUrl;
+}
+
+// kind: "pdf" | "png" (flat render only) | "image" (original is an image) | "unknown" (not resolved yet / transient)
+function setPlanPdfStatus(floorId, kind, reason) {
+  const prev = _planPdfStatus[floorId];
+  _planPdfStatus[floorId] = { kind, reason };
+  const flat = (k) => k === "png" || k === "image";
+  if (!prev || flat(prev.kind) !== flat(kind)) { clearTimeout(setPlanPdfStatus._t); setPlanPdfStatus._t = setTimeout(() => { if (!state.modal) render(); }, 50); }
+  refreshPlanDebug();
+}
+function planIsFlat(floor) {
+  const s = floor && _planPdfStatus[floor.id];
+  return !!(s && (s.kind === "png" || s.kind === "image") && !_planPdfSrc[floor.id]);
+}
+function setHiresDebug(status, extra) {
+  _hiresDebug = Object.assign({ status }, extra ? extra : { scale: null, canvas: null });
+  refreshPlanDebug();
+}
+function planDebugLine() {
+  const floor = currentFloor();
+  if (!floor) return "No floor selected";
+  const s = _planPdfStatus[floor.id];
+  const kind = _planPdfSrc[floor.id] ? "pdf" : (s ? s.kind : "unknown");
+  const d = _hiresDebug || {};
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  return `src=${kind}${s && s.reason && kind !== "pdf" ? " (" + s.reason + ")" : ""} · fileId=${floor.planDriveFileId ? "yes" : "no"} · pdfStored=${_planPdfSrc[floor.id] ? "yes" : "no"} · last=${d.status || "none"} · scale=${d.scale ? d.scale.toFixed(1) + "/" + (state.canvas.zoom * dpr).toFixed(1) : "-"} · canvas=${d.canvas || "-"} · dpr=${window.devicePixelRatio || 1}`;
+}
+function refreshPlanDebug() {
+  const el = document.getElementById("planDebug");
+  if (el) el.textContent = planDebugLine();
 }
 
 function releasePlanPdfDoc() {
@@ -4073,31 +4129,43 @@ function releasePlanPdfDoc() {
 
 function dropHiresCanvas() {
   if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} _hiresTask = null; }
+  _hiresInflightKey = null;
   if (_hires && _hires.canvas) { _hires.canvas.remove(); _hires.canvas.width = 0; _hires.canvas.height = 0; }
   _hires = null;
 }
 
-// PDF source for a floor: memory, then IndexedDB, then (lazily) the Drive original.
-async function planPdfSource(floor) {
+// PDF source for a floor: memory, then IndexedDB, then the Drive original. Concurrent callers share one load.
+function planPdfSource(floor) {
   const id = floor.id;
-  if (_planPdfSrc[id]) return _planPdfSrc[id];
-  if (_planPdfState[id]) return null;
-  _planPdfState[id] = "loading";
-  try {
-    if (window.NDCache) {
-      const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + id).catch(() => null);
-      if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { _planPdfSrc[id] = cached; delete _planPdfState[id]; return cached; }
-    }
-    if (floor.planFileName && !/\.pdf$/i.test(floor.planFileName)) { _planPdfState[id] = "none"; return null; }
-    if (!floor.planDriveFileId || !isTokenValid()) { delete _planPdfState[id]; return null; }
-    const meta = await gapi.client.drive.files.get({ fileId: floor.planDriveFileId, fields: "mimeType" });
-    if (meta?.result?.mimeType !== "application/pdf") { _planPdfState[id] = "none"; return null; }
-    const url = await fetchDriveFileAsDataUrl(floor.planDriveFileId);
-    delete _planPdfState[id];
-    if (url && url.startsWith("data:application/pdf")) { rememberPlanPdf(id, url); return url; }
-    _planPdfState[id] = "none";
-  } catch (e) { delete _planPdfState[id]; console.warn("PDF plan source unavailable", e); }
-  return null;
+  if (_planPdfSrc[id]) return Promise.resolve(_planPdfSrc[id]);
+  const st = _planPdfStatus[id];
+  if (st && (st.kind === "png" || st.kind === "image")) return Promise.resolve(null);
+  if (st && st.retryAt && Date.now() < st.retryAt) return Promise.resolve(null);
+  if (_planPdfLoading[id]) return _planPdfLoading[id];
+  const p = (async () => {
+    try {
+      if (window.NDCache) {
+        const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + id).catch(() => null);
+        if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { _planPdfSrc[id] = cached; setPlanPdfStatus(id, "pdf", "from device cache"); return cached; }
+      }
+      if (!floor.planDriveFileId) { setPlanPdfStatus(id, floor.planPngFileId ? "png" : "image", "no original file id"); return null; }
+      if (floor.planFileName && /\.(png|jpe?g|webp|svg|heic|gif)$/i.test(floor.planFileName)) { setPlanPdfStatus(id, "image", "original is " + floor.planFileName.split(".").pop()); return null; }
+      if (!isTokenValid()) { _planPdfStatus[id] = { kind: "unknown", reason: "signed out", retryAt: Date.now() + 5000 }; refreshPlanDebug(); return null; }
+      let mime = "";
+      try { mime = (await gapi.client.drive.files.get({ fileId: floor.planDriveFileId, fields: "mimeType" }))?.result?.mimeType || ""; } catch (e) {}
+      if (/^image\//.test(mime)) { setPlanPdfStatus(id, "image", "original is " + mime); return null; }
+      const url = await fetchDriveFileAsDataUrl(floor.planDriveFileId);   // sniffs %PDF
+      if (url && url.startsWith("data:application/pdf")) { rememberPlanPdf(id, url); setPlanPdfStatus(id, "pdf", "from Drive"); return url; }
+      setPlanPdfStatus(id, url ? "image" : "unknown", url ? "original is not a PDF (" + (mime || url.slice(5, url.indexOf(";"))) + ")" : "download failed");
+    } catch (e) {
+      _planPdfStatus[id] = { kind: "unknown", reason: "fetch error: " + describeError(e), retryAt: Date.now() + 30000 };
+      refreshPlanDebug();
+      console.warn("PDF plan source unavailable", e);
+    } finally { delete _planPdfLoading[id]; }
+    return null;
+  })();
+  _planPdfLoading[id] = p;
+  return p;
 }
 
 function planPdfPage(floorId, src) {
@@ -4127,12 +4195,25 @@ function scheduleHiresPlan() {
     }
   }
   clearTimeout(_hiresTimer);
-  _hiresTimer = setTimeout(() => { updateHiresPlan().catch((e) => console.warn("hi-res plan render failed", e)); }, 220);
+  _hiresTimer = setTimeout(() => {
+    updateHiresPlan().catch((e) => { setHiresDebug("error: " + describeError(e)); console.warn("hi-res plan render failed", e); });
+  }, 220);
 }
 
 function syncHiresStyle(canvas, img) {
   canvas.style.opacity = img.style.opacity || "";
   canvas.style.filter = img.style.filter || "";
+}
+
+function hiresGeometry(stage, viewport, img) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  // Map onto the <img> content box (inside its border) so the overlay lines up exactly.
+  const ir = img.getBoundingClientRect(), vr = viewport.getBoundingClientRect();
+  if (!ir.width || !ir.height || !img.offsetWidth || !img.clientWidth || !img.clientHeight) return null;
+  const z = ir.width / img.offsetWidth;
+  const box = { left: img.offsetLeft + img.clientLeft, top: img.offsetTop + img.clientTop, w: img.clientWidth, h: img.clientHeight };
+  const sr = { left: ir.left + img.clientLeft * z, top: ir.top + img.clientTop * z, width: box.w * z, height: box.h * z };
+  return { dpr, vr, box, sr, fullW: sr.width * dpr, fullH: sr.height * dpr };
 }
 
 async function updateHiresPlan() {
@@ -4141,49 +4222,76 @@ async function updateHiresPlan() {
   const img = stage && stage.querySelector("img.floor-plan");
   const floor = currentFloor();
   if (!stage || !viewport || !img || !floor || !state.floorPlans[floor.id]) { dropHiresCanvas(); return; }
+  const srcPromise = planPdfSource(floor);   // resolve the source even at low zoom so the flat-plan notice can show
   if (viewport.classList.contains("is-gesturing")) { scheduleHiresPlan(); return; }
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  // Map onto the <img> content box (inside its border) so the overlay lines up exactly.
-  const ir = img.getBoundingClientRect(), vr = viewport.getBoundingClientRect();
-  if (!ir.width || !ir.height || !img.offsetWidth || !img.clientWidth || !img.clientHeight) return;
-  const z = ir.width / img.offsetWidth;
-  const box = { left: img.offsetLeft + img.clientLeft, top: img.offsetTop + img.clientTop, w: img.clientWidth, h: img.clientHeight };
-  const sr = { left: ir.left + img.clientLeft * z, top: ir.top + img.clientTop * z, width: box.w * z, height: box.h * z };
-  const fullW = sr.width * dpr, fullH = sr.height * dpr;   // device px of the whole plan at this zoom
+  let g = hiresGeometry(stage, viewport, img);
+  if (!g) { setHiresDebug("skipped: plan not laid out"); return; }
+  if (!img.complete || !img.naturalWidth) { img.addEventListener("load", scheduleHiresPlan, { once: true }); setHiresDebug("skipped: base image loading"); return; }
   // The base raster is sharp enough: no overlay needed.
-  if (fullW <= (img.naturalWidth || 0) * 1.05 && fullH <= (img.naturalHeight || 0) * 1.05) { dropHiresCanvas(); return; }
-  const seq = ++_hiresSeq;
-  const src = await planPdfSource(floor);
-  if (!src || seq !== _hiresSeq) return;
+  if (g.fullW <= img.naturalWidth * 1.05 && g.fullH <= img.naturalHeight * 1.05) { dropHiresCanvas(); setHiresDebug("skipped: base image sharp enough at this zoom"); return; }
+  const src = await srcPromise;
+  if (!src) {
+    const st = _planPdfStatus[floor.id];
+    setHiresDebug("skipped: no PDF (" + (st ? st.kind + ": " + st.reason : "unknown") + ")");
+    if (st && st.kind === "unknown" && st.retryAt) setTimeout(scheduleHiresPlan, Math.max(1000, st.retryAt - Date.now()));
+    return;
+  }
+  // Re-measure after the await: the stage may have been rebuilt or moved.
+  const stage2 = document.getElementById("planStage"), viewport2 = document.getElementById("canvasViewport");
+  const img2 = stage2 && stage2.querySelector("img.floor-plan");
+  if (!img2 || currentFloor()?.id !== floor.id) return;
+  if (viewport2.classList.contains("is-gesturing")) { scheduleHiresPlan(); return; }
+  g = hiresGeometry(stage2, viewport2, img2);
+  if (!g) return;
+  const { vr, sr, box, fullW, fullH } = g;
   // Visible part of the plan (+ a margin for small pans), as plan fractions.
   const mx = vr.width * 0.25, my = vr.height * 0.25;
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
-  let fx0 = clamp01((vr.left - mx - sr.left) / sr.width), fx1 = clamp01((vr.right + mx - sr.left) / sr.width);
-  let fy0 = clamp01((vr.top - my - sr.top) / sr.height), fy1 = clamp01((vr.bottom + my - sr.top) / sr.height);
-  if (fx1 - fx0 <= 0 || fy1 - fy0 <= 0) return;
-  let scale = 1;
+  const fx0 = clamp01((vr.left - mx - sr.left) / sr.width), fx1 = clamp01((vr.right + mx - sr.left) / sr.width);
+  const fy0 = clamp01((vr.top - my - sr.top) / sr.height), fy1 = clamp01((vr.bottom + my - sr.top) / sr.height);
+  if (fx1 - fx0 <= 0 || fy1 - fy0 <= 0) { setHiresDebug("skipped: plan off screen"); return; }
   const rw = (fx1 - fx0) * fullW, rh = (fy1 - fy0) * fullH;
-  scale = Math.min(scale, HIRES_MAX_SIDE / rw, HIRES_MAX_SIDE / rh, Math.sqrt(HIRES_MAX_PIXELS / (rw * rh)));
+  const scale = Math.min(1, HIRES_MAX_SIDE / rw, HIRES_MAX_SIDE / rh, Math.sqrt(HIRES_MAX_PIXELS / (rw * rh)));
   const W = fullW * scale, H = fullH * scale;
   const x0 = Math.floor(fx0 * W), y0 = Math.floor(fy0 * H);
   const cw = Math.max(1, Math.min(HIRES_MAX_SIDE, Math.ceil(fx1 * W) - x0));
   const ch = Math.max(1, Math.min(HIRES_MAX_SIDE, Math.ceil(fy1 * H) - y0));
   const key = [floor.id, src.length, Math.round(W), Math.round(H), x0, y0, cw, ch].join(":");
-  if (_hires && _hires.key === key && _hires.canvas.parentNode === stage) return;
-  const page = await planPdfPage(floor.id, src);
+  const dbgExtra = { scale: W / box.w, canvas: cw + "×" + ch };
+  if (_hires && _hires.key === key && _hires.canvas.parentNode === stage2) { setHiresDebug("ok", dbgExtra); return; }
+  // 0.15.3 — an identical render is already running: let it finish. Every render() (toasts,
+  // sync, photo queue) used to restart it, so slow iPhone renders never completed.
+  if (_hiresInflightKey === key) return;
+  const seq = ++_hiresSeq;
+  if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} _hiresTask = null; }
+  _hiresInflightKey = key;
+  setHiresDebug("rendering…", dbgExtra);
+  let page;
+  try { page = await planPdfPage(floor.id, src); }
+  catch (e) {
+    if (_hiresInflightKey === key) _hiresInflightKey = null;
+    if (/pdf\.js failed to load/.test(String(e && e.message))) { setHiresDebug("error: pdf.js failed to load (offline?)"); return; }
+    // Stored PDF is unreadable: forget it so the flat-plan notice offers a re-upload.
+    delete _planPdfSrc[floor.id];
+    if (window.NDCache) NDCache.remove(PLAN_PDF_CACHE_PREFIX + floor.id).catch(() => {});
+    setPlanPdfStatus(floor.id, "png", "original PDF unreadable");
+    setHiresDebug("error: PDF unreadable: " + describeError(e));
+    return;
+  }
   if (seq !== _hiresSeq) return;
   const vp = page.getViewport({ scale: 1 });
   const canvas = document.createElement("canvas");
   canvas.className = "plan-hires";
   canvas.width = cw; canvas.height = ch;
   const ctx = canvas.getContext("2d");
+  if (!ctx) { canvas.width = canvas.height = 0; _hiresInflightKey = null; setHiresDebug("error: canvas context unavailable (memory)"); return; }
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
-  if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} }
   const task = page.render({ canvasContext: ctx, viewport: vp, transform: [W / vp.width, 0, 0, H / vp.height, -x0, -y0] });
   _hiresTask = task;
   try { await task.promise; }
-  catch (e) { canvas.width = 0; canvas.height = 0; if (e && e.name === "RenderingCancelledException") return; throw e; }
+  catch (e) { canvas.width = 0; canvas.height = 0; if (_hiresInflightKey === key) _hiresInflightKey = null; if (e && e.name === "RenderingCancelledException") return; throw e; }
   finally { if (_hiresTask === task) _hiresTask = null; }
+  if (_hiresInflightKey === key) _hiresInflightKey = null;
   const liveStage = document.getElementById("planStage");
   const liveImg = liveStage && liveStage.querySelector("img.floor-plan");
   if (seq !== _hiresSeq || !liveImg || currentFloor()?.id !== floor.id) { canvas.width = 0; canvas.height = 0; return; }
@@ -4196,6 +4304,7 @@ async function updateHiresPlan() {
   _hires = { floorId: floor.id, key, canvas };
   liveImg.after(canvas);
   if (old && old.canvas !== canvas) { old.canvas.remove(); old.canvas.width = 0; old.canvas.height = 0; }
+  setHiresDebug("ok", dbgExtra);
 }
 
 function updateScaleReadout() {
@@ -4917,14 +5026,33 @@ function uploadFloorPlan() {
   const input = document.createElement("input");
   input.type = "file"; input.accept = "image/png,image/jpeg,image/svg+xml,image/webp,application/pdf,.pdf";
   input.onchange = async () => {
-    const file = input.files?.[0]; if (!file) return;
+    let file = input.files?.[0]; if (!file) return;
+    // 0.15.3 — iOS can hand over a PDF with an empty type; label it so Drive stores application/pdf.
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (isPdf && file.type !== "application/pdf") file = new File([file], file.name, { type: "application/pdf" });
+    const prevAspect = floor.planAspectRatio;
+    // 0.15.3 — visible progress so a big PDF upload never looks frozen on the phone.
+    const step = (label, pct) => { state.planUpload = label ? { step: label, pct } : null; render(); };
+    step("Reading file…", 5);
     const reader = new FileReader();
+    reader.onerror = () => { step(null); toast("Could not read that file"); render(); };
     reader.onload = async () => {
-      await cacheFloorPlan(floor.id, reader.result, { planFileName: file.name });   // §2.3
+      try {
+      step(isPdf ? "Rendering PDF…" : "Preparing image…", 25);
+      if (!isPdf) {   // an image replaces a PDF plan: forget the old PDF so it isn't drawn over the new image
+        delete _planPdfSrc[floor.id]; if (_hires && _hires.floorId === floor.id) dropHiresCanvas();
+        if (window.NDCache) NDCache.remove(PLAN_PDF_CACHE_PREFIX + floor.id).catch(() => {});
+        setPlanPdfStatus(floor.id, "image", "uploaded image");
+      }
+      await cacheFloorPlan(floor.id, reader.result, { planFileName: file.name });   // §2.3 (keeps the PDF locally too)
       floor.planFileName = file.name;
       floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || floor.planAspectRatio || 1.6;
-      persist(); render();
+      // Markers and rooms are stored as % of the plan, so they keep their place when the
+      // new render has different pixel dimensions. Only a different page shape moves them.
+      if (prevAspect && Math.abs(floor.planAspectRatio / prevAspect - 1) > 0.02) setTimeout(() => { toast("New plan has a different shape: check marker positions"); render(); }, 3000);
+      persist();
       toast(`Plan uploaded for ${floor.name}`);
+      if (isTokenValid()) step(isPdf ? "Uploading PDF to Drive…" : "Uploading to Drive…", 50); else step(null);
       logAudit("Plan Uploaded", { projectId: proj.id, floorId: floor.id, details: `${floor.name}: ${file.name}` });
       if (isTokenValid()) {
         try {
@@ -4933,18 +5061,22 @@ function uploadFloorPlan() {
           let result;
           if (floor.planDriveFileId) {
             try { result = await updateFileBytes(floor.planDriveFileId, file); }
-            catch (e) { result = await uploadFileToDrive(file, floorFolderId, `floor-plan-${file.name}`); }
+            catch (e) { result = null; }
+            // Replacing an old image original with a PDF: store a fresh PDF file if Drive kept the old type.
+            if (!result || (isPdf && result.mimeType && result.mimeType !== "application/pdf")) result = await uploadFileToDrive(file, floorFolderId, `floor-plan-${file.name}`);
           } else {
             result = await uploadFileToDrive(file, floorFolderId, `floor-plan-${file.name}`);
           }
           floor.planDriveFileId = result.id;
           floor.planMimeType = result.mimeType;
           floor.planWebViewLink = result.webViewLink;
-          persist(); render();
+          persist();
+          step("Saving render…", 85);
           await ensurePlanPng(proj, floor, true);   // also store a PNG render for fit-off
           toast(`Plan synced to Drive`);
         } catch (e) { console.warn(e); toast("Drive sync failed: " + describeError(e)); }
       }
+      } finally { step(null); }
     };
     reader.readAsDataURL(file);
   };
