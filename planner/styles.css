@@ -3501,3 +3501,6 @@ body.report-fullscreen { overflow:hidden; }
   .print-page.report-full-images .print-node-card { break-inside:auto; page-break-inside:auto; }
   .print-page.report-full-images .print-photo { break-inside:avoid; }
 }
+
+/* 0.15.2 sharp PDF plans: visible-area re-render laid over the base plan image. */
+.plan-hires { position:absolute; display:block; pointer-events:none; max-width:none; }

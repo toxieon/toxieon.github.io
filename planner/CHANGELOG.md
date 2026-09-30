@@ -1,3 +1,5 @@
+## 0.15.2 · 2026-10-01 · pdf-zoom · Re-render PDF plans sharply at zoom, load originals for reports and raise max zoom to 800%
+
 ## 0.15.1 · 2026-09-29 · pdf-export · Add direct device PDF saving, iOS sharing and printable report isolation
 
 ## 0.14.1 · 2026-09-29 · report-viewing · Preserve compact cards, expose full-size photos and add full-screen browsing
