@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.17.1";
+const APP_VERSION = "0.17.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -255,6 +255,12 @@ const _planPdfSrc = {};        // floorId -> PDF data URL
 const _planPdfStatus = {};     // floorId -> { kind: pdf|png|image|unknown, reason, retryAt? }
 const _planPdfLoading = {};    // floorId -> in-flight source promise
 let _planPdfDoc = null;        // { floorId, src, promise }
+/* 0.17.2 single-image PDF state (see analyzePlanPdf). */
+const PLAN_TILES_PREFIX = "plantiles:";
+const PLAN_TILE = 2048;
+const _planKind = {};     // floorId -> { kind: "vector"|"raster"|"mixed", w, h, srcLen }
+const _planTiles = {};    // floorId -> { w, h, T, blobs, bitmaps: [] }
+const _planKindLoading = {};
 let _hires = null;             // { floorId, key, canvas }
 let _hiresTimer = null, _hiresTask = null, _hiresSeq = 0, _hiresInflightKey = null;
 let _hiresDebug = null;        // last re-render status for the on-device debug line
@@ -300,7 +306,7 @@ function loadPdfJs() {
 async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   const pdfjsLib = await loadPdfJs();
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
-  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false }).promise;
   const page = await pdf.getPage(1);
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(1, Math.min(maxEdge / base.width, maxEdge / base.height));
@@ -4175,6 +4181,7 @@ function rememberPlanPdf(floorId, dataUrl) {
   if (_planPdfSrc[floorId] === dataUrl) return;
   _planPdfSrc[floorId] = dataUrl;
   delete _planPdfLoading[floorId];
+  delete _planKind[floorId]; delete _planTiles[floorId];
   setPlanPdfStatus(floorId, "pdf", "original PDF stored");
   if (_planPdfDoc && _planPdfDoc.floorId === floorId) { releasePlanPdfDoc(); }
   if (_hires && _hires.floorId === floorId) dropHiresCanvas();
@@ -4212,7 +4219,7 @@ function planDebugLine() {
   const kind = _planPdfSrc[floor.id] ? "pdf" : (s ? s.kind : "unknown");
   const d = _hiresDebug || {};
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  return `src=${kind}${s && s.reason && kind !== "pdf" ? " (" + s.reason + ")" : ""} · fileId=${floor.planDriveFileId ? "yes" : "no"} · pdfStored=${_planPdfSrc[floor.id] ? "yes" : "no"} · last=${d.status || "none"} · scale=${d.scale ? d.scale.toFixed(1) + "/" + (state.canvas.zoom * dpr).toFixed(1) : "-"} · canvas=${d.canvas || "-"} · dpr=${window.devicePixelRatio || 1}`;
+  return `src=${kind}${s && s.reason && kind !== "pdf" ? " (" + s.reason + ")" : ""} · fileId=${floor.planDriveFileId ? "yes" : "no"} · pdfStored=${_planPdfSrc[floor.id] ? "yes" : "no"} · pdf=${planKindLabel(floor.id)} · last=${d.status || "none"} · scale=${d.scale ? d.scale.toFixed(1) + "/" + (state.canvas.zoom * dpr).toFixed(1) : "-"} · canvas=${d.canvas || "-"} · dpr=${window.devicePixelRatio || 1}`;
 }
 function refreshPlanDebug() {
   const el = document.getElementById("planDebug");
@@ -4243,7 +4250,7 @@ function planPdfSource(floor) {
     try {
       if (window.NDCache) {
         const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + id).catch(() => null);
-        if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { _planPdfSrc[id] = cached; setPlanPdfStatus(id, "pdf", "from device cache"); return cached; }
+        if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { _planPdfSrc[id] = cached; setPlanPdfStatus(id, "pdf", "from device cache"); if (!floor.planDriveFileId) linkLocalPlanOriginal(project(), floor); return cached; }
       }
       if (!floor.planDriveFileId) { setPlanPdfStatus(id, floor.planPngFileId ? "png" : "image", "no original file id"); return null; }
       if (floor.planFileName && /\.(png|jpe?g|webp|svg|heic|gif)$/i.test(floor.planFileName)) { setPlanPdfStatus(id, "image", "original is " + floor.planFileName.split(".").pop()); return null; }
@@ -4271,13 +4278,114 @@ function planPdfPage(floorId, src) {
     const promise = (async () => {
       const pdfjsLib = await loadPdfJs();
       const bytes = Uint8Array.from(atob(src.split(",")[1]), (c) => c.charCodeAt(0));
-      const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false }).promise;
       return { pdf, page: await pdf.getPage(1) };
     })();
     promise.catch(() => { if (_planPdfDoc && _planPdfDoc.promise === promise) _planPdfDoc = null; });
     _planPdfDoc = { floorId, src, promise };
   }
   return _planPdfDoc.promise.then((x) => x.page);
+}
+
+/* ── 0.17.2 single-image (scanned/exported raster) PDFs ───────────────────
+ * Procore-style PDFs wrap ONE full-page bitmap (e.g. 4725×3391 + smask). pdf.js
+ * redraws were soft on iPhone, so extract that bitmap at full size (no 3200 cap),
+ * flattened on white, as <=2048px JPEG tiles (iOS canvas limits) cached in
+ * IndexedDB, and draw the visible part from the tiles. pdf.js stays for vector PDFs. */
+function planKindLabel(floorId) {
+  const k = _planKind[floorId];
+  return !k ? "?" : k.kind === "raster" ? `raster ${k.w}×${k.h}` : k.kind === "mixed" ? `mixed (img ${k.w}×${k.h})` : "vector";
+}
+function mulM(a, b) { return [a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1], a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3], a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5]]; }
+async function analyzePlanPdf(floorId, src) {
+  const k = _planKind[floorId];
+  if (k && k.srcLen === src.length) return k;
+  if (_planKindLoading[floorId]) return _planKindLoading[floorId];
+  const p = (async () => {
+    try {
+      const cached = window.NDCache ? await NDCache.get(PLAN_TILES_PREFIX + floorId).catch(() => null) : null;
+      if (cached && cached.srcLen === src.length && Array.isArray(cached.blobs) && cached.blobs.length) {
+        _planTiles[floorId] = { ...cached, bitmaps: [] };
+        return (_planKind[floorId] = { kind: "raster", w: cached.w, h: cached.h, srcLen: src.length });
+      }
+      const page = await planPdfPage(floorId, src);
+      const ol = await page.getOperatorList();
+      const O = window.pdfjsLib.OPS;
+      const imageOps = [O.paintImageXObject, O.paintInlineImageXObject, O.paintImageXObjectRepeat, O.paintInlineImageXObjectGroup, O.paintImageMaskXObject, O.paintJpegXObject].filter((v) => v !== undefined);
+      const drawOps = [O.constructPath, O.showText, O.showSpacedText, O.fill, O.stroke, O.eoFill, O.fillStroke, O.shadingFill].filter((v) => v !== undefined);
+      let ctm = [1, 0, 0, 1, 0, 0]; const stack = []; let img = null, nImg = 0, nDraw = 0;
+      for (let i = 0; i < ol.fnArray.length; i++) {
+        const fn = ol.fnArray[i], a = ol.argsArray[i];
+        if (fn === O.save) stack.push(ctm); else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+        else if (fn === O.transform) ctm = mulM(ctm, a);
+        else if (imageOps.includes(fn)) { nImg++; if (fn === O.paintImageXObject) img = { id: a[0], ctm }; }
+        else if (drawOps.includes(fn)) nDraw++;
+      }
+      const vp = page.getViewport({ scale: 1 });
+      if (nImg !== 1 || !img) return (_planKind[floorId] = { kind: nImg ? "mixed" : "vector", w: 0, h: 0, srcLen: src.length });
+      const obj = await new Promise((res) => { try { (img.id.startsWith("g_") ? page.commonObjs : page.objs).get(img.id, res); } catch (e) { res(null); } });
+      const [pa, pb, pc, pd, pe, pf] = img.ctm, [x0v, y0v, x1v, y1v] = page.view;
+      const pw = x1v - x0v, ph = y1v - y0v;
+      // Axis-aligned, upright image; it may sit inside page margins (Procore adds ~40pt).
+      const upright = Math.abs(pb) < 1e-6 && Math.abs(pc) < 1e-6 && pa > 0 && pd > 0 && !page.rotate;
+      const rect = { rx: (pe - x0v) / pw, ry: 1 - (pf + pd - y0v) / ph, rw: pa / pw, rh: pd / ph };
+      if (!obj || !obj.data || !upright || nDraw > 4) return (_planKind[floorId] = { kind: "mixed", w: obj?.width || 0, h: obj?.height || 0, srcLen: src.length });
+      const tiles = { ...(await buildPlanTiles(obj)), ...rect };
+      _planTiles[floorId] = { ...tiles, bitmaps: [] };
+      if (window.NDCache) NDCache.put(PLAN_TILES_PREFIX + floorId, { ...tiles, srcLen: src.length }, null).catch((e) => console.warn("plan tiles cache put failed", e));
+      return (_planKind[floorId] = { kind: "raster", w: obj.width, h: obj.height, srcLen: src.length });
+    } finally { delete _planKindLoading[floorId]; }
+  })();
+  _planKindLoading[floorId] = p;
+  return p;
+}
+// pdf.js image data (kind 1 = 1bpp gray, 2 = RGB, 3 = RGBA incl. smask) -> white-flattened JPEG tiles.
+async function buildPlanTiles(obj) {
+  const { width: w, height: h, data, kind } = obj;
+  const T = PLAN_TILE, blobs = [];
+  const cols = Math.ceil(w / T), rows = Math.ceil(h / T);
+  for (let ty = 0; ty < rows; ty++) for (let tx = 0; tx < cols; tx++) {
+    const tw = Math.min(T, w - tx * T), th = Math.min(T, h - ty * T);
+    const c = document.createElement("canvas"); c.width = tw; c.height = th;
+    const ctx = c.getContext("2d"); const id = ctx.createImageData(tw, th); const o = id.data;
+    for (let y = 0; y < th; y++) {
+      const sy = ty * T + y;
+      for (let x = 0; x < tw; x++) {
+        const sx = tx * T + x, di = (y * tw + x) * 4;
+        let r, g, b;
+        if (kind === 3) { const si = (sy * w + sx) * 4, al = data[si + 3]; r = (data[si] * al + 255 * (255 - al)) / 255; g = (data[si + 1] * al + 255 * (255 - al)) / 255; b = (data[si + 2] * al + 255 * (255 - al)) / 255; }
+        else if (kind === 2) { const si = (sy * w + sx) * 3; r = data[si]; g = data[si + 1]; b = data[si + 2]; }
+        else { const rowBytes = (w + 7) >> 3; const bit = (data[sy * rowBytes + (sx >> 3)] >> (7 - (sx & 7))) & 1; r = g = b = bit ? 255 : 0; }
+        o[di] = r; o[di + 1] = g; o[di + 2] = b; o[di + 3] = 255;
+      }
+    }
+    ctx.putImageData(id, 0, 0);
+    blobs.push(await new Promise((res) => c.toBlob(res, "image/jpeg", 0.95)));
+    c.width = c.height = 0;
+    await new Promise((r) => setTimeout(r, 0));   // keep the UI responsive between tiles
+  }
+  return { w, h, T, cols, rows, blobs };
+}
+async function planTileBitmap(t, i) {
+  if (!t.bitmaps[i]) t.bitmaps[i] = createImageBitmap(t.blobs[i]);
+  return t.bitmaps[i];
+}
+async function drawPlanTiles(ctx, t, W, H, x0, y0, cw, ch) {
+  // Image rect inside the page (fractions), then source px per canvas px.
+  const rx = t.rx ?? 0, ry = t.ry ?? 0, rw = t.rw ?? 1, rh = t.rh ?? 1;
+  const kx = t.w / (rw * W), ky = t.h / (rh * H);
+  x0 -= rx * W; y0 -= ry * H;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  const cols = t.cols || Math.ceil(t.w / t.T);
+  for (let i = 0; i < t.blobs.length; i++) {
+    const tx = (i % cols) * t.T, ty = Math.floor(i / cols) * t.T;
+    const tw = Math.min(t.T, t.w - tx), th = Math.min(t.T, t.h - ty);
+    // tile rect in canvas px
+    const dx = tx / kx - x0, dy = ty / ky - y0, dw = tw / kx, dh = th / ky;
+    if (dx >= cw || dy >= ch || dx + dw <= 0 || dy + dh <= 0) continue;
+    const bmp = await planTileBitmap(t, i);
+    ctx.drawImage(bmp, 0, 0, tw, th, dx, dy, dw, dh);
+  }
 }
 
 function scheduleHiresPlan() {
@@ -4363,6 +4471,21 @@ async function updateHiresPlan() {
   if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} _hiresTask = null; }
   _hiresInflightKey = key;
   setHiresDebug("rendering…", dbgExtra);
+  let kind = null;
+  try { kind = await analyzePlanPdf(floor.id, src); } catch (e) { console.warn("plan PDF analysis failed", e); }
+  if (seq !== _hiresSeq) { if (_hiresInflightKey === key) _hiresInflightKey = null; return; }
+  Object.keys(_planTiles).forEach((id) => { if (id !== floor.id) { (_planTiles[id].bitmaps || []).forEach((b) => b && b.then((x) => x.close && x.close()).catch(() => {})); _planTiles[id].bitmaps = []; } });
+  if (kind && kind.kind === "raster" && _planTiles[floor.id]) {
+    const canvas = document.createElement("canvas");
+    canvas.className = "plan-hires"; canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { canvas.width = canvas.height = 0; _hiresInflightKey = null; setHiresDebug("error: canvas context unavailable (memory)"); return; }
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
+    try { await drawPlanTiles(ctx, _planTiles[floor.id], W, H, x0, y0, cw, ch); }
+    catch (e) { canvas.width = canvas.height = 0; if (_hiresInflightKey === key) _hiresInflightKey = null; throw e; }
+    if (_hiresInflightKey === key) _hiresInflightKey = null;
+    return placeHiresCanvas(canvas, floor, seq, key, box, W, H, x0, y0, cw, ch, dbgExtra);
+  }
   let page;
   try { page = await planPdfPage(floor.id, src); }
   catch (e) {
@@ -4389,6 +4512,9 @@ async function updateHiresPlan() {
   catch (e) { canvas.width = 0; canvas.height = 0; if (_hiresInflightKey === key) _hiresInflightKey = null; if (e && e.name === "RenderingCancelledException") return; throw e; }
   finally { if (_hiresTask === task) _hiresTask = null; }
   if (_hiresInflightKey === key) _hiresInflightKey = null;
+  return placeHiresCanvas(canvas, floor, seq, key, box, W, H, x0, y0, cw, ch, dbgExtra);
+}
+function placeHiresCanvas(canvas, floor, seq, key, box, W, H, x0, y0, cw, ch, dbgExtra) {
   const liveStage = document.getElementById("planStage");
   const liveImg = liveStage && liveStage.querySelector("img.floor-plan");
   if (seq !== _hiresSeq || !liveImg || currentFloor()?.id !== floor.id) { canvas.width = 0; canvas.height = 0; return; }
@@ -4460,8 +4586,27 @@ function selectProject(projectId) {
   maybeFetchPlanForCurrentFloor();
 }
 
+// 0.17.2 — a PDF plan stored on this device but never linked to Drive (upload happened while
+// signed out / offline): upload the original now so the floor gets its planDriveFileId.
+const _planLinking = {};
+async function linkLocalPlanOriginal(proj, fl) {
+  if (_planLinking[fl.id] || fl.planDriveFileId || !_planPdfSrc[fl.id] || !isTokenValid() || !proj) return;
+  _planLinking[fl.id] = true;
+  try {
+    const folderId = await ensureFloorDriveFolder(proj, fl); if (!folderId || fl.planDriveFileId) return;
+    const blob = await (await fetch(_planPdfSrc[fl.id])).blob();
+    const name = fl.planFileName && /\.pdf$/i.test(fl.planFileName) ? fl.planFileName : "plan.pdf";
+    const result = await uploadFileToDrive(new File([blob], name, { type: "application/pdf" }), folderId, `floor-plan-${name}`);
+    fl.planDriveFileId = result.id; fl.planMimeType = result.mimeType; fl.planWebViewLink = result.webViewLink;
+    persist(); refreshPlanDebug();
+    logAudit("Plan Linked", { projectId: proj.id, floorId: fl.id, details: `${fl.name}: original PDF uploaded` });
+  } catch (e) { console.warn("plan original link failed", e); }
+  finally { delete _planLinking[fl.id]; }
+}
+
 function maybeFetchPlanForCurrentFloor() {
   const fl = currentFloor(); if (!fl) return;
+  if (!fl.planDriveFileId && _planPdfSrc[fl.id] && isTokenValid()) linkLocalPlanOriginal(project(), fl);
   if (!state.floorPlans[fl.id] && fl.planDriveFileId && isTokenValid()) {
     fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); await ensurePlanPng(project(), fl, false); } }).catch((e) => console.warn(e));
   } else if (state.floorPlans[fl.id] && !fl.planPngFileId && isTokenValid()) {
@@ -5188,9 +5333,13 @@ function uploadFloorPlan() {
       if (prevAspect && Math.abs(floor.planAspectRatio / prevAspect - 1) > 0.02) setTimeout(() => { toast("New plan has a different shape: check marker positions"); render(); }, 3000);
       persist();
       toast(`Plan uploaded for ${floor.name}`);
-      if (isTokenValid()) step(isPdf ? "Uploading PDF to Drive…" : "Uploading to Drive…", 50); else step(null);
+      // 0.17.2 — refresh the session before giving up on Drive, so the original gets linked (fileId).
+      let canSync = isTokenValid();
+      if (!canSync && window.NDAuth?.ensureToken) { try { await NDAuth.ensureToken(); canSync = isTokenValid(); } catch (e) {} }
+      if (canSync) step(isPdf ? "Uploading PDF to Drive…" : "Uploading to Drive…", 50);
+      else { step(null); toast("Plan saved on this device; it will link to Drive when you're signed in"); }
       logAudit("Plan Uploaded", { projectId: proj.id, floorId: floor.id, details: `${floor.name}: ${file.name}` });
-      if (isTokenValid()) {
+      if (canSync) {
         try {
           const floorFolderId = await ensureFloorDriveFolder(proj, floor);
           if (!floorFolderId) { toast("Floor folder not found"); return; }

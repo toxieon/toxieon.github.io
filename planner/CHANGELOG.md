@@ -1,3 +1,5 @@
+## 0.17.2 · 2026-10-01 · raster-pdf-plans · Extract single-image PDF plans at full resolution as tiles, stop pdf.js downscaling embedded images, link unsynced plan originals to Drive
+
 ## 0.17.1 · 2026-10-01 · draw-room · Draw and edit a room polygon from a title pin, auto-assign nodes inside, rename and delete with the pin
 
 ## 0.16.1 · 2026-10-01 · room-title-pins · Add room title pins: place, rename, move and delete labelled map pins on the plan
