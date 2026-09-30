@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.15.1";
+const APP_VERSION = "0.15.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -246,6 +246,16 @@ function persist(opts = {}) {
  * full-res original. */
 const PLAN_CACHE_PREFIX = "plan:";
 const PLAN_MAX_EDGE = 3200;   // higher-res so PDF/plan detail stays legible when zoomed in
+/* 0.15.2 sharp PDF zoom state (see updateHiresPlan). */
+const MAX_ZOOM = 8;
+const HIRES_MAX_SIDE = 4096;
+const HIRES_MAX_PIXELS = 16000000;
+const PLAN_PDF_CACHE_PREFIX = "planpdf:";
+const _planPdfSrc = {};        // floorId -> PDF data URL
+const _planPdfState = {};      // floorId -> "loading" | "none"
+let _planPdfDoc = null;        // { floorId, src, promise }
+let _hires = null;             // { floorId, key, canvas }
+let _hiresTimer = null, _hiresTask = null, _hiresSeq = 0;
 
 function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   return new Promise((resolve) => {
@@ -307,6 +317,7 @@ async function planDisplayUrl(dataUrl) {
 }
 
 async function cacheFloorPlan(floorId, dataUrl, meta) {
+  rememberPlanPdf(floorId, dataUrl);   // 0.15.2 — keep the vector PDF for sharp zoom re-renders
   dataUrl = await planDisplayUrl(dataUrl);   // PDF → PNG so <img> can show it
   const working = await downscaleDataUrl(dataUrl);
   state.floorPlans[floorId] = working;
@@ -316,6 +327,9 @@ async function cacheFloorPlan(floorId, dataUrl, meta) {
 
 function evictFloorPlan(floorId) {
   delete state.floorPlans[floorId];
+  delete _planPdfSrc[floorId]; delete _planPdfState[floorId];
+  if (_hires && _hires.floorId === floorId) dropHiresCanvas();
+  if (window.NDCache) NDCache.remove(PLAN_PDF_CACHE_PREFIX + floorId).catch(() => {});
   if (window.NDCache) NDCache.remove(PLAN_CACHE_PREFIX + floorId).catch(() => {});
 }
 
@@ -3355,7 +3369,10 @@ async function openPlannerReport(reportMode) {
     if (!state.floorPlans[floor.id] && floor.planDriveFileId) {
       try {
         await NDAuth.ensureToken();
-        const url = await fetchDriveFileAsDataUrl(floor.planPngFileId || floor.planDriveFileId);
+        // 0.15.2 — original first: the flattened PNG render replaced the vector PDF in the plan cache.
+        let url = null;
+        try { url = await fetchDriveFileAsDataUrl(floor.planDriveFileId); } catch (e) {}
+        if (!url && floor.planPngFileId) url = await fetchDriveFileAsDataUrl(floor.planPngFileId);
         if (url) { await cacheFloorPlan(floor.id, url); floor.planAspectRatio = await readImageAspectRatio(state.floorPlans[floor.id]) || floor.planAspectRatio; }
       } catch (e) { console.warn('Report floor plan unavailable', floor.id); }
     }
@@ -3890,7 +3907,7 @@ function bindCanvasEvents() {
         const mid = pointerMidpoint(points[0], points[1]);
         const focal = clientToViewportFocal(mid.x, mid.y, viewport);
         const rawZoom = pinchState.zoom * (distance / pinchState.distance);
-        const newZoom = Math.max(0.55, Math.min(6, Number(rawZoom.toFixed(2))));
+        const newZoom = Math.max(0.55, Math.min(MAX_ZOOM, Number(rawZoom.toFixed(2))));
         const ratio = newZoom / pinchState.zoom;
         // Absolute focal zoom from pinch-start: keeps midpoint under fingers and pans with mid movement.
         state.canvas.panX = focal.x - (pinchState.focalX - pinchState.panX) * ratio;
@@ -4028,6 +4045,157 @@ function applyCanvasTransform() {
   const stage = document.getElementById("planStage");
   if (!stage) return;
   stage.style.transform = `translate(calc(-50% + ${state.canvas.panX}px), calc(-50% + ${state.canvas.panY}px)) scale(${state.canvas.zoom})`;
+  scheduleHiresPlan();
+}
+
+/* ── 0.15.2 sharp PDF plans at zoom ──────────────────────────────────────
+ * The <img> plan is a fixed <=3200px raster that the stage CSS-scales, so
+ * PDF plans blur at high zoom. Keep the pdf.js page and, once zoom/pan
+ * settles, re-render just the visible part of the plan into a canvas at
+ * zoom x devicePixelRatio, laid over the <img>. The low-res <img> (and the
+ * previous canvas, CSS-scaled with the stage) show while gesturing.
+ * Budget keeps iOS Safari safe: <=16M px per canvas, longest side <=4096. */
+
+function rememberPlanPdf(floorId, dataUrl) {
+  if (!floorId || typeof dataUrl !== "string" || !dataUrl.startsWith("data:application/pdf")) return;
+  if (_planPdfSrc[floorId] === dataUrl) return;
+  _planPdfSrc[floorId] = dataUrl;
+  delete _planPdfState[floorId];
+  if (_planPdfDoc && _planPdfDoc.floorId === floorId) { releasePlanPdfDoc(); }
+  if (_hires && _hires.floorId === floorId) dropHiresCanvas();
+  if (window.NDCache) NDCache.put(PLAN_PDF_CACHE_PREFIX + floorId, dataUrl, null).catch(() => {});
+}
+
+function releasePlanPdfDoc() {
+  const d = _planPdfDoc; _planPdfDoc = null;
+  if (d) d.promise.then((x) => x && x.pdf && x.pdf.destroy()).catch(() => {});
+}
+
+function dropHiresCanvas() {
+  if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} _hiresTask = null; }
+  if (_hires && _hires.canvas) { _hires.canvas.remove(); _hires.canvas.width = 0; _hires.canvas.height = 0; }
+  _hires = null;
+}
+
+// PDF source for a floor: memory, then IndexedDB, then (lazily) the Drive original.
+async function planPdfSource(floor) {
+  const id = floor.id;
+  if (_planPdfSrc[id]) return _planPdfSrc[id];
+  if (_planPdfState[id]) return null;
+  _planPdfState[id] = "loading";
+  try {
+    if (window.NDCache) {
+      const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + id).catch(() => null);
+      if (typeof cached === "string" && cached.startsWith("data:application/pdf")) { _planPdfSrc[id] = cached; delete _planPdfState[id]; return cached; }
+    }
+    if (floor.planFileName && !/\.pdf$/i.test(floor.planFileName)) { _planPdfState[id] = "none"; return null; }
+    if (!floor.planDriveFileId || !isTokenValid()) { delete _planPdfState[id]; return null; }
+    const meta = await gapi.client.drive.files.get({ fileId: floor.planDriveFileId, fields: "mimeType" });
+    if (meta?.result?.mimeType !== "application/pdf") { _planPdfState[id] = "none"; return null; }
+    const url = await fetchDriveFileAsDataUrl(floor.planDriveFileId);
+    delete _planPdfState[id];
+    if (url && url.startsWith("data:application/pdf")) { rememberPlanPdf(id, url); return url; }
+    _planPdfState[id] = "none";
+  } catch (e) { delete _planPdfState[id]; console.warn("PDF plan source unavailable", e); }
+  return null;
+}
+
+function planPdfPage(floorId, src) {
+  if (!_planPdfDoc || _planPdfDoc.floorId !== floorId || _planPdfDoc.src !== src) {
+    releasePlanPdfDoc();
+    const promise = (async () => {
+      const pdfjsLib = await loadPdfJs();
+      const bytes = Uint8Array.from(atob(src.split(",")[1]), (c) => c.charCodeAt(0));
+      const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+      return { pdf, page: await pdf.getPage(1) };
+    })();
+    promise.catch(() => { if (_planPdfDoc && _planPdfDoc.promise === promise) _planPdfDoc = null; });
+    _planPdfDoc = { floorId, src, promise };
+  }
+  return _planPdfDoc.promise.then((x) => x.page);
+}
+
+function scheduleHiresPlan() {
+  const stage = document.getElementById("planStage");
+  const floor = currentFloor();
+  // render() rebuilds the stage: re-attach the current canvas at once so it doesn't flicker.
+  if (_hires && stage) {
+    if (!floor || _hires.floorId !== floor.id) dropHiresCanvas();
+    else if (_hires.canvas.parentNode !== stage) {
+      const img = stage.querySelector("img.floor-plan");
+      if (img) { syncHiresStyle(_hires.canvas, img); img.after(_hires.canvas); } else dropHiresCanvas();
+    }
+  }
+  clearTimeout(_hiresTimer);
+  _hiresTimer = setTimeout(() => { updateHiresPlan().catch((e) => console.warn("hi-res plan render failed", e)); }, 220);
+}
+
+function syncHiresStyle(canvas, img) {
+  canvas.style.opacity = img.style.opacity || "";
+  canvas.style.filter = img.style.filter || "";
+}
+
+async function updateHiresPlan() {
+  const stage = document.getElementById("planStage");
+  const viewport = document.getElementById("canvasViewport");
+  const img = stage && stage.querySelector("img.floor-plan");
+  const floor = currentFloor();
+  if (!stage || !viewport || !img || !floor || !state.floorPlans[floor.id]) { dropHiresCanvas(); return; }
+  if (viewport.classList.contains("is-gesturing")) { scheduleHiresPlan(); return; }
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  // Map onto the <img> content box (inside its border) so the overlay lines up exactly.
+  const ir = img.getBoundingClientRect(), vr = viewport.getBoundingClientRect();
+  if (!ir.width || !ir.height || !img.offsetWidth || !img.clientWidth || !img.clientHeight) return;
+  const z = ir.width / img.offsetWidth;
+  const box = { left: img.offsetLeft + img.clientLeft, top: img.offsetTop + img.clientTop, w: img.clientWidth, h: img.clientHeight };
+  const sr = { left: ir.left + img.clientLeft * z, top: ir.top + img.clientTop * z, width: box.w * z, height: box.h * z };
+  const fullW = sr.width * dpr, fullH = sr.height * dpr;   // device px of the whole plan at this zoom
+  // The base raster is sharp enough: no overlay needed.
+  if (fullW <= (img.naturalWidth || 0) * 1.05 && fullH <= (img.naturalHeight || 0) * 1.05) { dropHiresCanvas(); return; }
+  const seq = ++_hiresSeq;
+  const src = await planPdfSource(floor);
+  if (!src || seq !== _hiresSeq) return;
+  // Visible part of the plan (+ a margin for small pans), as plan fractions.
+  const mx = vr.width * 0.25, my = vr.height * 0.25;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  let fx0 = clamp01((vr.left - mx - sr.left) / sr.width), fx1 = clamp01((vr.right + mx - sr.left) / sr.width);
+  let fy0 = clamp01((vr.top - my - sr.top) / sr.height), fy1 = clamp01((vr.bottom + my - sr.top) / sr.height);
+  if (fx1 - fx0 <= 0 || fy1 - fy0 <= 0) return;
+  let scale = 1;
+  const rw = (fx1 - fx0) * fullW, rh = (fy1 - fy0) * fullH;
+  scale = Math.min(scale, HIRES_MAX_SIDE / rw, HIRES_MAX_SIDE / rh, Math.sqrt(HIRES_MAX_PIXELS / (rw * rh)));
+  const W = fullW * scale, H = fullH * scale;
+  const x0 = Math.floor(fx0 * W), y0 = Math.floor(fy0 * H);
+  const cw = Math.max(1, Math.min(HIRES_MAX_SIDE, Math.ceil(fx1 * W) - x0));
+  const ch = Math.max(1, Math.min(HIRES_MAX_SIDE, Math.ceil(fy1 * H) - y0));
+  const key = [floor.id, src.length, Math.round(W), Math.round(H), x0, y0, cw, ch].join(":");
+  if (_hires && _hires.key === key && _hires.canvas.parentNode === stage) return;
+  const page = await planPdfPage(floor.id, src);
+  if (seq !== _hiresSeq) return;
+  const vp = page.getViewport({ scale: 1 });
+  const canvas = document.createElement("canvas");
+  canvas.className = "plan-hires";
+  canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
+  if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} }
+  const task = page.render({ canvasContext: ctx, viewport: vp, transform: [W / vp.width, 0, 0, H / vp.height, -x0, -y0] });
+  _hiresTask = task;
+  try { await task.promise; }
+  catch (e) { canvas.width = 0; canvas.height = 0; if (e && e.name === "RenderingCancelledException") return; throw e; }
+  finally { if (_hiresTask === task) _hiresTask = null; }
+  const liveStage = document.getElementById("planStage");
+  const liveImg = liveStage && liveStage.querySelector("img.floor-plan");
+  if (seq !== _hiresSeq || !liveImg || currentFloor()?.id !== floor.id) { canvas.width = 0; canvas.height = 0; return; }
+  canvas.style.left = (box.left + x0 / W * box.w) + "px";
+  canvas.style.top = (box.top + y0 / H * box.h) + "px";
+  canvas.style.width = (cw / W * box.w) + "px";
+  canvas.style.height = (ch / H * box.h) + "px";
+  syncHiresStyle(canvas, liveImg);
+  const old = _hires;
+  _hires = { floorId: floor.id, key, canvas };
+  liveImg.after(canvas);
+  if (old && old.canvas !== canvas) { old.canvas.remove(); old.canvas.width = 0; old.canvas.height = 0; }
 }
 
 function updateScaleReadout() {
@@ -4053,7 +4221,7 @@ function setZoom(value, rerender = true, opts = {}) {
   const focal = opts && opts.focal;
   const animate = Boolean(opts && opts.animate);
   const oldZoom = state.canvas.zoom;
-  const newZoom = Math.max(0.55, Math.min(6, Number(value.toFixed(2))));
+  const newZoom = Math.max(0.55, Math.min(MAX_ZOOM, Number(value.toFixed(2))));
   if (focal && oldZoom > 0 && newZoom !== oldZoom) {
     const ratio = newZoom / oldZoom;
     state.canvas.panX = focal.x - (focal.x - state.canvas.panX) * ratio;
