@@ -3504,3 +3504,10 @@ body.report-fullscreen { overflow:hidden; }
 
 /* 0.15.2 sharp PDF plans: visible-area re-render laid over the base plan image. */
 .plan-hires { position:absolute; display:block; pointer-events:none; max-width:none; }
+
+/* 0.15.3 plan debug line (tap the zoom %) and flat-plan notice. */
+.scale-readout[data-action] { cursor:pointer; }
+.plan-debug { position:absolute; left:14px; right:14px; bottom:54px; z-index:5; padding:6px 8px; border-radius:8px; background:rgba(15,17,23,.88); color:#cbd5e1; font:11px/1.35 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; pointer-events:none; }
+.plan-flat-notice { position:absolute; left:50%; top:12px; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:8px; max-width:calc(100% - 24px); padding:8px 10px; border:1px solid #f59e0b; border-radius:10px; background:rgba(15,17,23,.92); color:#fde68a; font-size:12px; }
+.plan-flat-notice .ghost-button { min-height:36px; white-space:nowrap; }
+.plan-debug-inline { font:11px/1.35 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }

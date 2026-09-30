@@ -1,3 +1,5 @@
+## 0.15.3 · 2026-10-01 · pdf-zoom-fix · Stop restarting slow sharp re-renders, fetch Drive PDFs as raw bytes, add plan debug line and flat-plan re-upload notice
+
 ## 0.15.2 · 2026-10-01 · pdf-zoom · Re-render PDF plans sharply at zoom, load originals for reports and raise max zoom to 800%
 
 ## 0.15.1 · 2026-09-29 · pdf-export · Add direct device PDF saving, iOS sharing and printable report isolation
