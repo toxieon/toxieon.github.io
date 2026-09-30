@@ -3521,3 +3521,9 @@ body.report-fullscreen { overflow:hidden; }
 .node-marker.is-title-pin.is-selected .title-pin-label { outline:2px solid #3b82f6; outline-offset:1px; }
 .node-marker.is-title-pin.is-bulk .title-pin-label { background:#dbeafe; }
 .print-title-pin { position:absolute; left:calc(var(--x) * 1%); top:calc(var(--y) * 1%); transform:translate(-50%,-100%); padding:1px 4px; border:1px solid #dc2626; border-radius:4px; background:#fff; color:#111; font-size:8px; font-weight:700; white-space:nowrap; }
+
+/* 0.17.1 room corner handles (finger-sized at any zoom) and title-pin drawer. */
+.room-vertex-handle { position:absolute; width:var(--hs,30px); height:var(--hs,30px); transform:translate(-50%,-50%); border-radius:50%; background:rgba(34,197,94,.35); border:2px solid #22c55e; box-shadow:0 0 0 1px #fff; z-index:6; touch-action:none; cursor:grab; }
+.room-vertex-handle::after { content:""; position:absolute; left:50%; top:50%; width:30%; height:30%; transform:translate(-50%,-50%); border-radius:50%; background:#fff; }
+.drawer--title .drawer-actions { flex-wrap:wrap; gap:8px; }
+@media (max-width:720px) { .room-draw-banner .hint { display:none; } .room-draw-banner { flex-wrap:wrap; gap:6px; padding:6px 8px; } .room-draw-banner button { min-height:40px; } }
