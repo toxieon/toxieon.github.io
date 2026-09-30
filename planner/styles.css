@@ -3511,3 +3511,13 @@ body.report-fullscreen { overflow:hidden; }
 .plan-flat-notice { position:absolute; left:50%; top:12px; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:8px; max-width:calc(100% - 24px); padding:8px 10px; border:1px solid #f59e0b; border-radius:10px; background:rgba(15,17,23,.92); color:#fde68a; font-size:12px; }
 .plan-flat-notice .ghost-button { min-height:36px; white-space:nowrap; }
 .plan-debug-inline { font:11px/1.35 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }
+
+/* 0.16.1 room title pins: map pin whose tip sits on the position, label above it. */
+.plan-stage .node-marker.is-title-pin { width:auto; height:auto; min-width:0; padding:0; border-radius:0; background:transparent; box-shadow:none; display:flex; flex-direction:column; align-items:center; gap:1px; transform:translate(-50%,-100%) scale(var(--size,1)); transform-origin:bottom center; z-index:4; }
+.plan-stage .node-marker.is-title-pin::before, .plan-stage .node-marker.is-title-pin::after { content:none; display:none; }
+.plan-stage .node-marker.is-title-pin.is-selected { transform:translate(-50%,-100%) scale(calc(var(--size,1) * 1.1)); }
+.title-pin-label { display:block; max-width:40cqw; padding:2px 6px; border-radius:6px; background:rgba(255,255,255,.94); color:#111827; border:1px solid #dc2626; font-weight:700; font-size:clamp(10px,1.5cqw,18px); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.35); pointer-events:none; }
+.title-pin-head { display:block; width:clamp(12px,1.4cqw,20px); height:clamp(12px,1.4cqw,20px); background:#dc2626; border:2px solid #fff; border-radius:50% 50% 50% 0; transform:rotate(-45deg); margin-bottom:3px; box-shadow:0 1px 3px rgba(0,0,0,.4); pointer-events:none; }
+.node-marker.is-title-pin.is-selected .title-pin-label { outline:2px solid #3b82f6; outline-offset:1px; }
+.node-marker.is-title-pin.is-bulk .title-pin-label { background:#dbeafe; }
+.print-title-pin { position:absolute; left:calc(var(--x) * 1%); top:calc(var(--y) * 1%); transform:translate(-50%,-100%); padding:1px 4px; border:1px solid #dc2626; border-radius:4px; background:#fff; color:#111; font-size:8px; font-weight:700; white-space:nowrap; }

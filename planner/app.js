@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.15.3";
+const APP_VERSION = "0.16.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -227,7 +227,7 @@ function migrateState(s) {
 
 function persist(opts = {}) {
   const saveable = {
-    ...state, modal: null, lightbox: null, toast: "", planUpload: null,
+    ...state, modal: null, lightbox: null, toast: "", planUpload: null, titlePlacing: false,
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
     roomDraw: { mode: null, points: [], roomId: null },
     bulkSelection: [],
@@ -659,7 +659,7 @@ function requirePlannerDrive(label = "upload files") {
 }
 
 function stats(nodes) {
-  const list = nodes || projectNodes();
+  const list = (nodes || projectNodes()).filter((n) => n.type !== "title");   // 0.16.1: room title pins aren't work items
   const total = list.length;
   const complete = list.filter((n) => n.status === "Complete").length;
   const progress = list.filter((n) => n.status === "In Progress").length;
@@ -2467,12 +2467,13 @@ function renderMapView() {
             <button class="primary-button" data-action="create-node" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("plus")}<span>Node</span></button>
             <button class="ghost-button" data-action="mass-start" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("mass")}<span>Mass</span></button>
             <button class="ghost-button" data-action="add-portal" ${!hasPlan ? "disabled" : ""}>${icon("portal")}<span>Door</span></button>
+            <button class="ghost-button ${state.titlePlacing ? "is-active" : ""}" data-action="add-title-pin" ${!hasPlan ? "disabled" : ""} title="Place a room title pin">${icon("map")}<span>${state.titlePlacing ? "Tap plan…" : "Room title"}</span></button>
             <button class="ghost-button" data-action="print-report" title="Print plan overview">${icon("printer")}<span>Overview</span></button>
             <button class="ghost-button" data-action="print-full-report" title="Full project report with rooms, notes and photos">${icon("download")}<span>Full report</span></button>
           </div>
         </div>
         <div class="canvas-shell">
-          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode ? "is-placing" : ""}" id="canvasViewport">
+          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""}" id="canvasViewport">
             <div class="plan-stage" id="planStage" style="--plan-ar:${planAspect}">
               ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
@@ -2581,13 +2582,16 @@ function renderSelect(name, options, value) { return `<select data-filter="${nam
 /* A node "pings" red when it has no photo, overriding its status colour.
  * Portals are wayfinding links that carry no photos, so they're exempt. */
 function nodeMissingPhoto(node) {
-  return node.type !== "portal" && (node.imageRefs || []).length === 0;
+  return node.type !== "portal" && node.type !== "title" && (node.imageRefs || []).length === 0;
 }
 
 function renderMarker(node) {
   const isSelected = node.id === state.selectedNodeId;
   const isBulk = state.bulkSelection.includes(node.id);
   const isDim = !matchesNode(node);
+  if (node.type === "title") {   // 0.16.1 room title pin: map pin + readable label, tip sits on the position
+    return `<button class="node-marker is-title-pin ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""}" style="--x:${node.position.x};--y:${node.position.y};--size:${node.size || 1}" data-node="${node.id}" aria-label="Room title: ${escapeHtml(nodeDisplayTitle(node))}"><span class="title-pin-label">${escapeHtml(nodeDisplayTitle(node))}</span><span class="title-pin-head" aria-hidden="true"></span></button>`;
+  }
   const isPortal = node.type === "portal";
   const isSwitchboard = node.type === "switchboard";
   const isSubboard = node.type === "subboard";
@@ -3227,6 +3231,12 @@ function renderNodeModal() {
   const isEdit = state.modal.mode === "edit";
   const node = isEdit ? selectedNode() : null;
   const nodeType = state.modal.nodeType || node?.type || "marker";
+  if (nodeType === "title") {
+    return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal modal--node" id="nodeForm" role="dialog">
+    <div class="modal-header"><div><h3>${isEdit ? "Rename room title" : "Room title"}</h3><p>${escapeHtml(currentFloor()?.name || "")}</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div>
+    <div class="modal-body"><input type="hidden" name="nodeType" value="title" /><div class="field full"><label for="nodeCustomTitle">Room name</label><input id="nodeCustomTitle" name="customTitle" value="${escapeHtml(node?.customTitle || "")}" placeholder="e.g. Bedroom 1" required autofocus enterkeyhint="done" autocomplete="off" /></div></div>
+    <div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${isEdit ? "Save" : "Place title"}</button></div></form>`;
+  }
   const isSwitchboard = nodeType === "switchboard" || nodeType === "subboard";
   const cats = categoryNames();
   if (!cats.length && !isSwitchboard) {
@@ -3295,7 +3305,7 @@ function renderPrintPlanHero(floor, nodes, heading, thumbnail = false) {
   return `
     <section class="print-hero" ${thumbnail ? "" : "data-report-page"}>
       <h2>${escapeHtml(title)}</h2>
-      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.filter(n => n.position && Number.isFinite(Number(n.position.x)) && Number.isFinite(Number(n.position.y))).map((n) => { const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : `<p>${floor.planDriveFileId ? "Floor plan unavailable. Reopen the report online to retry." : "No floor plan uploaded."}</p>`}
+      ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.filter(n => n.position && Number.isFinite(Number(n.position.x)) && Number.isFinite(Number(n.position.y))).map((n) => { if (n.type === "title") return `<span class="print-title-pin" style="--x:${n.position.x};--y:${n.position.y}">${escapeHtml(nodeDisplayTitle(n))}</span>`; const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : `<p>${floor.planDriveFileId ? "Floor plan unavailable. Reopen the report online to retry." : "No floor plan uploaded."}</p>`}
     </section>`;
 }
 function renderReportCover(proj) {
@@ -3344,7 +3354,7 @@ function renderPrintFullBody(proj) {
   const floors = [...(proj.floors || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const sections = floors.map((fl, idx) => {
-    const nodes = floorNodes(fl.id).filter((n) => n.type !== "portal");
+    const nodes = floorNodes(fl.id).filter((n) => n.type !== "portal" && n.type !== "title");
     const rooms = floorRooms(fl.id);
     const byRoom = new Map();
     rooms.forEach((r) => byRoom.set(r.id, []));
@@ -3811,6 +3821,7 @@ function handleAction(event) {
       state.modal = { mode: "mass-pick", category: categoryNames()[0] }; return render();
     case "mass-stop": return stopMassMode();
     case "add-portal": state.modal = { mode: "portal-create" }; return render();
+    case "add-title-pin": state.titlePlacing = !state.titlePlacing; if (state.titlePlacing) toast("Tap the plan where the room title goes"); return render();
     case "follow-portal": return followPortal();
     case "plan-debug": state.ui.planDebug = !state.ui.planDebug; return render();
     case "zoom-in": return setZoom(state.canvas.zoom + 0.15, false, { animate: true });
@@ -3966,6 +3977,7 @@ function bindCanvasEvents() {
     persist();
     if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest(".empty-plan") && !e.target.closest("button")) {
       const pos = pointerToPlanPosition(e); if (!pos) return;
+      if (state.titlePlacing) { state.titlePlacing = false; state.modal = { mode: "create", nodeType: "title", position: pos }; return render(); }
       if (state.roomDraw?.mode) return handleRoomDrawPoint(pos);
       if (state.massMode.active) return placeMassNode(pos);
       const proj = project();
@@ -4014,9 +4026,10 @@ function bindMarkerDrag() {
       if (!nodeDragState || nodeDragState.pointerId !== e.pointerId) return;
       const plan = document.querySelector(".floor-plan"); if (!plan) return;
       const rect = plan.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
       const node = state.nodes.find((n) => n.id === nodeDragState.nodeId); if (!node) return;
+      // Title pins are grabbed by the label above the tip: move by the finger's delta so the tip doesn't jump.
+      const x = node.type === "title" ? nodeDragState.originX + ((e.clientX - nodeDragState.startX) / rect.width) * 100 : ((e.clientX - rect.left) / rect.width) * 100;
+      const y = node.type === "title" ? nodeDragState.originY + ((e.clientY - nodeDragState.startY) / rect.height) * 100 : ((e.clientY - rect.top) / rect.height) * 100;
       node.position.x = Math.max(0, Math.min(100, x));
       node.position.y = Math.max(0, Math.min(100, y));
       nodeDragState.moved = true;
@@ -4445,6 +4458,7 @@ async function handleNodeForm(event) {
   const form = new FormData(event.currentTarget);
   const files = Array.from(document.getElementById("nodeImages")?.files || []);
   const nodeType = (form.get("nodeType") || "marker").toString();
+  if (nodeType === "title") return saveTitlePin(proj, floor, (form.get("customTitle") || "").toString().trim());
   const isSwitchboard = nodeType === "switchboard" || nodeType === "subboard";
   const category = (form.get("category") || "").toString();
   const lineItem = (form.get("lineItem") || "").toString();
@@ -4497,6 +4511,34 @@ async function handleNodeForm(event) {
     if (files.length) await uploadPhotosToNode(node.id, files);
     toast("Node created");
   }
+}
+
+// 0.16.1 room title pin: a node of type "title" (same store, sync and offline path as other nodes).
+function saveTitlePin(proj, floor, name) {
+  if (!name) { toast("Enter a room name"); return; }
+  if (state.modal.mode === "edit") {
+    const node = selectedNode(); if (!node) return;
+    const prev = nodeDisplayTitle(node);
+    node.customTitle = name; node.updatedAt = nowStamp();
+    state.modal = null; persist(); render();
+    if (prev !== name) logAudit("Node Renamed", { nodeId: node.id, details: `${prev} -> ${name}` });
+    toast("Room title updated");
+    return;
+  }
+  const position = state.modal.position || { x: 50, y: 50 };
+  const node = {
+    id: uid("node"), projectId: proj.id, floorId: floor.id, type: "title",
+    category: "", lineItem: "", customTitle: name, status: "Complete",
+    roomId: resolveInitialRoomId(position) || null, assignedTo: "", tags: [], description: "",
+    position, size: 1,
+    createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local",
+    createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: []
+  };
+  state.nodes.push(node);
+  state.selectedNodeId = node.id; state.drawerOpen = false; state.modal = null;
+  persist(); render();
+  logAudit("Node Created", { nodeId: node.id, details: `Room title / ${name}` });
+  toast(`Placed "${name}"`);
 }
 
 function handleMassForm(event) {
