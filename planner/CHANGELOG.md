@@ -1,3 +1,5 @@
+## 0.17.1 · 2026-10-01 · draw-room · Draw and edit a room polygon from a title pin, auto-assign nodes inside, rename and delete with the pin
+
 ## 0.16.1 · 2026-10-01 · room-title-pins · Add room title pins: place, rename, move and delete labelled map pins on the plan
 
 ## 0.15.3 · 2026-10-01 · pdf-zoom-fix · Stop restarting slow sharp re-renders, fetch Drive PDFs as raw bytes, add plan debug line and flat-plan re-upload notice

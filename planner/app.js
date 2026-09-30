@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.16.1";
+const APP_VERSION = "0.17.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -525,6 +525,30 @@ function resolveInitialRoomId(position) {
 function clearRoomDraw() {
   state.roomDraw = { mode: null, points: [], roomId: null };
 }
+/* 0.17.1 Draw room from a title pin: the pin's linkedRoomId points at a normal room
+ * (state.rooms, Rooms sheet); nodes keep using roomId. */
+function titlePinForRoom(roomId) { return roomId ? state.nodes.find((n) => n.type === "title" && n.linkedRoomId === roomId) || null : null; }
+// Re-resolve roomId for this floor's nodes that are inside the room or were assigned to it.
+function reassignRoomNodes(room) {
+  let changed = 0;
+  state.nodes.filter((n) => n.floorId === room.floorId && n.position).forEach((n) => {
+    const hit = roomAtPlanPoint(Number(n.position.x), Number(n.position.y), room.floorId);
+    const next = hit ? hit.id : null;
+    if ((n.roomId === room.id || next === room.id) && (n.roomId || null) !== next) { n.roomId = next; n.updatedAt = nowStamp(); changed++; }
+  });
+  return changed;
+}
+function startTitleRoomDraw(edit) {
+  const pin = selectedNode(); if (!pin || pin.type !== "title") return;
+  const proj = project(); if (proj && !proj.showRooms) proj.showRooms = true;
+  const room = edit ? roomById(pin.linkedRoomId) : null;
+  state.drawerOpen = false;
+  startRoomDraw("poly", room ? room.id : null);
+  state.roomDraw.titleNodeId = pin.id;
+  state.roomDraw.editHandles = Boolean(room);
+  if (room) toast("Drag the corner handles, then Done");
+  render();
+}
 
 function dismissModal() {
   state.modal = null;
@@ -569,10 +593,25 @@ function finishRoomDraw() {
     if (!room) { clearRoomDraw(); render(); return; }
     room.shape = shape;
     room.updatedAt = nowStamp();
+    const moved = reassignRoomNodes(room);   // 0.17.1: recompute who's inside after editing corners
+    if (moved) setTimeout(() => { toast(`${moved} node(s) re-assigned`); render(); }, 2900);
     clearRoomDraw();
     persist(); render();
     logAudit("Room Shape Updated", { projectId: room.projectId, floorId: room.floorId, details: room.name });
     toast(`Updated shape for ${room.name}`);
+    return;
+  }
+  const pin = draw.titleNodeId ? state.nodes.find((n) => n.id === draw.titleNodeId) : null;
+  if (pin) {   // 0.17.1: room named by its title pin, no name prompt
+    const order = floorRooms(pin.floorId).reduce((m, r) => Math.max(m, r.order || 0), -1) + 1;
+    const room = { id: uid("room"), projectId: pin.projectId, floorId: pin.floorId, name: nodeDisplayTitle(pin), createdAt: nowStamp(), updatedAt: nowStamp(), order, shape };
+    state.rooms.push(room);
+    pin.linkedRoomId = room.id; pin.updatedAt = nowStamp();
+    const n = reassignRoomNodes(room);
+    clearRoomDraw();
+    persist(); render();
+    logAudit("Room Created", { projectId: room.projectId, floorId: room.floorId, details: `${room.name} (from title pin)` });
+    toast(`Room "${room.name}" created · ${n} node(s) assigned`);
     return;
   }
   state.roomDraw = { mode: null, points: pts, roomId: null, pendingShape: shape };
@@ -582,6 +621,7 @@ function finishRoomDraw() {
 function handleRoomDrawPoint(pos) {
   if (!pos || !state.roomDraw?.mode) return;
   const draw = state.roomDraw;
+  if (draw.editHandles) return;   // editing corners: drag handles instead of adding points
   if (draw.mode === "poly") {
     draw.points.push([pos.x, pos.y]);
     render();
@@ -2243,6 +2283,7 @@ function render() {
   document.body.classList.toggle("np-overlay", !!((state.drawerOpen && selectedNode()) || state.modal || state.lightbox));
   bindEvents();
   bindPlannerCamera();
+  bindRoomVertexHandles();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
   if (window.NDUI && NDUI.skeletonOverlay) {
@@ -2475,7 +2516,7 @@ function renderMapView() {
         <div class="canvas-shell">
           <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""}" id="canvasViewport">
             <div class="plan-stage" id="planStage" style="--plan-ar:${planAspect}">
-              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() : ""}` : renderEmptyPlanArea()}
+              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
@@ -2522,7 +2563,7 @@ function renderRoomOverlays(rooms) {
     const pts = shape.pts.map(([x, y]) => `${x},${y}`).join(" ");
     const c = polygonCentroid(shape.pts);
     const selected = state.selectedRoomId === r.id;
-    return `<g class="room-poly ${selected ? "is-selected" : ""}" data-room-poly="${escapeHtml(r.id)}"><polygon points="${pts}"></polygon><text x="${c.x}" y="${c.y}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(r.name)}</text></g>`;
+    return `<g class="room-poly ${selected ? "is-selected" : ""}" data-room-poly="${escapeHtml(r.id)}"><polygon points="${pts}"></polygon>${titlePinForRoom(r.id) ? "" : `<text x="${c.x}" y="${c.y}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(r.name)}</text>`}</g>`;
   }).join("");
   if (!polys) return "";
   return `<svg class="room-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${polys}</svg>`;
@@ -2540,13 +2581,40 @@ function renderRoomDrawPreview() {
   const closed = pts.length >= 3 && (draw.mode === "poly" || draw.points.length >= 2);
   return `<svg class="room-overlay room-overlay--draw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${closed ? `<polygon class="room-draw-poly" points="${pointsAttr}"></polygon>` : `<polyline class="room-draw-line" points="${pointsAttr}" fill="none"></polyline>`}${dots}</svg>`;
 }
+function renderRoomVertexHandles() {
+  const draw = state.roomDraw;
+  if (!draw?.editHandles) return "";
+  return (draw.points || []).map(([x, y], i) => `<span class="room-vertex-handle" data-vertex="${i}" style="left:${x}%;top:${y}%;--hs:${(30 / (state.canvas.zoom || 1)).toFixed(2)}px"></span>`).join("");
+}
+function bindRoomVertexHandles() {
+  document.querySelectorAll(".room-vertex-handle").forEach((el) => {
+    let active = null;
+    el.addEventListener("pointerdown", (e) => { e.stopPropagation(); e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (err) {} active = e.pointerId; });
+    el.addEventListener("pointermove", (e) => {
+      if (active !== e.pointerId) return;
+      e.stopPropagation();
+      const plan = document.querySelector(".floor-plan"); if (!plan) return;
+      const r = plan.getBoundingClientRect();
+      const x = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+      const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
+      const i = Number(el.dataset.vertex);
+      state.roomDraw.points[i] = [Number(x.toFixed(1)), Number(y.toFixed(1))];
+      el.style.left = x + "%"; el.style.top = y + "%";
+      const poly = document.querySelector(".room-draw-poly");
+      if (poly) poly.setAttribute("points", state.roomDraw.points.map(([a, b]) => `${a},${b}`).join(" "));
+    });
+    const end = (e) => { if (active !== e.pointerId) return; e.stopPropagation(); active = null; render(); };
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+  });
+}
 function renderRoomDrawBanner() {
   const draw = state.roomDraw || {};
   const n = (draw.points || []).length;
   const editing = Boolean(draw.roomId);
   const label = draw.mode === "rect" ? "Rectangle" : "Polygon";
   const hint = draw.mode === "rect" ? "Tap two opposite corners." : "Tap to add vertices (≥3), then Done.";
-  return `<div class="mass-banner room-draw-banner" role="status">${icon("layers")}<span>${editing ? "Editing room shape" : `Drawing room (${label})`} &middot; ${n} pt${n === 1 ? "" : "s"}</span><span class="hint">${hint} <kbd>Esc</kbd> cancel.</span><button class="ghost-button" data-action="room-draw-cancel">${icon("close")}Cancel</button><button class="primary-button" data-action="room-draw-done" ${n < (draw.mode === "rect" ? 2 : 3) ? "disabled" : ""}>${icon("check")}Done</button></div>`;
+  return `<div class="mass-banner room-draw-banner" role="status">${icon("layers")}<span>${editing ? "Editing room shape" : `Drawing room (${label})`} &middot; ${n} pt${n === 1 ? "" : "s"}</span><span class="hint">${hint} <kbd>Esc</kbd> cancel.</span>${!draw.editHandles && n ? `<button class="ghost-button" data-action="room-draw-undo">Undo point</button>` : ""}<button class="ghost-button" data-action="room-draw-cancel">${icon("close")}Cancel</button><button class="primary-button" data-action="room-draw-done" ${n < (draw.mode === "rect" ? 2 : 3) ? "disabled" : ""}>${icon("check")}Done</button></div>`;
 }
 function renderEmptyPlanArea() {
   return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan (PNG, JPG, SVG, or PDF). It will sync to Drive automatically.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
@@ -3159,6 +3227,19 @@ async function repairMovedSearchImages() {
 }
 
 function renderDrawer(node) {
+  if (node.type === "title") {   // 0.17.1 compact drawer for room title pins
+    const room = roomById(node.linkedRoomId);
+    const count = room ? state.nodes.filter((n) => n.roomId === room.id && n.type !== "title").length : 0;
+    return `<div class="drawer-backdrop" data-action="close-drawer"></div>
+    <aside class="drawer drawer--title" role="dialog" aria-label="${escapeHtml(nodeDisplayTitle(node))}">
+      <div class="drawer-header"><div class="drawer-title"><h3>${escapeHtml(nodeDisplayTitle(node))}</h3><p>Room title${room ? ` · room drawn · ${count} node(s) inside` : " · no room drawn yet"}</p></div><button class="icon-button" data-action="close-drawer" aria-label="Close">${icon("close")}</button></div>
+      <div class="drawer-body"><div class="drawer-actions">
+        ${room && parseRoomShape(room.shape) ? `<button class="primary-button" data-action="title-edit-room">${icon("edit")}Edit room</button>` : `<button class="primary-button" data-action="title-draw-room">${icon("layers")}Draw room</button>`}
+        <button class="ghost-button" data-action="edit-node">${icon("edit")}Rename</button>
+        <button class="ghost-button" data-action="delete-node">${icon("trash")}Delete</button>
+      </div></div>
+    </aside>`;
+  }
   const isPortal = node.type === "portal";
   const isSwitchboard = node.type === "switchboard" || node.type === "subboard";
   const linkedProject = isPortal ? projectById(node.linkedProjectId) : null;
@@ -3813,6 +3894,9 @@ function handleAction(event) {
     case "edit-room-shape": if (state.selectedRoomId === "all") return; return startRoomDraw("poly", state.selectedRoomId);
     case "room-draw-done": return finishRoomDraw();
     case "room-draw-cancel": clearRoomDraw(); return render();
+    case "room-draw-undo": if (state.roomDraw?.points?.length) state.roomDraw.points.pop(); return render();
+    case "title-draw-room": return startTitleRoomDraw(false);
+    case "title-edit-room": return startTitleRoomDraw(true);
     case "rename-floor": if (!currentFloor()) return; state.modal = { mode: "rename-floor" }; return render();
     case "delete-floor": return deleteCurrentFloor();
     case "upload-plan": return uploadFloorPlan();
@@ -4520,6 +4604,8 @@ function saveTitlePin(proj, floor, name) {
     const node = selectedNode(); if (!node) return;
     const prev = nodeDisplayTitle(node);
     node.customTitle = name; node.updatedAt = nowStamp();
+    const room = roomById(node.linkedRoomId);   // 0.17.1: nodes show roomName(roomId), so this renames it everywhere
+    if (room && room.name !== name) { room.name = name; room.updatedAt = nowStamp(); }
     state.modal = null; persist(); render();
     if (prev !== name) logAudit("Node Renamed", { nodeId: node.id, details: `${prev} -> ${name}` });
     toast("Room title updated");
@@ -4955,6 +5041,14 @@ async function formatPlannerData() {
 
 async function deleteSelectedNode() {
   const node = selectedNode(); if (!node) return;
+  const titleRoom = node.type === "title" ? roomById(node.linkedRoomId) : null;
+  if (titleRoom) {   // 0.17.1: deleting a room's title pin deletes the room too
+    if (!window.confirm(`Delete "${nodeDisplayTitle(node)}" and its room? Nodes inside keep their place but lose the room.`)) return;
+    state.nodes.forEach((n) => { if (n.roomId === titleRoom.id) { n.roomId = null; n.updatedAt = nowStamp(); } if (n.linkedRoomId === titleRoom.id && n.id !== node.id) n.linkedRoomId = null; });
+    state.rooms = state.rooms.filter((r) => r.id !== titleRoom.id);
+    if (state.selectedRoomId === titleRoom.id) state.selectedRoomId = "all";
+    logAudit("Room Deleted", { projectId: titleRoom.projectId, floorId: titleRoom.floorId, details: `${titleRoom.name} (with title pin)` });
+  }
   const driveId_N = state.drive.nodeFolderMap[node.id];
   const linkedDriveId = node.linkedNodeId ? state.drive.nodeFolderMap[node.linkedNodeId] : null;
   const linkedNode = (node.type === "portal" && node.linkedNodeId) ? state.nodes.find((n) => n.id === node.linkedNodeId) : null;
