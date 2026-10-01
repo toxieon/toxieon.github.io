@@ -12,8 +12,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Checklist">
 <script src="../shared/nd-backend.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../shared/nd-pdf.js"></script>
+<script src="../shared/vendor/sheetjs/xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#07111f; --panel:#0e1a2b; --panel-2:#132339; --line:#1d3350;
@@ -1599,8 +1599,8 @@ $('#fileIn').addEventListener('change',async e=>{
 });
 
 async function readPdf(file){
-  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer(),isEvalSupported:false}).promise;
+  const pdfjsLib=await NDPdf.load();
+  const pdf=await pdfjsLib.getDocument(NDPdf.docOptions({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false})).promise;
   const lines=[];
   for(let p=1;p<=pdf.numPages;p++){
     const tc=await (await pdf.getPage(p)).getTextContent();

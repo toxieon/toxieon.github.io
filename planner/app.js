@@ -8,11 +8,11 @@
  *  v0.8.0: Switchboard & Sub-board node types. SWB deep-link integration.
  *  v0.9.0: Room plan overlays, full project report, floor layers, mobile polish.
  *  v0.9.1: Projects master row Updated At column alignment.
- *  v0.9.2: Lean Drive PDF export for Full report / Overview (html2canvas+jsPDF CDN).
+ *  v0.9.2: Lean Drive PDF export for Full report / Overview (html2canvas+jsPDF; vendored since 0.18.3).
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.18.2";
+const APP_VERSION = "0.18.3";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -21,8 +21,8 @@ const DRIVE_PDF_MAX_IMAGES_TOTAL = 48;
 const DRIVE_PDF_MAX_PAGES = 40;
 const DRIVE_PDF_MAX_BLOB_BYTES = 18 * 1024 * 1024;
 const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
-const DRIVE_PDF_HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-const DRIVE_PDF_JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+const DRIVE_PDF_HTML2CANVAS_SRC = "../shared/vendor/html2canvas-pro/html2canvas-pro.min.js"; // html2canvas-pro 2.5.0, MIT
+const DRIVE_PDF_JSPDF_SRC = "../shared/vendor/jspdf/jspdf.umd.min.js"; // jsPDF 2.5.1, MIT
 let _drivePdfBusy = false;
 let _downloadPdf = null;
 
@@ -288,26 +288,15 @@ function downscaleDataUrl(dataUrl, maxEdge = PLAN_MAX_EDGE) {
  * <img> can't render a PDF, so we rasterise page 1 to a PNG via pdf.js the
  * moment a plan URL is set (upload, cache hydration, or Drive fetch — all
  * funnel through cacheFloorPlan). The original PDF still lives in Drive. */
-let _pdfjsPromise = null;
+// 0.18.3: vendored pdf.js 6.3.289 via shared/nd-pdf.js (no CDN).
 function loadPdfJs() {
-  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
-  if (_pdfjsPromise) return _pdfjsPromise;
-  _pdfjsPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = () => {
-      try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(window.pdfjsLib); }
-      catch (e) { reject(e); }
-    };
-    s.onerror = () => reject(new Error("pdf.js failed to load"));
-    document.head.appendChild(s);
-  });
-  return _pdfjsPromise;
+  if (!window.NDPdf) return Promise.reject(new Error("pdf.js loader (nd-pdf.js) missing"));
+  return NDPdf.load();
 }
 async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   const pdfjsLib = await loadPdfJs();
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
-  const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false }).promise;
+  const pdf = await pdfjsLib.getDocument(NDPdf.docOptions({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false })).promise;
   const page = await pdf.getPage(1);
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(1, Math.min(maxEdge / base.width, maxEdge / base.height));
@@ -4292,7 +4281,7 @@ function planPdfPage(floorId, src) {
     const promise = (async () => {
       const pdfjsLib = await loadPdfJs();
       const bytes = Uint8Array.from(atob(src.split(",")[1]), (c) => c.charCodeAt(0));
-      const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false }).promise;
+      const pdf = await pdfjsLib.getDocument(NDPdf.docOptions({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false })).promise;
       return { pdf, page: await pdf.getPage(1) };
     })();
     promise.catch(() => { if (_planPdfDoc && _planPdfDoc.promise === promise) _planPdfDoc = null; });
@@ -5437,7 +5426,7 @@ async function uploadPhotosToNode(nodeId, files, options = {}) {
 
 
 /* ============================================================ DRIVE PDF (v0.9.2)
- * Lean path: on-demand CDN html2canvas + jsPDF → blob → uploadFileToDrive.
+ * Lean path: on-demand vendored html2canvas-pro + jsPDF → blob → uploadFileToDrive.
  * Browser Print remains the full-fidelity path; Drive PDF caps photos/pages.
  * ======================================================================= */
 
@@ -5461,11 +5450,12 @@ function loadScriptOnce(src) {
 }
 
 async function loadDrivePdfLibs() {
-  if (!window.html2canvas) await loadScriptOnce(DRIVE_PDF_HTML2CANVAS_CDN);
-  if (!(window.jspdf && window.jspdf.jsPDF) && !window.jsPDF) await loadScriptOnce(DRIVE_PDF_JSPDF_CDN);
+  if (!window.html2canvas) await loadScriptOnce(DRIVE_PDF_HTML2CANVAS_SRC);
+  if (!(window.jspdf && window.jspdf.jsPDF) && !window.jsPDF) await loadScriptOnce(DRIVE_PDF_JSPDF_SRC);
   const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-  if (!window.html2canvas || !JsPDF) throw new Error("PDF libraries failed to load");
-  return { html2canvas: window.html2canvas, jsPDF: JsPDF };
+  const h2c = typeof window.html2canvas === "function" ? window.html2canvas : (window.html2canvas && window.html2canvas.default);
+  if (!h2c || !JsPDF) throw new Error("PDF libraries failed to load");
+  return { html2canvas: h2c, jsPDF: JsPDF };
 }
 
 function applyDrivePdfPhotoCaps(root) {

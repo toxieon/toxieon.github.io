@@ -9,7 +9,7 @@
  *   - install precaches with {cache:'reload'} to bypass the HTTP cache
  */
 
-const CACHE_VERSION = 'checklist-v3';
+const CACHE_VERSION = 'checklist-v4';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
@@ -17,7 +17,11 @@ const SHELL_ASSETS = [
   "./manifest.json",
   "./favicon.svg",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "../shared/nd-pdf.js",
+  "../shared/vendor/pdfjs/pdf.min.mjs",
+  "../shared/vendor/pdfjs/pdf.worker.min.mjs",
+  "../shared/vendor/sheetjs/xlsx.full.min.js"
 ];
 
 const IS_API_HOST = (url) =>
@@ -47,7 +51,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;    // login POSTs always hit the network
   if (IS_API_HOST(req.url)) return;    // Apps Script login: network-only
-  if (new URL(req.url).origin !== self.location.origin) return; // pdf.js / xlsx CDN: browser default
+  if (new URL(req.url).origin !== self.location.origin) return; // cross-origin (Google): browser default
 
   if (req.mode === 'navigate') {
     event.respondWith(
