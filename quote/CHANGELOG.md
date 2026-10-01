@@ -1,0 +1,1 @@
+## 0.1.1 · 2026-10-01 · versioning-baseline · Version baseline; today's changes: local-date fix for the today/tomorrow banner and ICS/PDF/JPG filenames (#20), jsPDF 2.5.1 vendored (#21), CSV via PapaParse and photo downscale via pica (#22)

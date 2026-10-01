@@ -580,6 +580,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
         <div class="muted" id="import-status" style="font-size:12px; margin-top:10px;"></div>
       </div>
     </div>
+    <div class="muted" id="app-version" style="font-size:12px; text-align:center; margin:18px 0 6px;"></div>
   </div>
 </section>
 
@@ -652,6 +653,8 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
+const APP_VERSION = '0.1.1';   // see timesheet/VERSIONING.md
+document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
 window.TIMESHEET_CONFIG = {

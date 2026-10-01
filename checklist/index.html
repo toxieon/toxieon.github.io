@@ -671,6 +671,7 @@ textarea.field{min-height:110px;resize:vertical;font-family:inherit;line-height:
 <!-- ============ CHECKLIST APP ============ -->
 <script>
 ND.app = 'checklist';
+const APP_VERSION = '0.1.1';   // see checklist/VERSIONING.md
 
 ND.records.define('job',     { expiresDays: null, label: 'Install job' });
 
@@ -1041,7 +1042,7 @@ function enterApp(){
 /* ---------- account / suite menu ---------- */
 $('#whoBtn').onclick=()=>{
   const u=me();
-  openSheet('Signed in', u.name+' · '+ND.auth.ROLES[u.role].label, [
+  openSheet('Signed in · Checklist v'+APP_VERSION, u.name+' · '+ND.auth.ROLES[u.role].label, [
     ...(ND.auth.can('staff.manage')?[{ic:'👥',label:'Staff',sub:'Who has access · managed by your admin',act:()=>{closeSheet();showStaff();}}]:[]),
     ...(ND.auth.can('activity.view')?[{ic:'🪪',label:'Activity log',sub:'Last 90 days, this device',act:()=>{closeSheet();showActivity();}}]:[]),
     ...(ND.auth.can('data.export')?[
@@ -1626,7 +1627,7 @@ async function readPdf(file){
 function refreshHint(){
   $('#lockHint').innerHTML='Use your <b>Neill Data</b> passcode.<br>'+
     'New people are added by your admin.<br>'+
-    `<span style="opacity:.65">On-device storage · ND Core v${ND.version}</span>`;
+    `<span style="opacity:.65">On-device storage · ND Core v${ND.version} · Checklist v${APP_VERSION}</span>`;
 }
 
 (async function(){
