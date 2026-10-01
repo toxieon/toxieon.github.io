@@ -300,7 +300,8 @@ function loadPdfJs() {
 async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   const pdfjsLib = await loadPdfJs();
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
-  const pdf = await pdfjsLib.getDocument(NDPdf.docOptions({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false })).promise;
+  const task = pdfjsLib.getDocument(NDPdf.docOptions({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false }));
+  const pdf = await task.promise;
   const page = await pdf.getPage(1);
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(0.01, Math.min(maxEdge / base.width, maxEdge / base.height));
@@ -313,7 +314,7 @@ async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   try {
     await page.render({ canvasContext: ctx, viewport }).promise;
     return canvas.toDataURL("image/png");
-  } finally { await pdf.destroy(); }
+  } finally { try { await task.destroy(); } catch (e) {} }   // pdf.js 6: the loading task owns destroy()
 }
 async function planDisplayUrl(dataUrl) {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:application/pdf")) return dataUrl;
@@ -809,7 +810,7 @@ function handleAuthEvent(ev) {
     state.googleAuth.lastError = null;
     if (ev.profile) state.googleAuth.profile = ev.profile;
     if (window.gapi?.client) gapi.client.setToken({ access_token: state.googleAuth.accessToken });
-    if (ev.type !== "signin") { render(); return; }   // silent renewals never re-bootstrap
+    if (ev.type !== "signin") { render(); if (state.drive.masterSheetId && _syncStatus !== "synced") scheduleMasterSync(); return; }   // silent renewals never re-bootstrap; 0.19.1: but they do push pending edits
     bootstrapDrive();
   } else if (ev.type === "signout") {
     if (_downloadPdf) { URL.revokeObjectURL(_downloadPdf.url); _downloadPdf = null; }
@@ -839,6 +840,8 @@ function requireAuth(label) { if (isTokenValid()) return true; toast(`Sign in to
 
 async function bootstrapDrive() {
   state.googleAuth.bootstrapping = true; render();
+  const prevSheetId = state.drive.masterSheetId || null;   // 0.19.1: which sheet this device's data belongs to
+  _bootSyncing = true;   // 0.19.1: no background flush may run between the push and the reload below
   try {
     const rootId = await findOrCreateRootFolder();
     const [adminId, projectsId, unfiledId, bulkPhotosFolderId, sortedPhotosFolderId] = await Promise.all([
@@ -873,7 +876,15 @@ async function bootstrapDrive() {
     // Heal any missing project/floor folders silently in background
     syncAllDriveFolders({ silent: true }).catch((e) => console.warn("Background folder sync failed", e));
     await refreshUsers();
-    await hydrateFromMasterSheet({ silent: true, preferCloud: true });
+    // 0.19.1: PUSH this device's unsynced edits BEFORE the cloud reload replaces local state
+    // (offline site work used to be wiped here). Data from a different master sheet/account is
+    // never pushed into this one; it is backed up instead.
+    const lastSheet = (loadSnapshot() || {}).__sheet || prevSheetId;
+    const foreignLocal = !!(lastSheet && masterSheetId && lastSheet !== masterSheetId);
+    if (foreignLocal) backupForeignLocalState(lastSheet);
+    else await flushMasterDeltas({ silent: true, prePull: true });
+    await hydrateFromMasterSheet({ silent: true, preferCloud: true, foreignLocal });
+    _bootSyncing = false;
     await importMasterPhotos({ silent: true, renderOnChange: false });
     hydrateFromHash();
     maybeFetchPlanForCurrentFloor();
@@ -888,7 +899,7 @@ async function bootstrapDrive() {
     state.googleAuth.lastError = "Drive setup failed: " + describeError(e);
     state.googleAuth.bootstrapping = false;
     persist(); render();
-  }
+  } finally { _bootSyncing = false; }
 }
 
 function describeError(e) { if (!e) return "unknown"; if (e.result?.error?.message) return e.result.error.message; if (e.message) return e.message; return String(e); }
@@ -1625,7 +1636,7 @@ async function hydrateFromMasterSheet(opts = {}) {
   state.googleAuth.hydrating = true;
   render();
   try {
-    let devicePlans = await pendingDevicePlans();
+    let devicePlans = opts.foreignLocal ? [] : await pendingDevicePlans();   // 0.19.1: never carry another account's plans over
     const floorPreferences = new Map(state.projects.flatMap(p => (p.floors || []).map(f => [f.id, { planOpacity: f.planOpacity, planBrightness: f.planBrightness, planGrid: f.planGrid, planRecoveryDisabled: f.planRecoveryDisabled }])));
     if (!silent) toast("Loading from cloud...");
     const resp = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
@@ -1634,7 +1645,7 @@ async function hydrateFromMasterSheet(opts = {}) {
     }));
     // An upload can finish while Sheets is in flight (for example during token renewal).
     // Capture again before replacing objects so its new association cannot be dropped.
-    devicePlans = Array.from(new Map([...devicePlans, ...await pendingDevicePlans()].map(item => [item.floor.id,item])).values());
+    if (!opts.foreignLocal) devicePlans = Array.from(new Map([...devicePlans, ...await pendingDevicePlans()].map(item => [item.floor.id,item])).values());
     const vrs = resp.result.valueRanges || [];
     const projRows = (vrs[0] && vrs[0].values) || [];
     const floorRows = (vrs[1] && vrs[1].values) || [];
@@ -1642,7 +1653,12 @@ async function hydrateFromMasterSheet(opts = {}) {
     const photoRows = (vrs[3] && vrs[3].values) || [];
     const folderRows = (vrs[4] && vrs[4].values) || [];
     const roomRows = (vrs[5] && vrs[5].values) || [];
-    if (!projRows.length) {
+    // 0.19.1: records this device changed but the sheet doesn't have yet (push failed or still pending)
+    const cloudIds = { Projects: new Set(), Floors: new Set(), Nodes: new Set(), Photos: new Set(), Folders: new Set(), Rooms: new Set() };
+    [["Projects", projRows], ["Floors", floorRows], ["Nodes", nodeRows], ["Photos", photoRows], ["Folders", folderRows], ["Rooms", roomRows]].forEach(([tab, rows]) => rows.forEach((r) => { if (r && r[0]) cloudIds[tab].add(String(r[0])); }));
+    const cloudStamps = { Projects: new Map(projRows.map((r) => [String(r[0] || ""), r[7] || ""])), Nodes: new Map(nodeRows.map((r) => [String(r[0] || ""), r[21] || ""])), Rooms: new Map(roomRows.map((r) => [String(r[0] || ""), r[5] || ""])) };
+    const localDirty = opts.foreignLocal ? null : collectLocalDirty(cloudIds);
+    if (!projRows.length && !(opts.preferCloud && localDirty)) {
       if (opts.preferCloud) {
         state.projectFolders = [];
         state.projects = [];
@@ -1655,6 +1671,7 @@ async function hydrateFromMasterSheet(opts = {}) {
         state.drawerOpen = false;
         restorePendingDevicePlans(devicePlans);
         persist({ skipSync: true });
+        snapshotAfterHydrate(null, cloudIds, !!opts.foreignLocal);   // 0.19.1: this device now matches the (empty) sheet
         render();
       }
       if (!silent) toast("No projects in cloud yet");
@@ -1753,6 +1770,7 @@ async function hydrateFromMasterSheet(opts = {}) {
       return node;
     });
     restorePendingDevicePlans(devicePlans);
+    const keptLocal = mergeLocalDirty(localDirty, cloudStamps);
     if (state.projects.length && (!state.selectedProjectId || !state.projects.some((p) => p.id === state.selectedProjectId))) {
       state.selectedProjectId = state.projects[0].id;
       state.selectedFloorId = state.projects[0].floors[0] ? state.projects[0].floors[0].id : null;
@@ -1762,6 +1780,8 @@ async function hydrateFromMasterSheet(opts = {}) {
     if (state.selectedRoomId !== "all" && !state.rooms.some((r) => r.id === state.selectedRoomId)) state.selectedRoomId = "all";
     persist({ skipSync: true });
     if (keptPlans) { console.info("Kept " + keptPlans + " unsynced plan link(s) from this device; pushing them"); scheduleMasterSync(); }
+    snapshotAfterHydrate(localDirty, cloudIds, !!opts.foreignLocal);
+    if (keptLocal) { console.info("Kept " + keptLocal + " unsynced local record(s) through the cloud reload; pushing them"); scheduleMasterSync(); }
     render();
     if (!silent) toast("Loaded " + state.projects.length + " projects, " + state.nodes.length + " nodes from cloud");
     return true;
@@ -1906,6 +1926,8 @@ async function reloadMasterData(options = {}) {
   if (_masterSyncing || _planHealRunning || Object.keys(_planLinking).length) { toast("Plan or master sync is still running. Retry reload when it finishes."); return; }
   if (!isTokenValid() || !state.drive.masterSheetId) { toast("Sign in and connect Drive before reloading"); return; }
   if (navigator.onLine === false) { toast("You're offline. Keeping the plans saved on this device."); return; }
+  await flushMasterDeltas({ silent: true, prePull: true });   // 0.19.1: push local edits before reloading
+  if (_masterReloading) return;
   _masterReloading = true;
   clearTimeout(_masterSyncTimer);
   clearTimeout(_hiresTimer);
@@ -1932,6 +1954,146 @@ async function reloadMasterData(options = {}) {
 }
 
 let _masterSyncTimer = null;
+let _bootSyncing = false;   // 0.19.1
+
+/* 0.19.1 push-before-reload helpers. The snapshot (id -> row hash of what this device last
+ * wrote or saw in the sheet) is the dirty marker: a local row whose hash differs from it is
+ * an unsynced local edit; an id in it that is gone locally is an unsynced local delete. */
+function sheetSnapshot() {
+  const s = loadSnapshot();
+  if (!s || (s.__sheet && s.__sheet !== state.drive.masterSheetId)) return null;
+  return s;
+}
+function backupForeignLocalState(sheetId) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw && (state.projects || []).length) localStorage.setItem("neillplanner-backup-" + sheetId, raw);
+    console.warn("Local data belongs to another master sheet; kept a backup and loading this account's cloud data");
+  } catch (e) { console.warn("foreign-state backup failed", e); }
+}
+function collectLocalDirty(cloudIds) {
+  const snap = sheetSnapshot();
+  const hashMode = !!(snap && !snap.__seeded);
+  const rows = buildMasterRows();
+  const dirty = {}, deleted = {};
+  let count = 0;
+  Object.keys(MASTER_TABS).forEach((tab) => {
+    dirty[tab] = new Set(); deleted[tab] = new Set();
+    const snapTab = (snap && snap[tab]) || {};
+    rows[tab].forEach((row, id) => { if (hashMode ? snapTab[id] !== rowHash(row) : !cloudIds[tab].has(id)) { dirty[tab].add(id); count++; } });
+    if (hashMode) Object.keys(snapTab).forEach((id) => { if (!rows[tab].has(id)) { deleted[tab].add(id); count++; } });
+  });
+  rows.Photos.forEach((row, id) => { if (dirty.Photos.has(id) && row[3]) dirty.Nodes.add(String(row[3])); });   // photo metadata lives on its node
+  if (!count) return null;
+  const floors = new Map();
+  (state.projects || []).forEach((p) => (p.floors || []).forEach((f) => floors.set(f.id, { floor: f, projectId: p.id })));
+  return {
+    dirty, deleted, count, floors,
+    projects: new Map((state.projects || []).map((p) => [p.id, p])),
+    nodes: new Map((state.nodes || []).map((n) => [n.id, n])),
+    rooms: new Map((state.rooms || []).map((r) => [r.id, r])),
+    folders: new Map((state.projectFolders || []).map((f) => [f.id, f])),
+    maps: { project: { ...state.drive.projectFolderMap }, floor: { ...state.drive.floorFolderMap }, node: { ...state.drive.nodeFolderMap } }
+  };
+}
+function mergeLocalDirty(ld, cloudStamps) {
+  if (!ld) return 0;
+  let kept = 0;
+  // Last-writer-wins by Updated At where the sheet has one; a tie or missing stamp keeps the local edit.
+  const localWins = (tab, id, rec) => { const c = cloudStamps[tab]?.get(id); return !c || !rec?.updatedAt || String(rec.updatedAt) >= String(c); };
+  const upsert = (arr, rec) => { const i = arr.findIndex((x) => x.id === rec.id); if (i >= 0) arr[i] = rec; else arr.push(rec); };
+  const projectFor = (pid) => {
+    let cp = state.projects.find((p) => p.id === pid);
+    if (!cp && ld.projects.has(pid)) { cp = { ...ld.projects.get(pid), floors: [] }; state.projects.push(cp); }
+    return cp;
+  };
+  ld.dirty.Folders.forEach((id) => { const f = ld.folders.get(id); if (f) { upsert(state.projectFolders, f); kept++; } });
+  ld.dirty.Projects.forEach((id) => {
+    const lp = ld.projects.get(id);
+    if (!lp || !localWins("Projects", id, lp)) { ld.dirty.Projects.delete(id); return; }
+    const cp = state.projects.find((p) => p.id === id);
+    if (cp) Object.assign(cp, { ...lp, floors: cp.floors }); else state.projects.push({ ...lp, floors: [] });
+    if (!state.drive.projectFolderMap[id] && ld.maps.project[id]) state.drive.projectFolderMap[id] = ld.maps.project[id];
+    kept++;
+  });
+  ld.dirty.Floors.forEach((id) => {
+    const e = ld.floors.get(id); if (!e) return;
+    const cp = projectFor(e.projectId); if (!cp) return;
+    cp.floors = cp.floors || [];
+    const i = cp.floors.findIndex((f) => f.id === id);
+    if (i >= 0) {
+      const cf = cp.floors[i], lf = e.floor;
+      // 0.18.5 rule kept: a non-empty cloud plan id wins unless this device has a pending replacement
+      const pick = (a, b) => lf.planPendingUpload ? (a || b || null) : (b || a || null);
+      cp.floors[i] = { ...cf, ...lf, planDriveFileId: pick(lf.planDriveFileId, cf.planDriveFileId), planPngFileId: pick(lf.planPngFileId, cf.planPngFileId), planAspectRatio: lf.planAspectRatio || cf.planAspectRatio || null };
+    } else cp.floors.push(e.floor);
+    cp.floors.sort((a, b) => (a.order || 0) - (b.order || 0));
+    if (!state.drive.floorFolderMap[id] && ld.maps.floor[id]) state.drive.floorFolderMap[id] = ld.maps.floor[id];
+    kept++;
+  });
+  ld.dirty.Nodes.forEach((id) => {
+    const n = ld.nodes.get(id);
+    if (!n || !localWins("Nodes", id, n)) { ld.dirty.Nodes.delete(id); return; }
+    upsert(state.nodes, n);
+    if (!state.drive.nodeFolderMap[id] && ld.maps.node[id]) state.drive.nodeFolderMap[id] = ld.maps.node[id];
+    kept++;
+  });
+  ld.dirty.Rooms.forEach((id) => {
+    const r = ld.rooms.get(id);
+    if (!r || !localWins("Rooms", id, r)) { ld.dirty.Rooms.delete(id); return; }
+    upsert(state.rooms, r); kept++;
+  });
+  // Deletes made on this device that haven't reached the sheet stay deleted.
+  const del = ld.deleted;
+  if (del.Projects.size) state.projects = state.projects.filter((p) => !del.Projects.has(p.id));
+  if (del.Floors.size) state.projects.forEach((p) => { p.floors = (p.floors || []).filter((f) => !del.Floors.has(f.id)); });
+  if (del.Nodes.size) state.nodes = state.nodes.filter((n) => !del.Nodes.has(n.id));
+  if (del.Rooms.size) state.rooms = state.rooms.filter((r) => !del.Rooms.has(r.id));
+  if (del.Folders.size) state.projectFolders = state.projectFolders.filter((f) => !del.Folders.has(f.id));
+  Object.values(del).forEach((set) => { kept += set.size; });
+  return kept;
+}
+// After a reload the snapshot describes the sheet as just read, except for the local edits still
+// to push (they keep their old hash, so the next flush sends them).
+function snapshotAfterHydrate(ld, cloudIds, foreign) {
+  const prev = foreign ? null : sheetSnapshot();
+  const rows = buildMasterRows();
+  const snap = { __sheet: state.drive.masterSheetId };
+  Object.keys(MASTER_TABS).forEach((tab) => {
+    snap[tab] = {};
+    const prevTab = (prev && !prev.__seeded && prev[tab]) || {};
+    rows[tab].forEach((row, id) => {
+      if (ld && ld.dirty[tab].has(id)) { if (prevTab[id] && cloudIds[tab].has(id)) snap[tab][id] = prevTab[id]; return; }
+      if (cloudIds[tab].has(id)) snap[tab][id] = rowHash(row);
+    });
+    if (ld) ld.deleted[tab].forEach((id) => { if (cloudIds[tab].has(id) && prevTab[id]) snap[tab][id] = prevTab[id]; });
+  });
+  saveSnapshot(snap);
+}
+// Before a reload: don't push a row whose Updated At in the sheet is newer (another device's edit).
+const MASTER_STAMP_COL = { Projects: 7, Nodes: 21, Rooms: 5 };
+async function dropCloudNewer(deltas) {
+  const tabs = Object.keys(MASTER_STAMP_COL).filter((t) => deltas[t] && deltas[t].upserts.size);
+  if (!tabs.length) return 0;
+  const r = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
+    spreadsheetId: state.drive.masterSheetId,
+    ranges: tabs.map((t) => `${t}!A2:${ND.sheetsKit.colLetter(MASTER_STAMP_COL[t])}`)
+  }));
+  let dropped = 0;
+  tabs.forEach((tab, i) => {
+    const c = MASTER_STAMP_COL[tab];
+    ((r.result.valueRanges?.[i]?.values) || []).forEach((raw) => {
+      const id = String(raw[0] || ""), row = deltas[tab].upserts.get(id);
+      if (!row) return;
+      const cloud = String(raw[c] || ""), local = String(row[c] || "");
+      if (cloud && local && cloud > local) { deltas[tab].upserts.delete(id); dropped++; }
+    });
+  });
+  if (dropped) console.info("Skipped " + dropped + " local row(s) older than the sheet's copy");
+  return dropped;
+}
+if (typeof window !== "undefined") window.addEventListener("online", () => { if (state.drive.masterSheetId && isTokenValid()) scheduleMasterSync(); });   // 0.19.1: reconnect pushes pending edits
+
 let _masterSyncing = false;
 let _masterSyncQueued = false;
 /* ============================================================ MASTER SYNC
@@ -2018,7 +2180,7 @@ function buildMasterRows() {
   return out;
 }
 
-function computeDeltas(rows, snapshot) {
+function computeDeltas(rows, snapshot, addOnly = false) {
   const deltas = {};
   let count = 0;
   const summary = [];
@@ -2028,9 +2190,9 @@ function computeDeltas(rows, snapshot) {
     const deletes = [];
     rows[tab].forEach((row, id) => {
       const h = rowHash(row);
-      if (snapTab[id] !== h) upserts.set(id, row);
+      if (addOnly ? !(id in snapTab) : snapTab[id] !== h) upserts.set(id, row);
     });
-    Object.keys(snapTab).forEach((id) => { if (!rows[tab].has(id)) deletes.push(id); });
+    if (!addOnly) Object.keys(snapTab).forEach((id) => { if (!rows[tab].has(id)) deletes.push(id); });
     if (upserts.size || deletes.length) {
       deltas[tab] = { upserts, deletes };
       count += upserts.size + deletes.length;
@@ -2122,6 +2284,7 @@ async function applyTabDelta(tab, delta) {
 
 async function flushMasterDeltas(opts = {}) {
   const { silent = false, manual = false } = opts;
+  if (_bootSyncing && !opts.prePull) { setSyncStatus("pending"); return; }   // 0.19.1: sign-in pushes first, then reloads
   if (_masterReloading || state.googleAuth.hydrating) { _masterSyncQueued = true; return; }
   if (!isTokenValid()) { if (manual) toast("Sign in first"); return; }
   if (!state.drive.masterSheetId) { if (manual) toast("Master sheet not bootstrapped"); return; }
@@ -2130,10 +2293,22 @@ async function flushMasterDeltas(opts = {}) {
   setSyncStatus("flushing");
   try {
     await ensureMasterTabsExist();
-    let snapshot = loadSnapshot();
-    if (!snapshot) snapshot = await seedSnapshotFromSheet();
+    // 0.19.1: with no snapshot for THIS sheet (never synced here), seed from the sheet and only add
+    // records the sheet doesn't have: never overwrite or delete cloud rows from unproven local state.
+    let snapshot = sheetSnapshot();
+    if (!snapshot) { snapshot = await seedSnapshotFromSheet(); snapshot.__seeded = true; snapshot.__sheet = state.drive.masterSheetId; saveSnapshot(snapshot); }
+    else if (!snapshot.__sheet) snapshot.__sheet = state.drive.masterSheetId;
     const rows = buildMasterRows();
-    const { deltas, count, summary } = computeDeltas(rows, snapshot);
+    const { deltas } = computeDeltas(rows, snapshot, !!snapshot.__seeded);
+    if (opts.prePull) await dropCloudNewer(deltas);   // another device's newer edit wins; the reload brings it in
+    let count = 0; const summary = [];
+    Object.keys(deltas).forEach((tab) => {
+      const d = deltas[tab];
+      if (!d.upserts.size && !d.deletes.length) { delete deltas[tab]; return; }
+      count += d.upserts.size + d.deletes.length;
+      d.upserts.forEach((_, id) => summary.push({ kind: tab, key: id, op: "upsert", lastError: _lastSyncError }));
+      d.deletes.forEach((id) => summary.push({ kind: tab, key: id, op: "delete", lastError: _lastSyncError }));
+    });
     _pendingSummary = summary;
     if (!count) {
       _lastSyncError = null;
@@ -2143,9 +2318,10 @@ async function flushMasterDeltas(opts = {}) {
     }
     for (const tab of Object.keys(deltas)) {
       await applyTabDelta(tab, deltas[tab]);
-      // commit this tab's snapshot only after its writes landed
-      snapshot[tab] = {};
-      rows[tab].forEach((row, id) => { snapshot[tab][id] = rowHash(row); });
+      // commit this tab's snapshot only after its writes landed (0.19.1: only the rows written)
+      snapshot[tab] = snapshot[tab] || {};
+      deltas[tab].upserts.forEach((row, id) => { snapshot[tab][id] = rowHash(row); });
+      deltas[tab].deletes.forEach((id) => { delete snapshot[tab][id]; });
       saveSnapshot(snapshot);
     }
     _pendingSummary = [];
