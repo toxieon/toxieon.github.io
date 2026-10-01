@@ -1,0 +1,76 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const icons = require('./suite-icons.js');
+
+test('catalog has unique stable app and utility identities and matching exported SVGs', () => {
+  const all = icons.list();
+  assert.equal(all.length, 36);
+  assert.equal(new Set(all.map(icon => icon.id)).size, all.length);
+  assert.equal(icons.list({ kind: 'app' }).length, 12);
+  assert.equal(icons.list({ kind: 'ui' }).length, 24);
+  for (const icon of all) {
+    assert.match(icon.id, /^(app|ui)-[a-z-]+$/);
+    assert.ok(icon.label && icon.recommendation && icon.tags.length);
+    const exported = fs.readFileSync(path.join(__dirname, '..', icon.file), 'utf8').trim();
+    assert.equal(exported, icons.svg(icon.id, { size: icon.kind === 'app' ? 48 : 24 }));
+    assert.match(exported, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    assert.match(exported, /<title>[^<]+<\/title>/);
+    assert.match(exported, /<\/svg>$/);
+    assert.doesNotMatch(exported, /<(script|foreignObject|image|use)\b|\bon\w+=|href=/i);
+  }
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(__dirname, 'suite-icons/catalog.json'), 'utf8')).icons, all);
+});
+
+test('app colours preserve hub registry identity', () => {
+  const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../hub/apps.json'), 'utf8'));
+  for (const app of registry.apps) {
+    const id = 'app-' + (app.id === 'site' ? 'website' : app.id);
+    assert.equal(icons.list().find(icon => icon.id === id).color, app.color);
+  }
+});
+
+test('search is case-insensitive and metadata is isolated from caller mutation', () => {
+  assert.equal(icons.list({ kind: 'ui', query: 'SYNC' }).length, 4);
+  assert.equal(icons.list({ kind: 'app', query: 'timesheet' })[0].id, 'app-timesheet');
+  const first = icons.list()[0];
+  first.label = 'Changed';
+  first.tags.push('unique-mutation');
+  assert.notEqual(icons.list()[0].label, 'Changed');
+  assert.equal(icons.list({ query: 'unique-mutation' }).length, 0);
+});
+
+test('accessible titles and decorative icons are escaped without active SVG injection', () => {
+  const output = icons.svg('ui-photo', { title: '\"><script>alert(1)</script>&\'\u0000' });
+  assert.match(output, /&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;&amp;&#39;/);
+  assert.doesNotMatch(output, /<script|\u0000/);
+  assert.match(icons.svg('ui-photo'), /role="img" aria-label="Photo"/);
+  const decorative = icons.svg('ui-photo', { title: '' });
+  assert.match(decorative, /aria-hidden="true"/);
+  assert.doesNotMatch(decorative, /<title>|role="img"/);
+});
+
+test('untrusted colour and size input cannot add SVG attributes or external resources', () => {
+  for (const color of ['red" onload="alert(1)', 'url(https://example.com/track)', 'var(--bad)', '<script/>']) {
+    const output = icons.svg('ui-pen', { color, size: '" onload="alert(1)' });
+    assert.match(output, /color="currentColor"/);
+    assert.match(output, /width="24"/);
+    assert.doesNotMatch(output, /onload|url\(|<script|var\(/);
+  }
+  assert.match(icons.svg('ui-pen', { color: '#ff5252' }), /color="#ff5252"/);
+  assert.match(icons.svg('ui-pen', { color: 'rgb(255 20 10 / 50%)' }), /color="rgb\(255 20 10 \/ 50%\)"/);
+  assert.match(icons.svg('ui-pen', { size: Infinity }), /width="24"/);
+  assert.match(icons.svg('ui-pen', { size: 2000 }), /width="1024"/);
+  assert.match(icons.svg('ui-pen', { size: 1 }), /width="8"/);
+  assert.throws(() => icons.svg('__proto__'), RangeError);
+});
+
+test('browser global loads without CommonJS and retains inherited utility colour', () => {
+  const vm = require('node:vm');
+  const context = vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'suite-icons.js'), 'utf8'), context);
+  assert.equal(context.NDSuiteIcons.version, icons.version);
+  assert.match(context.NDSuiteIcons.svg('ui-arrow'), /color="currentColor"/);
+  assert.match(context.NDSuiteIcons.svg('app-upload'), /fill="#101922"/);
+});

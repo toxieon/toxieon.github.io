@@ -3,7 +3,7 @@
  A growing library of drop-in feature components shared across the apps
  (uploader, quote, planner, timesheet, swb, hub).
  Update this file whenever an asset is added, changed, or wired into an app.
- Last updated: 2026-08-05
+ Last updated: 2026-10-01
 ========================================================================
 
 HOW THIS RELATES TO /shared
@@ -310,6 +310,34 @@ HOW THIS RELATES TO /shared
               radial. Same colour language (done green / issue amber).
 
 ------------------------------------------------------------------------
+ FIELD COLLECTION — ASSET STUDIO 1.0.0 (2026-10-01)
+------------------------------------------------------------------------
+
+[24] photo-markup.js — NDPhotoMarkup
+    Self-contained touch/keyboard/mouse photo markup studio. Arrow, freehand,
+    rectangle, ellipse, labels, entered dimensions, solid redaction, undo/redo,
+    original preview, flattened PNG download/share and async host save callback.
+    Source photos are not modified. No automatic Drive upload.
+    Used by: assets/studio (WIRED). Host integration: photo-markup/README.md.
+
+[25] trade-symbols.js — NDTradeSymbols
+    36 original project symbols across six trade categories. Search/list/render,
+    selected print-ready legends and Planner category CSV. SVGs, sprite,
+    catalogue and full legends under assets/trade-symbols/.
+    Used by: assets/studio gallery (WIRED). Plan SVG pin integration is future work.
+
+[26] suite-icons.js — NDSuiteIcons
+    12 app favicon identities and 24 interface icons. Original editable SVG,
+    app PNGs at 32/180/192/512, catalogue and replacement recommendations.
+    Used by: assets/studio gallery + Assets showroom/Studio favicon (WIRED).
+    Other app references are unchanged; candidates are ready for rollout.
+
+    Launch: /assets/studio/ (linked from /1234567890/).
+    Packs: assets/downloads/neill-trade-symbols.zip and neill-suite-icons.zip.
+    Guide: assets/STUDIO-README.md. Remaining ideas: ASSETS-HANDOFF-2026-10-01.md.
+    Production dependencies: none added. SVG artwork is original.
+
+------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
   (library complete — all identified best-of components extracted)
@@ -320,6 +348,10 @@ HOW THIS RELATES TO /shared
 ------------------------------------------------------------------------
  CHANGELOG
 ------------------------------------------------------------------------
+  2026-10-01  Add the Field Collection: Photo Markup Studio, 36 trade symbols,
+              12 app favicons and 24 interface icons. Add searchable galleries,
+              PNG/SVG packs, legend/CSV exports, tests, guides and handoff.
+              Link the Studio and use the new Assets favicon in the showroom.
   2026-07-27  Created /assets library. Added here.js and watermark.js
               (extracted from Quote). Seeded candidate list.
   2026-07-27  Added countdown-confirm.js (from Timesheet's near clock-on).

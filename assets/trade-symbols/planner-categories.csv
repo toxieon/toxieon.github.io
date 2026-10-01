@@ -1,0 +1,37 @@
+Item,Code,Description,Color,Shorthand
+Single data outlet,ND-D1,One data connection at a wall outlet.,#3b82f6,D1
+Double data outlet,ND-D2,Two data connections at a wall outlet.,#3b82f6,D2
+Communications rack,ND-RACK,Communications cabinet or equipment rack.,#3b82f6,RACK
+Patch panel,ND-PP,Rack patch panel with labelled cable terminations.,#3b82f6,PP
+Fibre outlet,ND-FO,Fibre-optic termination or outlet.,#3b82f6,FO
+Wireless access point,ND-WAP,Ceiling or wall wireless access point.,#3b82f6,WAP
+Network switch,ND-SW,Ethernet network switch.,#3b82f6,SW
+Router,ND-RTR,Network router or gateway.,#3b82f6,RTR
+Fibre splice enclosure,ND-FSP,Protective enclosure for fibre cable splices.,#3b82f6,FSP
+Dome camera,ND-DOM,Fixed dome surveillance camera.,#8b5cf6,DOM
+Bullet camera,ND-BUL,Fixed bullet surveillance camera.,#8b5cf6,BUL
+PTZ camera,ND-PTZ,"Camera with pan, tilt and zoom movement.",#8b5cf6,PTZ
+Network video recorder,ND-NVR,Network video recording equipment.,#8b5cf6,NVR
+Display monitor,ND-MON,Video viewing screen or security monitor.,#8b5cf6,MON
+Card reader,ND-RDR,Access credential or card reader.,#0d9488,RDR
+Access controller,ND-AC,Controller enclosure for access devices.,#0d9488,AC
+Electric lock,ND-EL,Electrically operated lock or strike.,#0d9488,EL
+Intercom,ND-INT,Entry communication station.,#0d9488,INT
+Door contact,ND-DC,Door or window position contact.,#0d9488,DC
+Request-to-exit button,ND-REX,Request-to-exit push button or touch plate.,#0d9488,REX
+PIR detector,ND-PIR,Passive infrared movement detector.,#e11d48,PIR
+Alarm panel,ND-ALM,Security alarm controller or keypad.,#e11d48,ALM
+Siren,ND-SIR,Audible alarm sounder or siren.,#e11d48,SIR
+Glass-break detector,ND-GB,Detector monitoring glass breakage.,#e11d48,GB
+Smoke detector,ND-SD,Project marker for a smoke detection device.,#e11d48,SD
+Single power outlet,ND-GPO1,Single general-purpose power outlet.,#d97706,GPO1
+Double power outlet,ND-GPO2,Double general-purpose power outlet.,#d97706,GPO2
+Light fitting,ND-LGT,Project marker for a light fitting.,#d97706,LGT
+Light switch,ND-LS,Wall-mounted light switch.,#d97706,LS
+Main switchboard,ND-MSB,Main electrical switchboard location.,#d97706,MSB
+Distribution board,ND-DB,Sub-board or local electrical distribution board.,#d97706,DB
+Earth point,ND-EP,Project marker for an earth connection point.,#d97706,EP
+Isolator,ND-ISO,Local electrical isolation switch.,#d97706,ISO
+Conduit route,ND-COND,Indicative conduit route or pathway.,#64748b,COND
+Junction box,ND-JB,Cable junction or connection enclosure.,#64748b,JB
+Cable tray,ND-TRAY,Cable tray or ladder pathway.,#64748b,TRAY

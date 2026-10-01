@@ -1,0 +1,14 @@
+# Planner 0.19.1 — Brandon's device check
+
+This build is local and ready for Ray to review/upload. The existing Google backend and sheet columns are unchanged. Per-room appearance is carried inside the existing room-shape JSON. Older Planner builds can discard that extra appearance data when saving a room, so use 0.19.1 on both devices when checking it.
+
+1. **Mobile PDF → desktop:** upload a PDF on the phone, wait for the message confirming its master-sheet link, then use Settings → Master spreadsheet → Reload on the desktop. Confirm the plan appears. Replace the PDF on the phone and reload on desktop again; the new drawing should replace the old cache even if the Drive ID is unchanged.
+2. **Interrupted upload:** briefly lose reception during upload, reopen/sign in with reception, and let the phone finish linking the pending plan. The saved local copy should remain available. Reload must preserve any pending local plan and say it was kept.
+3. **Drive recovery:** for a floor whose sheet link is missing but whose known `floor-plan-*` original exists in its Drive folder, reload should recover the plan locally. It should show a useful failure count when access is denied and leave an existing usable image in place. Reload does not search arbitrary Drive folders or guess unrelated PDF filenames.
+4. **Room pin:** open a room title and reduce size to 1%. In the right-side Plan menu, hide room titles; pins should remain selectable. Restore titles and use apply-to-floor sizing.
+5. **Opacity:** set one room's fill to 100% and another's to 50%. Set All room opacity to 50%; the fills should display at 50% and 25%. Check border opacity independently. Restore the universal slider to 100% and verify both room values are unchanged.
+6. **Shared wall:** draw a second room with the shared edge's endpoints near the first room's jagged wall. With Wall snap On, preview and save should follow its corners. Toggle Off to keep the drawn line. Try a far/ambiguous wall: it should not jump. The original room should remain unchanged. Snapping affects the room being drawn/edited; later edits to one room do not automatically move a saved neighbour.
+7. **Room export:** open a drawn room title → Export rooms. Select another room on that floor. True to plan should preserve their relative positions; Side by side should remove the gap between separate panels. Areas outside the polygons should be white, not expose neighbouring plan sections. Check optional labels/nodes/borders/fill, PNG and PDF, then native share on iPhone.
+8. **Version/cache:** Settings → About must show 0.19.1 on each device after deployment. Confirm old installed PWAs have picked up the new build.
+
+The Assets tools are available at `/assets/studio/`. Photo markup can be used there immediately; direct Annotate buttons in Planner/Upload/Quote and SVG pin rendering are documented follow-up integrations.
