@@ -1,3 +1,5 @@
+## 0.18.1 · 2026-10-01 · osd-plan-view · Show raster PDF plans in OpenSeadragon (vendored 4.1.1) at full resolution with the node/room overlay synced on top; retire custom tiles; fix plan Drive auto-link
+
 ## 0.17.2 · 2026-10-01 · raster-pdf-plans · Extract single-image PDF plans at full resolution as tiles, stop pdf.js downscaling embedded images, link unsynced plan originals to Drive
 
 ## 0.17.1 · 2026-10-01 · draw-room · Draw and edit a room polygon from a title pin, auto-assign nodes inside, rename and delete with the pin
