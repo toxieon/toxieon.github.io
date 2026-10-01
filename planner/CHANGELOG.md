@@ -1,3 +1,5 @@
+## 0.18.2 · 2026-10-01 · licence-pdfjs-dates · Read photo EXIF date with vendored exifr (MIT) instead of ExifReader (MPL); drop heic2any (LGPL libheif) with a clear HEIC message; pdf.js isEvalSupported:false; local-date fix for Hours week/4-week ranges and audit CSV filename
+
 ## 0.18.1 · 2026-10-01 · osd-plan-view · Show raster PDF plans in OpenSeadragon (vendored 4.1.1) at full resolution with the node/room overlay synced on top; retire custom tiles; fix plan Drive auto-link
 
 ## 0.17.2 · 2026-10-01 · raster-pdf-plans · Extract single-image PDF plans at full resolution as tiles, stop pdf.js downscaling embedded images, link unsynced plan originals to Drive

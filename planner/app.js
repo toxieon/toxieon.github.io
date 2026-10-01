@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.18.1";
+const APP_VERSION = "0.18.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -307,7 +307,7 @@ function loadPdfJs() {
 async function pdfFirstPageToPng(dataUrl, maxEdge = PLAN_MAX_EDGE) {
   const pdfjsLib = await loadPdfJs();
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
-  const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false }).promise;
   const page = await pdf.getPage(1);
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(1, Math.min(maxEdge / base.width, maxEdge / base.height));
@@ -406,6 +406,8 @@ function escapeHtml(value) { return String(value ?? "").replaceAll("&","&amp;").
 function statusStyle(status) { return `--status:${statusMeta[status]?.color || "#2563eb"}`; }
 function statusPill(status) { return `<span class="status-pill" style="${statusStyle(status)}">${escapeHtml(status)}</span>`; }
 function initials(name) { if (!name) return "?"; return name.trim().split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase(); }
+/* Local (device time zone) YYYY-MM-DD. toISOString() is UTC and gives yesterday before 10am in Sydney. */
+function localDateStr(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function nowStamp() { return new Date().toISOString().slice(0, 16).replace("T", " "); }
 function parseBool(value) { return /^(true|yes|y|1|protected)$/i.test(String(value || "").trim()); }
 function detectDevice() { return /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "Mobile" : "Desktop"; }
@@ -2251,7 +2253,7 @@ function downloadAuditCsv(rows) {
   for (const r of rows) lines.push([r.timestamp,r.user,r.action,r.projectId,r.projectName,r.folderName,r.floorName,r.nodeId,r.nodeTitle,r.category,r.status,r.details,r.device].map(esc).join(","));
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = `NeillPlanner-Audit-${new Date().toISOString().slice(0, 10)}.csv`;
+  const a = document.createElement("a"); a.href = url; a.download = `NeillPlanner-Audit-${localDateStr(new Date())}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
   toast(`CSV downloaded (${rows.length} rows)`);
@@ -2696,7 +2698,7 @@ const TS_JOB_COLS = ["job_id","job_name","address","lat","lng","radius_m","job_t
 let _hoursData = { loaded: false, loading: false, error: "", sessions: [], jobs: [] };
 let _hoursUI = { excluded: new Set(), range: "all" };
 function tsAddrKey(addr) { return window.NDMatch ? NDMatch.addressKey(addr || "") : (addr || "").trim().toLowerCase().replace(/[.,]/g, "").replace(/\s+/g, " "); }
-function isoDay(d) { return d.toISOString().slice(0, 10); }
+function isoDay(d) { return localDateStr(d); }
 function hoursRangeBounds(range) {
   if (range === "all") return null;
   const now = new Date();
@@ -4290,7 +4292,7 @@ function planPdfPage(floorId, src) {
     const promise = (async () => {
       const pdfjsLib = await loadPdfJs();
       const bytes = Uint8Array.from(atob(src.split(",")[1]), (c) => c.charCodeAt(0));
-      const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: bytes, isOffscreenCanvasSupported: false, isEvalSupported: false }).promise;
       return { pdf, page: await pdf.getPage(1) };
     })();
     promise.catch(() => { if (_planPdfDoc && _planPdfDoc.promise === promise) _planPdfDoc = null; });

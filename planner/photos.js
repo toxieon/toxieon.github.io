@@ -8,13 +8,12 @@ async function preparePlannerPhoto(job) {
   if (job.file.size > 40 * 1024 * 1024) throw new Error('Photo exceeds 40 MB. Export a smaller image and select it again.');
   let takenAt = job.capturedAt || job.uploadedAt, source = job.source === 'camera' ? 'App camera time' : 'Upload time (no EXIF date)';
   if (job.source !== 'camera') {
-    await loadScriptOnce('https://cdn.jsdelivr.net/npm/exifreader@4.41.3/dist/exif-reader.js');
+    // Vendored exifr 7.1.3 (MIT, shared/vendor). Unreadable or missing EXIF falls back to upload time.
+    await loadScriptOnce('../shared/vendor/exifr.umd.js');
     let meta;
-    try { meta = ExifReader.load(await job.file.arrayBuffer()); }
-    catch (error) {
-      if (!/No Exif data/i.test(error.message)) throw new Error('Photo metadata could not be read. Export as JPEG and select it again.');
-    }
-    const raw = meta?.DateTimeOriginal?.description;
+    try { meta = await exifr.parse(job.file, { pick: ['DateTimeOriginal'], reviveValues: false }); }
+    catch (error) { meta = null; }
+    const raw = meta?.DateTimeOriginal;
     if (typeof raw === 'string' && /^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) {
       takenAt = raw.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'); source = 'Photo EXIF time';
     }
@@ -28,10 +27,9 @@ async function preparePlannerPhoto(job) {
   let img;
   try { img = await decode(job.file); }
   catch (error) {
-    if (!/heic|heif/i.test(job.file.type + job.file.name)) throw error;
-    await loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
-    const converted = await heic2any({ blob: job.file, toType: 'image/jpeg', quality: 0.9 });
-    img = await decode(Array.isArray(converted) ? converted[0] : converted);
+    // HEIC goes through the normal decoder (Safari decodes it natively); no LGPL converter.
+    if (/heic|heif/i.test(job.file.type + job.file.name)) throw new Error('This device cannot open HEIC photos. Export it as JPEG (or set Camera > Formats > Most Compatible) and try again.');
+    throw error;
   }
   const scale = Math.min(1, 2560 / Math.max(img.naturalWidth, img.naturalHeight));
   const canvas = document.createElement('canvas');
