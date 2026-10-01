@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.17.2";
+const APP_VERSION = "0.18.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -256,11 +256,12 @@ const _planPdfStatus = {};     // floorId -> { kind: pdf|png|image|unknown, reas
 const _planPdfLoading = {};    // floorId -> in-flight source promise
 let _planPdfDoc = null;        // { floorId, src, promise }
 /* 0.17.2 single-image PDF state (see analyzePlanPdf). */
-const PLAN_TILES_PREFIX = "plantiles:";
-const PLAN_TILE = 2048;
+const PLAN_IMAGE_PREFIX = "planimage:";   // 0.18.1: full-size embedded image for OpenSeadragon
 const _planKind = {};     // floorId -> { kind: "vector"|"raster"|"mixed", w, h, srcLen }
-const _planTiles = {};    // floorId -> { w, h, T, blobs, bitmaps: [] }
+const _planImage = {};    // floorId -> { url, w, h, rx, ry, rw, rh }
 const _planKindLoading = {};
+let _osd = null;          // { floorId, viewer, el, aspect, ready }
+const _planLinkStatus = {};
 let _hires = null;             // { floorId, key, canvas }
 let _hiresTimer = null, _hiresTask = null, _hiresSeq = 0, _hiresInflightKey = null;
 let _hiresDebug = null;        // last re-render status for the on-device debug line
@@ -2290,6 +2291,7 @@ function render() {
   bindEvents();
   bindPlannerCamera();
   bindRoomVertexHandles();
+  mountOsd();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
   if (window.NDUI && NDUI.skeletonOverlay) {
@@ -2520,8 +2522,8 @@ function renderMapView() {
           </div>
         </div>
         <div class="canvas-shell">
-          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""}" id="canvasViewport">
-            <div class="plan-stage" id="planStage" style="--plan-ar:${planAspect}">
+          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""} ${osdFloorReady(floor) ? "is-osd" : ""}" id="canvasViewport">
+            <div class="plan-stage ${osdFloorReady(floor) ? "is-osd" : ""}" id="planStage" style="--plan-ar:${planAspect}">
               ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
@@ -3917,6 +3919,7 @@ function handleAction(event) {
     case "zoom-in": return setZoom(state.canvas.zoom + 0.15, false, { animate: true });
     case "zoom-out": return setZoom(state.canvas.zoom - 0.15, false, { animate: true });
     case "reset-view":
+      if (osdActive() && _osd.ready) { _osd.viewer.viewport.goHome(); return; }
       state.canvas = { zoom: 1, panX: 0, panY: 0 };
       persist();
       applyCanvasTransform();
@@ -3969,6 +3972,7 @@ function bindCanvasEvents() {
     const pos = pointerToPlanPosition(e) || { x: 50, y: 50 };
     placeBatchNode(key, pos);
   });
+  if (osdFloorReady(currentFloor())) return;   // 0.18.1: OpenSeadragon handles pan/pinch/zoom/taps
   // Non-passive touch listeners: block Safari page pinch/double-tap zoom while plan-pinching.
   const blockSafariPageZoom = (e) => {
     if ((e.touches && e.touches.length >= 2) || pinchState) e.preventDefault();
@@ -4067,12 +4071,7 @@ function bindCanvasEvents() {
     persist();
     if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest(".empty-plan") && !e.target.closest("button")) {
       const pos = pointerToPlanPosition(e); if (!pos) return;
-      if (state.titlePlacing) { state.titlePlacing = false; state.modal = { mode: "create", nodeType: "title", position: pos }; return render(); }
-      if (state.roomDraw?.mode) return handleRoomDrawPoint(pos);
-      if (state.massMode.active) return placeMassNode(pos);
-      const proj = project();
-      const fl = currentFloor();
-      if (proj && fl && (state.floorPlans[fl.id] || fl.planDriveFileId)) openCreateModal(pos);
+      planTapAt(pos);
     }
   });
   viewport.addEventListener("pointercancel", (e) => {
@@ -4083,6 +4082,16 @@ function bindCanvasEvents() {
     viewport.classList.remove("is-dragging", "is-gesturing");
     if (endingPinch || canvasPointers.size === 0) persist();
   });
+}
+
+// Shared plan-tap action (custom stage gestures and the OpenSeadragon viewer).
+function planTapAt(pos) {
+  if (state.titlePlacing) { state.titlePlacing = false; state.modal = { mode: "create", nodeType: "title", position: pos }; return render(); }
+  if (state.roomDraw?.mode) return handleRoomDrawPoint(pos);
+  if (state.massMode.active) return placeMassNode(pos);
+  const proj = project();
+  const fl = currentFloor();
+  if (proj && fl && (state.floorPlans[fl.id] || fl.planDriveFileId)) openCreateModal(pos);
 }
 
 function pointerDistance(a, b) {
@@ -4164,6 +4173,7 @@ function pointerToPlanPosition(event) {
 function applyCanvasTransform() {
   const stage = document.getElementById("planStage");
   if (!stage) return;
+  if (stage.classList.contains("is-osd")) { syncStageToOsd(); return; }
   stage.style.transform = `translate(calc(-50% + ${state.canvas.panX}px), calc(-50% + ${state.canvas.panY}px)) scale(${state.canvas.zoom})`;
   scheduleHiresPlan();
 }
@@ -4181,7 +4191,9 @@ function rememberPlanPdf(floorId, dataUrl) {
   if (_planPdfSrc[floorId] === dataUrl) return;
   _planPdfSrc[floorId] = dataUrl;
   delete _planPdfLoading[floorId];
-  delete _planKind[floorId]; delete _planTiles[floorId];
+  delete _planKind[floorId];
+  if (_planImage[floorId]) { URL.revokeObjectURL(_planImage[floorId].url); delete _planImage[floorId]; }
+  if (_osd && _osd.floorId === floorId) destroyOsd();
   setPlanPdfStatus(floorId, "pdf", "original PDF stored");
   if (_planPdfDoc && _planPdfDoc.floorId === floorId) { releasePlanPdfDoc(); }
   if (_hires && _hires.floorId === floorId) dropHiresCanvas();
@@ -4219,7 +4231,7 @@ function planDebugLine() {
   const kind = _planPdfSrc[floor.id] ? "pdf" : (s ? s.kind : "unknown");
   const d = _hiresDebug || {};
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  return `src=${kind}${s && s.reason && kind !== "pdf" ? " (" + s.reason + ")" : ""} · fileId=${floor.planDriveFileId ? "yes" : "no"} · pdfStored=${_planPdfSrc[floor.id] ? "yes" : "no"} · pdf=${planKindLabel(floor.id)} · last=${d.status || "none"} · scale=${d.scale ? d.scale.toFixed(1) + "/" + (state.canvas.zoom * dpr).toFixed(1) : "-"} · canvas=${d.canvas || "-"} · dpr=${window.devicePixelRatio || 1}`;
+  return `src=${kind}${s && s.reason && kind !== "pdf" ? " (" + s.reason + ")" : ""} · fileId=${floor.planDriveFileId ? "yes" : "no"} · pdfStored=${_planPdfSrc[floor.id] ? "yes" : "no"} · pdf=${planKindLabel(floor.id)} · viewer=${osdActive() ? "osd" : "stage"} · link=${_planLinkStatus[floor.id] || "-"} · last=${d.status || "none"} · scale=${d.scale ? d.scale.toFixed(1) + "/" + (state.canvas.zoom * dpr).toFixed(1) : "-"} · canvas=${d.canvas || "-"} · dpr=${window.devicePixelRatio || 1}`;
 }
 function refreshPlanDebug() {
   const el = document.getElementById("planDebug");
@@ -4303,11 +4315,12 @@ async function analyzePlanPdf(floorId, src) {
   if (_planKindLoading[floorId]) return _planKindLoading[floorId];
   const p = (async () => {
     try {
-      const cached = window.NDCache ? await NDCache.get(PLAN_TILES_PREFIX + floorId).catch(() => null) : null;
-      if (cached && cached.srcLen === src.length && Array.isArray(cached.blobs) && cached.blobs.length) {
-        _planTiles[floorId] = { ...cached, bitmaps: [] };
+      const cached = window.NDCache ? await NDCache.get(PLAN_IMAGE_PREFIX + floorId).catch(() => null) : null;
+      if (cached && cached.srcLen === src.length && cached.blob) {
+        setPlanImage(floorId, cached);
         return (_planKind[floorId] = { kind: "raster", w: cached.w, h: cached.h, srcLen: src.length });
       }
+      if (window.NDCache) NDCache.remove("plantiles:" + floorId).catch(() => {});   // retired 0.17.2 tiles
       const page = await planPdfPage(floorId, src);
       const ol = await page.getOperatorList();
       const O = window.pdfjsLib.OPS;
@@ -4330,62 +4343,104 @@ async function analyzePlanPdf(floorId, src) {
       const upright = Math.abs(pb) < 1e-6 && Math.abs(pc) < 1e-6 && pa > 0 && pd > 0 && !page.rotate;
       const rect = { rx: (pe - x0v) / pw, ry: 1 - (pf + pd - y0v) / ph, rw: pa / pw, rh: pd / ph };
       if (!obj || !obj.data || !upright || nDraw > 4) return (_planKind[floorId] = { kind: "mixed", w: obj?.width || 0, h: obj?.height || 0, srcLen: src.length });
-      const tiles = { ...(await buildPlanTiles(obj)), ...rect };
-      _planTiles[floorId] = { ...tiles, bitmaps: [] };
-      if (window.NDCache) NDCache.put(PLAN_TILES_PREFIX + floorId, { ...tiles, srcLen: src.length }, null).catch((e) => console.warn("plan tiles cache put failed", e));
+      const blob = await buildPlanImageBlob(obj);
+      const entry = { blob, w: obj.width, h: obj.height, ...rect, srcLen: src.length };
+      setPlanImage(floorId, entry);
+      if (window.NDCache) NDCache.put(PLAN_IMAGE_PREFIX + floorId, entry, null).catch((e) => console.warn("plan image cache put failed", e));
       return (_planKind[floorId] = { kind: "raster", w: obj.width, h: obj.height, srcLen: src.length });
     } finally { delete _planKindLoading[floorId]; }
   })();
   _planKindLoading[floorId] = p;
   return p;
 }
-// pdf.js image data (kind 1 = 1bpp gray, 2 = RGB, 3 = RGBA incl. smask) -> white-flattened JPEG tiles.
-async function buildPlanTiles(obj) {
+function setPlanImage(floorId, e) {
+  const old = _planImage[floorId]; if (old && old.url) URL.revokeObjectURL(old.url);
+  _planImage[floorId] = { url: URL.createObjectURL(e.blob), w: e.w, h: e.h, rx: e.rx ?? 0, ry: e.ry ?? 0, rw: e.rw ?? 1, rh: e.rh ?? 1 };
+}
+// pdf.js image data (kind 1 = 1bpp gray, 2 = RGB, 3 = RGBA incl. smask) -> one full-size JPEG flattened on white.
+async function buildPlanImageBlob(obj) {
   const { width: w, height: h, data, kind } = obj;
-  const T = PLAN_TILE, blobs = [];
-  const cols = Math.ceil(w / T), rows = Math.ceil(h / T);
-  for (let ty = 0; ty < rows; ty++) for (let tx = 0; tx < cols; tx++) {
-    const tw = Math.min(T, w - tx * T), th = Math.min(T, h - ty * T);
-    const c = document.createElement("canvas"); c.width = tw; c.height = th;
-    const ctx = c.getContext("2d"); const id = ctx.createImageData(tw, th); const o = id.data;
-    for (let y = 0; y < th; y++) {
-      const sy = ty * T + y;
-      for (let x = 0; x < tw; x++) {
-        const sx = tx * T + x, di = (y * tw + x) * 4;
-        let r, g, b;
-        if (kind === 3) { const si = (sy * w + sx) * 4, al = data[si + 3]; r = (data[si] * al + 255 * (255 - al)) / 255; g = (data[si + 1] * al + 255 * (255 - al)) / 255; b = (data[si + 2] * al + 255 * (255 - al)) / 255; }
-        else if (kind === 2) { const si = (sy * w + sx) * 3; r = data[si]; g = data[si + 1]; b = data[si + 2]; }
-        else { const rowBytes = (w + 7) >> 3; const bit = (data[sy * rowBytes + (sx >> 3)] >> (7 - (sx & 7))) & 1; r = g = b = bit ? 255 : 0; }
-        o[di] = r; o[di + 1] = g; o[di + 2] = b; o[di + 3] = 255;
-      }
-    }
-    ctx.putImageData(id, 0, 0);
-    blobs.push(await new Promise((res) => c.toBlob(res, "image/jpeg", 0.95)));
-    c.width = c.height = 0;
-    await new Promise((r) => setTimeout(r, 0));   // keep the UI responsive between tiles
-  }
-  return { w, h, T, cols, rows, blobs };
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d"); if (!ctx) throw new Error("canvas " + w + "×" + h + " unavailable");
+  const id = ctx.createImageData(w, h); const o = id.data, n = w * h;
+  if (kind === 3) { for (let i = 0, j = 0; i < n; i++, j += 4) { const a = data[j + 3], ia = 255 - a; o[j] = (data[j] * a + 255 * ia) / 255; o[j + 1] = (data[j + 1] * a + 255 * ia) / 255; o[j + 2] = (data[j + 2] * a + 255 * ia) / 255; o[j + 3] = 255; } }
+  else if (kind === 2) { for (let i = 0, j = 0, k = 0; i < n; i++, j += 4, k += 3) { o[j] = data[k]; o[j + 1] = data[k + 1]; o[j + 2] = data[k + 2]; o[j + 3] = 255; } }
+  else { const rb = (w + 7) >> 3; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = ((data[y * rb + (x >> 3)] >> (7 - (x & 7))) & 1) ? 255 : 0, j = (y * w + x) * 4; o[j] = o[j + 1] = o[j + 2] = v; o[j + 3] = 255; } }
+  ctx.putImageData(id, 0, 0);
+  const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.95));
+  c.width = c.height = 0;
+  if (!blob) throw new Error("image encode failed");
+  return blob;
 }
-async function planTileBitmap(t, i) {
-  if (!t.bitmaps[i]) t.bitmaps[i] = createImageBitmap(t.blobs[i]);
-  return t.bitmaps[i];
+
+/* ── 0.18.1 OpenSeadragon plan view for raster PDFs ───────────────────────
+ * OSD (vendor/openseadragon, 4.1.1) shows the page render plus the full-size embedded
+ * image and owns pan/pinch/zoom. #planStage (markers, rooms, title pins) is kept as a
+ * transparent layer whose transform is synced to OSD's viewport, so positions stay
+ * plan percentages and all existing marker/room code keeps working. */
+function osdFloorReady(floor) {
+  return !!(floor && window.OpenSeadragon && _planKind[floor.id]?.kind === "raster" && _planImage[floor.id] && state.floorPlans[floor.id]);
 }
-async function drawPlanTiles(ctx, t, W, H, x0, y0, cw, ch) {
-  // Image rect inside the page (fractions), then source px per canvas px.
-  const rx = t.rx ?? 0, ry = t.ry ?? 0, rw = t.rw ?? 1, rh = t.rh ?? 1;
-  const kx = t.w / (rw * W), ky = t.h / (rh * H);
-  x0 -= rx * W; y0 -= ry * H;
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-  const cols = t.cols || Math.ceil(t.w / t.T);
-  for (let i = 0; i < t.blobs.length; i++) {
-    const tx = (i % cols) * t.T, ty = Math.floor(i / cols) * t.T;
-    const tw = Math.min(t.T, t.w - tx), th = Math.min(t.T, t.h - ty);
-    // tile rect in canvas px
-    const dx = tx / kx - x0, dy = ty / ky - y0, dw = tw / kx, dh = th / ky;
-    if (dx >= cw || dy >= ch || dx + dw <= 0 || dy + dh <= 0) continue;
-    const bmp = await planTileBitmap(t, i);
-    ctx.drawImage(bmp, 0, 0, tw, th, dx, dy, dw, dh);
-  }
+function osdActive() { const f = currentFloor(); return !!(_osd && f && _osd.floorId === f.id && osdFloorReady(f)); }
+function destroyOsd() {
+  if (!_osd) return;
+  try { _osd.viewer.destroy(); } catch (e) {}
+  _osd.el.remove(); _osd = null;
+}
+function mountOsd() {
+  const floor = currentFloor();
+  const viewport = document.getElementById("canvasViewport");
+  if (!viewport || !osdFloorReady(floor)) { if (_osd && (!floor || _osd.floorId !== floor.id || !viewport)) destroyOsd(); return; }
+  if (_osd && _osd.floorId !== floor.id) destroyOsd();
+  if (!_osd) {
+    const el = document.createElement("div"); el.className = "osd-host";
+    viewport.prepend(el);
+    const aspect = floor.planAspectRatio || 1.6, im = _planImage[floor.id];
+    const viewer = OpenSeadragon({
+      element: el, showNavigationControl: false, animationTime: 0.25, springStiffness: 9,
+      maxZoomPixelRatio: 1e6, visibilityRatio: 0.2, constrainDuringPan: false, preserveImageSizeOnResize: true,
+      imageSmoothingEnabled: true, minPixelRatio: 0.5,
+      gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: false },
+      gestureSettingsTouch: { clickToZoom: false, dblClickToZoom: false, pinchRotate: false, flickEnabled: true },
+      tileSources: [
+        { tileSource: { type: "image", url: state.floorPlans[floor.id], buildPyramid: true }, x: 0, y: 0, width: 1 },
+        { tileSource: { type: "image", url: im.url, buildPyramid: true }, x: im.rx, y: im.ry / aspect, width: im.rw }
+      ]
+    });
+    _osd = { floorId: floor.id, viewer, el, aspect, ready: false };
+    viewer.addHandler("open", () => {
+      const home = viewer.viewport.getHomeZoom();
+      viewer.viewport.maxZoomLevel = home * MAX_ZOOM;
+      viewer.viewport.minZoomLevel = home * 0.55;
+      _osd.ready = true;
+      syncStageToOsd();
+    });
+    viewer.addHandler("update-viewport", syncStageToOsd);
+    viewer.addHandler("resize", syncStageToOsd);
+    viewer.addHandler("canvas-click", (ev) => {
+      if (!ev.quick || !_osd) return;
+      const pt = viewer.viewport.pointFromPixel(ev.position);
+      const x = pt.x * 100, y = pt.y * _osd.aspect * 100;
+      if (x < 0 || x > 100 || y < 0 || y > 100) return;
+      planTapAt({ x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) });
+    });
+    viewer.addHandler("open-failed", (e) => setHiresDebug("error: viewer open failed " + (e.message || "")));
+  } else if (_osd.el.parentNode !== viewport) viewport.prepend(_osd.el);
+  _osd.viewer.panHorizontal = _osd.viewer.panVertical = !state.ui.planLocked;
+  syncStageToOsd();
+}
+function syncStageToOsd() {
+  const stage = document.getElementById("planStage");
+  if (!_osd || !_osd.ready || !stage || !stage.offsetWidth) return;
+  const vp = _osd.viewer.viewport;
+  const r = vp.viewportToViewerElementRectangle(new OpenSeadragon.Rect(0, 0, 1, 1 / _osd.aspect));
+  const s = r.width / stage.offsetWidth;
+  stage.style.transform = `translate(${r.x}px, ${r.y}px) scale(${s})`;
+  state.canvas.zoom = Number((vp.getZoom(true) / vp.getHomeZoom()).toFixed(2));
+  updateScaleReadout();
+  const pi = _planImage[_osd.floorId];
+  // scale = source image px per plan CSS px (vs. zoom×dpr device px needed); OSD shows every source pixel.
+  setHiresDebug("ok (osd)", { scale: pi ? pi.w / ((pi.rw || 1) * (stage.offsetWidth || 1)) : 0, canvas: "osd" });
 }
 
 function scheduleHiresPlan() {
@@ -4427,7 +4482,10 @@ async function updateHiresPlan() {
   const img = stage && stage.querySelector("img.floor-plan");
   const floor = currentFloor();
   if (!stage || !viewport || !img || !floor || !state.floorPlans[floor.id]) { dropHiresCanvas(); return; }
+  if (osdFloorReady(floor)) { dropHiresCanvas(); return; }   // 0.18.1: raster plans render in OpenSeadragon
   const srcPromise = planPdfSource(floor);   // resolve the source even at low zoom so the flat-plan notice can show
+  srcPromise.then((src) => src && analyzePlanPdf(floor.id, src)).then((k) => { if (k && k.kind === "raster" && osdFloorReady(currentFloor())) render(); })
+    .catch((e) => { setHiresDebug("error: " + describeError(e)); console.warn("plan PDF analysis failed", e); });
   if (viewport.classList.contains("is-gesturing")) { scheduleHiresPlan(); return; }
   let g = hiresGeometry(stage, viewport, img);
   if (!g) { setHiresDebug("skipped: plan not laid out"); return; }
@@ -4471,21 +4529,6 @@ async function updateHiresPlan() {
   if (_hiresTask) { try { _hiresTask.cancel(); } catch (e) {} _hiresTask = null; }
   _hiresInflightKey = key;
   setHiresDebug("rendering…", dbgExtra);
-  let kind = null;
-  try { kind = await analyzePlanPdf(floor.id, src); } catch (e) { console.warn("plan PDF analysis failed", e); }
-  if (seq !== _hiresSeq) { if (_hiresInflightKey === key) _hiresInflightKey = null; return; }
-  Object.keys(_planTiles).forEach((id) => { if (id !== floor.id) { (_planTiles[id].bitmaps || []).forEach((b) => b && b.then((x) => x.close && x.close()).catch(() => {})); _planTiles[id].bitmaps = []; } });
-  if (kind && kind.kind === "raster" && _planTiles[floor.id]) {
-    const canvas = document.createElement("canvas");
-    canvas.className = "plan-hires"; canvas.width = cw; canvas.height = ch;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) { canvas.width = canvas.height = 0; _hiresInflightKey = null; setHiresDebug("error: canvas context unavailable (memory)"); return; }
-    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
-    try { await drawPlanTiles(ctx, _planTiles[floor.id], W, H, x0, y0, cw, ch); }
-    catch (e) { canvas.width = canvas.height = 0; if (_hiresInflightKey === key) _hiresInflightKey = null; throw e; }
-    if (_hiresInflightKey === key) _hiresInflightKey = null;
-    return placeHiresCanvas(canvas, floor, seq, key, box, W, H, x0, y0, cw, ch, dbgExtra);
-  }
   let page;
   try { page = await planPdfPage(floor.id, src); }
   catch (e) {
@@ -4549,6 +4592,7 @@ function flashStageAnimating() {
  * @param {{ skipPersist?: boolean, focal?: {x:number,y:number}|null, animate?: boolean }} [opts]
  */
 function setZoom(value, rerender = true, opts = {}) {
+  if (osdActive() && _osd.ready) { const vp = _osd.viewer.viewport; vp.zoomTo(vp.getHomeZoom() * Math.max(0.55, Math.min(MAX_ZOOM, value))); return; }
   const skipPersist = Boolean(opts && opts.skipPersist);
   const focal = opts && opts.focal;
   const animate = Boolean(opts && opts.animate);
@@ -4589,24 +4633,38 @@ function selectProject(projectId) {
 // 0.17.2 — a PDF plan stored on this device but never linked to Drive (upload happened while
 // signed out / offline): upload the original now so the floor gets its planDriveFileId.
 const _planLinking = {};
+// 0.18.1: the auto-link never fired because it only ran when the PDF was already in memory
+// (it's loaded lazily from IndexedDB) and the token was valid at that exact moment. Now it
+// reads the device copy itself, retries after sign-in, and reports its status in the debug line.
 async function linkLocalPlanOriginal(proj, fl) {
-  if (_planLinking[fl.id] || fl.planDriveFileId || !_planPdfSrc[fl.id] || !isTokenValid() || !proj) return;
+  if (!fl || !proj || _planLinking[fl.id] || fl.planDriveFileId) return;
+  if (!isTokenValid()) { _planLinkStatus[fl.id] = "waiting for sign-in"; refreshPlanDebug(); return; }
   _planLinking[fl.id] = true;
   try {
-    const folderId = await ensureFloorDriveFolder(proj, fl); if (!folderId || fl.planDriveFileId) return;
+    if (!_planPdfSrc[fl.id] && window.NDCache) {
+      const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + fl.id).catch(() => null);
+      if (typeof cached === "string" && cached.startsWith("data:application/pdf")) _planPdfSrc[fl.id] = cached;
+    }
+    if (!_planPdfSrc[fl.id]) { _planLinkStatus[fl.id] = "no PDF on device"; return; }
+    _planLinkStatus[fl.id] = "uploading"; refreshPlanDebug();
+    const folderId = await ensureFloorDriveFolder(proj, fl); if (!folderId) { _planLinkStatus[fl.id] = "no floor folder"; return; }
+    const live = state.projects.flatMap((p) => p.floors || []).find((f) => f.id === fl.id) || fl;   // floors may be re-hydrated meanwhile
+    if (live.planDriveFileId) { _planLinkStatus[fl.id] = "ok"; return; }
+    fl = live;
     const blob = await (await fetch(_planPdfSrc[fl.id])).blob();
     const name = fl.planFileName && /\.pdf$/i.test(fl.planFileName) ? fl.planFileName : "plan.pdf";
     const result = await uploadFileToDrive(new File([blob], name, { type: "application/pdf" }), folderId, `floor-plan-${name}`);
-    fl.planDriveFileId = result.id; fl.planMimeType = result.mimeType; fl.planWebViewLink = result.webViewLink;
+    fl.planDriveFileId = result.id; fl.planMimeType = result.mimeType; fl.planWebViewLink = result.webViewLink; fl.updatedAt = nowStamp();
+    _planLinkStatus[fl.id] = "ok";
     persist(); refreshPlanDebug();
     logAudit("Plan Linked", { projectId: proj.id, floorId: fl.id, details: `${fl.name}: original PDF uploaded` });
-  } catch (e) { console.warn("plan original link failed", e); }
-  finally { delete _planLinking[fl.id]; }
+  } catch (e) { _planLinkStatus[fl.id] = "error: " + describeError(e); console.warn("plan original link failed", e); }
+  finally { delete _planLinking[fl.id]; refreshPlanDebug(); }
 }
 
 function maybeFetchPlanForCurrentFloor() {
   const fl = currentFloor(); if (!fl) return;
-  if (!fl.planDriveFileId && _planPdfSrc[fl.id] && isTokenValid()) linkLocalPlanOriginal(project(), fl);
+  if (!fl.planDriveFileId) linkLocalPlanOriginal(project(), fl);
   if (!state.floorPlans[fl.id] && fl.planDriveFileId && isTokenValid()) {
     fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); await ensurePlanPng(project(), fl, false); } }).catch((e) => console.warn(e));
   } else if (state.floorPlans[fl.id] && !fl.planPngFileId && isTokenValid()) {
@@ -5322,6 +5380,7 @@ function uploadFloorPlan() {
       step(isPdf ? "Rendering PDF…" : "Preparing image…", 25);
       if (!isPdf) {   // an image replaces a PDF plan: forget the old PDF so it isn't drawn over the new image
         delete _planPdfSrc[floor.id]; if (_hires && _hires.floorId === floor.id) dropHiresCanvas();
+        delete _planKind[floor.id]; if (_planImage[floor.id]) { URL.revokeObjectURL(_planImage[floor.id].url); delete _planImage[floor.id]; } if (_osd && _osd.floorId === floor.id) destroyOsd();
         if (window.NDCache) NDCache.remove(PLAN_PDF_CACHE_PREFIX + floor.id).catch(() => {});
         setPlanPdfStatus(floor.id, "image", "uploaded image");
       }

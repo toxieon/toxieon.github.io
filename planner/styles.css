@@ -3527,3 +3527,10 @@ body.report-fullscreen { overflow:hidden; }
 .room-vertex-handle::after { content:""; position:absolute; left:50%; top:50%; width:30%; height:30%; transform:translate(-50%,-50%); border-radius:50%; background:#fff; }
 .drawer--title .drawer-actions { flex-wrap:wrap; gap:8px; }
 @media (max-width:720px) { .room-draw-banner .hint { display:none; } .room-draw-banner { flex-wrap:wrap; gap:6px; padding:6px 8px; } .room-draw-banner button { min-height:40px; } }
+
+/* 0.18.1 OpenSeadragon plan view: OSD fills the viewport and owns gestures; the stage
+ * above it is a transparent, OSD-synced layer where only markers/handles take input. */
+.osd-host { position:absolute !important; inset:0; z-index:0; background:transparent; touch-action:none; }
+.plan-stage.is-osd { left:0; top:0; transform-origin:0 0; pointer-events:none; z-index:1; }
+.plan-stage.is-osd > img.floor-plan { visibility:hidden; }
+.plan-stage.is-osd .node-marker, .plan-stage.is-osd .room-vertex-handle { pointer-events:auto; }
