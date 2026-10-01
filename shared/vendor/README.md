@@ -7,5 +7,8 @@
 | html2canvas-pro/ | html2canvas-pro | 2.5.0 | MIT (LICENSE) | npm html2canvas-pro |
 | jspdf/ | jsPDF | 2.5.1 (identical to the cdnjs file previously used) | MIT (LICENSE) | npm jspdf |
 | sheetjs/ | SheetJS Community Edition xlsx.full.min.js | 0.20.3 | Apache-2.0 (LICENSE) | https://cdn.sheetjs.com/xlsx-0.20.3/ |
+| papaparse/ | Papa Parse | 5.7.0 | MIT (LICENSE) | npm papaparse |
+| pica/ | pica (full build, inline worker) | 10.0.3 | MIT (LICENSE) | npm pica |
 
 Load pdf.js through `shared/nd-pdf.js` (NDPdf.load / NDPdf.docOptions), which also sets the worker, wasm and icc URLs plus isEvalSupported:false.
+CSV goes through `shared/nd-csv.js` (NDCSV.rows) and photo downscales through `shared/nd-resize.js` (NDResize.toCanvas).

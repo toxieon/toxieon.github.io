@@ -35,6 +35,8 @@ async function preparePlannerPhoto(job) {
   const canvas = document.createElement('canvas');
   const width = Math.max(1, Math.round(img.naturalWidth * scale)), height = Math.max(1, Math.round(img.naturalHeight * scale));
   // A footer preserves every source pixel; it never covers the site record.
+  // pica (shared/nd-resize.js) for a sharp downscale; same 2560 cap and JPEG 0.88 output.
+  const scaled = window.NDResize ? await NDResize.toCanvas(img, width, height) : img;
   const font = Math.max(12, Math.round(width / 65)), pad = Math.max(8, Math.round(font * 0.6));
   canvas.width = width;
   const lines = [job.jobName, `${takenAt} — ${source}`];
@@ -48,7 +50,8 @@ async function preparePlannerPhoto(job) {
   }
   canvas.height = height + pad * 2 + wrapped.length * Math.ceil(font * 1.35);
   ctx = canvas.getContext('2d'); ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, width, canvas.height);
-  ctx.drawImage(img, 0, 0, width, height);
+  ctx.drawImage(scaled, 0, 0, width, height);
+  if (scaled !== img) scaled.width = scaled.height = 0;
   ctx.fillStyle = '#fff'; ctx.font = `${font}px sans-serif`; ctx.textBaseline = 'top';
   wrapped.forEach((line, i) => ctx.fillText(line, pad, height + pad + i * Math.ceil(font * 1.35)));
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));

@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.18.3";
+const APP_VERSION = "0.18.4";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -3066,30 +3066,14 @@ function csvEscape(value) {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function parseCsvLine(line) {
-  const out = [];
-  let cur = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"' && quoted && line[i + 1] === '"') { cur += '"'; i += 1; continue; }
-    if (ch === '"') { quoted = !quoted; continue; }
-    if (ch === "," && !quoted) { out.push(cur); cur = ""; continue; }
-    cur += ch;
-  }
-  out.push(cur);
-  return out.map((v) => v.trim());
-}
-
+// 0.18.4: PapaParse via shared/nd-csv.js. Quoted fields may contain commas and line breaks.
 function parseCategoryCsv(text) {
-  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (!lines.length) return [];
-  const first = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
-  const hasHeader = first.includes("item");
-  return lines.slice(hasHeader ? 1 : 0).map((line) => {
-    const [item, code, description, color, shorthand] = parseCsvLine(line);
-    return { item: item || "", code: code || "", description: description || "", color: color || "", shorthand: (shorthand || "").slice(0, 4) };
-  }).filter((row) => row.item);
+  const rows = NDCSV.rows(text).map((r) => r.map((v) => String(v ?? "").trim())).filter((r) => r.some((v) => v !== ""));
+  if (!rows.length) return [];
+  const hasHeader = rows[0].map((h) => h.toLowerCase()).includes("item");
+  return rows.slice(hasHeader ? 1 : 0).map(([item, code, description, color, shorthand]) => (
+    { item: item || "", code: code || "", description: description || "", color: color || "", shorthand: (shorthand || "").slice(0, 4) }
+  )).filter((row) => row.item);
 }
 
 function hexToRgbColor(hex) {

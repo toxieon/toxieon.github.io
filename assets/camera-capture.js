@@ -105,9 +105,12 @@
       var w = video.videoWidth, h = video.videoHeight;
       var longest = Math.max(w, h);
       if (longest > maxDim) { var s = maxDim / longest; w = Math.round(w * s); h = Math.round(h * s); }
+      // Optional high-quality downscale via shared/nd-resize.js (pica); plain drawImage otherwise.
+      var scaled = root.NDResize ? await root.NDResize.toCanvas(video, w, h) : video;
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(scaled, 0, 0, w, h);
+      if (scaled !== video) scaled.width = scaled.height = 0;
       var lines = typeof opts.watermarkLines === "function" ? opts.watermarkLines() : opts.watermarkLines;
       if (lines && lines.length && root.NDWatermark) { try { root.NDWatermark.draw(ctx, w, h, { lines: lines }); } catch (e) {} }
       var url = canvas.toDataURL("image/jpeg", jpegQ);
