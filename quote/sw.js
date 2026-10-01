@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'quote-v5';
+const CACHE_VERSION = 'quote-v6';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
@@ -24,7 +24,8 @@ const SHELL_ASSETS = [
   "../shared/nd-cache.js",
   "../shared/nd-queue.js",
   "../shared/nd-ui.js",
-  "../shared/nd-pwa.js"
+  "../shared/nd-pwa.js",
+  "../shared/vendor/jspdf/jspdf.umd.min.js"
 ];
 
 const IS_API_HOST = (url) =>

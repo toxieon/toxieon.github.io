@@ -1,3 +1,5 @@
+## 0.18.3 · 2026-10-01 · vendor-libs · Vendor pdf.js 6.3.289 (legacy build, shared/nd-pdf.js loader, wasm JPX/JBIG2 decoders), html2canvas-pro 2.5.0 and jsPDF 2.5.1 under shared/vendor with LICENSE files; drop all cdnjs loads; precache in sw
+
 ## 0.18.2 · 2026-10-01 · licence-pdfjs-dates · Read photo EXIF date with vendored exifr (MIT) instead of ExifReader (MPL); drop heic2any (LGPL libheif) with a clear HEIC message; pdf.js isEvalSupported:false; local-date fix for Hours week/4-week ranges and audit CSV filename
 
 ## 0.18.1 · 2026-10-01 · osd-plan-view · Show raster PDF plans in OpenSeadragon (vendored 4.1.1) at full resolution with the node/room overlay synced on top; retire custom tiles; fix plan Drive auto-link
