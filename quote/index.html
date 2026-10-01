@@ -2623,6 +2623,9 @@ async function syncFromSheet(silent) {
     if (status) { status.style.display='block'; status.className='tip warn'; status.innerHTML='<b>!</b> ' + settings.sheetLastStatus; }
   }
 }
+/* Local (device time zone) YYYY-MM-DD. toISOString() is UTC and gives yesterday before 10am in Sydney. */
+function localDateStr(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
 function parseCsv(text) {
   if (!text) return [];
   const rows = []; let cur = []; let f = ''; let q = false;
@@ -2652,8 +2655,8 @@ function renderUpcomingBrief() {
   const listEl = document.getElementById('brief-list');
   const today = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-  const todayStr = today.toISOString().slice(0, 10);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const todayStr = localDateStr(today);
+  const tomorrowStr = localDateStr(tomorrow);
   const upcoming = history.filter(canSeeQuote).filter(q => {
     if (!q.proposedDate || q.completed) return false;
     const pd = String(q.proposedDate).includes('T') ? String(q.proposedDate).slice(0, 10) : String(q.proposedDate);
@@ -3301,7 +3304,7 @@ document.getElementById('cal-day-export').onclick = () => {
     window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
   } else {
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-    downloadBlob(blob, 'jobs-' + selectedCalDay.toISOString().slice(0,10) + '.ics');
+    downloadBlob(blob, 'jobs-' + localDateStr(selectedCalDay) + '.ics');
   }
 };
 
@@ -3849,7 +3852,7 @@ function buildQuoteImageData(style) {
       : 'Quote valid 30 days. Payment to be made upon job completion. Final pricing subject to site assessment.') : '',
     photos: visiblePhotos,
     logo: (window.NDLogo ? NDLogo.get(NDLogo.CURRENT_KEY) : null),
-    filename: `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.jpg`
+    filename: `${docKind}-${slug}-${localDateStr(new Date())}${docTag}.jpg`
   };
   } finally { if (_filter) currentQuote = _full; }
 }
@@ -5800,7 +5803,7 @@ function generatePDF(style) {
   const docKind = isCash ? 'quote' : (isInvoice ? 'invoice' : 'quote');
   // Append site photos (4 per page, 2x2 grid)
   appendPhotosToPdf(doc, M);
-  const filename = `${docKind}-${slug}-${new Date().toISOString().slice(0,10)}${docTag}.pdf`;
+  const filename = `${docKind}-${slug}-${localDateStr(new Date())}${docTag}.pdf`;
   // Always trigger the file download
   doc.save(filename);
   // On supported devices (mobile especially), also offer to share via SMS / AirDrop / Mail

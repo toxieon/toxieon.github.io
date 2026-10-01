@@ -142,7 +142,7 @@
   async function pdfBlobToPng(blob) {
     var lib = await loadPdfJs();
     var buf = await blob.arrayBuffer();
-    var pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+    var pdf = await lib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
     var page = await pdf.getPage(1);
     var base = page.getViewport({ scale: 1 });
     var vp = page.getViewport({ scale: Math.max(1, Math.min(2600 / base.width, 2600 / base.height)) });
