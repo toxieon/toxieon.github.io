@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.18.4";
+const APP_VERSION = "0.18.5";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -830,6 +830,7 @@ async function bootstrapDrive() {
     await importMasterPhotos({ silent: true, renderOnChange: false });
     hydrateFromHash();
     maybeFetchPlanForCurrentFloor();
+    healUnlinkedPlans().catch((e) => console.warn("plan heal failed", e));   // 0.18.5
     startMasterPhotoImportLoop();
     refreshInbox({ silent: true }).then(() => migrateLegacyBulkPhotos()).catch((e) => console.warn("Initial inbox refresh failed", e));
     flushMasterDeltas({ silent: true }).catch((e) => console.warn("Initial master sync failed", e));
@@ -1509,6 +1510,25 @@ function startMasterPhotoImportLoop() {   // name kept for existing call sites
 
 function stopMasterPhotoImportLoop() { /* listeners self-guard via isTokenValid */ }
 
+// 0.18.5: floors whose plan file ids exist only on this device (row differs from the last
+// synced snapshot, or there is no snapshot yet). Read-only.
+function localUnsyncedPlanLinks() {
+  const out = {};
+  let snapFloors = null, rows;
+  try { snapFloors = (loadSnapshot() || {}).Floors || null; rows = buildMasterRows().Floors; } catch (e) { return out; }
+  (state.projects || []).forEach((p) => (p.floors || []).forEach((f) => {
+    if (!f.planDriveFileId && !f.planPngFileId) return;
+    const row = rows.get(f.id);
+    if (snapFloors && row && snapFloors[f.id] === rowHash(row)) return;   // already synced as-is: cloud is authoritative
+    out[f.id] = { planDriveFileId: f.planDriveFileId || null, planPngFileId: f.planPngFileId || null, planFileName: f.planFileName || null, planAspectRatio: f.planAspectRatio || null };
+  }));
+  return out;
+}
+function liveFloorById(id) {
+  for (const p of state.projects || []) { const f = (p.floors || []).find((x) => x.id === id); if (f) return f; }
+  return null;
+}
+
 async function hydrateFromMasterSheet(opts = {}) {
   const silent = opts.silent || false;
   if (!isTokenValid() || !state.drive.masterSheetId) return;
@@ -1545,6 +1565,11 @@ async function hydrateFromMasterSheet(opts = {}) {
       if (!silent) toast("No projects in cloud yet");
       return;
     }
+    // 0.18.5: plan links this device has but the sheet doesn't yet (never pushed) survive the rebuild;
+    // the bootstrap hydrate runs BEFORE its flush, so they used to be wiped and never reach other devices.
+    // (computed before the folder maps below are reset, so row hashes match the snapshot)
+    const unsyncedPlans = localUnsyncedPlanLinks();
+    let keptPlans = 0;
     state.drive.projectFolderMap = {};
     state.drive.floorFolderMap = {};
     state.drive.nodeFolderMap = {};
@@ -1587,6 +1612,12 @@ async function hydrateFromMasterSheet(opts = {}) {
         createdAt: r[8] || nowStamp(), planAspectRatio: Number(r[9]) || null,
         planPngFileId: r[10] || null
       };
+      const keep = unsyncedPlans[fl.id];   // gap-fill only: a non-empty cloud value always wins
+      if (keep) {
+        if (!fl.planDriveFileId && keep.planDriveFileId) { fl.planDriveFileId = keep.planDriveFileId; fl.planFileName = keep.planFileName; keptPlans++; }
+        if (!fl.planPngFileId && keep.planPngFileId) { fl.planPngFileId = keep.planPngFileId; keptPlans++; }
+        if (!fl.planAspectRatio && keep.planAspectRatio) fl.planAspectRatio = keep.planAspectRatio;
+      }
       if (r[6]) state.drive.floorFolderMap[fl.id] = r[6];
       proj.floors.push(fl);
     }
@@ -1633,6 +1664,7 @@ async function hydrateFromMasterSheet(opts = {}) {
     if (selectedProject && (!state.selectedFloorId || !selectedProject.floors.some((f) => f.id === state.selectedFloorId))) state.selectedFloorId = selectedProject.floors[0]?.id || null;
     if (state.selectedRoomId !== "all" && !state.rooms.some((r) => r.id === state.selectedRoomId)) state.selectedRoomId = "all";
     persist({ skipSync: true });
+    if (keptPlans) { console.info("Kept " + keptPlans + " unsynced plan link(s) from this device; pushing them"); scheduleMasterSync(); }
     render();
     if (!silent) toast("Loaded " + state.projects.length + " projects, " + state.nodes.length + " nodes from cloud");
   } catch (e) {
@@ -1755,8 +1787,9 @@ function computeDeltas(rows, snapshot) {
 }
 
 function scheduleMasterSync() {
-  if (!state.drive.masterSheetId || !isTokenValid()) return;
-  setSyncStatus("pending");
+  if (!state.drive.masterSheetId) return;
+  setSyncStatus("pending");   // 0.18.5: also while signed out, so the chip never says "synced" over unsent edits
+  if (!isTokenValid()) return;
   if (_masterSyncing) { _masterSyncQueued = true; return; }
   clearTimeout(_masterSyncTimer);
   _masterSyncTimer = setTimeout(() => { flushMasterDeltas({ silent: true }).catch((e) => console.warn("auto master sync", e)); }, MASTER_SYNC_DEBOUNCE_MS);
@@ -2133,6 +2166,7 @@ async function updateFileBytes(fileId, file) {
 
 async function fetchDriveFileAsDataUrl(fileId) {
   if (!isTokenValid()) return null;
+  let firstErr = null;
   // 0.15.3 — raw bytes via fetch: gapi.client.request returns the body as decoded text, which can
   // mangle binary (PDF) bytes. Falls back to the old path if fetch fails.
   try {
@@ -2142,7 +2176,8 @@ async function fetchDriveFileAsDataUrl(fileId) {
     const blob = await r.blob();
     const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
     return normalizePdfDataUrl(url);
-  } catch (e) { console.warn("Drive fetch download failed, trying gapi", e); }
+  } catch (e) { console.warn("Drive fetch download failed, trying gapi", e); firstErr = e; }
+  try {   // 0.18.5: if the fallback also fails, report the real Drive error (e.g. 403/404), not the fallback's
   let meta;
   try { meta = await gapi.client.drive.files.get({ fileId, fields: "mimeType,name" }); }
   catch (e) { meta = { result: { mimeType: "application/octet-stream" } }; }
@@ -2152,6 +2187,7 @@ async function fetchDriveFileAsDataUrl(fileId) {
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i) & 0xff;
   return normalizePdfDataUrl(`data:${mime};base64,${arrayBufferToBase64(arr.buffer)}`);
+  } catch (e) { throw firstErr || e; }
 }
 
 // #37 — Drive thumbnail URLs need Google session cookies this app doesn't have,
@@ -2522,6 +2558,7 @@ function renderMapView() {
           <div class="canvas-tools" aria-label="Canvas tools"><button class="icon-button ${state.ui.planLocked ? "is-active" : ""}" data-action="toggle-plan-lock" title="${state.ui.planLocked ? "Plan locked — tap to allow panning" : "Lock plan (stops panning so you can place/move nodes)"}">${icon(state.ui.planLocked ? "lock" : "unlock")}</button><button class="icon-button" data-action="zoom-in" title="Zoom in">${icon("zoomIn")}</button><button class="icon-button" data-action="zoom-out" title="Zoom out">${icon("zoomOut")}</button><button class="icon-button" data-action="reset-view" title="Recenter">${icon("target")}</button></div>
           <div class="scale-readout" data-action="plan-debug" role="button" title="Tap for plan debug info"><span class="scale-bar"></span><span>${Math.round(state.canvas.zoom * 100)}%</span></div>
           ${hasPlan && state.ui.planDebug ? `<div class="plan-debug" id="planDebug">${escapeHtml(planDebugLine())}</div>` : ""}
+          ${hasPlan && !state.floorPlans[floor.id] && !osdFloorReady(floor) && (_planFetchError[floor.id] || !isTokenValid()) ? `<div class="plan-flat-notice" role="status"><span>${!isTokenValid() ? "Sign in to load this plan from Google Drive." : "Couldn't load this plan from Google Drive (" + escapeHtml(_planFetchError[floor.id]) + "). Check you're signed in with the Neill account."}</span>${isTokenValid() ? `<button class="ghost-button" data-action="retry-plan-fetch">Retry</button>` : ""}</div>` : ""}
           ${hasPlan && planIsFlat(floor) ? `<div class="plan-flat-notice" role="status"><span>This plan is a flat image; re-upload the PDF for sharp zoom.</span><button class="ghost-button" data-action="upload-plan">${icon("upload")}Re-upload PDF</button></div>` : ""}
         </div>
         
@@ -2616,7 +2653,7 @@ function renderRoomDrawBanner() {
   return `<div class="mass-banner room-draw-banner" role="status">${icon("layers")}<span>${editing ? "Editing room shape" : `Drawing room (${label})`} &middot; ${n} pt${n === 1 ? "" : "s"}</span><span class="hint">${hint} <kbd>Esc</kbd> cancel.</span>${!draw.editHandles && n ? `<button class="ghost-button" data-action="room-draw-undo">Undo point</button>` : ""}<button class="ghost-button" data-action="room-draw-cancel">${icon("close")}Cancel</button><button class="primary-button" data-action="room-draw-done" ${n < (draw.mode === "rect" ? 2 : 3) ? "disabled" : ""}>${icon("check")}Done</button></div>`;
 }
 function renderEmptyPlanArea() {
-  return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan (PNG, JPG, SVG, or PDF). It will sync to Drive automatically.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
+  return `<div class="empty-plan"><div class="empty-plan-inner"><div class="empty-plan-icon">${icon("map")}</div><h3>No floor plan yet</h3><p>Upload a building plan (PNG, JPG, SVG, or PDF). It will sync to Drive automatically.</p><p class="empty-plan-hint">Added the plan on another device? Open Planner there, signed in with reception, so it can finish syncing.</p><button class="primary-button" type="button" data-action="upload-plan">${icon("upload")}Upload plan image</button></div></div>`;
 }
 
 /* §22 Floor-plan settings (right panel "Plan" tab). Per-floor display prefs
@@ -3883,6 +3920,7 @@ function handleAction(event) {
     case "rename-floor": if (!currentFloor()) return; state.modal = { mode: "rename-floor" }; return render();
     case "delete-floor": return deleteCurrentFloor();
     case "upload-plan": return uploadFloorPlan();
+    case "retry-plan-fetch": { const f = currentFloor(); if (f) delete _planFetchError[f.id]; render(); return maybeFetchPlanForCurrentFloor(); }
     case "mass-start":
       if (!categoryNames().length) { toast("No categories - hit Refresh categories in Settings"); state.activeView = "settings"; return render(); }
       state.modal = { mode: "mass-pick", category: categoryNames()[0] }; return render();
@@ -4630,6 +4668,7 @@ async function linkLocalPlanOriginal(proj, fl) {
     const name = fl.planFileName && /\.pdf$/i.test(fl.planFileName) ? fl.planFileName : "plan.pdf";
     const result = await uploadFileToDrive(new File([blob], name, { type: "application/pdf" }), folderId, `floor-plan-${name}`);
     fl.planDriveFileId = result.id; fl.planMimeType = result.mimeType; fl.planWebViewLink = result.webViewLink; fl.updatedAt = nowStamp();
+    const liveNow = liveFloorById(fl.id); if (liveNow && liveNow !== fl) Object.assign(liveNow, { planDriveFileId: result.id, planMimeType: result.mimeType, planWebViewLink: result.webViewLink });   // 0.18.5
     _planLinkStatus[fl.id] = "ok";
     persist(); refreshPlanDebug();
     logAudit("Plan Linked", { projectId: proj.id, floorId: fl.id, details: `${fl.name}: original PDF uploaded` });
@@ -4637,11 +4676,47 @@ async function linkLocalPlanOriginal(proj, fl) {
   finally { delete _planLinking[fl.id]; refreshPlanDebug(); }
 }
 
+// 0.18.5: on sign-in, link EVERY plan PDF stored only on this device (IndexedDB planpdf:) with no
+// Drive file id, not just the open floor, so other devices can load it. Never deletes the device copy.
+let _planHealRunning = false;
+async function healUnlinkedPlans() {
+  if (_planHealRunning || !window.NDCache || !isTokenValid()) return;
+  _planHealRunning = true;
+  try {
+    const todo = [];
+    for (const p of state.projects || []) for (const f of p.floors || []) {
+      if (f.planDriveFileId) continue;
+      const cached = await NDCache.get(PLAN_PDF_CACHE_PREFIX + f.id).catch(() => null);
+      if (typeof cached === "string" && cached.startsWith("data:application/pdf")) todo.push([p, f]);
+    }
+    if (!todo.length) return;
+    const n = todo.length, plural = n === 1 ? "" : "s";
+    toast(`Syncing ${n} plan${plural} saved only on this device…`);
+    let ok = 0;
+    for (const [p, f] of todo) {
+      await linkLocalPlanOriginal(p, f);
+      if (liveFloorById(f.id)?.planDriveFileId) ok++;
+      if (f.id !== state.selectedFloorId) delete _planPdfSrc[f.id];   // memory: reloaded from IndexedDB when opened
+    }
+    toast(ok === n ? `${n} plan${plural} synced to Drive. Other devices can open ${n === 1 ? "it" : "them"} now.` : `${ok} of ${n} plans synced. Keep Planner open with reception and signed in to finish.`);
+    if (ok) scheduleMasterSync();
+  } finally { _planHealRunning = false; }
+}
+
+const _planFetchError = {};
 function maybeFetchPlanForCurrentFloor() {
   const fl = currentFloor(); if (!fl) return;
   if (!fl.planDriveFileId) linkLocalPlanOriginal(project(), fl);
   if (!state.floorPlans[fl.id] && fl.planDriveFileId && isTokenValid()) {
-    fetchDriveFileAsDataUrl(fl.planDriveFileId).then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); await ensurePlanPng(project(), fl, false); } }).catch((e) => console.warn(e));
+    // 0.18.5: fall back to the PNG render and show why if neither loads (was a silent blank plan).
+    (async () => {
+      let url = null, err = null;
+      try { url = await fetchDriveFileAsDataUrl(fl.planDriveFileId); } catch (e) { err = e; }
+      if (!url && fl.planPngFileId) { try { url = await fetchDriveFileAsDataUrl(fl.planPngFileId); } catch (e) { err = err || e; } }
+      if (!url) { _planFetchError[fl.id] = err ? describeError(err) : "download failed"; render(); }
+      else delete _planFetchError[fl.id];
+      return url;
+    })().then(async (url) => { if (url) { await cacheFloorPlan(fl.id, url, { planDriveFileId: fl.planDriveFileId }); fl.planAspectRatio = fl.planAspectRatio || await readImageAspectRatio(state.floorPlans[fl.id]) || null; persist(); render(); await ensurePlanPng(project(), fl, false); } }).catch((e) => console.warn(e));
   } else if (state.floorPlans[fl.id] && !fl.planPngFileId && isTokenValid()) {
     // Have a rendered plan but no PNG in Drive yet (existing plan) — backfill it
     // so fit-off can load a plain image instead of re-parsing the PDF.
@@ -5329,6 +5404,7 @@ async function ensurePlanPng(proj, floor, force) {
       result = await uploadFileToDrive(file, folderId, "floor-plan-render.png");
     }
     floor.planPngFileId = result.id;
+    const liveFloor = liveFloorById(floor.id); if (liveFloor && liveFloor !== floor) liveFloor.planPngFileId = result.id;   // 0.18.5
     persist();
   } catch (e) { console.warn("plan png sync failed", e); }
 }
@@ -5386,12 +5462,12 @@ function uploadFloorPlan() {
           } else {
             result = await uploadFileToDrive(file, floorFolderId, `floor-plan-${file.name}`);
           }
-          floor.planDriveFileId = result.id;
-          floor.planMimeType = result.mimeType;
-          floor.planWebViewLink = result.webViewLink;
+          // 0.18.5: a sign-in during the upload re-hydrates floors; write to the live floor, not a detached copy.
+          const liveFloor = liveFloorById(floor.id) || floor;
+          for (const f of new Set([floor, liveFloor])) { f.planDriveFileId = result.id; f.planMimeType = result.mimeType; f.planWebViewLink = result.webViewLink; f.planFileName = file.name; }
           persist();
           step("Saving render…", 85);
-          await ensurePlanPng(proj, floor, true);   // also store a PNG render for fit-off
+          await ensurePlanPng(project() && project().id === proj.id ? project() : proj, liveFloor, true);   // also store a PNG render for fit-off
           toast(`Plan synced to Drive`);
         } catch (e) { console.warn(e); toast("Drive sync failed: " + describeError(e)); }
       }
