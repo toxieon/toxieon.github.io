@@ -1,0 +1,489 @@
+{
+  "version": "1.0.0",
+  "provenance": "Original geometric SVG artwork created for Neill Data Suite, October 2026. No third-party artwork or icon-font dependency.",
+  "pngSizes": [
+    32,
+    180,
+    192,
+    512
+  ],
+  "icons": [
+    {
+      "id": "app-hub",
+      "label": "Suite hub",
+      "kind": "app",
+      "color": "#35d0ba",
+      "file": "assets/suite-icons/apps/hub.svg",
+      "recommendation": "Candidate for hub favicon and suite launcher; four destinations share one home.",
+      "tags": [
+        "home",
+        "launcher",
+        "apps"
+      ]
+    },
+    {
+      "id": "app-planner",
+      "label": "Planner",
+      "kind": "app",
+      "color": "#ff5252",
+      "file": "assets/suite-icons/apps/planner.svg",
+      "recommendation": "Candidate for planner/favicon.svg and Planner PWA icons; floor-plan walls remain distinct at 16 px.",
+      "tags": [
+        "plan",
+        "floor",
+        "nodes",
+        "blueprint"
+      ]
+    },
+    {
+      "id": "app-upload",
+      "label": "Upload",
+      "kind": "app",
+      "color": "#a855f7",
+      "file": "assets/suite-icons/apps/upload.svg",
+      "recommendation": "Candidate for upload/favicon.svg and Upload PWA icons; an upward arrow lands above a file tray.",
+      "tags": [
+        "send",
+        "photo",
+        "files"
+      ]
+    },
+    {
+      "id": "app-search",
+      "label": "Search",
+      "kind": "app",
+      "color": "#facc15",
+      "file": "assets/suite-icons/apps/search.svg",
+      "recommendation": "Candidate for search/favicon.svg and Search PWA icons; a large magnifier reads clearly in a browser tab.",
+      "tags": [
+        "find",
+        "files",
+        "lens"
+      ]
+    },
+    {
+      "id": "app-quote",
+      "label": "Quote",
+      "kind": "app",
+      "color": "#94a3b8",
+      "file": "assets/suite-icons/apps/quote.svg",
+      "recommendation": "Candidate for quote/favicon.svg; a price tag identifies quoting without tiny currency text.",
+      "tags": [
+        "price",
+        "estimate",
+        "invoice",
+        "tag"
+      ]
+    },
+    {
+      "id": "app-timesheet",
+      "label": "Timesheet",
+      "kind": "app",
+      "color": "#3ab87a",
+      "file": "assets/suite-icons/apps/timesheet.svg",
+      "recommendation": "Candidate for Timesheet browser, Apple touch and PWA icons; preserve the existing green app colour.",
+      "tags": [
+        "hours",
+        "clock",
+        "work",
+        "time"
+      ]
+    },
+    {
+      "id": "app-swb",
+      "label": "Switchboard",
+      "kind": "app",
+      "color": "#f59e0b",
+      "file": "assets/suite-icons/apps/swb.svg",
+      "recommendation": "Candidate for swb/favicon.svg and SWB PWA icons; an enclosed bolt identifies the switchboard tool.",
+      "tags": [
+        "power",
+        "board",
+        "electrical",
+        "breaker"
+      ]
+    },
+    {
+      "id": "app-fitoff",
+      "label": "Fit-off",
+      "kind": "app",
+      "color": "#3ab87a",
+      "file": "assets/suite-icons/apps/fitoff.svg",
+      "recommendation": "Candidate for fitoff/favicon.svg; a bold completion mark distinguishes it from the green Timesheet clock.",
+      "tags": [
+        "complete",
+        "install",
+        "finish"
+      ]
+    },
+    {
+      "id": "app-checklist",
+      "label": "Install checklist",
+      "kind": "app",
+      "color": "#2ee6a8",
+      "file": "assets/suite-icons/apps/checklist.svg",
+      "recommendation": "Candidate for the Checklist browser icon; paired checks distinguish the list from the Fit-off completion mark.",
+      "tags": [
+        "tasks",
+        "checks",
+        "install",
+        "units"
+      ]
+    },
+    {
+      "id": "app-assets",
+      "label": "Assets library",
+      "kind": "app",
+      "color": "#6ddba3",
+      "file": "assets/suite-icons/apps/assets.svg",
+      "recommendation": "Candidate for the Assets showroom favicon; stacked layers represent reusable building blocks.",
+      "tags": [
+        "library",
+        "components",
+        "layers"
+      ]
+    },
+    {
+      "id": "app-company",
+      "label": "Company",
+      "kind": "app",
+      "color": "#e07b2a",
+      "file": "assets/suite-icons/apps/company.svg",
+      "recommendation": "Candidate for company/favicon.svg; a team glyph represents membership and workspace access.",
+      "tags": [
+        "team",
+        "people",
+        "members"
+      ]
+    },
+    {
+      "id": "app-website",
+      "label": "Website",
+      "kind": "app",
+      "color": "#2563eb",
+      "file": "assets/suite-icons/apps/website.svg",
+      "recommendation": "Candidate for the public website favicon; keep rollout separate from internal tools if the public brand changes.",
+      "tags": [
+        "site",
+        "public",
+        "web",
+        "globe"
+      ]
+    },
+    {
+      "id": "ui-markup",
+      "label": "Mark up photo",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/markup.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "annotate",
+        "edit",
+        "photo"
+      ]
+    },
+    {
+      "id": "ui-arrow",
+      "label": "Arrow",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/arrow.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "direction",
+        "annotation",
+        "point"
+      ]
+    },
+    {
+      "id": "ui-pen",
+      "label": "Pen",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/pen.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "draw",
+        "pencil",
+        "freehand"
+      ]
+    },
+    {
+      "id": "ui-rectangle",
+      "label": "Rectangle",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/rectangle.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "box",
+        "shape",
+        "annotation"
+      ]
+    },
+    {
+      "id": "ui-circle",
+      "label": "Circle",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/circle.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "ellipse",
+        "shape",
+        "annotation"
+      ]
+    },
+    {
+      "id": "ui-label",
+      "label": "Text label",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/label.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "type",
+        "annotation",
+        "text"
+      ]
+    },
+    {
+      "id": "ui-measure",
+      "label": "Measure",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/measure.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "ruler",
+        "distance",
+        "dimensions"
+      ]
+    },
+    {
+      "id": "ui-undo",
+      "label": "Undo",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/undo.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "back",
+        "reverse",
+        "edit"
+      ]
+    },
+    {
+      "id": "ui-redo",
+      "label": "Redo",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/redo.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "forward",
+        "repeat",
+        "edit"
+      ]
+    },
+    {
+      "id": "ui-download",
+      "label": "Download",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/download.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "save",
+        "export",
+        "file"
+      ]
+    },
+    {
+      "id": "ui-photo",
+      "label": "Photo",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/photo.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "image",
+        "evidence",
+        "gallery"
+      ]
+    },
+    {
+      "id": "ui-node",
+      "label": "Plan node",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/node.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "marker",
+        "device",
+        "location",
+        "point"
+      ]
+    },
+    {
+      "id": "ui-report",
+      "label": "Report",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/report.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "handover",
+        "document",
+        "summary",
+        "pdf"
+      ]
+    },
+    {
+      "id": "ui-offline",
+      "label": "Offline",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/offline.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "connection",
+        "disconnected",
+        "network"
+      ]
+    },
+    {
+      "id": "ui-cloud",
+      "label": "Cloud storage",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/cloud.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "drive",
+        "storage",
+        "remote"
+      ]
+    },
+    {
+      "id": "ui-sync-pending",
+      "label": "Changes pending",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/sync-pending.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "queue",
+        "waiting",
+        "unsynced"
+      ]
+    },
+    {
+      "id": "ui-sync-active",
+      "label": "Syncing",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/sync-active.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "refresh",
+        "syncing",
+        "progress"
+      ]
+    },
+    {
+      "id": "ui-sync-success",
+      "label": "Synced",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/sync-success.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "saved",
+        "success",
+        "uploaded"
+      ]
+    },
+    {
+      "id": "ui-sync-error",
+      "label": "Sync failed",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/sync-error.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "failed",
+        "error",
+        "retry"
+      ]
+    },
+    {
+      "id": "ui-qr",
+      "label": "QR code",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/qr.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "scan",
+        "label",
+        "code"
+      ]
+    },
+    {
+      "id": "ui-before-after",
+      "label": "Before and after",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/before-after.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "compare",
+        "evidence",
+        "split",
+        "photos"
+      ]
+    },
+    {
+      "id": "ui-pin",
+      "label": "Pin",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/pin.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "keep",
+        "bookmark",
+        "favourite"
+      ]
+    },
+    {
+      "id": "ui-close",
+      "label": "Close",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/close.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "dismiss",
+        "cancel",
+        "exit"
+      ]
+    },
+    {
+      "id": "ui-check",
+      "label": "Complete",
+      "kind": "ui",
+      "color": "currentColor",
+      "file": "assets/suite-icons/ui/check.svg",
+      "recommendation": "Use inline at 20–24 px; inherits the surrounding text colour. Pass title:'' beside a visible label.",
+      "tags": [
+        "done",
+        "tick",
+        "success"
+      ]
+    }
+  ]
+}

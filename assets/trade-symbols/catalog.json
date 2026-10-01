@@ -1,0 +1,399 @@
+{
+  "name": "Neill project symbols",
+  "version": "1.0.0",
+  "notice": "Original project identification symbols; no claim of drafting or electrical-code compliance.",
+  "categories": [
+    {
+      "id": "data",
+      "label": "Data & networking",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "cctv",
+      "label": "CCTV",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "access",
+      "label": "Access control",
+      "color": "#0d9488"
+    },
+    {
+      "id": "security",
+      "label": "Security & detection",
+      "color": "#e11d48"
+    },
+    {
+      "id": "electrical",
+      "label": "Electrical",
+      "color": "#d97706"
+    },
+    {
+      "id": "containment",
+      "label": "Cable containment",
+      "color": "#64748b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "data-single",
+      "label": "Single data outlet",
+      "category": "data",
+      "shorthand": "D1",
+      "description": "One data connection at a wall outlet.",
+      "color": "#3b82f6",
+      "code": "ND-D1",
+      "file": "assets/trade-symbols/data-single.svg"
+    },
+    {
+      "id": "data-double",
+      "label": "Double data outlet",
+      "category": "data",
+      "shorthand": "D2",
+      "description": "Two data connections at a wall outlet.",
+      "color": "#3b82f6",
+      "code": "ND-D2",
+      "file": "assets/trade-symbols/data-double.svg"
+    },
+    {
+      "id": "rack",
+      "label": "Communications rack",
+      "category": "data",
+      "shorthand": "RACK",
+      "description": "Communications cabinet or equipment rack.",
+      "color": "#3b82f6",
+      "code": "ND-RACK",
+      "file": "assets/trade-symbols/rack.svg"
+    },
+    {
+      "id": "patch-panel",
+      "label": "Patch panel",
+      "category": "data",
+      "shorthand": "PP",
+      "description": "Rack patch panel with labelled cable terminations.",
+      "color": "#3b82f6",
+      "code": "ND-PP",
+      "file": "assets/trade-symbols/patch-panel.svg"
+    },
+    {
+      "id": "fibre-outlet",
+      "label": "Fibre outlet",
+      "category": "data",
+      "shorthand": "FO",
+      "description": "Fibre-optic termination or outlet.",
+      "color": "#3b82f6",
+      "code": "ND-FO",
+      "file": "assets/trade-symbols/fibre-outlet.svg"
+    },
+    {
+      "id": "wireless-ap",
+      "label": "Wireless access point",
+      "category": "data",
+      "shorthand": "WAP",
+      "description": "Ceiling or wall wireless access point.",
+      "color": "#3b82f6",
+      "code": "ND-WAP",
+      "file": "assets/trade-symbols/wireless-ap.svg"
+    },
+    {
+      "id": "network-switch",
+      "label": "Network switch",
+      "category": "data",
+      "shorthand": "SW",
+      "description": "Ethernet network switch.",
+      "color": "#3b82f6",
+      "code": "ND-SW",
+      "file": "assets/trade-symbols/network-switch.svg"
+    },
+    {
+      "id": "router",
+      "label": "Router",
+      "category": "data",
+      "shorthand": "RTR",
+      "description": "Network router or gateway.",
+      "color": "#3b82f6",
+      "code": "ND-RTR",
+      "file": "assets/trade-symbols/router.svg"
+    },
+    {
+      "id": "fibre-splice",
+      "label": "Fibre splice enclosure",
+      "category": "data",
+      "shorthand": "FSP",
+      "description": "Protective enclosure for fibre cable splices.",
+      "color": "#3b82f6",
+      "code": "ND-FSP",
+      "file": "assets/trade-symbols/fibre-splice.svg"
+    },
+    {
+      "id": "dome-camera",
+      "label": "Dome camera",
+      "category": "cctv",
+      "shorthand": "DOM",
+      "description": "Fixed dome surveillance camera.",
+      "color": "#8b5cf6",
+      "code": "ND-DOM",
+      "file": "assets/trade-symbols/dome-camera.svg"
+    },
+    {
+      "id": "bullet-camera",
+      "label": "Bullet camera",
+      "category": "cctv",
+      "shorthand": "BUL",
+      "description": "Fixed bullet surveillance camera.",
+      "color": "#8b5cf6",
+      "code": "ND-BUL",
+      "file": "assets/trade-symbols/bullet-camera.svg"
+    },
+    {
+      "id": "ptz-camera",
+      "label": "PTZ camera",
+      "category": "cctv",
+      "shorthand": "PTZ",
+      "description": "Camera with pan, tilt and zoom movement.",
+      "color": "#8b5cf6",
+      "code": "ND-PTZ",
+      "file": "assets/trade-symbols/ptz-camera.svg"
+    },
+    {
+      "id": "nvr",
+      "label": "Network video recorder",
+      "category": "cctv",
+      "shorthand": "NVR",
+      "description": "Network video recording equipment.",
+      "color": "#8b5cf6",
+      "code": "ND-NVR",
+      "file": "assets/trade-symbols/nvr.svg"
+    },
+    {
+      "id": "monitor",
+      "label": "Display monitor",
+      "category": "cctv",
+      "shorthand": "MON",
+      "description": "Video viewing screen or security monitor.",
+      "color": "#8b5cf6",
+      "code": "ND-MON",
+      "file": "assets/trade-symbols/monitor.svg"
+    },
+    {
+      "id": "card-reader",
+      "label": "Card reader",
+      "category": "access",
+      "shorthand": "RDR",
+      "description": "Access credential or card reader.",
+      "color": "#0d9488",
+      "code": "ND-RDR",
+      "file": "assets/trade-symbols/card-reader.svg"
+    },
+    {
+      "id": "access-controller",
+      "label": "Access controller",
+      "category": "access",
+      "shorthand": "AC",
+      "description": "Controller enclosure for access devices.",
+      "color": "#0d9488",
+      "code": "ND-AC",
+      "file": "assets/trade-symbols/access-controller.svg"
+    },
+    {
+      "id": "electric-lock",
+      "label": "Electric lock",
+      "category": "access",
+      "shorthand": "EL",
+      "description": "Electrically operated lock or strike.",
+      "color": "#0d9488",
+      "code": "ND-EL",
+      "file": "assets/trade-symbols/electric-lock.svg"
+    },
+    {
+      "id": "intercom",
+      "label": "Intercom",
+      "category": "access",
+      "shorthand": "INT",
+      "description": "Entry communication station.",
+      "color": "#0d9488",
+      "code": "ND-INT",
+      "file": "assets/trade-symbols/intercom.svg"
+    },
+    {
+      "id": "door-contact",
+      "label": "Door contact",
+      "category": "access",
+      "shorthand": "DC",
+      "description": "Door or window position contact.",
+      "color": "#0d9488",
+      "code": "ND-DC",
+      "file": "assets/trade-symbols/door-contact.svg"
+    },
+    {
+      "id": "exit-button",
+      "label": "Request-to-exit button",
+      "category": "access",
+      "shorthand": "REX",
+      "description": "Request-to-exit push button or touch plate.",
+      "color": "#0d9488",
+      "code": "ND-REX",
+      "file": "assets/trade-symbols/exit-button.svg"
+    },
+    {
+      "id": "pir-detector",
+      "label": "PIR detector",
+      "category": "security",
+      "shorthand": "PIR",
+      "description": "Passive infrared movement detector.",
+      "color": "#e11d48",
+      "code": "ND-PIR",
+      "file": "assets/trade-symbols/pir-detector.svg"
+    },
+    {
+      "id": "alarm-panel",
+      "label": "Alarm panel",
+      "category": "security",
+      "shorthand": "ALM",
+      "description": "Security alarm controller or keypad.",
+      "color": "#e11d48",
+      "code": "ND-ALM",
+      "file": "assets/trade-symbols/alarm-panel.svg"
+    },
+    {
+      "id": "siren",
+      "label": "Siren",
+      "category": "security",
+      "shorthand": "SIR",
+      "description": "Audible alarm sounder or siren.",
+      "color": "#e11d48",
+      "code": "ND-SIR",
+      "file": "assets/trade-symbols/siren.svg"
+    },
+    {
+      "id": "glass-break",
+      "label": "Glass-break detector",
+      "category": "security",
+      "shorthand": "GB",
+      "description": "Detector monitoring glass breakage.",
+      "color": "#e11d48",
+      "code": "ND-GB",
+      "file": "assets/trade-symbols/glass-break.svg"
+    },
+    {
+      "id": "smoke-detector",
+      "label": "Smoke detector",
+      "category": "security",
+      "shorthand": "SD",
+      "description": "Project marker for a smoke detection device.",
+      "color": "#e11d48",
+      "code": "ND-SD",
+      "file": "assets/trade-symbols/smoke-detector.svg"
+    },
+    {
+      "id": "single-gpo",
+      "label": "Single power outlet",
+      "category": "electrical",
+      "shorthand": "GPO1",
+      "description": "Single general-purpose power outlet.",
+      "color": "#d97706",
+      "code": "ND-GPO1",
+      "file": "assets/trade-symbols/single-gpo.svg"
+    },
+    {
+      "id": "double-gpo",
+      "label": "Double power outlet",
+      "category": "electrical",
+      "shorthand": "GPO2",
+      "description": "Double general-purpose power outlet.",
+      "color": "#d97706",
+      "code": "ND-GPO2",
+      "file": "assets/trade-symbols/double-gpo.svg"
+    },
+    {
+      "id": "light-fitting",
+      "label": "Light fitting",
+      "category": "electrical",
+      "shorthand": "LGT",
+      "description": "Project marker for a light fitting.",
+      "color": "#d97706",
+      "code": "ND-LGT",
+      "file": "assets/trade-symbols/light-fitting.svg"
+    },
+    {
+      "id": "light-switch",
+      "label": "Light switch",
+      "category": "electrical",
+      "shorthand": "LS",
+      "description": "Wall-mounted light switch.",
+      "color": "#d97706",
+      "code": "ND-LS",
+      "file": "assets/trade-symbols/light-switch.svg"
+    },
+    {
+      "id": "main-switchboard",
+      "label": "Main switchboard",
+      "category": "electrical",
+      "shorthand": "MSB",
+      "description": "Main electrical switchboard location.",
+      "color": "#d97706",
+      "code": "ND-MSB",
+      "file": "assets/trade-symbols/main-switchboard.svg"
+    },
+    {
+      "id": "sub-board",
+      "label": "Distribution board",
+      "category": "electrical",
+      "shorthand": "DB",
+      "description": "Sub-board or local electrical distribution board.",
+      "color": "#d97706",
+      "code": "ND-DB",
+      "file": "assets/trade-symbols/sub-board.svg"
+    },
+    {
+      "id": "earth-point",
+      "label": "Earth point",
+      "category": "electrical",
+      "shorthand": "EP",
+      "description": "Project marker for an earth connection point.",
+      "color": "#d97706",
+      "code": "ND-EP",
+      "file": "assets/trade-symbols/earth-point.svg"
+    },
+    {
+      "id": "isolator",
+      "label": "Isolator",
+      "category": "electrical",
+      "shorthand": "ISO",
+      "description": "Local electrical isolation switch.",
+      "color": "#d97706",
+      "code": "ND-ISO",
+      "file": "assets/trade-symbols/isolator.svg"
+    },
+    {
+      "id": "conduit",
+      "label": "Conduit route",
+      "category": "containment",
+      "shorthand": "COND",
+      "description": "Indicative conduit route or pathway.",
+      "color": "#64748b",
+      "code": "ND-COND",
+      "file": "assets/trade-symbols/conduit.svg"
+    },
+    {
+      "id": "junction-box",
+      "label": "Junction box",
+      "category": "containment",
+      "shorthand": "JB",
+      "description": "Cable junction or connection enclosure.",
+      "color": "#64748b",
+      "code": "ND-JB",
+      "file": "assets/trade-symbols/junction-box.svg"
+    },
+    {
+      "id": "cable-tray",
+      "label": "Cable tray",
+      "category": "containment",
+      "shorthand": "TRAY",
+      "description": "Cable tray or ladder pathway.",
+      "color": "#64748b",
+      "code": "ND-TRAY",
+      "file": "assets/trade-symbols/cable-tray.svg"
+    }
+  ]
+}

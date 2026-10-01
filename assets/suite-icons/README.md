@@ -1,0 +1,60 @@
+# Neill Data Suite icon library
+
+36 original geometric SVGs: 12 app identities and 24 interface symbols. These are proposed assets; this library does not replace any live favicon, manifest or app icon automatically.
+
+App tiles share a dark rounded surface and a large functional glyph, using the existing `hub/apps.json` colours. Hub uses the suite teal and Checklist uses its completion green. The glyphs are designed to remain recognisable at 16–32 px. Review `preview.png` or `preview.svg` for the family at 16, 32 and 64 px.
+
+## Use in an app
+
+```html
+<script src="../assets/suite-icons.js"></script>
+```
+
+```js
+NDSuiteIcons.list();                       // fresh metadata objects for all 36 icons
+NDSuiteIcons.list({ kind: 'app' });         // 12 app identities
+NDSuiteIcons.list({ kind: 'ui', query: 'sync' });
+NDSuiteIcons.svg('app-planner', { size: 48 });
+NDSuiteIcons.svg('ui-download', { size: 20, title: 'Download SVG' });
+NDSuiteIcons.svg('ui-check', { title: '' }); // decorative beside visible text
+```
+
+`svg(id, {size, color, title})` returns inline SVG markup. Unknown IDs throw `RangeError`. The default size is 24 px; numeric sizes are constrained to 8–1024 px. A provided `color` overrides the glyph only, preserving an app tile's dark background. Hex, simple named and numeric RGB/HSL colours are accepted; CSS URLs, variables and markup are rejected. Use `currentColor` to inherit text colour. The default accessible title is the icon label. Titles are escaped and a blank title produces `aria-hidden="true"`. SVGs have no external resource, script or font dependency.
+
+Metadata contains `id`, `label`, `kind` (`app` or `ui`), `color`, `file`, `recommendation` and `tags`. `file` is a repository-root-relative path. Use `'/' + icon.file` when constructing a URL inside a nested app. `catalog.json` also works without JavaScript.
+
+## Downloads and recommended rollout
+
+- `apps/{name}.svg`: scalable app tile suitable for a favicon and image element.
+- `apps/{name}-32.png`: fallback small browser icon.
+- `apps/{name}-180.png`: Apple touch icon.
+- `apps/{name}-192.png` and `apps/{name}-512.png`: ordinary PWA icons. **These are not maskable icons:** the glyph layout has not been designed for the smaller maskable safe area.
+- `ui/{name}.svg`: 24 px utility icon. Inline SVG inherits `currentColor`; an external `<img>` does not inherit a parent's text colour. Use `svg()` when colour should follow the interface theme.
+
+| App | Glyph | Existing destination to review |
+| --- | --- | --- |
+| Hub | Four destinations | Hub browser icon and launcher |
+| Planner | Floor-plan walls | `planner/favicon.svg` and PWA icons |
+| Upload | Up arrow and tray | `upload/favicon.svg` and PWA icons |
+| Search | Magnifier | `search/favicon.svg` and PWA icons |
+| Quote | Price tag | `quote/favicon.svg` |
+| Timesheet | Clock | Browser, Apple touch and PWA icons |
+| SWB | Enclosed bolt | `swb/favicon.svg` and PWA icons |
+| Fit-off | Completion mark | `fitoff/favicon.svg` |
+| Checklist | Paired checks | Checklist browser icon |
+| Assets | Stacked layers | Assets showroom browser icon |
+| Company | Team | `company/favicon.svg` |
+| Website | Globe | Root public-site favicon |
+
+Update each app's actual link/manifest references deliberately and update `hub/apps.json` in the same rollout. Check pinned/install icons on a real device because browser and operating-system caches may retain previous artwork. Utility `qr` is a decorative QR symbol, not a scannable code generator. `measure` is an interface symbol, not a calibrated measurement tool.
+
+## Rebuild and verify
+
+```sh
+node assets/suite-icons/build-assets.cjs
+node --test assets/suite-icons.test.cjs
+```
+
+SVG/catalog generation uses only Node built-ins. PNG generation uses an existing `sharp` installation; optionally set `ND_SHARP_PATH` to its absolute module path. No dependencies are added to this repository. All exported art is defined in `assets/suite-icons.js`; regenerate exports after changes.
+
+Provenance: original artwork created for Neill Data Suite, October 2026. No third-party icon collection, font or copied artwork is included.

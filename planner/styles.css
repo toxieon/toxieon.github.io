@@ -3201,14 +3201,14 @@ button[disabled],
 .node-layer { z-index: 3; }
 
 .room-poly polygon {
-  fill: rgba(14, 165, 233, 0.18);
-  stroke: rgba(56, 189, 248, 0.85);
+  fill: rgba(14, 165, 233, var(--room-fill, 0.18));
+  stroke: rgba(56, 189, 248, var(--room-border, 0.85));
   stroke-width: 0.35;
   vector-effect: non-scaling-stroke;
 }
 .room-poly.is-selected polygon {
-  fill: rgba(245, 158, 11, 0.22);
-  stroke: #f59e0b;
+  fill: rgba(245, 158, 11, var(--room-fill, 0.18));
+  stroke: rgba(245, 158, 11, var(--room-border, 0.85));
   stroke-width: 0.55;
 }
 .room-poly text {
@@ -3513,9 +3513,15 @@ body.report-fullscreen { overflow:hidden; }
 .plan-debug-inline { font:11px/1.35 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }
 
 /* 0.16.1 room title pins: map pin whose tip sits on the position, label above it. */
-.plan-stage .node-marker.is-title-pin { width:auto; height:auto; min-width:0; padding:0; border-radius:0; background:transparent; box-shadow:none; display:flex; flex-direction:column; align-items:center; gap:1px; transform:translate(-50%,-100%) scale(var(--size,1)); transform-origin:bottom center; z-index:4; }
+.plan-stage .node-marker.is-title-pin { width:var(--pin-hit,28px); height:var(--pin-hit,28px); min-width:0; min-height:0; padding:0; border-radius:0; background:transparent; box-shadow:none; display:block; transform:translate(-50%,-100%); transform-origin:bottom center; z-index:4; overflow:visible; }
 .plan-stage .node-marker.is-title-pin::before, .plan-stage .node-marker.is-title-pin::after { content:none; display:none; }
-.plan-stage .node-marker.is-title-pin.is-selected { transform:translate(-50%,-100%) scale(calc(var(--size,1) * 1.1)); }
+.plan-stage .node-marker.is-title-pin.is-selected { transform:translate(-50%,-100%); }
+.title-pin-visual { position:absolute; bottom:0; left:50%; display:flex; flex-direction:column; align-items:center; gap:1px; transform:translateX(-50%) scale(var(--size,1)); transform-origin:bottom center; pointer-events:none; }
+.title-pin-label[hidden] { display:none; }
+.room-appearance { display:grid; gap:14px; margin-top:22px; }
+.room-appearance input[type=range], .drawer--title .size-control input[type=range] { min-height:44px; width:100%; }
+.plan-settings input[type=range] { min-height:44px; }
+.plan-settings input[type=number] { max-width:100%; min-height:44px; }
 .title-pin-label { display:block; max-width:40cqw; padding:2px 6px; border-radius:6px; background:rgba(255,255,255,.94); color:#111827; border:1px solid #dc2626; font-weight:700; font-size:clamp(10px,1.5cqw,18px); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.35); pointer-events:none; }
 .title-pin-head { display:block; width:clamp(12px,1.4cqw,20px); height:clamp(12px,1.4cqw,20px); background:#dc2626; border:2px solid #fff; border-radius:50% 50% 50% 0; transform:rotate(-45deg); margin-bottom:3px; box-shadow:0 1px 3px rgba(0,0,0,.4); pointer-events:none; }
 .node-marker.is-title-pin.is-selected .title-pin-label { outline:2px solid #3b82f6; outline-offset:1px; }
