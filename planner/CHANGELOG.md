@@ -1,3 +1,5 @@
+## 0.18.4 · 2026-10-01 · csv-resize-libs · Category CSV import via vendored PapaParse 5.7.0 (quoted line breaks now work); photo downscale via vendored pica 10.0.3 (same 2560px cap / JPEG 0.88); precache both
+
 ## 0.18.3 · 2026-10-01 · vendor-libs · Vendor pdf.js 6.3.289 (legacy build, shared/nd-pdf.js loader, wasm JPX/JBIG2 decoders), html2canvas-pro 2.5.0 and jsPDF 2.5.1 under shared/vendor with LICENSE files; drop all cdnjs loads; precache in sw
 
 ## 0.18.2 · 2026-10-01 · licence-pdfjs-dates · Read photo EXIF date with vendored exifr (MIT) instead of ExifReader (MPL); drop heic2any (LGPL libheif) with a clear HEIC message; pdf.js isEvalSupported:false; local-date fix for Hours week/4-week ranges and audit CSV filename

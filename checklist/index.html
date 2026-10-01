@@ -13,6 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Checklist">
 <script src="../shared/nd-backend.js"></script>
 <script src="../shared/nd-pdf.js"></script>
+<script src="../shared/vendor/papaparse/papaparse.min.js"></script>
+<script src="../shared/nd-csv.js"></script>
 <script src="../shared/vendor/sheetjs/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -1449,25 +1451,9 @@ async function readSpreadsheet(file){
   return records.map(mapRow).filter(r=>r.apartment && (r.indoor_model||r.outdoor_model));
 }
 
-/* Small dependency-free CSV parser (handles quotes, commas, CRLF). */
 function parseCsv(text){
-  const rows=[]; let row=[], val='', q=false;
-  text=String(text).replace(/^﻿/,'');
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(q){
-      if(c==='"'){ if(text[i+1]==='"'){ val+='"'; i++; } else q=false; }
-      else val+=c;
-    }else{
-      if(c==='"') q=true;
-      else if(c===','){ row.push(val); val=''; }
-      else if(c==='\n'){ row.push(val); rows.push(row); row=[]; val=''; }
-      else if(c==='\r'){ /* skip */ }
-      else val+=c;
-    }
-  }
-  if(val!==''||row.length){ row.push(val); rows.push(row); }
-  const clean=rows.filter(r=>r.some(c=>String(c).trim()!==''));
+  // PapaParse via shared/nd-csv.js (quoted commas/newlines, "" escapes, BOM).
+  const clean=NDCSV.rows(text).filter(r=>r.some(c=>String(c).trim()!==''));
   if(clean.length<2) return [];
   const head=clean[0].map(h=>String(h).trim());
   return clean.slice(1).map(r=>{ const o={}; head.forEach((h,i)=>o[h]=r[i]!==undefined?r[i]:''); return o; });

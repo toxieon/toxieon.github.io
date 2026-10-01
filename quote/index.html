@@ -16,6 +16,10 @@
 <script src="../assets/remember.js"></script>
 <script src="../assets/logo.js"></script>
 <script src="../shared/nd-config.js"></script>
+<script src="../shared/vendor/papaparse/papaparse.min.js"></script>
+<script src="../shared/nd-csv.js"></script>
+<script src="../shared/vendor/pica/pica.min.js"></script>
+<script src="../shared/nd-resize.js"></script>
 <script src="../shared/nd-auth.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
     <meta name="theme-color" content="#07111f" />
@@ -2627,22 +2631,11 @@ async function syncFromSheet(silent) {
 function localDateStr(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
 function parseCsv(text) {
+  // PapaParse via shared/nd-csv.js (quoted commas/newlines, "" escapes, BOM).
   if (!text) return [];
-  const rows = []; let cur = []; let f = ''; let q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) { if (c === '"' && text[i+1] === '"') { f += '"'; i++; } else if (c === '"') q = false; else f += c; }
-    else {
-      if (c === '"') q = true;
-      else if (c === ',') { cur.push(f); f = ''; }
-      else if (c === '\n') { cur.push(f); rows.push(cur); cur = []; f = ''; }
-      else if (c === '\r') {}
-      else f += c;
-    }
-  }
-  if (f || cur.length) { cur.push(f); rows.push(cur); }
+  const rows = NDCSV.rows(text);
   if (!rows.length) return [];
-  const headers = rows.shift().map(h => h.trim());
+  const headers = rows.shift().map(h => String(h).trim());
   return rows.filter(r => r.some(x => x !== '')).map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? '').trim()])));
 }
 
@@ -4541,9 +4534,11 @@ async function snapPhoto() {
   let w = video.videoWidth, h = video.videoHeight;
   const longest = Math.max(w, h);
   if (longest > PHOTO_MAX_DIM) { const s = PHOTO_MAX_DIM / longest; w = Math.round(w * s); h = Math.round(h * s); }
+  const scaled = window.NDResize ? await NDResize.toCanvas(video, w, h) : video;   // pica downscale
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, w, h);
+  ctx.drawImage(scaled, 0, 0, w, h);
+  if (scaled !== video) scaled.width = scaled.height = 0;
   await drawWatermark(ctx, w, h);
   const url = canvas.toDataURL('image/jpeg', PHOTO_JPEG_Q);
   const photo = { url: url, w: w, h: h, customerVisible: true, ref: genPhotoRef(), tags: [], createdAt: new Date().toISOString() };
@@ -5403,11 +5398,13 @@ async function compressImage(file) {
     const s = PHOTO_MAX_DIM / longest;
     w = Math.round(w * s); h = Math.round(h * s);
   }
-  const cv = document.createElement('canvas');
-  cv.width = w; cv.height = h;
-  const ctx = cv.getContext('2d');
-  ctx.drawImage(img, 0, 0, w, h);
-  return { url: cv.toDataURL('image/jpeg', PHOTO_JPEG_Q), w: w, h: h };
+  // pica (shared/nd-resize.js) for a sharp downscale; same PHOTO_MAX_DIM / PHOTO_JPEG_Q output.
+  let cv;
+  if (window.NDResize) cv = await NDResize.toCanvas(img, w, h);
+  else { cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(img, 0, 0, w, h); }
+  const url = cv.toDataURL('image/jpeg', PHOTO_JPEG_Q);
+  cv.width = cv.height = 0;
+  return { url: url, w: w, h: h };
 }
 
 // Migrate older photo records (plain strings) to { url, w, h, ref, tags, customerVisible }

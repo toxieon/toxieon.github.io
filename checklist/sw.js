@@ -9,7 +9,7 @@
  *   - install precaches with {cache:'reload'} to bypass the HTTP cache
  */
 
-const CACHE_VERSION = 'checklist-v4';
+const CACHE_VERSION = 'checklist-v5';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
@@ -19,6 +19,8 @@ const SHELL_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "../shared/nd-pdf.js",
+  "../shared/vendor/papaparse/papaparse.min.js",
+  "../shared/nd-csv.js",
   "../shared/vendor/pdfjs/pdf.min.mjs",
   "../shared/vendor/pdfjs/pdf.worker.min.mjs",
   "../shared/vendor/sheetjs/xlsx.full.min.js"
