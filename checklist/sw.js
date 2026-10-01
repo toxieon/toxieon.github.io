@@ -9,7 +9,7 @@
  *   - install precaches with {cache:'reload'} to bypass the HTTP cache
  */
 
-const CACHE_VERSION = 'checklist-v5';
+const CACHE_VERSION = 'checklist-0.1.1';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",

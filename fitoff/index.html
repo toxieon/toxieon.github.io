@@ -97,6 +97,7 @@
 <div id="app"><div class="center"><div class="spinner"></div><p>Starting&hellip;</p></div></div>
 
 <script>
+var APP_VERSION = "0.1.1";   // see fitoff/VERSIONING.md
 (function () {
   "use strict";
   var cfg = (window.ND && ND.config) ? ND.config.forApp("planner") : {};
@@ -238,7 +239,7 @@
     var cards = data.projects.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (p) {
       return '<button class="pcard" data-open="' + esc(p.id) + '"><strong>' + esc(p.name) + "</strong><span>" + esc(p.address || "No address") + "</span></button>";
     }).join("");
-    app.innerHTML = '<div class="bar"><h1>Fit-off<span class="sub">choose a job</span></h1></div><div class="picker"><p class="note">' + (note || "Pick a job:") + "</p>" + cards + "</div>";
+    app.innerHTML = '<div class="bar"><h1>Fit-off<span class="sub">choose a job</span></h1></div><div class="picker"><p class="note">' + (note || "Pick a job:") + "</p>" + cards + '<p class="note" style="opacity:.6">Fit-off v' + APP_VERSION + "</p></div>";
     app.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { openProject(b.dataset.open); }); });
   }
 
@@ -326,7 +327,7 @@
     });
   }
   function showSignIn() {
-    screenCenter("<p>Sign in with your Neill account to load the fit-off view.</p>", '<button class="btn" id="signin">Sign in with Google</button>');
+    screenCenter("<p>Sign in with your Neill account to load the fit-off view.</p><p class=\"note\" style=\"opacity:.6\">Fit-off v" + APP_VERSION + "</p>", '<button class="btn" id="signin">Sign in with Google</button>');
     var b = document.getElementById("signin");
     if (b) b.addEventListener("click", function () { NDAuth.ensureToken({ interactive: true }).catch(function (e) { screenCenter('<p class="err">Sign-in failed: ' + esc(e && e.message || e) + "</p>", '<button class="btn" onclick="location.reload()">Retry</button>'); }); });
   }
