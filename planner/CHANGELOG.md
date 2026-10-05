@@ -1,3 +1,11 @@
+## 0.20.1 · 2026-10-06 · report-cover · Polish the report cover: big Neill Data logo, Neill Planner title and job name with address/generated date set small at the foot; single swappable cover-logo slot
+
+- Cover design by Cinna. The existing `/logo.png` sits large and centred slightly above the optical middle (440 px in the 794 px A4 sheet), followed by **Neill Planner** (40/700) and the job name (26/500, balanced wrap, capped at 560 px). The address and "Generated …" stamp sit small and grey at the foot. No new assets, fields or fonts.
+- One swap point for the cover logo: `REPORT_COVER_LOGO_SRC` in app.js plus the `--cover-logo-w` / `--cover-logo-gap` vars on `.print-cover` (keep any new file in sw.js PRECACHE).
+- The cover stays on one sheet: PDF render min-height 1040 px (of 1059 px usable), print min-height 255 mm (of 277 mm usable), with `break-after`/`page-break-after` kept and `@page` unchanged.
+- The Lean Drive PDF notice now sits with the cover's foot details instead of floating in the flex column.
+- The cover's "Generated" time is now Sydney time with a short zone label, e.g. "6 Oct 2026, 10:34 am AEDT" (AEST in winter), via `sydneyStamp()` (`Intl.DateTimeFormat`, `timeZone: "Australia/Sydney"`). It was UTC before. `nowStamp()` and stored timestamps stay UTC.
+
 ## 0.19.1 · 2026-10-01 · room-tools-drive-recovery · Recover floor plans from Drive; add room sizing, appearance, shared-wall snapping and room cutout exports
 
 - Master Reload now reloads the master records, looks for associated plan originals/rendered previews in each floor's Drive folder, and fetches fresh bytes even when the Drive file ID has not changed. It falls back to the rendered plan if the PDF cannot download/render, reports partial failures and retains working copies on failure.

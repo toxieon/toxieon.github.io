@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.19.1";
+const APP_VERSION = "0.20.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -405,6 +405,17 @@ function initials(name) { if (!name) return "?"; return name.trim().split(/\s+/)
 /* Local (device time zone) YYYY-MM-DD. toISOString() is UTC and gives yesterday before 10am in Sydney. */
 function localDateStr(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function nowStamp() { return new Date().toISOString().slice(0, 16).replace("T", " "); }
+/* Cover "Generated" stamp in Sydney time with a short zone label, e.g. "6 Oct 2026, 10:34 am AEDT" (AEST in winter).
+ * Fixed to Australia/Sydney (not the device zone or UTC). nowStamp() stays UTC because it writes stored timestamps. */
+const SYDNEY_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function sydneyStamp(d = new Date()) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short" }).formatToParts(d).map((x) => [x.type, x.value]));
+    return `${Number(p.day)} ${SYDNEY_MONTHS[Number(p.month) - 1] || p.month} ${p.year}, ${Number(p.hour)}:${p.minute} ${String(p.dayPeriod || "").toLowerCase()} ${p.timeZoneName || ""}`.replace(/\s+/g, " ").trim();
+  } catch (_) {
+    return `${nowStamp()} UTC`;
+  }
+}
 function parseBool(value) { return /^(true|yes|y|1|protected)$/i.test(String(value || "").trim()); }
 function detectDevice() { return /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "Mobile" : "Desktop"; }
 function isPhoneLayout() {
@@ -3857,8 +3868,18 @@ function renderPrintPlanHero(floor, nodes, heading, thumbnail = false) {
       ${planUrl ? `<div class="print-plan" style="--plan-ar:${planAspect}"><img src="${escapeHtml(planUrl)}" alt="Floor plan" /><div class="print-marker-layer">${nodes.filter(n => n.position && Number.isFinite(Number(n.position.x)) && Number.isFinite(Number(n.position.y))).map((n) => { if (n.type === "title") return `<span class="print-title-pin" style="--x:${n.position.x};--y:${n.position.y}">${escapeHtml(nodeDisplayTitle(n))}</span>`; const sh = nodeShorthand(n) || nodeDisplayTitle(n).slice(0, 4); return `<span class="print-marker" data-len="${sh.length}" style="--x:${n.position.x};--y:${n.position.y};--cat:${nodeColor(n)};${statusStyle(n.status)}">${escapeHtml(sh)}</span>`; }).join("")}</div></div>` : `<p>${floor.planDriveFileId ? "Floor plan unavailable. Reopen the report online to retry." : "No floor plan uploaded."}</p>`}
     </section>`;
 }
+/* Report cover logo: the ONE swap point for the cover's big logo (keep it in sw.js PRECACHE). */
+const REPORT_COVER_LOGO_SRC = "../logo.png";
 function renderReportCover(proj) {
-  return `<section class="print-cover" data-report-page><img src="../logo.png" alt="Neill Data" /><h1>Neill Planner</h1><h2>${escapeHtml(proj.name)}</h2><p>${escapeHtml(proj.address || '')}</p><p class="print-muted">Generated ${escapeHtml(nowStamp())}</p></section>`;
+  const address = proj.address ? `<p class="print-cover-address">${escapeHtml(proj.address)}</p>` : "";
+  return `<section class="print-cover" data-report-page>
+    <div class="print-cover-main">
+      <img class="print-cover-logo" src="${REPORT_COVER_LOGO_SRC}" alt="Neill Data" />
+      <h1>Neill Planner</h1>
+      <h2>${escapeHtml(proj.name)}</h2>
+    </div>
+    <footer class="print-cover-meta">${address}<p class="print-muted">Generated ${escapeHtml(sydneyStamp())}</p></footer>
+  </section>`;
 }
 function renderPrintNodeCard(n) {
   const photos = n.imageRefs || [];
@@ -6030,7 +6051,7 @@ function applyDrivePdfPhotoCaps(root) {
     banner.className = "print-muted";
     banner.style.cssText = "margin:8px 0 16px;padding:8px 10px;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;color:#92400e;";
     banner.textContent = `Lean Drive PDF: omitted ${totalDropped} photo(s) across ${nodesCapped} node(s) to keep file size manageable. Use Print / Save as PDF for the full set.`;
-    const cover = root.querySelector(".print-cover");
+    const cover = root.querySelector(".print-cover-meta") || root.querySelector(".print-cover");
     const header = root.querySelector(".print-header");
     if (cover) cover.appendChild(banner);
     else if (header) header.appendChild(banner);
