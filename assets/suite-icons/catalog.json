@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "provenance": "Original geometric SVG artwork created for Neill Data Suite, October 2026. No third-party artwork or icon-font dependency.",
   "pngSizes": [
     32,
@@ -27,11 +27,12 @@
       "kind": "app",
       "color": "#ff5252",
       "file": "assets/suite-icons/apps/planner.svg",
-      "recommendation": "Candidate for planner/favicon.svg and Planner PWA icons; floor-plan walls remain distinct at 16 px.",
+      "recommendation": "Hub tile and candidate for planner/favicon.svg; an L-shaped floor plan with an entrance gap, a partition wall and three placed nodes.",
       "tags": [
         "plan",
         "floor",
         "nodes",
+        "rooms",
         "blueprint"
       ]
     },
@@ -41,11 +42,13 @@
       "kind": "app",
       "color": "#a855f7",
       "file": "assets/suite-icons/apps/upload.svg",
-      "recommendation": "Candidate for upload/favicon.svg and Upload PWA icons; an upward arrow lands above a file tray.",
+      "recommendation": "Hub tile and candidate for upload/favicon.svg; a site photo dropping into a job folder.",
       "tags": [
         "send",
         "photo",
-        "files"
+        "files",
+        "job",
+        "folder"
       ]
     },
     {
@@ -54,10 +57,12 @@
       "kind": "app",
       "color": "#facc15",
       "file": "assets/suite-icons/apps/search.svg",
-      "recommendation": "Candidate for search/favicon.svg and Search PWA icons; a large magnifier reads clearly in a browser tab.",
+      "recommendation": "Hub tile and candidate for search/favicon.svg; a lens framing a house finds a job by name or address.",
       "tags": [
         "find",
-        "files",
+        "job",
+        "address",
+        "lookup",
         "lens"
       ]
     },
@@ -65,14 +70,14 @@
       "id": "app-quote",
       "label": "Quote",
       "kind": "app",
-      "color": "#94a3b8",
+      "color": "#31d0ff",
       "file": "assets/suite-icons/apps/quote.svg",
-      "recommendation": "Candidate for quote/favicon.svg; a price tag identifies quoting without tiny currency text.",
+      "recommendation": "Hub tile and candidate for quote/favicon.svg; a torn-off trade quote docket carrying a price mark, in the Quote app brand cyan.",
       "tags": [
         "price",
         "estimate",
-        "invoice",
-        "tag"
+        "docket",
+        "invoice"
       ]
     },
     {

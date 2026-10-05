@@ -26,10 +26,10 @@
   }
 
   app("hub", "Suite hub", "#35d0ba", '<rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><path d="M14 17.5h7m-3.5-3.5v7"/>', "home launcher apps", "Candidate for hub favicon and suite launcher; four destinations share one home.");
-  app("planner", "Planner", "#ff5252", '<path d="M3 3h18v18H3zM3 11h8v10M11 3v4M15 14h6"/><circle cx="16" cy="8" r="1.8" fill="currentColor" stroke="none"/>', "plan floor nodes blueprint", "Candidate for planner/favicon.svg and Planner PWA icons; floor-plan walls remain distinct at 16 px.");
-  app("upload", "Upload", "#a855f7", '<path d="M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6"/>', "send photo files", "Candidate for upload/favicon.svg and Upload PWA icons; an upward arrow lands above a file tray.");
-  app("search", "Search", "#facc15", '<circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/>', "find files lens", "Candidate for search/favicon.svg and Search PWA icons; a large magnifier reads clearly in a browser tab.");
-  app("quote", "Quote", "#94a3b8", '<path d="M3 4h10l8 8-9 9-9-9z"/><circle cx="8" cy="9" r="1.4" fill="currentColor" stroke="none"/>', "price estimate invoice tag", "Candidate for quote/favicon.svg; a price tag identifies quoting without tiny currency text.");
+  app("planner", "Planner", "#ff5252", '<path d="M8 21H3V3h11v7h7v11h-9M3 12h6"/><circle cx="8.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="7.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="17" cy="15.5" r="1.7" fill="currentColor" stroke="none"/>', "plan floor nodes rooms blueprint", "Hub tile and candidate for planner/favicon.svg; an L-shaped floor plan with an entrance gap, a partition wall and three placed nodes.");
+  app("upload", "Upload", "#a855f7", '<path d="M2 13V5.5A1.5 1.5 0 0 1 3.5 4H8l2 2h10.5A1.5 1.5 0 0 1 22 7.5V13"/><g transform="rotate(-9 12 7.5)"><rect x="6" y="1.5" width="12" height="10" rx="1.5" fill="#101922"/><path d="m8.5 9.5 3-3.5 3 3"/><circle cx="14.6" cy="4.9" r="1.3" fill="currentColor" stroke="none"/></g><path d="M2 12.5h20v7a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 19.5z" fill="#101922"/>', "send photo files job folder", "Hub tile and candidate for upload/favicon.svg; a site photo dropping into a job folder.");
+  app("search", "Search", "#facc15", '<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5.5 5.5M6.5 11l4-3.5 4 3.5M8 9.8V14h5V9.8"/>', "find job address lookup lens", "Hub tile and candidate for search/favicon.svg; a lens framing a house finds a job by name or address.");
+  app("quote", "Quote", "#31d0ff", '<path d="M5 2.5h14V21l-2.33-1.5L14.33 21 12 19.5 9.67 21 7.33 19.5 5 21z"/><path d="M14.5 8.5c-.4-.9-1.3-1.5-2.5-1.5-1.4 0-2.5.8-2.5 1.9s1.1 1.6 2.5 1.9 2.5.8 2.5 1.9-1.1 1.9-2.5 1.9c-1.2 0-2.1-.6-2.5-1.5M12 5.5v11"/>', "price estimate docket invoice", "Hub tile and candidate for quote/favicon.svg; a torn-off trade quote docket carrying a price mark, in the Quote app brand cyan.");
   app("timesheet", "Timesheet", "#3ab87a", '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 3"/>', "hours clock work time", "Candidate for Timesheet browser, Apple touch and PWA icons; preserve the existing green app colour.");
   app("swb", "Switchboard", "#f59e0b", '<rect x="3" y="2" width="18" height="20" rx="2"/><path d="m13 5-5 8h4l-1 6 5-8h-4z" fill="currentColor" stroke="none"/>', "power board electrical breaker", "Candidate for swb/favicon.svg and SWB PWA icons; an enclosed bolt identifies the switchboard tool.");
   app("fitoff", "Fit-off", "#3ab87a", '<path d="M5 3h14l2 2v14l-2 2H5l-2-2V5zM7 12l3.5 3.5L17 9"/>', "complete install finish", "Candidate for fitoff/favicon.svg; a bold completion mark distinguishes it from the green Timesheet clock.");
@@ -101,5 +101,5 @@
     output += '<g fill="none" stroke="currentColor" color="' + escapeXML(color) + '" stroke-width="' + (isApp ? '2.2' : '1.8') + '" stroke-linecap="round" stroke-linejoin="round"' + (isApp ? ' transform="translate(7.8 7.8) scale(1.35)"' : '') + '>' + icon.body + '</g></svg>';
     return output;
   }
-  return Object.freeze({ version: "1.1.0", list: list, svg: svg });
+  return Object.freeze({ version: "1.2.0", list: list, svg: svg });
 });
