@@ -37,6 +37,7 @@
   app("assets", "Assets library", "#6ddba3", '<path d="m12 2 10 6-10 6L2 8zM2 13l10 6 10-6M2 18l10 6 10-6" transform="translate(1 0) scale(.92)"/>', "library components layers", "Candidate for the Assets showroom favicon; stacked layers represent reusable building blocks.");
   app("company", "Company", "#e07b2a", '<circle cx="12" cy="6" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3M4 5a3 3 0 0 0 0 6m16-6a3 3 0 0 1 0 6M2 15v6m20-6v6"/>', "team people members", "Candidate for company/favicon.svg; a team glyph represents membership and workspace access.");
   app("website", "Website", "#2563eb", '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>', "site public web globe", "Candidate for the public website favicon; keep rollout separate from internal tools if the public brand changes.");
+  app("ico", "ICO Generator", "#60a5fa", '<path d="M8 3h11a2 2 0 0 1 2 2v11"/><rect x="3" y="7" width="14" height="14" rx="2.5" fill="#0B1F3A"/><path d="M6.5 12.5h7M8 16.5h4"/>', "icon ico folder version image", "Used for ico/favicon.svg and the hub tile; a navy icon tile with name and version lines, stacked to suggest multiple sizes.");
 
   ui("markup", "Mark up photo", '<path d="M11 3H3v18h18v-8M10 14l1-5 7-7 4 4-7 7zM16 4l4 4"/>', "annotate edit photo");
   ui("arrow", "Arrow", '<path d="M4 20 20 4M7 4h13v13"/>', "direction annotation point");
@@ -100,5 +101,5 @@
     output += '<g fill="none" stroke="currentColor" color="' + escapeXML(color) + '" stroke-width="' + (isApp ? '2.2' : '1.8') + '" stroke-linecap="round" stroke-linejoin="round"' + (isApp ? ' transform="translate(7.8 7.8) scale(1.35)"' : '') + '>' + icon.body + '</g></svg>';
     return output;
   }
-  return Object.freeze({ version: "1.0.0", list: list, svg: svg });
+  return Object.freeze({ version: "1.1.0", list: list, svg: svg });
 });

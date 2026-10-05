@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'hub-v3';
+const CACHE_VERSION = 'hub-v4'; // v4: ICO Generator tile in apps.json
 const SHELL_ASSETS = [
   "./",
   "./index.html",
