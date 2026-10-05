@@ -1,6 +1,8 @@
 # ICO Generator (Neill Data Suite)
 
-Makes multi-size Windows `.ico` files with two lines of text so Desktop folders show name + version at a glance:
+Makes multi-size Windows `.ico` files, either from **two lines of text** (name + version, so Desktop folders show what's inside at a glance) or from **a picture** (PNG / JPEG / WebP / ICO, see [From a picture](#from-a-picture)).
+
+Text icons:
 
 - **Line 1:** program name, bold white (e.g. `TipBot`)
 - **Line 2:** version, regular weight, slightly dimmer (e.g. `0.45.1`)
@@ -27,6 +29,7 @@ python -m ico.cli TipBot 0.45.1 -o TipBot.ico
 python ico/cli.py "Neill Data" 0.19.1          # -> Neill-Data-0.19.1.ico
 python ico/cli.py TipBot 0.45.1 --bg "#123456" --fg "#ffcc00" --short TB --png preview.png
 python ico/cli.py TipBot 0.45.1 --bg transparent  # alpha background (also: --bg none)
+python -m ico.cli --image logo.png -o logo.ico     # picture -> .ico (see below)
 
 # HTTP API (port 8765)
 uvicorn ico.server:app --host 127.0.0.1 --port 8765
@@ -37,7 +40,7 @@ uvicorn ico.server:app --host 127.0.0.1 --port 8765
 
 ```bash
 curl http://127.0.0.1:8765/health
-# {"status":"ok","version":"0.1.3"}
+# {"status":"ok","version":"0.1.4"}
 
 curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&version=0.45.1"
 # saves TipBot-0.45.1.ico (Content-Type: image/x-icon, Content-Disposition: attachment)
@@ -66,6 +69,26 @@ Bad input returns `400` (or `422` if `name`/`version` is missing). Interactive d
 
 From Python without HTTP: `from ico.generate import generate_ico; data = generate_ico("TipBot", "0.45.1")` (add `bg="transparent"` for alpha; `bg=None` means navy).
 
+## From a picture
+
+```bash
+curl -fOJ -F "image=@logo.png" http://127.0.0.1:8765/ico            # saves logo.ico
+curl -fo logo.ico -F "file=@photo.jpg" -F "sizes=16,32,48,256" http://127.0.0.1:8765/ico
+python -m ico.cli --image logo.png -o logo.ico
+python ico/cli.py --image photo.webp --sizes 16,32,48,64,256         # writes photo.ico
+```
+
+PowerShell 7+: `Invoke-WebRequest http://127.0.0.1:8765/ico -Method Post -Form @{ image = Get-Item .\logo.png } -OutFile logo.ico`
+
+- `POST /ico`, `multipart/form-data`, file field **`image`** (or `file`), optional form field `sizes` (same list as above). Returns `image/x-icon` as `<upload-name>.ico`.
+- Inputs: PNG, JPEG, WebP, ICO (the largest frame inside an .ico is used). Other formats get `400`.
+- **Limits:** 10 MB per file (`413` if larger), 40 million pixels (e.g. 8000 x 5000; checked from the file header before decoding, `400` if larger).
+- Non-square pictures are centred on a **transparent** square; nothing is painted behind the picture, so PNG/WebP/ICO alpha is kept. JPEGs stay opaque inside their own area. Phone photos are turned upright using their EXIF rotation.
+- Each size is resized from the original with Pillow LANCZOS (alpha-aware, so no dark fringes). Small sources are scaled up to 256 px; use a 256 px or larger source for a sharp large icon.
+- `--bg`, `--fg`, `--short` only apply to text icons.
+- The /ico/ page does the same in the browser (drop or choose a picture, preview, **Download .ico**), or sends it to this API with **Download via API**. The browser path uses high-quality canvas smoothing (stepwise halving) instead of LANCZOS; the API is the canonical path.
+- CORS: the API answers browsers on `https://www.neilldata.com` and `http://localhost` / `http://127.0.0.1` (any port). Set `ICO_CORS_ORIGINS=https://a.example,https://b.example` (or `*`) to change that. Chrome may ask once to allow the website to reach a device on your local network; Safari may refuse an https page talking to `http://127.0.0.1` (use Chrome/Edge, or the in-browser **Download .ico**).
+
 ## Transparent icons: what to expect
 
 - Every frame is a 32-bit RGBA PNG inside the `.ico`, so Windows Vista and later (Explorer, Desktop) show the real alpha. The outline is about 2 % of the icon size (1 px at 16-48 px, 5 px at 256), dark for light text and light for dark `fg`.
@@ -90,7 +113,7 @@ Both use an existing `.ico` as-is (our hand-drawn 16/32/48 px frames are kept, n
 | File | Purpose |
 |---|---|
 | `generate.py` | Pillow draw + ICO encode (shared by server and CLI) |
-| `server.py` | FastAPI app: `GET /ico`, `GET /health` |
+| `server.py` | FastAPI app: `GET /ico` (text), `POST /ico` (picture), `GET /health` |
 | `cli.py` | Command line front end |
 | `ico-canvas.js` | Browser twin of `generate.py` (Canvas draw + small ICO packer), used by `index.html` |
 | `index.html` | Static page served at `/ico/` |
@@ -106,6 +129,7 @@ Both use an existing `.ico` as-is (our hand-drawn 16/32/48 px frames are kept, n
 | Starlette (via FastAPI) | 1.7.0 | BSD-3-Clause | pip |
 | pydantic / pydantic-core | 2.13.5 / 2.46.5 | MIT | pip |
 | uvicorn | 0.54.0 | BSD-3-Clause | pip |
+| python-multipart (FastAPI file uploads) | 0.0.32 | Apache-2.0 | pip |
 | Other transitive: anyio, h11, annotated-types, annotated-doc, typing-inspection (MIT); click, idna (BSD-3); opentelemetry-api (Apache-2.0); typing-extensions (PSF-2.0) | | permissive | pip |
 | DejaVu Sans fonts | 2.37 | Bitstream Vera licence + public domain changes | `fonts/LICENSE.txt` |
 | `ico-canvas.js` ICO packer | | Neill Data code, no third-party JS | |

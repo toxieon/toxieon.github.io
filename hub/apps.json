@@ -9,7 +9,7 @@
     { "id": "fitoff",    "name": "Fit-off",   "path": "/fitoff/",    "icon": "/fitoff/favicon.svg",    "color": "#3ab87a", "order": 7, "hidden": false },
     { "id": "assets",    "name": "Assets",    "path": "/1234567890/", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8, "hidden": false },
     { "id": "company",   "name": "Company",   "path": "/company/",   "icon": "/company/favicon.svg",   "color": "#e07b2a", "order": 9, "hidden": false },
-    { "id": "ico",       "name": "ICO Generator", "path": "/ico/",   "icon": "/ico/favicon.svg",       "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.3" },
+    { "id": "ico",       "name": "ICO Generator", "path": "/ico/",   "icon": "/ico/favicon.svg",       "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.4" },
     { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 11, "hidden": true }
   ]
 }

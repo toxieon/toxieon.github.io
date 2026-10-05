@@ -2,4 +2,5 @@
 pillow==12.3.0    # MIT-CMU (HPND family); see LICENSE.Pillow.txt
 fastapi==0.142.2  # MIT  (pulls starlette BSD-3, pydantic MIT, anyio MIT, opentelemetry-api Apache-2.0, typing-extensions PSF-2.0, ...)
 uvicorn==0.54.0   # BSD-3-Clause (pulls click BSD-3, h11 MIT)
+python-multipart==0.0.32  # Apache-2.0; needed by FastAPI for POST /ico file uploads
 # CLI only needs pillow. Tests optionally use httpx (BSD-3) for FastAPI's TestClient; not required to run.

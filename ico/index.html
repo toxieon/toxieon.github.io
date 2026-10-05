@@ -24,13 +24,18 @@ input[type=color] { padding: 2px; height: 42px; }
 button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; background: var(--brand); color: #04121f; }
 button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
-#previews { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
+#previews, .previews { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
 figure { margin: 0; text-align: center; font-size: .75rem; color: var(--muted); }
 figure canvas { display: block; margin: 0 auto 4px; image-rendering: pixelated; border: 1px solid var(--border);
   background: repeating-conic-gradient(#d9dee5 0% 25%, #f6f8fb 0% 50%) 50% / 12px 12px; }
 label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); flex: 1 1 160px; align-self: flex-end; padding-bottom: 10px; }
 label.check input { width: 18px; height: 18px; }
 input:disabled { opacity: .35; }
+.drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 120px; padding: 16px;
+  border: 2px dashed var(--border); border-radius: 14px; color: var(--muted); text-align: center; cursor: pointer; flex: 1 1 100%; }
+.drop.over { border-color: var(--brand); background: rgba(49,208,255,.08); color: var(--text); }
+.drop input { display: none; }
+.drop strong { color: var(--text); }
 .err { color: #ff6b88; min-height: 1.2em; }
 code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; }
 pre { background: rgba(0,0,0,.35); border-radius: 10px; padding: 10px 12px; overflow-x: auto; margin: 6px 0 12px; }
@@ -41,7 +46,7 @@ a { color: var(--brand); }
 <body>
 <main>
   <h1>ICO Generator</h1>
-  <p class="lead">Windows <code>.ico</code> with the program name and version on it (16, 32, 48 and 256 px), so Desktop folders show what's inside at a glance. Navy background by default, or transparent (text gets a subtle outline so it reads on any wallpaper).</p>
+  <p class="lead">Windows <code>.ico</code> with the program name and version on it (16, 32, 48 and 256 px), so Desktop folders show what's inside at a glance. Navy background by default, or transparent (text gets a subtle outline so it reads on any wallpaper). Or turn a picture (PNG, JPEG, WebP, ICO) into an .ico.</p>
 
   <section>
     <h2>Make an icon</h2>
@@ -66,6 +71,21 @@ a { color: var(--brand); }
   </section>
 
   <section>
+    <h2>Make an icon from a picture</h2>
+    <label class="drop" id="drop">
+      <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp,image/x-icon,.ico" />
+      <strong id="dropText">Drop a PNG, JPEG, WebP or ICO here, or tap to choose</strong>
+      <span>Up to 10 MB. Fitted to a square, transparency kept (no background added). 16, 32, 48 and 256 px.</span>
+    </label>
+    <div class="actions">
+      <button type="button" id="imgDownload" disabled>Download .ico</button>
+      <button type="button" class="secondary" id="imgViaApi" disabled>Download via API</button>
+      <span class="err" id="imgErr"></span>
+    </div>
+    <div id="imgPreviews" class="previews"></div>
+  </section>
+
+  <section>
     <h2>Use the Python API instead (scripts / Ray &amp; Husker)</h2>
     <p>The page above draws the icon in your browser. For automation, run the Python API or CLI from <code>ico/</code> in the repo (see <a href="https://github.com/toxieon/toxieon.github.io/tree/main/ico">ico/README.md</a>):</p>
 <pre>pip install -r ico/requirements.txt
@@ -73,23 +93,25 @@ uvicorn ico.server:app --host 127.0.0.1 --port 8765
 
 curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&amp;version=0.45.1"
 curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&amp;version=0.45.1&amp;bg=transparent"
+curl -fOJ -F "image=@logo.png" http://127.0.0.1:8765/ico
 python -m ico.cli TipBot 0.45.1 -o TipBot.ico
-python -m ico.cli TipBot 0.45.1 --bg transparent</pre>
+python -m ico.cli TipBot 0.45.1 --bg transparent
+python -m ico.cli --image logo.png -o logo.ico</pre>
     <div class="row">
       <label>API base URL<input id="apiBase" value="http://127.0.0.1:8765" /></label>
     </div>
     <div class="actions">
       <button type="button" class="secondary" id="viaApi">Download via API</button>
-      <span style="color:var(--muted);font-size:.85rem">Uses the name/version/colours above.</span>
+      <span style="color:var(--muted);font-size:.85rem">Uses the name/version/colours above. The picture section's "Download via API" uses this URL too.</span>
     </div>
     <p style="color:var(--muted);font-size:.85rem;margin:12px 0 0">Applying the icon to a Windows folder is done on the PC, e.g. <a href="https://github.com/demberto/FolderIkon">FolderIkon</a> or <a href="https://github.com/goddivor/seticon-cli">seticon-cli</a> (both MIT).</p>
   </section>
 
   <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
 </main>
-<script src="ico-canvas.js?v=0.1.3"></script>
+<script src="ico-canvas.js?v=0.1.4"></script>
 <script>
-const APP_VERSION = "0.1.3";   // see ico/VERSIONING.md
+const APP_VERSION = "0.1.4";   // see ico/VERSIONING.md
 document.getElementById("app-version").textContent = "v" + APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const API_KEY = "nd:ico:apiBase";
@@ -136,6 +158,70 @@ $("viaApi").addEventListener("click", () => {
   const q = new URLSearchParams({ name: o.name.trim(), version: o.version.trim(), bg: o.bg, fg: o.fg });
   if (o.short.trim()) q.set("short", o.short.trim());
   window.location.href = base + "/ico?" + q.toString();
+});
+
+// ---- picture -> .ico ----
+let pickedFile = null;
+function saveBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function apiBase() {
+  const base = $("apiBase").value.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(base)) throw new Error("API base URL must start with http:// or https://");
+  try { localStorage.setItem(API_KEY, base); } catch (e) {}
+  return base;
+}
+async function pickImage(file) {
+  $("imgErr").textContent = ""; $("imgPreviews").innerHTML = "";
+  $("imgDownload").disabled = $("imgViaApi").disabled = true;
+  pickedFile = null;
+  $("dropText").textContent = "Drop a PNG, JPEG, WebP or ICO here, or tap to choose";
+  if (!file) return;
+  try {
+    const source = await NDIco.decodeImage(file);
+    NDIco.DEFAULT_SIZES.forEach((s) => {
+      const fig = document.createElement("figure");
+      const c = NDIco.drawImageFrame(document.createElement("canvas"), source, s);
+      const show = s < 64 ? s * 3 : 128;
+      c.style.width = show + "px"; c.style.height = show + "px";
+      fig.appendChild(c);
+      fig.appendChild(document.createTextNode(s + " px" + (s < 64 ? " (×3)" : "")));
+      $("imgPreviews").appendChild(fig);
+    });
+    pickedFile = file;
+    $("dropText").textContent = file.name + " (" + Math.max(1, Math.round(file.size / 1024)) + " KB) - drop another to replace";
+    $("imgDownload").disabled = $("imgViaApi").disabled = false;
+  } catch (e) { $("imgErr").textContent = e.message; }
+}
+$("imageFile").addEventListener("change", () => pickImage($("imageFile").files[0]));
+["dragenter", "dragover"].forEach((t) => $("drop").addEventListener(t, (ev) => { ev.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => $("drop").addEventListener(t, (ev) => { ev.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", (ev) => pickImage(ev.dataTransfer.files[0]));
+$("imgDownload").addEventListener("click", async () => {
+  try { const { blob, filename } = await NDIco.imageToIco(pickedFile); saveBlob(blob, filename); }
+  catch (e) { $("imgErr").textContent = e.message; }
+});
+$("imgViaApi").addEventListener("click", async () => {
+  $("imgErr").textContent = "";
+  try {
+    const body = new FormData();
+    body.append("image", pickedFile, pickedFile.name);
+    const r = await fetch(apiBase() + "/ico", { method: "POST", body });
+    if (!r.ok) {
+      let msg = "API error " + r.status;
+      try { const j = await r.json(); if (j.detail) msg += ": " + (typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)); } catch (e) {}
+      throw new Error(msg);
+    }
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = /filename="([^"]+)"/.exec(cd);
+    saveBlob(await r.blob(), m ? m[1] : NDIco.imageFilename(pickedFile.name));
+  } catch (e) {
+    $("imgErr").textContent = e.message === "Failed to fetch" || e.name === "TypeError"
+      ? "Could not reach the API at " + $("apiBase").value + " (is it running? see below)" : e.message;
+  }
 });
 
 $("reset").addEventListener("click", () => { $("bg").value = "#0b1f3a"; $("fg").value = "#ffffff"; $("short").value = ""; $("transparent").checked = false; $("bg").disabled = false; preview(); });
