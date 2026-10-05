@@ -1,0 +1,11 @@
+{
+  "name": "neilldata-site",
+  "private": true,
+  "description": "Static GitHub Pages site for www.neilldata.com. No dependencies; scripts use Node built-ins only.",
+  "scripts": {
+    "hub:apps": "node hub/build-apps.cjs",
+    "hub:check": "node hub/build-apps.cjs --check",
+    "test:hub": "node --test hub/build-apps.test.cjs assets/suite-icons.test.cjs",
+    "test": "node --test"
+  }
+}

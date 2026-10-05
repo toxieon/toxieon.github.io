@@ -7,6 +7,11 @@
 <meta name="theme-color" content="#0B1F3A" />
 <title>ND • ICO Generator</title>
 <link rel="icon" type="image/svg+xml" href="/ico/favicon.svg" />
+<!-- Hub tile (auto-discovered by hub/build-apps.cjs; see hub/README.md) -->
+<meta name="nd:app" content="ICO Generator" />
+<meta name="nd:color" content="#60a5fa" />
+<meta name="nd:order" content="10" />
+<meta name="nd:description" content="Name + version or picture to a multi-size Windows .ico" />
 <style>
 @font-face { font-family: "ND Ico Sans"; font-weight: 700; src: url("fonts/DejaVuSans-Bold.ttf") format("truetype"); font-display: block; }
 @font-face { font-family: "ND Ico Sans"; font-weight: 400; src: url("fonts/DejaVuSans.ttf") format("truetype"); font-display: block; }
@@ -109,9 +114,9 @@ python -m ico.cli --image logo.png -o logo.ico</pre>
 
   <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
 </main>
-<script src="ico-canvas.js?v=0.1.4"></script>
+<script src="ico-canvas.js?v=0.1.5"></script>
 <script>
-const APP_VERSION = "0.1.4";   // see ico/VERSIONING.md
+const APP_VERSION = "0.1.5";   // see ico/VERSIONING.md
 document.getElementById("app-version").textContent = "v" + APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const API_KEY = "nd:ico:apiBase";

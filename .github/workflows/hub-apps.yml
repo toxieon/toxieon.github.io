@@ -1,0 +1,52 @@
+# Regenerates hub/apps.json (the Suite hub's tile list) from the app folders'
+# nd:* meta tags whenever main changes, and commits it if it changed.
+# The commit uses GITHUB_TOKEN, which never re-triggers workflows; [skip ci] is belt and braces.
+name: Hub apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*/index.html'
+      - '*/VERSION'
+      - '*/app.json'
+      - 'hub/discover.json'
+      - 'hub/build-apps.cjs'
+      - 'hub/build-apps.test.cjs'
+      - 'hub/apps.json'
+      - 'assets/suite-icons/catalog.json'
+      - '.github/workflows/hub-apps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hub-apps
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate hub/apps.json
+        run: node hub/build-apps.cjs
+      - name: Test
+        run: node --test hub/build-apps.test.cjs assets/suite-icons.test.cjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- hub/apps.json; then
+            echo "hub/apps.json already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hub/apps.json
+          git commit -m "hub: regenerate apps.json [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1

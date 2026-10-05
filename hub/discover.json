@@ -1,0 +1,19 @@
+{
+  "_readme": "Config for hub/build-apps.cjs. Every top-level folder with an index.html becomes a hub tile unless listed in exclude or marked hidden. Per-app settings: nd:* meta tags in the folder's index.html (preferred) or <folder>/app.json. 'overrides' keeps the tiles that existed before auto-discovery looking the same; nd:* meta tags and app.json win over it. See hub/README.md.",
+  "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive"],
+  "defaults": { "color": "#94a3b8", "order": 99 },
+  "overrides": {
+    "planner":    { "name": "Planner",   "icon": "/planner/favicon.svg",   "color": "#ff5252", "order": 1 },
+    "upload":     { "name": "Upload",    "icon": "/upload/favicon.svg",    "color": "#a855f7", "order": 2 },
+    "search":     { "name": "Search",    "icon": "/search/favicon.svg",    "color": "#facc15", "order": 3 },
+    "quote":      { "name": "Quote",     "icon": "/quote/favicon.svg",     "color": "#94a3b8", "order": 4 },
+    "timesheet":  { "name": "Timesheet", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5 },
+    "swb":        { "name": "SWB",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6 },
+    "fitoff":     { "name": "Fit-off",   "icon": "/fitoff/favicon.svg",    "color": "#3ab87a", "order": 7 },
+    "1234567890": { "id": "assets", "name": "Assets", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8 },
+    "company":    { "name": "Company",   "icon": "/company/favicon.svg",   "color": "#e07b2a", "order": 9 }
+  },
+  "extra": [
+    { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true }
+  ]
+}
