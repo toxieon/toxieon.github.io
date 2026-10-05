@@ -6,9 +6,9 @@ const icons = require('./suite-icons.js');
 
 test('catalog has unique stable app and utility identities and matching exported SVGs', () => {
   const all = icons.list();
-  assert.equal(all.length, 36);
+  assert.equal(all.length, 37);
   assert.equal(new Set(all.map(icon => icon.id)).size, all.length);
-  assert.equal(icons.list({ kind: 'app' }).length, 12);
+  assert.equal(icons.list({ kind: 'app' }).length, 13);
   assert.equal(icons.list({ kind: 'ui' }).length, 24);
   for (const icon of all) {
     assert.match(icon.id, /^(app|ui)-[a-z-]+$/);
@@ -21,6 +21,24 @@ test('catalog has unique stable app and utility identities and matching exported
     assert.doesNotMatch(exported, /<(script|foreignObject|image|use)\b|\bon\w+=|href=/i);
   }
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(__dirname, 'suite-icons/catalog.json'), 'utf8')).icons, all);
+});
+
+test('every visible hub app has a suite icon and an icon file that exists', () => {
+  const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../hub/apps.json'), 'utf8'));
+  for (const app of registry.apps) {
+    const id = 'app-' + (app.id === 'site' ? 'website' : app.id);
+    assert.ok(icons.list().some(icon => icon.id === id), 'missing suite icon ' + id);
+    if (!app.hidden) assert.ok(fs.existsSync(path.join(__dirname, '..', app.icon.replace(/^\//, ''))), app.id + ' icon file ' + app.icon);
+  }
+});
+
+test('ICO Generator hub tile matches the ICO app (favicon = suite icon, version = ico/VERSION)', () => {
+  const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '../hub/apps.json'), 'utf8'));
+  const tile = registry.apps.find(app => app.id === 'ico');
+  assert.equal(tile.path, '/ico/');
+  assert.equal(tile.hidden, false);
+  assert.equal(tile.version, fs.readFileSync(path.join(__dirname, '../ico/VERSION'), 'utf8').trim());
+  assert.equal(fs.readFileSync(path.join(__dirname, '../ico/favicon.svg'), 'utf8').trim(), icons.svg('app-ico', { size: 48 }));
 });
 
 test('app colours preserve hub registry identity', () => {

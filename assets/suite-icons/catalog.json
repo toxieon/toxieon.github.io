@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "provenance": "Original geometric SVG artwork created for Neill Data Suite, October 2026. No third-party artwork or icon-font dependency.",
   "pngSizes": [
     32,
@@ -168,6 +168,21 @@
         "public",
         "web",
         "globe"
+      ]
+    },
+    {
+      "id": "app-ico",
+      "label": "ICO Generator",
+      "kind": "app",
+      "color": "#60a5fa",
+      "file": "assets/suite-icons/apps/ico.svg",
+      "recommendation": "Used for ico/favicon.svg and the hub tile; a navy icon tile with name and version lines, stacked to suggest multiple sizes.",
+      "tags": [
+        "icon",
+        "ico",
+        "folder",
+        "version",
+        "image"
       ]
     },
     {
