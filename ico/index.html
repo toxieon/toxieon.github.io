@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#0B1F3A" />
+<title>ND • ICO Generator</title>
+<link rel="icon" type="image/svg+xml" href="/ico/favicon.svg" />
+<style>
+@font-face { font-family: "ND Ico Sans"; font-weight: 700; src: url("fonts/DejaVuSans-Bold.ttf") format("truetype"); font-display: block; }
+@font-face { font-family: "ND Ico Sans"; font-weight: 400; src: url("fonts/DejaVuSans.ttf") format("truetype"); font-display: block; }
+:root { --bg: #07111f; --card: rgba(255,255,255,.07); --border: rgba(255,255,255,.14); --text: #f6f8fb; --muted: #b9c5d6; --brand: #31d0ff; --navy: #0B1F3A; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; } h2 { font-size: 1.1rem; margin: 0 0 12px; }
+p.lead { color: var(--muted); margin: 0 0 20px; }
+section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 18px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); flex: 1 1 160px; }
+input { font: inherit; color: var(--text); background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; }
+input[type=color] { padding: 2px; height: 42px; }
+button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; background: var(--brand); color: #04121f; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+#previews { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
+figure { margin: 0; text-align: center; font-size: .75rem; color: var(--muted); }
+figure canvas { display: block; margin: 0 auto 4px; image-rendering: pixelated; border: 1px solid var(--border); }
+.err { color: #ff6b88; min-height: 1.2em; }
+code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; }
+pre { background: rgba(0,0,0,.35); border-radius: 10px; padding: 10px 12px; overflow-x: auto; margin: 6px 0 12px; }
+footer { color: var(--muted); font-size: .8rem; text-align: center; }
+a { color: var(--brand); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ICO Generator</h1>
+  <p class="lead">Windows <code>.ico</code> with the program name and version on it (16, 32, 48 and 256 px), so Desktop folders show what's inside at a glance.</p>
+
+  <section>
+    <h2>Make an icon</h2>
+    <form id="form" autocomplete="off">
+      <div class="row">
+        <label>Name (line 1)<input id="name" value="TipBot" maxlength="40" required /></label>
+        <label>Version (line 2)<input id="version" value="0.45.1" maxlength="24" required /></label>
+        <label>16 px text <input id="short" placeholder="auto (initials)" maxlength="4" /></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>Background<input id="bg" type="color" value="#0b1f3a" /></label>
+        <label>Text<input id="fg" type="color" value="#ffffff" /></label>
+      </div>
+      <div class="actions">
+        <button type="submit">Download .ico</button>
+        <button type="button" class="secondary" id="reset">Neill defaults</button>
+        <span class="err" id="err"></span>
+      </div>
+    </form>
+    <div id="previews"></div>
+  </section>
+
+  <section>
+    <h2>Use the Python API instead (scripts / Ray &amp; Husker)</h2>
+    <p>The page above draws the icon in your browser. For automation, run the Python API or CLI from <code>ico/</code> in the repo (see <a href="https://github.com/toxieon/toxieon.github.io/tree/main/ico">ico/README.md</a>):</p>
+<pre>pip install -r ico/requirements.txt
+uvicorn ico.server:app --host 127.0.0.1 --port 8765
+
+curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&amp;version=0.45.1"
+python -m ico.cli TipBot 0.45.1 -o TipBot.ico</pre>
+    <div class="row">
+      <label>API base URL<input id="apiBase" value="http://127.0.0.1:8765" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" class="secondary" id="viaApi">Download via API</button>
+      <span style="color:var(--muted);font-size:.85rem">Uses the name/version/colours above.</span>
+    </div>
+    <p style="color:var(--muted);font-size:.85rem;margin:12px 0 0">Applying the icon to a Windows folder is done on the PC, e.g. <a href="https://github.com/demberto/FolderIkon">FolderIkon</a> or <a href="https://github.com/goddivor/seticon-cli">seticon-cli</a> (both MIT).</p>
+  </section>
+
+  <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
+</main>
+<script src="ico-canvas.js"></script>
+<script>
+const APP_VERSION = "0.1.1";   // see ico/VERSIONING.md
+document.getElementById("app-version").textContent = "v" + APP_VERSION;
+const $ = (id) => document.getElementById(id);
+const API_KEY = "nd:ico:apiBase";
+try { const saved = localStorage.getItem(API_KEY); if (saved) $("apiBase").value = saved; } catch (e) {}
+
+function opts() {
+  return { name: $("name").value, version: $("version").value, short: $("short").value, bg: $("bg").value, fg: $("fg").value };
+}
+
+async function preview() {
+  $("err").textContent = "";
+  let spec;
+  try { spec = NDIco.makeSpec(opts()); } catch (e) { $("err").textContent = e.message; return; }
+  await Promise.all([document.fonts.load('700 20px "ND Ico Sans"'), document.fonts.load('400 20px "ND Ico Sans"')]);
+  const box = $("previews"); box.innerHTML = "";
+  spec.sizes.forEach((s) => {
+    const fig = document.createElement("figure");
+    const c = NDIco.drawFrame(document.createElement("canvas"), spec, s);
+    const show = s < 64 ? s * 3 : 128;
+    c.style.width = show + "px"; c.style.height = show + "px";
+    fig.appendChild(c);
+    fig.appendChild(document.createTextNode(s + " px" + (s < 64 ? " (×3)" : "")));
+    box.appendChild(fig);
+  });
+}
+
+$("form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  try {
+    const { blob, filename } = await NDIco.generateIco(opts());
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (e) { $("err").textContent = e.message; }
+});
+
+$("viaApi").addEventListener("click", () => {
+  const base = $("apiBase").value.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(base)) { $("err").textContent = "API base URL must start with http:// or https://"; return; }
+  try { localStorage.setItem(API_KEY, base); } catch (e) {}
+  const o = opts();
+  const q = new URLSearchParams({ name: o.name.trim(), version: o.version.trim(), bg: o.bg, fg: o.fg });
+  if (o.short.trim()) q.set("short", o.short.trim());
+  window.location.href = base + "/ico?" + q.toString();
+});
+
+$("reset").addEventListener("click", () => { $("bg").value = "#0b1f3a"; $("fg").value = "#ffffff"; $("short").value = ""; preview(); });
+["name", "version", "short", "bg", "fg"].forEach((id) => $(id).addEventListener("input", preview));
+preview();
+</script>
+</body>
+</html>

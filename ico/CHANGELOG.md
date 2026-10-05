@@ -1,0 +1,1 @@
+## 0.1.1 · 2026-10-06 · ico-generator · New: two-line (name + version) multi-size Windows .ico (16/32/48/256) on Neill navy. Python core (Pillow) with FastAPI `GET /ico` + `GET /health` and a CLI for Ray/Husker scripts; static page at /ico/ draws the same icon client-side (Canvas + built-in ICO packer, bundled DejaVu Sans fonts)
