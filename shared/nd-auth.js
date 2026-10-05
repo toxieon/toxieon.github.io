@@ -31,6 +31,11 @@
  *  'external' means another tab wrote a token — treat like 'refresh',
  *             or like 'signin' if you weren't signed in yet.
  *
+ *  Stable login (server refresh token, iOS home-screen apps): see
+ *  createServerAuth below. Off unless shared/nd-backend.js sets
+ *  plannerOAuth:true with an endpoint. NDAuth.mode() -> 'gis' | 'server' |
+ *  'gis-fallback'. NDAuth.signOut({everywhere:true}) revokes the Google grant.
+ *
  *  Pure logic (isValid / needsProactiveRefresh / createAuth) is exported
  *  for Node tests: node shared/nd-auth.test.js
  * ========================================================================= */
@@ -354,65 +359,145 @@
     return api;
   }
 
-  // Optional server flow. Legacy suite pages retain the GIS token implementation.
+  /* ── stable login: server-side refresh token (shared/nd-backend.js) ────
+   * Used only when shared/nd-backend.js has plannerOAuth:true AND an /exec
+   * endpoint AND the app's scopes fit SERVER_SCOPES. Otherwise every app runs
+   * the GIS token client above, exactly as before.
+   * Browser keeps: an opaque session id (SESSION), a pending login {state,
+   * verifier} for 10 min (LOGIN), the current access token (STORAGE_KEY).
+   * The refresh token and the OAuth client secret live only in the Apps Script
+   * backend (apps-script/neill-data-backend/PlannerOAuth.gs).
+   */
+  const SERVER_SCOPES = ["openid", "email", "profile",
+    "https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
+  const EXEC_URL_RE = /^https:\/\/script\.google\.com\/(a\/macros\/[^/]+|macros)\/s\/[^/]+\/exec$/;
+  const SESSION_KEY = "nd.auth.planner.session.v1", LOGIN_KEY = "nd.auth.planner.login.v1", LOGOUT_KEY = "nd.auth.planner.logout.v1";
+  const SERVER_MESSAGES = {
+    session_expired: "Your Google sign-in has ended. Sign in again.",
+    login_expired: "Sign-in took too long. Try again.",
+    sign_in_failed: "Google sign-in was cancelled or declined. Try again.",
+    not_configured: "The sign-in server isn't set up yet. Try again in a moment.",
+    provider_unavailable: "Google is not responding. Try again shortly.",
+    login_busy: "Too many sign-ins in progress. Try again in a few minutes.",
+    "server error": "The sign-in server had a problem. Try again.",
+    signin_required: "Sign in to continue"
+  };
+  function serverError(code) {
+    const e = new Error(SERVER_MESSAGES[code] || code);
+    e.code = code;
+    return e;
+  }
+
+  /** The stable-login endpoint for these scopes, or '' (= use the GIS token client). */
+  function serverEndpointFor(backend, scopes) {
+    if (!backend || backend.plannerOAuth !== true) return "";
+    const endpoint = String(backend.endpoint || "").trim();
+    if (!EXEC_URL_RE.test(endpoint)) return "";
+    const ok = (scopes || []).every(function (sc) {
+      return SERVER_SCOPES.indexOf(sc) !== -1 || sc === "https://www.googleapis.com/auth/drive.file";
+    });
+    return ok ? endpoint : "";
+  }
+
   function createServerAuth(deps) {
-    const SESSION = 'nd.auth.planner.session.v1', LOGIN = 'nd.auth.planner.login.v1';
+    const SESSION = SESSION_KEY, LOGIN = LOGIN_KEY;
     let cfg, token = null, listeners = [], pending = null, timer = null, generation = 0;
     function emit(type, extra) { listeners.forEach(cb => { try { cb(Object.assign({ type, token: token?.access_token || null, profile: token?.profile || null, signedIn: api.isSignedIn() }, extra)); } catch (_) {} }); }
     function stored(key) { try { return JSON.parse(deps.storage.get(key) || 'null'); } catch (_) { return null; } }
-    async function call(action, body) {
-      const result = await deps.serverPost(cfg.serverEndpoint, Object.assign({ action }, body));
-      if (result.error) throw new Error(result.error);
+    async function call(action, body, extra) {
+      const result = await deps.serverPost(cfg.serverEndpoint, Object.assign({ action }, body), extra);
+      if (!result || result.error) throw serverError(result ? result.error : 'server error');
       return result;
     }
     function schedule() {
       if (timer) deps.clearTimer(timer);
-      if (token) timer = deps.setTimer(() => { timer = null; api.ensureToken({ force: true }).catch(() => {}); }, Math.max(1000, token.expiry - deps.now() - REFRESH_LEAD_MS));
+      if (token) timer = deps.setTimer(() => { timer = null; if (!deps.isVisible || deps.isVisible()) api.ensureToken({ force: true }).catch(() => {}); }, Math.max(1000, token.expiry - deps.now() - REFRESH_LEAD_MS));
+    }
+    function clearLocal() {
+      token = null;
+      if (timer) { deps.clearTimer(timer); timer = null; }
+      for (const k of [SESSION, LOGIN, STORAGE_KEY, IDENTITY_KEY]) {
+        deps.storage.remove(k);
+        if (deps.idb && deps.idb.remove) deps.idb.remove(k).catch(() => {});
+      }
+    }
+    // Server-side deletes that failed (offline sign-out) are retried on the next start.
+    function queuedLogouts() { const q = stored(LOGOUT_KEY); return Array.isArray(q) ? q : []; }
+    async function flushLogouts() {
+      const q = queuedLogouts();
+      if (!q.length) return;
+      const left = [];
+      for (const item of q) {
+        try { await call('planner_oauth_logout', item, { keepalive: true }); } catch (e) { left.push(item); }
+      }
+      if (left.length) deps.storage.set(LOGOUT_KEY, JSON.stringify(left.slice(-10))); else deps.storage.remove(LOGOUT_KEY);
+    }
+    async function startLogin(popup, run) {
+      const verifier = deps.randomSecret();
+      const started = await call('planner_oauth_start', { challenge: await deps.digest(verifier), return_to: deps.returnTo ? deps.returnTo() : undefined });
+      if (run !== generation) throw serverError('Sign-in cancelled');
+      const login = { state: started.state, verifier, exp: deps.now() + 600000 };
+      if (deps.storage.set(LOGIN, JSON.stringify(login)) === false) throw serverError('Device storage unavailable');
+      deps.navigateAuth(popup, started.url);
+      return login;
+    }
+    async function claim(login, run) {
+      while (run === generation && deps.now() < login.exp) {
+        const claimed = await call('planner_oauth_claim', { state: login.state, verifier: login.verifier });
+        if (claimed.session) return claimed.session;
+        await new Promise(resolve => deps.setTimer(resolve, 2500));
+      }
+      if (run !== generation) throw serverError('Sign-in cancelled');
+      deps.storage.remove(LOGIN);
+      throw serverError('login_expired');
     }
     const api = {
       init(config) {
         cfg = config;
-        // Always validate the server session at boot, including revocation.
-        if (deps.onVisibility) deps.onVisibility(() => api.ensureToken().catch(() => {}));
+        // The server session is validated on each start (catches revocation); apps call ensureToken() at boot.
+        if (deps.onVisibility) deps.onVisibility(() => { if (deps.storage.get(SESSION) || stored(LOGIN)) api.ensureToken().catch(() => {}); });
         if (deps.onSessionStorage) deps.onSessionStorage(() => {
           generation++; token = null;
           if (timer) deps.clearTimer(timer);
           if (!deps.storage.get(SESSION)) emit('signout');
           else api.ensureToken({ force: true }).catch(() => {});
         });
+        flushLogouts().catch(() => {});
         return api;
       },
       ensureToken(opts = {}) {
         if (pending) return pending;
         if (!opts.force && isValid(token, deps.now()) && !needsProactiveRefresh(token, deps.now())) return Promise.resolve(token.access_token);
         const run = generation;
-        // Open synchronously inside the user's tap, before the network request.
+        // Open synchronously inside the user's tap, before any network request (popup blockers / iOS).
         const login = stored(LOGIN);
-        const popup = opts.interactive && !deps.storage.get(SESSION) && !login ? deps.openAuth() : null;
+        const popup = opts.interactive && !deps.storage.get(SESSION) && !(login && login.exp > deps.now()) ? deps.openAuth() : null;
         pending = (async () => {
-          let session = deps.storage.get(SESSION), activeLogin = login;
+          let session = deps.storage.get(SESSION);
+          let activeLogin = login && login.exp > deps.now() ? login : null;
+          let result = null;
+          if (session) {
+            try { result = await call('planner_oauth_token', { session, force: !!opts.force }); }
+            catch (err) {
+              if (err.code !== 'session_expired') throw err;
+              // Refresh failed for good (revoked / expired grant): drop the session and,
+              // if the user tapped, fall straight back to the interactive sign-in.
+              deps.storage.remove(SESSION); session = null; token = null;
+              if (!opts.interactive) throw err;
+            }
+          }
           if (!session) {
             if (!activeLogin) {
-              if (!opts.interactive) throw new Error('Sign in to continue');
-              const verifier = deps.randomSecret();
-              const started = await call('planner_oauth_start', { challenge: await deps.digest(verifier) });
-              activeLogin = { state: started.state, verifier, exp: deps.now() + 600000 };
-              if (deps.storage.set(LOGIN, JSON.stringify(activeLogin)) === false) throw new Error('Device storage unavailable');
-              deps.navigateAuth(popup, started.url);
+              if (!opts.interactive) throw serverError('signin_required');
+              activeLogin = await startLogin(popup || deps.openAuth(), run);
             }
-            while (run === generation && deps.now() < activeLogin.exp) {
-              const claimed = await call('planner_oauth_claim', activeLogin);
-              if (claimed.session) { session = claimed.session; break; }
-              await new Promise(resolve => deps.setTimer(resolve, 2500));
-            }
-            if (run !== generation) throw new Error('Sign-in cancelled');
-            if (!session) { deps.storage.remove(LOGIN); throw new Error('Sign-in timed out. Try again.'); }
-            if (deps.storage.set(SESSION, session) === false) throw new Error('Device storage unavailable');
+            session = await claim(activeLogin, run);
+            if (deps.storage.set(SESSION, session) === false) throw serverError('Device storage unavailable');
             deps.storage.remove(LOGIN);
             if (popup && !popup.closed) popup.close();
+            result = await call('planner_oauth_token', { session, force: false });
           }
-          const result = await call('planner_oauth_token', { session, force: !!opts.force });
-          if (run !== generation) throw new Error('Sign-in cancelled');
+          if (run !== generation) throw serverError('Sign-in cancelled');
           const first = !token;
           token = { access_token: result.access_token, expiry: result.expiry, scopes: result.scopes, profile: result.profile, email: result.email };
           deps.storage.set(STORAGE_KEY, JSON.stringify(token));
@@ -421,24 +506,32 @@
           return token.access_token;
         })().catch(err => {
           if (run === generation) {
-            if (err.message === 'session_expired') { deps.storage.remove(SESSION); token = null; }
-            if (/login_expired|sign_in_failed/.test(err.message)) deps.storage.remove(LOGIN);
+            if (err.code === 'session_expired') { deps.storage.remove(SESSION); token = null; }
+            if (/login_expired|sign_in_failed/.test(err.code || '')) deps.storage.remove(LOGIN);
             if (popup && !popup.closed) popup.close();
-            emit('error', { error: err.message });
+            // A silent check with no session is not an error worth showing (same as GIS silent miss).
+            if (err.code !== 'signin_required') emit('error', { error: err.message, code: err.code || null });
           }
           throw err;
         }).finally(() => { pending = null; });
         return pending;
       },
-      async signOut() {
+      /* Sign-out is immediate on this device (session id, login, token and identity
+       * removed), then the server deletes the stored refresh token. Offline: queued
+       * and retried on the next start. {everywhere:true} also revokes the Google grant
+       * for every device. Resolves {serverDone}; never leaves the device signed in. */
+      async signOut(opts = {}) {
         const session = deps.storage.get(SESSION);
-        // Keep the credential if revocation fails, so the user can retry.
         generation++;
-        if (timer) deps.clearTimer(timer);
-        if (session) await call('planner_oauth_logout', { session });
-        token = null;
-        for (const k of [SESSION, LOGIN, STORAGE_KEY, IDENTITY_KEY]) { deps.storage.remove(k); if (deps.idb) await deps.idb.remove(k); }
+        clearLocal();
         emit('signout');
+        if (!session) return { serverDone: true };
+        const item = { session, everywhere: !!opts.everywhere };
+        try { await call('planner_oauth_logout', item, { keepalive: true }); return { serverDone: true }; }
+        catch (e) {
+          deps.storage.set(LOGOUT_KEY, JSON.stringify(queuedLogouts().concat([item]).slice(-10)));
+          return { serverDone: false, error: e.message };
+        }
       },
       onAuthChange(cb) { listeners.push(cb); return () => { listeners = listeners.filter(x => x !== cb); }; },
       getToken: () => token?.access_token || null,
@@ -447,10 +540,65 @@
       getEmail: () => token?.email || stored(IDENTITY_KEY)?.email || null,
       getResumeEmail: () => api.getEmail(),
       hasPriorSession: () => !!deps.storage.get(SESSION),
+      hasPendingLogin: () => { const l = stored(LOGIN); return !!(l && l.exp > deps.now()); },
       isSignedIn: () => isValid(token, deps.now()),
       pendingRequest: () => !!pending
     };
     return api;
+  }
+
+  /* ── NDAuth facade: picks the engine per page load ─────────────────────
+   * flag off / endpoint empty / scopes not covered -> GIS token client (today).
+   * flag on -> stable login; if the backend says it isn't configured (or can't
+   * be reached) and this device has no session yet, fall back to GIS.
+   */
+  function createNDAuth(deps, getBackend) {
+    let active = createAuth(deps), mode = "gis", listeners = [], probe = null;
+    const facade = {};
+    function swap(next, nextMode) {
+      listeners.forEach(s => s.off());
+      active = next; mode = nextMode;
+      listeners.forEach(s => { s.off = active.onAuthChange(s.cb); });
+    }
+    ["getToken", "getExpiry", "getProfile", "getEmail", "getResumeEmail", "hasPriorSession", "isSignedIn", "pendingRequest"]
+      .forEach(key => { facade[key] = (...args) => active[key](...args); });
+    facade.onAuthChange = cb => {
+      const subscription = { cb, off: active.onAuthChange(cb) };
+      listeners.push(subscription);
+      return () => { listeners = listeners.filter(x => x !== subscription); subscription.off(); };
+    };
+    facade.init = config => {
+      let endpoint = config.serverEndpoint;
+      if (endpoint === undefined) endpoint = serverEndpointFor(getBackend ? getBackend() : null, config.scopes);
+      if (!endpoint) { active.init(config); return facade; }       // today's path, unchanged
+      const server = createServerAuth(deps);
+      swap(server, "server");
+      server.init(Object.assign({}, config, { serverEndpoint: endpoint }));
+      if (!server.hasPriorSession() && !server.hasPendingLogin()) {
+        probe = Promise.resolve()
+          .then(() => deps.serverPost(endpoint, { action: "planner_oauth_status" }))
+          .then(r => !!(r && r.ok && r.configured), () => false)
+          .then(ok => {
+            probe = null;
+            if (!ok && active === server && !server.hasPriorSession() && !server.pendingRequest()) {
+              const gis = createAuth(deps);
+              swap(gis, "gis-fallback");
+              gis.init(config);
+            }
+            return ok;
+          });
+      }
+      return facade;
+    };
+    facade.ensureToken = opts => {
+      // A tap must reach the engine synchronously (popup); background calls wait for the probe.
+      if (probe && !(opts && opts.interactive)) return probe.then(() => active.ensureToken(opts));
+      return active.ensureToken(opts);
+    };
+    facade.signOut = opts => active.signOut(opts);
+    facade.mode = () => mode;
+    facade.whenReady = () => probe || Promise.resolve();
+    return facade;
   }
 
   /* ── IndexedDB tiny kv helper ─────────────────────────────────────── */
@@ -497,16 +645,19 @@
   function browserDeps() {
     const idb = idbOps();
     return {
-      serverPost: async function (endpoint, body) {
-        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(30000) });
+      // text/plain POST = "simple" request: no CORS preflight (Apps Script can't answer
+      // OPTIONS); /exec 302-redirects to googleusercontent, which allows any origin.
+      serverPost: async function (endpoint, body, extra) {
+        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'follow', keepalive: !!(extra && extra.keepalive), signal: AbortSignal.timeout(30000) });
         if (!response.ok) throw new Error('Login server unavailable');
         return response.json();
       },
+      returnTo: function () { return location.origin + location.pathname; },
       randomSecret: () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''),
       digest: async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join(''),
       openAuth: () => window.open('about:blank', '_blank'),
       navigateAuth: (popup, url) => { if (popup && !popup.closed) popup.location.replace(url); else window.location.assign(url); },
-      onSessionStorage: cb => window.addEventListener('storage', e => { if (e.key === 'nd.auth.planner.session.v1') cb(); }),
+      onSessionStorage: cb => window.addEventListener('storage', e => { if (e.key === SESSION_KEY) cb(); }),
       now: function () { return Date.now(); },
       storage: {
         get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -562,9 +713,9 @@
   }
 
   const API = {
-    STORAGE_KEY, IDENTITY_KEY, REFRESH_LEAD_MS, VALIDITY_SKEW_MS,
-    isValid, needsProactiveRefresh, scopesCover, parseStored, parseIdentity,
-    createAuth, createServerAuth, browserDeps
+    STORAGE_KEY, IDENTITY_KEY, REFRESH_LEAD_MS, VALIDITY_SKEW_MS, SERVER_SCOPES, SESSION_KEY,
+    isValid, needsProactiveRefresh, scopesCover, parseStored, parseIdentity, serverEndpointFor,
+    createAuth, createServerAuth, createNDAuth, browserDeps
   };
 
   if (typeof module !== "undefined" && module.exports) {
@@ -572,22 +723,7 @@
   } else {
     root.ND = root.ND || {};
     root.ND.authKit = API;
-    const deps = browserDeps();
-    let active = createAuth(deps), listeners = [];
-    root.NDAuth = {};
-    Object.keys(active).forEach(key => { root.NDAuth[key] = (...args) => active[key](...args); });
-    root.NDAuth.onAuthChange = cb => {
-      const subscription = {cb, off: active.onAuthChange(cb)};
-      listeners.push(subscription);
-      return () => { listeners = listeners.filter(x => x !== subscription); subscription.off(); };
-    };
-    root.NDAuth.init = config => {
-      if (config.serverEndpoint) {
-        listeners.forEach(s => s.off());
-        active = createServerAuth(deps);
-        listeners.forEach(s => { s.off = active.onAuthChange(s.cb); });
-      }
-      return active.init(config);
-    };
+    // ND_BACKEND comes from shared/nd-backend.js (loaded before init is called).
+    root.NDAuth = createNDAuth(browserDeps(), function () { return root.ND_BACKEND || null; });
   }
 })(typeof window !== "undefined" ? window : globalThis);

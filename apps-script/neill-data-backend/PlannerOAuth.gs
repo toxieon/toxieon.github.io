@@ -1,15 +1,35 @@
-/* Planner OAuth. Refresh tokens never leave Script Properties.
+/* Suite "stable login" (Planner first; any app whose scopes fit PLANNER_SCOPES).
+ * Refresh tokens never leave Script Properties; the browser only holds an opaque
+ * session id (localStorage) and short-lived access tokens fetched from here.
  * A browser-generated claim secret binds the initiating device to the callback.
  * Google state is separate; knowing the callback URL cannot claim a session.
+ * Flow: planner_oauth_start -> Google consent (redirect_uri = this /exec URL)
+ *   -> doGet callback exchanges the code (client secret from Script Properties)
+ *   -> planner_oauth_claim (device polls with its verifier) -> session id
+ *   -> planner_oauth_token (access token; refreshed server-side when near expiry or force)
+ *   -> planner_oauth_logout (this device; everywhere=true also revokes the Google grant)
+ * Script Properties: PLANNER_OAUTH_CLIENT_ID, PLANNER_OAUTH_CLIENT_SECRET,
+ * PLANNER_OAUTH_REDIRECT_URI (= the /exec URL). Setup: README.md.
  */
 const PLANNER_SCOPES = 'openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets';
 const PLANNER_TTL = 28 * 24 * 3600 * 1000;
+// Where the "Return to the app" link on the callback page may point.
+const PLANNER_RETURN_ORIGIN = 'https://www.neilldata.com';
+const PLANNER_EXEC_RE = /^https:\/\/script\.google\.com\/(a\/macros\/[^/]+|macros)\/s\/[^/]+\/exec$/;
 function plannerOAuthConfig_() {
   const p = PropertiesService.getScriptProperties();
   const c = { client_id: p.getProperty('PLANNER_OAUTH_CLIENT_ID'), client_secret: p.getProperty('PLANNER_OAUTH_CLIENT_SECRET'), redirect_uri: p.getProperty('PLANNER_OAUTH_REDIRECT_URI') };
-  if (!c.client_id || !c.client_secret || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(c.redirect_uri || '')) throw new Error('Planner OAuth is not configured');
+  if (!c.client_id || !c.client_secret || !PLANNER_EXEC_RE.test(c.redirect_uri || '')) throw new Error('Planner OAuth is not configured');
   return c;
 }
+function plannerOAuthConfigured_() { try { plannerOAuthConfig_(); return true; } catch (e) { return false; } }
+/** Public probe: lets the pages fall back to the plain Google sign-in while this isn't set up. No secrets. */
+function plannerOAuthStatus_() { return { ok: true, configured: plannerOAuthConfigured_(), scopes: PLANNER_SCOPES.split(' ') }; }
+function plannerReturnTo_(value) {
+  value = String(value || '');
+  return value.indexOf(PLANNER_RETURN_ORIGIN + '/') === 0 && value.length < 300 && !/[\s"'<>]/.test(value) ? value : PLANNER_RETURN_ORIGIN + '/hub/';
+}
+function plannerHtmlEscape_(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function plannerGoogleToken_(fields) {
   const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', { method: 'post', payload: Object.assign(plannerOAuthConfig_(), fields), muteHttpExceptions: true });
   const data = JSON.parse(response.getContentText());
@@ -19,6 +39,7 @@ function plannerGoogleToken_(fields) {
 }
 function plannerOAuthStart_(body) {
   if (!/^[0-9a-f]{64}$/.test(String(body.challenge || ''))) return { error: 'bad_challenge' };
+  if (!plannerOAuthConfigured_()) return { error: 'not_configured' };
   const config = plannerOAuthConfig_();
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
@@ -30,13 +51,13 @@ function plannerOAuthStart_(body) {
     });
     if (active >= 100) return { error: 'login_busy' };
     const state = randomHex_(64);
-    props.setProperty('po_' + state, JSON.stringify({ challenge: body.challenge, exp: Date.now() + 10 * 60 * 1000 }));
+    props.setProperty('po_' + state, JSON.stringify({ challenge: body.challenge, exp: Date.now() + 10 * 60 * 1000, ret: plannerReturnTo_(body.return_to) }));
     const query = { client_id: config.client_id, redirect_uri: config.redirect_uri, response_type: 'code', scope: PLANNER_SCOPES, access_type: 'offline', prompt: 'consent', state: state };
     return { ok: true, state: state, url: 'https://accounts.google.com/o/oauth2/v2/auth?' + Object.keys(query).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k])).join('&') };
   } finally { lock.releaseLock(); }
 }
 function plannerOAuthCallback_(params) {
-  const message = 'Sign-in finished. Return to Neill Planner to continue. If you declined access, try signing in again.';
+  const message = 'Sign-in finished. You can close this page and return to the app. If you declined access, sign in again from the app.';
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const state = String(params.state || '');
@@ -61,7 +82,11 @@ function plannerOAuthCallback_(params) {
       }
     }
     props.setProperty(key, JSON.stringify(pending));
-    return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width"><p>' + message + '</p>');
+    // target=_top: HtmlService output sits in an iframe. Used when iOS opened the
+    // sign-in in the app window itself (no popup); the app then claims the session on load.
+    const back = plannerReturnTo_(pending.ret);
+    return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width"><p style="font:16px system-ui">' + message +
+      '</p><p><a style="font:600 16px system-ui" target="_top" href="' + plannerHtmlEscape_(back) + '">Return to the app</a></p>');
   } finally { lock.releaseLock(); }
 }
 function plannerOAuthClaim_(body) {
@@ -104,8 +129,21 @@ function plannerOAuthToken_(body) {
     return { ok: true, access_token: s.access, expiry: s.expiry, scopes: s.scopes, profile: s.profile, email: s.profile.email };
   } finally { lock.releaseLock(); }
 }
+/* Sign-out. Default: this device only (its stored refresh token is deleted here, so
+ * the session id is useless). everywhere=true also revokes the Google grant (which
+ * ends every device's refresh token for this user) and drops all their sessions. */
 function plannerOAuthLogout_(body) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try { if (getSession_('planner', body.session)) dropSession_(body.session); return { ok: true }; }
-  finally { lock.releaseLock(); }
+  try {
+    const s = getSession_('planner', body.session);
+    if (!s) return { ok: true };
+    let revoked = false;
+    if (body.everywhere) {
+      const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/revoke', { method: 'post', payload: { token: s.refresh }, muteHttpExceptions: true });
+      revoked = r.getResponseCode() === 200;
+      dropSessionsFor_('planner', s.u, null);
+    }
+    dropSession_(body.session);
+    return { ok: true, revoked: revoked };
+  } finally { lock.releaseLock(); }
 }

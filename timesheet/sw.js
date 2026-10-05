@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'timesheet-0.1.1';
+const CACHE_VERSION = 'timesheet-0.1.2';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",

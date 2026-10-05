@@ -1,3 +1,4 @@
+## 0.20.2 · 2026-10-06 · stable-login-ready · Google sign-in is ready for the stable login (one sign-in, then silent server-side refresh via the Neill Data Backend, for the iPhone home-screen app): nd-auth picks it from shared/nd-backend.js (plannerOAuth + endpoint), falls back to the normal sign-in if the backend isn't set up, and sign-out is immediate on the device. Switched OFF (plannerOAuth:false), so sign-in is unchanged today
 ## 0.20.1 · 2026-10-06 · report-cover · Polish the report cover: big Neill Data logo, Neill Planner title and job name with address/generated date set small at the foot; single swappable cover-logo slot
 
 - Cover design by Cinna. The existing `/logo.png` sits large and centred slightly above the optical middle (440 px in the 794 px A4 sheet), followed by **Neill Planner** (40/700) and the job name (26/500, balanced wrap, capped at 560 px). The address and "Generated …" stamp sit small and grey at the foot. No new assets, fields or fonts.

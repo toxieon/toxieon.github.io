@@ -1,1 +1,2 @@
+## 0.1.2 · 2026-10-06 · stable-login-ready · Google sign-in can use the Neill Data Backend stable login (one sign-in, then silent server-side refresh; for iPhone home-screen apps) once shared/nd-backend.js sets plannerOAuth:true; switched OFF, so sign-in is unchanged today (GIS token client)
 ## 0.1.1 · 2026-10-01 · versioning-baseline · Version baseline; today's changes: local-date fix for the today/tomorrow banner and ICS/PDF/JPG filenames (#20), jsPDF 2.5.1 vendored (#21), CSV via PapaParse and photo downscale via pica (#22)

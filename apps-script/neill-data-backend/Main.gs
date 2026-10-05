@@ -2,6 +2,8 @@
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.state) return plannerOAuthCallback_(e.parameter);
+  // Setup check Brandon can open in a browser: <exec URL>?action=planner_oauth_status
+  if (e && e.parameter && e.parameter.action === 'planner_oauth_status') return json_(plannerOAuthStatus_());
   return json_({ ok: true, msg: 'Neill Data backend. POST to use.' });
 }
 
@@ -20,6 +22,7 @@ function doPost(e) {
 function route_(body) {
   const action = String(body.action || '');
   switch (action) {
+    case 'planner_oauth_status': return plannerOAuthStatus_();
     case 'planner_oauth_start': return plannerOAuthStart_(body);
     case 'planner_oauth_claim': return plannerOAuthClaim_(body);
     case 'planner_oauth_token': return plannerOAuthToken_(body);

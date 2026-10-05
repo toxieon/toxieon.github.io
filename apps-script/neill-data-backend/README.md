@@ -43,8 +43,8 @@ Script Properties (created by `setup()`, never in the repo): `ND_PEPPER`,
 2. Project Settings (gear) → tick **Show "appsscript.json" manifest file**. Replace
    its contents with `appsscript.json` from this folder.
 3. Create script files named exactly like the `.gs` files here (`Config`, `Main`,
-   `Auth`, `Quote`, `TimesheetLive`, `Admin`) and paste each one in (delete the
-   default `Code.gs`). **Save**.
+   `Auth`, `Quote`, `TimesheetLive`, `Admin`, `PlannerOAuth`) and paste each one in
+   (delete the default `Code.gs`). **Save**.
 4. In `Config.gs`, in the editor only, fill `SEED_TSL_CODES` with the Timesheet
    Live viewers: `[['Label', 'code'], ['Label', 'code']]`.
 5. Choose **setup** → **Run** → approve the permissions (Advanced → Go to Neill
@@ -81,31 +81,104 @@ only from there), unless you install the hourly sync — then keep editing the
 Quote spreadsheet and don't edit the price sheet.
 
 
-## Planner long-lived Google login (deployment required)
+## Stable Google login (iPhone home-screen apps stop asking to sign in)
 
-The optional Planner flow uses an Apps Script OAuth callback and a separate,
-browser-generated claim secret. Refresh tokens live only in Script Properties;
-28-day sliding device sessions retrieve short-lived access tokens. Logout deletes
-only that device session, without revoking Google's grant for other devices.
-Existing suite login paths are unchanged. No Sheet/Drive migration is needed.
+**What it does.** Today every app uses Google's browser token client: an access token
+lasts about an hour and the silent renewal often fails in iOS home-screen apps, so
+they ask to sign in again. With stable login the app signs in **once** through this
+backend: Google returns an authorization code to the `/exec` URL, the script swaps it
+for a refresh token (using the client secret from Script Properties) and keeps the
+refresh token in Script Properties. The phone only stores an opaque session id; when
+the access token is near expiry (or Google answers 401) the app asks this backend for
+a fresh one. No popup, no re-login. 28 days without opening the app, clearing the
+app's data, or revoking access at myaccount.google.com means one new sign-in.
 
-1. Google Cloud console: create/edit the OAuth **Web** client, add the authorized redirect URI(s) your flow uses, and confirm the Drive + Sheets scopes on the consent screen. Publish the consent screen to "In production" so refresh tokens don't expire after 7 days (Testing mode).
-   The redirect URI is exactly your deployed backend URL, https://script.google.com/macros/s/DEPLOYMENT_ID/exec. Use the same Google Cloud project as your existing OAuth client. Scopes: openid, email, profile, https://www.googleapis.com/auth/drive and https://www.googleapis.com/auth/spreadsheets. Google may require verification for these scopes.
-2. Put the client ID/secret into Script Properties (names you choose, documented in the backend README).
-   Names: PLANNER_OAUTH_CLIENT_ID, PLANNER_OAUTH_CLIENT_SECRET, PLANNER_OAUTH_REDIRECT_URI. The redirect property must equal the authorized URI. Do not put the secret in frontend config or Git.
-3. Apps Script: paste the updated .gs files, run any setup function, and **redeploy the web app as a new version**; update shared/nd-backend.js endpoint if the URL changes.
-   Include PlannerOAuth.gs, updated Main.gs and appsscript.json (external_request scope). Retain all other .gs files. No new setup/migration is required; existing backend setup applies. Redeploy executing as the owner, accessible to Anyone. Set endpoint to the /exec URL and plannerOAuth: true only when ready. This shared endpoint also affects existing suite consumers: retain the existing backend's configuration and test those apps.
+Code: `PlannerOAuth.gs` (server), `shared/nd-auth.js` (`createServerAuth`, used by
+every app that signs in with Google: Planner, Quote, Timesheet, Upload, Search, SWB,
+Fit-off, Company, Assets). It is **off** until `shared/nd-backend.js` has
+`plannerOAuth: true`; with it off (or no endpoint) the apps use the old sign-in
+unchanged. If it's on but the Script Properties below are missing, the apps
+automatically fall back to the old sign-in.
 
-First sign-in opens Google. After consent, return to the original Planner window;
-the app claims the session automatically. If iOS opens Safari from the PWA,
-return to the PWA; its pending login secret is saved for ten minutes. Thereafter
-renewal needs no popup. Storage clearing, consent revocation or 28 days without
-use requires sign-in again. Offline sign-out reports failure and must be retried
-online to revoke the server session. Do not log request bodies or property dumps.
+Sign-out in an app ends that device's session (its refresh token is deleted from
+Script Properties). `NDAuth.signOut({ everywhere: true })` also revokes the Google
+grant, which signs that Google account out on every device.
 
-Deployment checks: desktop and actual iPhone PWA initial login, reopen after days,
-refresh after one hour, denial/cancellation, and device-only logout. Script Properties
-are suitable for this small suite, not an unbounded public auth service. The login
-queue is capped at 100 pending requests; monitor Apps Script quota errors.
+### Setup checklist (Brandon, signed in as brandon.j.neill@gmail.com)
 
-Protocol reference: https://developers.google.com/identity/protocols/oauth2/web-server
+**A. Google Cloud Console** (the project that owns the suite's existing sign-in client,
+project number `418369916603`)
+
+1. Open https://console.cloud.google.com/auth/clients and pick that project
+   (top bar project picker).
+2. Open the **Web application** client
+   `418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com`
+   (use this one, don't create a new client).
+3. **Authorized JavaScript origins**: make sure `https://www.neilldata.com` is listed
+   (it already is for today's sign-in). Nothing else is needed: `neilldata.com` and
+   `http://` both redirect to `https://www.neilldata.com`.
+4. **Authorized redirect URIs**: add the Apps Script `/exec` URL from step B3,
+   character for character, e.g.
+   `https://script.google.com/macros/s/AKfycb…/exec` (no trailing slash, no `?`).
+   Save. (Do steps B1 to B3 first if you don't have the URL yet, then come back.)
+5. **Client secret**: on the same client page copy the client secret (if it isn't
+   shown, **Add secret** and copy the new one). It goes ONLY into Script Properties
+   (B4); never into the repo, chat or email.
+6. **Data access** (scopes): the list must be exactly today's scopes:
+   `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`,
+   `https://www.googleapis.com/auth/drive`, `https://www.googleapis.com/auth/spreadsheets`.
+   Don't add others.
+7. **Audience**: User type **External**, Publishing status **In production**
+   (press **Publish app** if it says Testing). This matters: in **Testing**, Google
+   expires refresh tokens after **7 days**, so everyone would be asked to sign in
+   weekly. In production no test users are needed. Because Drive is a restricted
+   scope and the app isn't verified, Google shows "Google hasn't verified this app"
+   at sign-in: tap **Advanced → Go to … (unsafe)** once per person. Fine for the
+   team (unverified apps are capped at 100 users).
+
+**B. Apps Script** (https://script.google.com, project **Neill Data Backend**)
+
+1. Do the **Deploy** steps above (1–8), including the `PlannerOAuth` file and the
+   current `Main.gs` and `appsscript.json`. If the project is already deployed:
+   paste the updated `Main.gs` + `PlannerOAuth.gs`, then **Deploy → Manage
+   deployments → Edit → Version: New version → Deploy** (same `/exec` URL).
+2. The deployment must be: type **Web app**, Execute as **Me**, Who has access
+   **Anyone** (not "Anyone with a Google account").
+3. Copy the **Web app URL**. It looks like
+   `https://script.google.com/macros/s/AKfycb…/exec`
+   (a Workspace account gives `https://script.google.com/a/macros/<domain>/s/…/exec`;
+   both work). This is the redirect URI for A4 and the endpoint for C1.
+4. **Project Settings (gear) → Script Properties → Add script property**, three times:
+
+   | Property | Value |
+   | --- | --- |
+   | `PLANNER_OAUTH_CLIENT_ID` | `418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com` |
+   | `PLANNER_OAUTH_CLIENT_SECRET` | the client secret from A5 |
+   | `PLANNER_OAUTH_REDIRECT_URI` | the `/exec` URL from B3, exactly as in A4 |
+
+   **Save script properties.** No redeploy is needed for properties. Leave `ND_PEPPER`
+   (made by `setup()`) alone; the session ids are derived from it.
+5. Check: open `<the /exec URL>?action=planner_oauth_status` in a browser. It must
+   show `"configured":true`. (`false` means a property is missing or the redirect URI
+   isn't an `/exec` URL.)
+6. Send Ray the `/exec` URL (not the secret).
+
+**C. Repo** (Ray)
+
+1. `shared/nd-backend.js`: `endpoint: 'https://script.google.com/macros/s/AKfycb…/exec'`
+   (the B3 URL, in quotes), `plannerOAuth: false`. Note this also switches Quote,
+   Timesheet, Checklist and Timesheet Live to this backend (their passcode logins),
+   as planned for the backend.
+2. Only after Brandon confirms B5 shows `configured: true` and the iPhone check below
+   passes on a test build, set `plannerOAuth: true` (Ray does this).
+
+**Device check after C2** (iPhone home-screen Planner): Sign in → Google opens →
+allow → "Sign-in finished … Return to the app" → back in Planner it signs in within a
+few seconds. Close the app completely, reopen after more than an hour: no sign-in
+prompt. Settings → Sign out, then sign in again works. Repeat once in Quote or Timesheet.
+
+Notes: refresh tokens are stored in this project's Script Properties, so anyone who
+can edit the script can read them. Keep editor access to Brandon. Script Properties
+suit this small team (about 9 KB per value, 500 KB total; each session is under 2 KB).
+Pending logins are capped at 100. Protocol reference:
+https://developers.google.com/identity/protocols/oauth2/web-server

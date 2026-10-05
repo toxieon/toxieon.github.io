@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'upload-v5';
+const CACHE_VERSION = 'upload-v6';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -23,6 +23,7 @@ const SHELL_ASSETS = [
   "./styles.css",
   "../shared/nd-config.js",
   "../assets/loading-bar.js",
+  "../shared/nd-backend.js",
   "../shared/nd-auth.js",
   "../shared/nd-match.js",
   "../shared/nd-sheets.js",
