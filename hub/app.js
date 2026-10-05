@@ -1,5 +1,6 @@
-/* Hub v0.5 — registry, not crawler (§5.1).
- * Apps come from the hand-curated apps.json; search is nd-match fuzzy;
+/* Hub v0.6.1 — registry, not crawler (§5.1). See hub/VERSION.
+ * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
+ * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Continue where you left off" reads the shared recents feed. */
 const grid = document.getElementById("grid");
 const statusEl = document.getElementById("status");
@@ -11,7 +12,9 @@ const cardTemplate = document.getElementById("cardTemplate");
 
 let apps = [];
 
+let lastLoad = 0;
 async function loadHub() {
+  lastLoad = Date.now();
   try {
     const r = await fetch("./apps.json", { cache: "no-cache" });
     const payload = await r.json();
@@ -82,7 +85,14 @@ function timeAgo(ts) {
 }
 
 searchInput.addEventListener("input", renderGrid);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) renderRecents(); });
+// An installed hub resumed from the background never reloads the page, so refresh
+// the app list when it becomes visible again (at most once a minute) and when a
+// new service worker takes over, so newly deployed tiles show without a reload.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (Date.now() - lastLoad > 60000) loadHub(); else renderRecents();
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("controllerchange", () => loadHub());
 loadHub();
 
 /* §1.6 suite-wide water-fill sync tube (shared). The hub is a launcher with no

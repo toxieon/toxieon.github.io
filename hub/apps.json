@@ -1,15 +1,16 @@
 {
+  "generated": "by hub/build-apps.cjs - edit nd:* meta tags or hub/discover.json, not this file",
   "apps": [
-    { "id": "planner",   "name": "Planner",   "path": "/planner/",   "icon": "/planner/favicon.svg",   "color": "#ff5252", "order": 1, "hidden": false },
-    { "id": "upload",    "name": "Upload",    "path": "/upload/",    "icon": "/upload/favicon.svg",    "color": "#a855f7", "order": 2, "hidden": false },
-    { "id": "search",    "name": "Search",    "path": "/search/",    "icon": "/search/favicon.svg",    "color": "#facc15", "order": 3, "hidden": false },
-    { "id": "quote",     "name": "Quote",     "path": "/quote/",     "icon": "/quote/favicon.svg",     "color": "#94a3b8", "order": 4, "hidden": false },
-    { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false },
-    { "id": "swb",       "name": "SWB",       "path": "/swb/",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6, "hidden": false },
-    { "id": "fitoff",    "name": "Fit-off",   "path": "/fitoff/",    "icon": "/fitoff/favicon.svg",    "color": "#3ab87a", "order": 7, "hidden": false },
-    { "id": "assets",    "name": "Assets",    "path": "/1234567890/", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8, "hidden": false },
-    { "id": "company",   "name": "Company",   "path": "/company/",   "icon": "/company/favicon.svg",   "color": "#e07b2a", "order": 9, "hidden": false },
-    { "id": "ico",       "name": "ICO Generator", "path": "/ico/",   "icon": "/ico/favicon.svg",       "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.4" },
-    { "id": "site",      "name": "Website",   "path": "/",           "icon": "/favicon.svg",           "color": "#2563eb", "order": 11, "hidden": true }
+    { "id": "planner", "name": "Planner", "path": "/planner/", "icon": "/planner/favicon.svg", "color": "#ff5252", "order": 1, "hidden": false, "version": "0.19.1" },
+    { "id": "upload", "name": "Upload", "path": "/upload/", "icon": "/upload/favicon.svg", "color": "#a855f7", "order": 2, "hidden": false },
+    { "id": "search", "name": "Search", "path": "/search/", "icon": "/search/favicon.svg", "color": "#facc15", "order": 3, "hidden": false },
+    { "id": "quote", "name": "Quote", "path": "/quote/", "icon": "/quote/favicon.svg", "color": "#94a3b8", "order": 4, "hidden": false, "version": "0.1.1" },
+    { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false, "version": "0.1.1" },
+    { "id": "swb", "name": "SWB", "path": "/swb/", "icon": "/swb/favicon.svg", "color": "#f59e0b", "order": 6, "hidden": false },
+    { "id": "fitoff", "name": "Fit-off", "path": "/fitoff/", "icon": "/fitoff/favicon.svg", "color": "#3ab87a", "order": 7, "hidden": false, "version": "0.1.1" },
+    { "id": "assets", "name": "Assets", "path": "/1234567890/", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8, "hidden": false },
+    { "id": "company", "name": "Company", "path": "/company/", "icon": "/company/favicon.svg", "color": "#e07b2a", "order": 9, "hidden": false },
+    { "id": "ico", "name": "ICO Generator", "path": "/ico/", "icon": "/ico/favicon.svg", "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.5", "description": "Name + version or picture to a multi-size Windows .ico" },
+    { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true }
   ]
 }
