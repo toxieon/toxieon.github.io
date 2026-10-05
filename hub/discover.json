@@ -3,15 +3,15 @@
   "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive"],
   "defaults": { "color": "#94a3b8", "order": 99 },
   "overrides": {
-    "planner":    { "name": "Planner",   "icon": "/planner/favicon.svg",   "color": "#ff5252", "order": 1 },
-    "upload":     { "name": "Upload",    "icon": "/upload/favicon.svg",    "color": "#a855f7", "order": 2 },
-    "search":     { "name": "Search",    "icon": "/search/favicon.svg",    "color": "#facc15", "order": 3 },
-    "quote":      { "name": "Quote",     "icon": "/quote/favicon.svg",     "color": "#94a3b8", "order": 4 },
+    "planner":    { "name": "Planner",   "icon": "/assets/suite-icons/apps/planner.svg?v=1.2.0",   "color": "#ff5252", "order": 1 },
+    "upload":     { "name": "Upload",    "icon": "/assets/suite-icons/apps/upload.svg?v=1.2.0",    "color": "#a855f7", "order": 2 },
+    "search":     { "name": "Search",    "icon": "/assets/suite-icons/apps/search.svg?v=1.2.0",    "color": "#facc15", "order": 3 },
+    "quote":      { "name": "Quote",     "icon": "/assets/suite-icons/apps/quote.svg?v=1.2.0",     "color": "#31d0ff", "order": 4 },
     "timesheet":  { "name": "Timesheet", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5 },
-    "swb":        { "name": "SWB",       "icon": "/swb/favicon.svg",       "color": "#f59e0b", "order": 6 },
-    "fitoff":     { "name": "Fit-off",   "icon": "/fitoff/favicon.svg",    "color": "#3ab87a", "order": 7 },
-    "1234567890": { "id": "assets", "name": "Assets", "icon": "/1234567890/favicon.svg", "color": "#6ddba3", "order": 8 },
-    "company":    { "name": "Company",   "icon": "/company/favicon.svg",   "color": "#e07b2a", "order": 9 }
+    "swb":        { "name": "SWB",       "icon": "/assets/suite-icons/apps/swb.svg?v=1.2.0",       "color": "#f59e0b", "order": 6 },
+    "fitoff":     { "name": "Fit-off",   "icon": "/assets/suite-icons/apps/fitoff.svg?v=1.2.0",    "color": "#3ab87a", "order": 7 },
+    "1234567890": { "id": "assets", "name": "Assets", "icon": "/assets/suite-icons/apps/assets.svg?v=1.2.0", "color": "#6ddba3", "order": 8 },
+    "company":    { "name": "Company",   "icon": "/assets/suite-icons/apps/company.svg?v=1.2.0",   "color": "#e07b2a", "order": 9 }
   },
   "extra": [
     { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true }

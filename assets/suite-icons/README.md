@@ -34,18 +34,20 @@ Metadata contains `id`, `label`, `kind` (`app` or `ui`), `color`, `file`, `recom
 | App | Glyph | Existing destination to review |
 | --- | --- | --- |
 | Hub | Four destinations | Hub browser icon and launcher |
-| Planner | Floor-plan walls | `planner/favicon.svg` and PWA icons |
-| Upload | Up arrow and tray | `upload/favicon.svg` and PWA icons |
-| Search | Magnifier | `search/favicon.svg` and PWA icons |
-| Quote | Price tag | `quote/favicon.svg` |
+| Planner | L-shaped floor plan, entrance gap, three placed nodes | Hub tile (**in use**, 1.2.0); `planner/favicon.svg` and PWA icons |
+| Upload | Site photo dropping into a job folder | Hub tile (**in use**, 1.2.0); `upload/favicon.svg` and PWA icons |
+| Search | Lens framing a house (find a job by name or address) | Hub tile (**in use**, 1.2.0); `search/favicon.svg` and PWA icons |
+| Quote | Torn-off quote docket with a price mark (Quote brand cyan `#31d0ff`) | Hub tile (**in use**, 1.2.0); `quote/favicon.svg` |
 | Timesheet | Clock | Browser, Apple touch and PWA icons |
-| SWB | Enclosed bolt | `swb/favicon.svg` and PWA icons |
-| Fit-off | Completion mark | `fitoff/favicon.svg` |
+| SWB | Enclosed bolt | Hub tile (**in use**, 1.2.0); `swb/favicon.svg` and PWA icons |
+| Fit-off | Completion mark | Hub tile (**in use**, 1.2.0); `fitoff/favicon.svg` |
 | Checklist | Paired checks | Checklist browser icon |
-| Assets | Stacked layers | Assets showroom browser icon |
-| Company | Team | `company/favicon.svg` |
+| Assets | Stacked layers | Hub tile (**in use**, 1.2.0); Assets showroom browser icon |
+| Company | Team | Hub tile (**in use**, 1.2.0); `company/favicon.svg` |
 | Website | Globe | Root public-site favicon |
 | ICO Generator | Stacked navy icon tile with name/version lines | `ico/favicon.svg` and hub tile (**in use**, 1.1.0) |
+
+Hub tiles for Planner, Upload, Search, Quote, SWB, Fit-off, Assets and Company point at `/assets/suite-icons/apps/<name>.svg?v=<library version>` through `hub/discover.json` "overrides" (an override `icon` beats the page favicon, so without it the hub shows each app's own `favicon.svg`). Timesheet keeps its own icon; ICO's favicon already is its suite icon. Bump the `?v=` there when the art changes. The apps' own favicons and PWA icons are unchanged.
 
 Update each app's actual link/manifest references deliberately and update `hub/apps.json` in the same rollout. Check pinned/install icons on a real device because browser and operating-system caches may retain previous artwork. Utility `qr` is a decorative QR symbol, not a scannable code generator. `measure` is an interface symbol, not a calibrated measurement tool.
 
@@ -58,4 +60,4 @@ node --test assets/suite-icons.test.cjs
 
 SVG/catalog generation uses only Node built-ins. PNG generation uses an existing `sharp` installation; optionally set `ND_SHARP_PATH` to its absolute module path. No dependencies are added to this repository. All exported art is defined in `assets/suite-icons.js`; regenerate exports after changes.
 
-Provenance: original artwork created for Neill Data Suite, October 2026 (ICO Generator icon added 2026-10-06, library 1.1.0). No third-party icon collection, font or copied artwork is included.
+Provenance: original artwork created for Neill Data Suite, October 2026 (ICO Generator icon added 2026-10-06, library 1.1.0; Planner, Upload, Search and Quote redrawn 2026-10-06, library 1.2.0). No third-party icon collection, font or copied artwork is included.
