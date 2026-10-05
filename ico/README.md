@@ -40,7 +40,7 @@ uvicorn ico.server:app --host 127.0.0.1 --port 8765
 
 ```bash
 curl http://127.0.0.1:8765/health
-# {"status":"ok","version":"0.1.5"}
+# {"status":"ok","version":"0.1.6"}
 
 curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&version=0.45.1"
 # saves TipBot-0.45.1.ico (Content-Type: image/x-icon, Content-Disposition: attachment)

@@ -6,6 +6,8 @@
     "hub:apps": "node hub/build-apps.cjs",
     "hub:check": "node hub/build-apps.cjs --check",
     "test:hub": "node --test hub/build-apps.test.cjs assets/suite-icons.test.cjs",
-    "test": "node --test"
+    "test": "node --test",
+    "icons:render": "node scripts/render-app-icons.cjs",
+    "icons:check": "node scripts/render-app-icons.cjs --check"
   }
 }

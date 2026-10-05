@@ -11,11 +11,12 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'swb-v5';
+const CACHE_VERSION = 'swb-v6';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
+  "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./favicon.svg",

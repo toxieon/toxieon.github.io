@@ -47,7 +47,7 @@ Metadata contains `id`, `label`, `kind` (`app` or `ui`), `color`, `file`, `recom
 | Website | Globe | Root public-site favicon |
 | ICO Generator | Stacked navy icon tile with name/version lines | `ico/favicon.svg` and hub tile (**in use**, 1.1.0) |
 
-Hub tiles for Planner, Upload, Search, Quote, SWB, Fit-off, Assets and Company point at `/assets/suite-icons/apps/<name>.svg?v=<library version>` through `hub/discover.json` "overrides" (an override `icon` beats the page favicon, so without it the hub shows each app's own `favicon.svg`). Timesheet keeps its own icon; ICO's favicon already is its suite icon. Bump the `?v=` there when the art changes. The apps' own favicons and PWA icons are unchanged.
+Hub tiles for Planner, Upload, Search, Quote, SWB, Fit-off, Assets and Company point at `/assets/suite-icons/apps/<name>.svg?v=<library version>` through `hub/discover.json` "overrides" (an override `icon` beats the page favicon, so without it the hub shows each app's own `favicon.svg`). Timesheet keeps its own icon; ICO's favicon already is its suite icon. Bump the `?v=` there when the art changes. The apps' own favicons are unchanged.
 
 Update each app's actual link/manifest references deliberately and update `hub/apps.json` in the same rollout. Check pinned/install icons on a real device because browser and operating-system caches may retain previous artwork. Utility `qr` is a decorative QR symbol, not a scannable code generator. `measure` is an interface symbol, not a calibrated measurement tool.
 
@@ -57,6 +57,18 @@ Update each app's actual link/manifest references deliberately and update `hub/a
 node assets/suite-icons/build-assets.cjs
 node --test assets/suite-icons.test.cjs
 ```
+
+### Home-screen (iPhone / PWA) icons
+
+Each app except Timesheet (which keeps its orange clock) uses this art for its `apple-touch-icon` (`<app>/icons/icon-180.png`) and manifest icons (`icon-192.png`, `icon-512.png`). The exported PNGs above have transparent rounded corners, which iOS paints black, so `scripts/render-app-icons.cjs` flattens them onto a solid square of the tile background (`#101922`) and writes 8-bit RGB PNGs with no alpha (Node built-ins only). After changing art:
+
+```sh
+node assets/suite-icons/build-assets.cjs   # SVG -> apps/<name>-{32,180,192,512}.png (sharp)
+npm run icons:render                        # -> <app>/icons/icon-{180,192,512}.png, opaque
+npm test                                    # includes the no-alpha / up-to-date check (npm run icons:check)
+```
+
+Then patch-bump each changed app per its VERSIONING.md (service worker caches precache the icons). iOS keeps the old picture on icons already added to the home screen until they are removed and re-added.
 
 SVG/catalog generation uses only Node built-ins. PNG generation uses an existing `sharp` installation; optionally set `ND_SHARP_PATH` to its absolute module path. No dependencies are added to this repository. All exported art is defined in `assets/suite-icons.js`; regenerate exports after changes.
 

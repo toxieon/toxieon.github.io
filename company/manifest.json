@@ -1,0 +1,24 @@
+{
+  "name": "Company · Neill Data & Security",
+  "short_name": "Company",
+  "description": "Neill Data & Security company details.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#101922",
+  "theme_color": "#101922",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

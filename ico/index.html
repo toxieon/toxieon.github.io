@@ -7,6 +7,9 @@
 <meta name="theme-color" content="#0B1F3A" />
 <title>ND • ICO Generator</title>
 <link rel="icon" type="image/svg+xml" href="/ico/favicon.svg" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
+<meta name="apple-mobile-web-app-title" content="ICO" />
 <!-- Hub tile (auto-discovered by hub/build-apps.cjs; see hub/README.md) -->
 <meta name="nd:app" content="ICO Generator" />
 <meta name="nd:color" content="#60a5fa" />
@@ -114,9 +117,9 @@ python -m ico.cli --image logo.png -o logo.ico</pre>
 
   <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
 </main>
-<script src="ico-canvas.js?v=0.1.5"></script>
+<script src="ico-canvas.js?v=0.1.6"></script>
 <script>
-const APP_VERSION = "0.1.5";   // see ico/VERSIONING.md
+const APP_VERSION = "0.1.6";   // see ico/VERSIONING.md
 document.getElementById("app-version").textContent = "v" + APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const API_KEY = "nd:ico:apiBase";
