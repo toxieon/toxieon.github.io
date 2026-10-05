@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'search-v3';
+const CACHE_VERSION = 'search-v4';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -21,6 +21,7 @@ const SHELL_ASSETS = [
   "./favicon.svg",
   "./styles.css",
   "../shared/nd-config.js",
+  "../shared/nd-backend.js",
   "../shared/nd-auth.js",
   "../shared/nd-match.js",
   "./app.js"

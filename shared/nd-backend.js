@@ -13,6 +13,9 @@
  */
 window.ND_BACKEND = Object.freeze({
   endpoint: '',
-  // Enable only after deploying PlannerOAuth.gs and configuring Script Properties.
+  // Stable Google login (one sign-in, silent server-side refresh) for every app that
+  // signs in with Google (shared/nd-auth.js). Turn on ONLY after the setup checklist in
+  // apps-script/neill-data-backend/README.md ("Stable Google login") is done and
+  // <endpoint>?action=planner_oauth_status shows "configured":true.
   plannerOAuth: false
 });
