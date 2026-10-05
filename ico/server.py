@@ -8,7 +8,8 @@ or:
 Endpoints:
     GET /health                                  -> {"status": "ok", "version": "..."}
     GET /ico?name=TipBot&version=0.45.1          -> image/x-icon download (TipBot-0.45.1.ico)
-        optional: bg=#0B1F3A  fg=#FFFFFF  short=TB  sizes=16,32,48,256
+        optional: bg=#0B1F3A | bg=transparent | bg=none   fg=#FFFFFF  short=TB  sizes=16,32,48,256
+        (bg omitted -> Neill navy; bg=, bg=transparent, bg=none -> transparent with outlined text)
 """
 from __future__ import annotations
 
@@ -36,7 +37,8 @@ def health():
 def ico(
     name: str = Query(..., max_length=gen.MAX_NAME, description="Line 1, e.g. TipBot"),
     version: str = Query(..., max_length=gen.MAX_VERSION, description="Line 2, e.g. 0.45.1"),
-    bg: str | None = Query(None, max_length=7, description="Background hex, default #0B1F3A"),
+    bg: str | None = Query(None, max_length=16,
+                           description="Background hex (default #0B1F3A), or 'transparent' / 'none' / empty for alpha"),
     fg: str | None = Query(None, max_length=7, description="Text hex, default #FFFFFF"),
     short: str | None = Query(None, max_length=gen.MAX_SHORT, description="Text for 16px (default: initials)"),
     sizes: str | None = Query(None, max_length=60, description="Comma list, default 16,32,48,256"),

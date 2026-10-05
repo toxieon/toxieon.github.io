@@ -26,7 +26,11 @@ button.secondary { background: transparent; color: var(--text); border: 1px soli
 .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
 #previews { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
 figure { margin: 0; text-align: center; font-size: .75rem; color: var(--muted); }
-figure canvas { display: block; margin: 0 auto 4px; image-rendering: pixelated; border: 1px solid var(--border); }
+figure canvas { display: block; margin: 0 auto 4px; image-rendering: pixelated; border: 1px solid var(--border);
+  background: repeating-conic-gradient(#d9dee5 0% 25%, #f6f8fb 0% 50%) 50% / 12px 12px; }
+label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); flex: 1 1 160px; align-self: flex-end; padding-bottom: 10px; }
+label.check input { width: 18px; height: 18px; }
+input:disabled { opacity: .35; }
 .err { color: #ff6b88; min-height: 1.2em; }
 code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; }
 pre { background: rgba(0,0,0,.35); border-radius: 10px; padding: 10px 12px; overflow-x: auto; margin: 6px 0 12px; }
@@ -37,7 +41,7 @@ a { color: var(--brand); }
 <body>
 <main>
   <h1>ICO Generator</h1>
-  <p class="lead">Windows <code>.ico</code> with the program name and version on it (16, 32, 48 and 256 px), so Desktop folders show what's inside at a glance.</p>
+  <p class="lead">Windows <code>.ico</code> with the program name and version on it (16, 32, 48 and 256 px), so Desktop folders show what's inside at a glance. Navy background by default, or transparent (text gets a subtle outline so it reads on any wallpaper).</p>
 
   <section>
     <h2>Make an icon</h2>
@@ -49,6 +53,7 @@ a { color: var(--brand); }
       </div>
       <div class="row" style="margin-top:10px">
         <label>Background<input id="bg" type="color" value="#0b1f3a" /></label>
+        <label class="check"><input id="transparent" type="checkbox" /> Transparent background</label>
         <label>Text<input id="fg" type="color" value="#ffffff" /></label>
       </div>
       <div class="actions">
@@ -67,7 +72,9 @@ a { color: var(--brand); }
 uvicorn ico.server:app --host 127.0.0.1 --port 8765
 
 curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&amp;version=0.45.1"
-python -m ico.cli TipBot 0.45.1 -o TipBot.ico</pre>
+curl -fOJ "http://127.0.0.1:8765/ico?name=TipBot&amp;version=0.45.1&amp;bg=transparent"
+python -m ico.cli TipBot 0.45.1 -o TipBot.ico
+python -m ico.cli TipBot 0.45.1 --bg transparent</pre>
     <div class="row">
       <label>API base URL<input id="apiBase" value="http://127.0.0.1:8765" /></label>
     </div>
@@ -80,16 +87,17 @@ python -m ico.cli TipBot 0.45.1 -o TipBot.ico</pre>
 
   <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
 </main>
-<script src="ico-canvas.js"></script>
+<script src="ico-canvas.js?v=0.1.2"></script>
 <script>
-const APP_VERSION = "0.1.1";   // see ico/VERSIONING.md
+const APP_VERSION = "0.1.2";   // see ico/VERSIONING.md
 document.getElementById("app-version").textContent = "v" + APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const API_KEY = "nd:ico:apiBase";
 try { const saved = localStorage.getItem(API_KEY); if (saved) $("apiBase").value = saved; } catch (e) {}
 
 function opts() {
-  return { name: $("name").value, version: $("version").value, short: $("short").value, bg: $("bg").value, fg: $("fg").value };
+  return { name: $("name").value, version: $("version").value, short: $("short").value,
+    bg: $("transparent").checked ? "transparent" : $("bg").value, fg: $("fg").value };
 }
 
 async function preview() {
@@ -130,8 +138,10 @@ $("viaApi").addEventListener("click", () => {
   window.location.href = base + "/ico?" + q.toString();
 });
 
-$("reset").addEventListener("click", () => { $("bg").value = "#0b1f3a"; $("fg").value = "#ffffff"; $("short").value = ""; preview(); });
+$("reset").addEventListener("click", () => { $("bg").value = "#0b1f3a"; $("fg").value = "#ffffff"; $("short").value = ""; $("transparent").checked = false; $("bg").disabled = false; preview(); });
+$("transparent").addEventListener("change", () => { $("bg").disabled = $("transparent").checked; preview(); });
 ["name", "version", "short", "bg", "fg"].forEach((id) => $(id).addEventListener("input", preview));
+$("bg").disabled = $("transparent").checked; // browsers may restore the checkbox on reload
 preview();
 </script>
 </body>
