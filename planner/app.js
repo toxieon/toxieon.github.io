@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.20.2";
+const APP_VERSION = "0.20.3";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -415,6 +415,16 @@ function sydneyStamp(d = new Date()) {
   } catch (_) {
     return `${nowStamp()} UTC`;
   }
+}
+/* Display only: a stored UTC stamp (nowStamp() "YYYY-MM-DD HH:MM", or ISO with Z/offset) shown in Sydney
+ * time, e.g. "6 Oct 2026, 10:42 am AEDT". Stored values never change; anything unparseable is shown as-is. */
+function sydneyFromStored(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(raw);
+  if (!m) return raw;
+  const d = m[7] ? new Date(raw.replace(" ", "T")) : new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
+  return Number.isNaN(d.getTime()) ? raw : sydneyStamp(d);
 }
 function parseBool(value) { return /^(true|yes|y|1|protected)$/i.test(String(value || "").trim()); }
 function detectDevice() { return /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "Mobile" : "Desktop"; }
@@ -3917,13 +3927,13 @@ function renderPrintOverviewBody(proj, floor) {
     ${renderPrintPlanHero(floor, nodes, `${floor?.name || "Plan"} — all nodes`)}
     <header class="print-header">
       <h1>${escapeHtml(proj.name)}</h1>
-      <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(nowStamp())}</p>
+      <p>${escapeHtml(proj.address || "")} &middot; Floor: ${escapeHtml(floor?.name || "-")} &middot; Generated ${escapeHtml(sydneyStamp())}</p>
       <p>Owner: ${escapeHtml(PRIMARY_OWNER_EMAIL)} &middot; Total nodes (this floor): ${nodes.length}</p>
     </header>
     <h2>Node Schedule</h2>
     <table class="print-table">
       <thead><tr><th>#</th><th>Title</th><th>Category</th><th>Line item</th><th>Status</th><th>Assignee</th><th>Room</th><th>Updated</th></tr></thead>
-      <tbody>${nodes.map((n, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(nodeDisplayTitle(n))}</td><td>${escapeHtml(n.category || "")}</td><td>${escapeHtml(n.lineItem || "")}</td><td>${escapeHtml(n.status)}</td><td>${escapeHtml(n.assignedTo || "-")}</td><td>${escapeHtml(roomLabel(n.roomId))}</td><td>${escapeHtml(n.updatedAt || "")}</td></tr>`).join("")}</tbody>
+      <tbody>${nodes.map((n, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(nodeDisplayTitle(n))}</td><td>${escapeHtml(n.category || "")}</td><td>${escapeHtml(n.lineItem || "")}</td><td>${escapeHtml(n.status)}</td><td>${escapeHtml(n.assignedTo || "-")}</td><td>${escapeHtml(roomLabel(n.roomId))}</td><td>${escapeHtml(sydneyFromStored(n.updatedAt))}</td></tr>`).join("")}</tbody>
     </table>`;
 }
 function renderPrintFullBody(proj) {
