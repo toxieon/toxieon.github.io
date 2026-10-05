@@ -1,0 +1,24 @@
+{
+  "name": "Assets · Neill Data Suite",
+  "short_name": "Assets",
+  "description": "Neill Data suite icon assets.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#101922",
+  "theme_color": "#101922",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
