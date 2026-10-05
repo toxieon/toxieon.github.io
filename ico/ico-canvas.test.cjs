@@ -48,3 +48,16 @@ test("packIco writes a valid ICONDIR with PNG frames", () => {
   assert.equal(out.length, 6 + 48 + 7 + 9 + 14);
   assert.throws(() => NDIco.packIco([{ size: 512, png: png(1) }]));
 });
+
+test("image path helpers mirror generate.py", () => {
+  assert.equal(NDIco.imageFilename("My Logo.png"), "My-Logo.ico");
+  assert.equal(NDIco.imageFilename("C:\\fakepath\\logo.webp"), "logo.ico");
+  assert.equal(NDIco.imageFilename(""), "icon.ico");
+  assert.deepEqual(NDIco.fitRect(400, 300, 256), { x: 0, y: 32, w: 256, h: 192 });
+  assert.deepEqual(NDIco.fitRect(100, 100, 16), { x: 0, y: 0, w: 16, h: 16 });
+  assert.deepEqual(NDIco.fitRect(10, 1000, 16), { x: 7, y: 0, w: 1, h: 16 });
+  assert.equal(NDIco.MAX_UPLOAD_BYTES, 10 * 1024 * 1024);
+  assert.throws(() => NDIco.checkImageFile({ name: "a.gif", type: "image/gif", size: 10 }), /PNG, JPEG, WebP or ICO/);
+  assert.throws(() => NDIco.checkImageFile({ name: "a.png", type: "image/png", size: 11 * 1024 * 1024 }), /10 MB/);
+  assert.doesNotThrow(() => NDIco.checkImageFile({ name: "logo.ICO", type: "", size: 10 }));
+});

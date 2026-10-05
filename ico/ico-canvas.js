@@ -2,7 +2,10 @@
  * Mirrors ico/generate.py (same defaults, fonts and layout rules) so the static
  * page at /ico/ works on GitHub Pages without a server. No third-party code:
  * an .ico with PNG frames is a 6-byte header + one 16-byte entry per frame + the PNGs.
- * The Python API/CLI (ico/server.py, ico/cli.py) is the canonical path for scripts. */
+ * The Python API/CLI (ico/server.py, ico/cli.py) is the canonical path for scripts.
+ * Image path: imageToIco(file) fits a PNG/JPEG/WebP/ICO into a square (transparent padding,
+ * no painted background), keeps alpha and resizes each size with high-quality smoothing
+ * (stepwise halving). The Python API uses Pillow LANCZOS for the same job. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
@@ -16,6 +19,8 @@
   const VERSION_DIM = 0.8;
   const VERSION_ALPHA = 0.88, OUTLINE_ALPHA = 0.75; // transparent background only
   const TRANSPARENT_WORDS = ["", "transparent", "none"];
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024, MAX_IMAGE_PIXELS = 40000000; // same limits as generate.py
+  const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/x-icon", "image/vnd.microsoft.icon"];
   const FONT_FAMILY = '"ND Ico Sans", "DejaVu Sans", Verdana, sans-serif';
 
   function clean(value, field, max, required) {
@@ -57,6 +62,20 @@
     let stem = version ? name + "-" + version : name;
     stem = stem.replace(/\s+/g, "-").replace(/[^A-Za-z0-9._-]/g, "").replace(/-{2,}/g, "-").replace(/^[.-]+|[.-]+$/g, "") || "icon";
     return stem.slice(0, 80) + ".ico";
+  }
+
+  /** "My Logo.png" -> "My-Logo.ico" (mirrors generate.image_filename) */
+  function imageFilename(uploadName) {
+    let stem = String(uploadName || "").split(/[\\/]/).pop();
+    if (stem.includes(".")) stem = stem.slice(0, stem.lastIndexOf("."));
+    return safeFilename(stem || "icon", "");
+  }
+
+  /** Where a w x h picture lands inside a size x size square (contain, centred). */
+  function fitRect(w, h, size) {
+    const k = size / Math.max(w, h);
+    const dw = Math.max(1, Math.round(w * k)), dh = Math.max(1, Math.round(h * k));
+    return { x: Math.floor((size - dw) / 2), y: Math.floor((size - dh) / 2), w: dw, h: dh };
   }
 
   function makeSpec(opts) {
@@ -171,6 +190,66 @@
     }, "image/png"));
   }
 
+  /** Draw a decoded picture (ImageBitmap / img / canvas) into a transparent size x size canvas. */
+  function drawImageFrame(canvas, source, size) {
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, size, size); // never paint a background behind the picture
+    const sw = source.width, sh = source.height;
+    const r = fitRect(sw, sh, size);
+    // Stepwise halving keeps big downscales sharp and alias-free (browser has no LANCZOS)
+    let src = source, cw = sw, ch = sh;
+    while (cw / 2 >= r.w && ch / 2 >= r.h) {
+      const tmp = document.createElement("canvas");
+      tmp.width = Math.max(1, Math.round(cw / 2)); tmp.height = Math.max(1, Math.round(ch / 2));
+      const t = tmp.getContext("2d");
+      t.imageSmoothingEnabled = true; t.imageSmoothingQuality = "high";
+      t.drawImage(src, 0, 0, cw, ch, 0, 0, tmp.width, tmp.height);
+      src = tmp; cw = tmp.width; ch = tmp.height;
+    }
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, cw, ch, r.x, r.y, r.w, r.h);
+    return canvas;
+  }
+
+  function checkImageFile(file) {
+    if (!file) throw new Error("choose a picture first");
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error("picture is larger than 10 MB");
+    const ok = IMAGE_TYPES.includes(file.type) || /\.(png|jpe?g|webp|ico)$/i.test(file.name || "");
+    if (!ok) throw new Error("use a PNG, JPEG, WebP or ICO picture");
+  }
+
+  /** Decode a File/Blob; EXIF rotation is applied by the browser. */
+  async function decodeImage(file) {
+    checkImageFile(file);
+    let bmp;
+    try { bmp = await createImageBitmap(file); }
+    catch (e) {
+      bmp = await new Promise((resolve, reject) => {
+        const img = new Image(); const url = URL.createObjectURL(file);
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("this picture could not be read by the browser")); };
+        img.src = url;
+      });
+    }
+    const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
+    if (!w || !h) throw new Error("this picture could not be read by the browser");
+    if (w * h > MAX_IMAGE_PIXELS) throw new Error("picture is " + w + "x" + h + "; the limit is 40 million pixels");
+    return bmp;
+  }
+
+  /** Browser: picture File -> { blob, filename, frames } (.ico with RGBA PNG frames). */
+  async function imageToIco(file, sizes) {
+    const source = await decodeImage(file);
+    const list = (sizes || DEFAULT_SIZES).slice().sort((a, b) => a - b);
+    const frames = [];
+    for (const size of list) {
+      const c = drawImageFrame(document.createElement("canvas"), source, size);
+      frames.push({ size, canvas: c, png: await canvasPng(c) });
+    }
+    return { blob: new Blob([packIco(frames)], { type: "image/x-icon" }), filename: imageFilename(file.name), frames };
+  }
+
   /** Browser: build the .ico Blob. Waits for the bundled fonts first. */
   async function generateIco(opts) {
     const spec = makeSpec(opts);
@@ -186,5 +265,7 @@
   }
 
   return { DEFAULT_BG, DEFAULT_FG, DEFAULT_SIZES, MAX_NAME, MAX_VERSION, MAX_SHORT,
-    initials, safeFilename, parseHex, parseBg, makeSpec, drawFrame, packIco, generateIco };
+    MAX_UPLOAD_BYTES, MAX_IMAGE_PIXELS,
+    initials, safeFilename, imageFilename, fitRect, parseHex, parseBg, makeSpec, drawFrame, packIco, generateIco,
+    checkImageFile, decodeImage, drawImageFrame, imageToIco };
 });

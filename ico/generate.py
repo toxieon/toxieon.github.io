@@ -11,6 +11,10 @@ Background: solid colour (default Neill navy) or transparent (bg = "transparent"
 an explicit empty string). Transparent icons keep the text colour (white by default) and add
 a subtle outline in a contrasting colour so the text still reads on light or dark wallpapers.
 The same layout rules are mirrored in ico/ico-canvas.js for the static page.
+
+Image path (image_to_ico): PNG / JPEG / WebP / ICO in -> multi-size .ico out. The picture is
+fitted into a square (transparent padding for non-square images, never a painted background),
+alpha is kept, and each size is resized from the source with LANCZOS.
 """
 from __future__ import annotations
 
@@ -19,7 +23,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 HERE = Path(__file__).resolve().parent
 VERSION = (HERE / "VERSION").read_text(encoding="utf-8").strip()
@@ -39,6 +43,11 @@ VERSION_DIM = 0.80  # version colour = 80 % fg + 20 % bg ("slightly lighter")
 VERSION_ALPHA = 0.88  # transparent bg: version line drawn at 88 % opacity instead
 OUTLINE_ALPHA = 0.75  # transparent bg: opacity of the contrasting text outline
 TRANSPARENT_WORDS = ("", "transparent", "none")
+
+# Image upload limits (also enforced by server.py before decoding)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB file
+MAX_IMAGE_PIXELS = 40_000_000        # e.g. 8000 x 5000; checked from the header before decoding
+IMAGE_FORMATS = ("PNG", "JPEG", "WEBP", "ICO")
 
 _HEX = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
@@ -246,4 +255,75 @@ def generate_png(name, version, size=256, **kw) -> bytes:
     spec = make_spec(name, version, sizes=[size], **kw)
     buf = io.BytesIO()
     render_size(spec, size).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def parse_sizes(sizes) -> tuple[int, ...]:
+    """None -> defaults; '16,32' or [16, 32] -> validated sorted tuple. Bad input -> ValueError."""
+    if sizes is None or sizes == "":
+        return DEFAULT_SIZES
+    if isinstance(sizes, str):
+        try:
+            sizes = [int(x) for x in sizes.split(",") if x.strip()]
+        except ValueError:
+            raise ValueError(f"sizes must be a comma list of numbers from {ALLOWED_SIZES}")
+    out = tuple(sorted(set(int(x) for x in sizes)))
+    bad = [x for x in out if x not in ALLOWED_SIZES]
+    if bad or not out:
+        raise ValueError(f"sizes must be from {ALLOWED_SIZES}, got {bad or 'none'}")
+    return out
+
+
+def image_filename(upload_name: str | None) -> str:
+    """'My Logo.png' -> 'My-Logo.ico'; anything odd -> 'icon.ico'."""
+    stem = re.split(r"[\\/]", upload_name or "")[-1]  # browsers may send C:\path\name.png
+    stem = stem.rsplit(".", 1)[0] if "." in stem else stem
+    return safe_filename(stem or "icon", "")
+
+
+def load_image(data: bytes) -> Image.Image:
+    """Decode an uploaded PNG / JPEG / WebP / ICO into an upright RGBA image (alpha kept)."""
+    if not data:
+        raise ValueError("image is empty")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError(f"image is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB")
+    try:
+        im = Image.open(io.BytesIO(data), formats=IMAGE_FORMATS)
+    except Exception:
+        raise ValueError("unsupported image: use PNG, JPEG, WebP or ICO")
+    if im.format == "ICO":  # use the biggest frame inside the .ico
+        im.size = max(im.info.get("sizes") or [im.size], key=lambda wh: wh[0] * wh[1])
+    w, h = im.size
+    if w < 1 or h < 1 or w * h > MAX_IMAGE_PIXELS:
+        raise ValueError(f"image is {w}x{h}; the limit is {MAX_IMAGE_PIXELS:,} pixels")
+    try:
+        im.load()
+        im = ImageOps.exif_transpose(im)  # phone photos: honour EXIF rotation
+    except Exception:
+        raise ValueError("image could not be decoded")
+    return im.convert("RGBA")  # P+transparency, LA, RGBA keep alpha; RGB/L/CMYK become opaque
+
+
+def square_image(im: Image.Image) -> Image.Image:
+    """Centre a non-square image on a transparent square canvas (no background painted)."""
+    w, h = im.size
+    if w == h:
+        return im
+    side = max(w, h)
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    canvas.paste(im, ((side - w) // 2, (side - h) // 2))
+    return canvas
+
+
+def image_frames(data: bytes, sizes=None) -> list[Image.Image]:
+    sq = square_image(load_image(data))
+    # Pillow resizes RGBA premultiplied, so transparent edges don't get dark fringes
+    return [sq.resize((s, s), Image.Resampling.LANCZOS) for s in parse_sizes(sizes)]
+
+
+def image_to_ico(data: bytes, sizes=None) -> bytes:
+    """Uploaded image bytes -> multi-size .ico bytes (RGBA PNG frames). Raises ValueError."""
+    frames = image_frames(data, sizes)
+    buf = io.BytesIO()
+    frames[-1].save(buf, format="ICO", sizes=[f.size for f in frames], append_images=frames[:-1])
     return buf.getvalue()
