@@ -25,6 +25,15 @@ test("spec defaults and validation", () => {
   assert.throws(() => NDIco.makeSpec({ name: "A".repeat(41), version: "1" }));
 });
 
+test("transparent background words (omitted bg stays navy)", () => {
+  for (const bg of ["transparent", "TRANSPARENT", " none ", "None", ""]) {
+    assert.equal(NDIco.makeSpec({ name: "TipBot", version: "0.45.1", bg }).bg, null, JSON.stringify(bg));
+  }
+  assert.deepEqual(NDIco.makeSpec({ name: "TipBot", version: "0.45.1" }).bg, [0x0b, 0x1f, 0x3a]);
+  assert.deepEqual(NDIco.makeSpec({ name: "TipBot", version: "0.45.1", bg: "#fff" }).bg, [255, 255, 255]);
+  assert.throws(() => NDIco.makeSpec({ name: "TipBot", version: "0.45.1", bg: "clear" }));
+});
+
 test("packIco writes a valid ICONDIR with PNG frames", () => {
   const png = (n) => Uint8Array.from([0x89, 0x50, 0x4e, 0x47, ...new Array(n).fill(7)]);
   const out = NDIco.packIco([{ size: 256, png: png(10) }, { size: 16, png: png(3) }, { size: 32, png: png(5) }]);

@@ -3,6 +3,7 @@
     python -m ico.cli TipBot 0.45.1 -o TipBot.ico      (from the repo root)
     python ico/cli.py "Neill Data" 0.19.1               (writes Neill-Data-0.19.1.ico)
     python ico/cli.py TipBot 0.45.1 --png preview.png   (also write a 256px PNG preview)
+    python ico/cli.py TipBot 0.45.1 --bg transparent    (alpha background, outlined text; also: none)
 """
 from __future__ import annotations
 
@@ -22,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("name", help="line 1, e.g. TipBot")
     p.add_argument("version", help="line 2, e.g. 0.45.1")
     p.add_argument("-o", "--output", help="output .ico path (default: <name>-<version>.ico in the current folder)")
-    p.add_argument("--bg", default=gen.DEFAULT_BG, help=f"background hex (default {gen.DEFAULT_BG})")
+    p.add_argument("--bg", default=None,
+                   help=f"background hex (default {gen.DEFAULT_BG}), or 'transparent' / 'none' for an alpha background")
     p.add_argument("--fg", default=gen.DEFAULT_FG, help=f"text hex (default {gen.DEFAULT_FG})")
     p.add_argument("--short", help="text for the 16px frame (default: initials, e.g. TB)")
     p.add_argument("--sizes", default=",".join(map(str, gen.DEFAULT_SIZES)),

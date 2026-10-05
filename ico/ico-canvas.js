@@ -14,6 +14,8 @@
   const DEFAULT_SIZES = [16, 32, 48, 256];
   const MAX_NAME = 40, MAX_VERSION = 24, MAX_SHORT = 4;
   const VERSION_DIM = 0.8;
+  const VERSION_ALPHA = 0.88, OUTLINE_ALPHA = 0.75; // transparent background only
+  const TRANSPARENT_WORDS = ["", "transparent", "none"];
   const FONT_FAMILY = '"ND Ico Sans", "DejaVu Sans", Verdana, sans-serif';
 
   function clean(value, field, max, required) {
@@ -31,6 +33,16 @@
     if (h.length === 3) h = h.split("").map((c) => c + c).join("");
     return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
   }
+
+  /** null/undefined (omitted) -> navy; "", "transparent", "none" (any case) -> null = transparent */
+  function parseBg(value) {
+    if (value === undefined || value === null) return parseHex(DEFAULT_BG, DEFAULT_BG);
+    if (TRANSPARENT_WORDS.includes(String(value).trim().toLowerCase())) return null;
+    return parseHex(value, DEFAULT_BG);
+  }
+
+  const outlineWidth = (size) => Math.max(1, Math.round(size * 0.02));
+  const outlineColour = (fg) => (0.2126 * fg[0] + 0.7152 * fg[1] + 0.0722 * fg[2] >= 128 ? [0, 0, 0] : [255, 255, 255]);
 
   function initials(name) {
     const words = name.split(/[\s_\-.]+/).filter(Boolean);
@@ -55,7 +67,7 @@
       name, version,
       short: short || initials(name),
       tiny: short || initials(name).slice(0, 2),
-      bg: parseHex(opts.bg, DEFAULT_BG),
+      bg: parseBg(opts.bg), // null = transparent
       fg: parseHex(opts.fg, DEFAULT_FG),
       sizes: (opts.sizes || DEFAULT_SIZES).slice().sort((a, b) => a - b),
     };
@@ -80,27 +92,39 @@
     return null;
   }
 
-  function put(ctx, text, m, x, y, colour) {
+  // outline = null (solid bg) or { width, colour } (transparent bg)
+  function put(ctx, text, m, x, y, colour, outline, alpha) {
     ctx.font = m.weight + " " + m.px + "px " + FONT_FAMILY;
-    ctx.fillStyle = colour;
     ctx.textBaseline = "alphabetic";
+    if (outline) {
+      ctx.lineJoin = "round";
+      ctx.lineWidth = outline.width * 2;
+      ctx.strokeStyle = "rgba(" + outline.colour.join(",") + "," + OUTLINE_ALPHA + ")";
+      ctx.strokeText(text, x + m.l, y + m.a);
+    }
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.fillStyle = colour;
     ctx.fillText(text, x + m.l, y + m.a);
+    ctx.globalAlpha = 1;
   }
 
   /** Draw one frame onto a size x size canvas (same rules as generate.render_size). */
   function drawFrame(canvas, spec, size) {
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = rgb(spec.bg);
-    ctx.fillRect(0, 0, size, size);
-    const pad = Math.max(1, Math.round(size * 0.06));
+    const transparent = spec.bg === null;
+    const sw = transparent ? outlineWidth(size) : 0;
+    const outline = transparent ? { width: sw, colour: outlineColour(spec.fg) } : null;
+    ctx.clearRect(0, 0, size, size);
+    if (!transparent) { ctx.fillStyle = rgb(spec.bg); ctx.fillRect(0, 0, size, size); }
+    const pad = Math.max(1, Math.round(size * 0.06)) + sw; // leave room for the outline
     const avail = size - 2 * pad;
     if (size < 32) {
       const m = fit(ctx, spec.tiny, 700, Math.round(size * 0.62), 4, avail, avail);
-      if (m) put(ctx, spec.tiny, m, (size - m.w) / 2, (size - m.h) / 2, rgb(spec.fg));
+      if (m) put(ctx, spec.tiny, m, (size - m.w) / 2, (size - m.h) / 2, rgb(spec.fg), outline);
       return canvas;
     }
-    const gap = Math.max(1, Math.round(size * 0.06));
+    const gap = Math.max(1, Math.round(size * 0.06)) + sw;
     const nameMaxH = Math.round(avail * 0.55);
     const minName = Math.max(8, Math.round(size * 0.05));
     let line1 = spec.name;
@@ -109,8 +133,9 @@
     const verStart = Math.min(Math.round(size * 0.26), Math.round(n.px * 0.82));
     const v = fit(ctx, spec.version, 400, verStart, 4, avail, Math.max(avail - n.h - gap, 4)) || measure(ctx, spec.version, 400, 4);
     const top = (size - (n.h + gap + v.h)) / 2;
-    put(ctx, line1, n, (size - n.w) / 2, top, rgb(spec.fg));
-    put(ctx, spec.version, v, (size - v.w) / 2, top + n.h + gap, rgb(mix(spec.fg, spec.bg, VERSION_DIM)));
+    put(ctx, line1, n, (size - n.w) / 2, top, rgb(spec.fg), outline);
+    if (transparent) put(ctx, spec.version, v, (size - v.w) / 2, top + n.h + gap, rgb(spec.fg), outline, VERSION_ALPHA);
+    else put(ctx, spec.version, v, (size - v.w) / 2, top + n.h + gap, rgb(mix(spec.fg, spec.bg, VERSION_DIM)));
     return canvas;
   }
 
@@ -161,5 +186,5 @@
   }
 
   return { DEFAULT_BG, DEFAULT_FG, DEFAULT_SIZES, MAX_NAME, MAX_VERSION, MAX_SHORT,
-    initials, safeFilename, parseHex, makeSpec, drawFrame, packIco, generateIco };
+    initials, safeFilename, parseHex, parseBg, makeSpec, drawFrame, packIco, generateIco };
 });
