@@ -1,6 +1,6 @@
 'use strict';
-// Hub (suite launcher) icons are the Neill Data suite logo (ND), not a suite tile icon, so the
-// hub is not in scripts/render-app-icons.cjs. This keeps the same guarantees for it.
+// Hub icons are the teal 'Suite hub' suite icon (assets/suite-icons/apps/hub.svg), rendered by
+// scripts/render-app-icons.cjs; maskables are the same art full-bleed. Hub 0.6.5.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -19,7 +19,7 @@ test('hub apple-touch-icon and maskables are opaque RGB at the right sizes', () 
   }
 });
 
-test('hub page, manifest and service worker reference the ND icons', () => {
+test('hub page, manifest and service worker reference the Suite hub icons', () => {
   const html = read('index.html').toString();
   assert.match(html, /<link rel="icon" href="favicon\.svg\?v=[\d.]+" type="image\/svg\+xml">/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="icons\/icon-180\.png"/);

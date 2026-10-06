@@ -25,12 +25,13 @@ test("each app page links the apple-touch-icon, title and manifest; manifest ico
     assert.match(html, new RegExp(`<meta name="apple-mobile-web-app-title" content="${app.title}"`), app.folder);
     assert.match(html, /<link rel="manifest" href="manifest\.json"/, app.folder);
     const m = JSON.parse(fs.readFileSync(path.join(ROOT, app.folder, "manifest.json"), "utf8"));
-    const sizes = m.icons.map((i) => i.sizes).sort();
-    assert.deepEqual(sizes, ["192x192", "512x512"], app.folder);
-    for (const i of m.icons) {
-      assert.equal(i.purpose, "any", `${app.folder}: art is not maskable-safe`);
-      assert.ok(fs.existsSync(path.join(ROOT, app.folder, i.src)), `${app.folder}/${i.src}`);
-    }
+    // The Hub also lists dedicated full-bleed maskable PNGs (hub/hub-icons.test.cjs checks them);
+    // the rendered suite art itself is only ever purpose "any".
+    const extraMaskable = app.folder === "hub" ? (i) => i.purpose === "maskable" && /icons\/maskable-/.test(i.src) : () => false;
+    const anyIcons = m.icons.filter((i) => !extraMaskable(i));
+    assert.deepEqual(anyIcons.map((i) => i.sizes).sort(), ["192x192", "512x512"], app.folder);
+    for (const i of m.icons) assert.ok(fs.existsSync(path.join(ROOT, app.folder, i.src)), `${app.folder}/${i.src}`);
+    for (const i of anyIcons) assert.equal(i.purpose, "any", `${app.folder}: art is not maskable-safe`);
   }
   assert.ok(SIZES.includes(180));
 });
