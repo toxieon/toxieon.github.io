@@ -14,6 +14,7 @@
 <script src="../assets/loading-bar.js"></script>
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
+<script src="../shared/nd-recent-jobs.js?v=1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -653,7 +654,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.1.2';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.1.3';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1019,6 +1020,12 @@ function payPeriodFor(date) {
   if (existing) return existing.label || weekStart;
   return weekStart;
 }
+/* Hub "Recent jobs" (shared/nd-recent-jobs.js). Timesheet has no deep link, so the entry reopens the app. */
+function recordRecentJob(session) {
+  if (!window.NDRecentJobs || !session) return;
+  NDRecentJobs.record({ app: 'timesheet', id: session.job_id || 'shift', label: NDRecentJobs.label(session.job_name || 'Shift', session.address_confirmed), url: '/timesheet/' });
+}
+
 function clockOn({ job, lat, lng, addressConfirmed }) {
   if (state.currentSession) return state.currentSession;
   const now = new Date();
@@ -1033,6 +1040,7 @@ function clockOn({ job, lat, lng, addressConfirmed }) {
     missed_clockoff: false, pay_period: payPeriodFor(now), entry_method: 'gps', _open: true
   };
   state.currentSession = session; saveState(); vibrate(60);
+  recordRecentJob(session);
   // §3.2e: write the open session immediately so lat_on/job_id/user aren't lost
   // if the shift is never clocked off. Upsert is duplicate-safe on clock-off.
   upsertSession(session);
@@ -1061,7 +1069,7 @@ function clockOff({ lat, lng, breakMinutes, notes, manualTime, departedOffsite, 
   session.missed_clockoff = !!missed; delete session._open;
   state.sessions.unshift(session); state.lastClosedSession = session; state.currentSession = null;
   bumpJobVisit(session.job_id); saveState(); upsertSession(session); vibrate([40, 60, 40]);
-  if (window.NDUI?.recordVisit) NDUI.recordVisit('timesheet', session.job_id || 'shift', 'Shift: ' + (session.job_name || 'job'), '/timesheet/');
+  recordRecentJob(session);
   // Clocking off after 15:25 counts as the last entry of the day → full sync.
   maybeDailyForceSync();
   return session;

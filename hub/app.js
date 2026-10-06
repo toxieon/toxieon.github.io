@@ -1,7 +1,9 @@
-/* Hub v0.6.5 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.7.1 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
- * "Continue where you left off" reads the shared recents feed. */
+ * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
+ * shared/nd-recent-jobs.js (localStorage nd:recent:v1). Built with DOM nodes and
+ * textContent only: stored strings never go through innerHTML. */
 const grid = document.getElementById("grid");
 const statusEl = document.getElementById("status");
 const visibleCount = document.getElementById("visibleCount");
@@ -54,26 +56,35 @@ function renderGrid() {
   visibleCount.textContent = String(visible.length);
 }
 
-async function renderRecents() {
-  if (!window.NDUI || !NDUI.recentVisits) return;
-  const recents = await NDUI.recentVisits(4);
+function renderRecents() {
+  const store = window.NDRecentJobs;
+  const recents = store ? store.list(5) : [];
+  recentsList.replaceChildren();
   if (!recents.length) { recentsRow.hidden = true; return; }
-  recentsList.innerHTML = "";
   recents.forEach((r) => {
     const app = apps.find((a) => a.id === r.app);
     const link = document.createElement("a");
     link.className = "recent-chip";
-    link.href = r.url || (app ? app.path : "/");
-    link.innerHTML = `<img src="${app ? app.icon : "/favicon.svg"}" alt="" width="20" height="20" />` +
-      `<span><strong>${escapeHtml(r.label)}</strong><small>${escapeHtml(app ? app.name : r.app)} · ${timeAgo(r.ts)}</small></span>`;
+    link.href = r.url || (app ? app.path : "/" + encodeURIComponent(r.app) + "/");
+    const img = document.createElement("img");
+    img.src = app ? app.icon : "/favicon.svg";
+    img.alt = ""; img.width = 20; img.height = 20;
+    const text = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = r.label;
+    const small = document.createElement("small");
+    small.textContent = (app ? app.name : r.app) + " · " + timeAgo(r.ts);
+    text.append(strong, small);
+    link.append(img, text);
     recentsList.appendChild(link);
   });
   recentsRow.hidden = false;
 }
 
-function escapeHtml(v) {
-  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+// Another tab (e.g. Planner) opening a job updates the list live.
+window.addEventListener("storage", (e) => {
+  if (!window.NDRecentJobs || e.key === null || e.key === NDRecentJobs.KEY) renderRecents();
+});
 
 function timeAgo(ts) {
   const m = Math.round((Date.now() - ts) / 60000);

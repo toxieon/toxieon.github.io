@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.20.4";
+const APP_VERSION = "0.20.5";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -4068,7 +4068,6 @@ function bindEvents() {
     const proj = projectById(b.dataset.projectOpen);
     if (proj) { proj.lastOpenedAt = Date.now(); }
     selectProject(b.dataset.projectOpen); state.activeView = "map"; render();
-    if (proj && window.NDUI?.recordVisit) NDUI.recordVisit("planner", proj.id, proj.name, "/planner/#project=" + encodeURIComponent(proj.id));
   }));
   document.querySelectorAll("[data-project-delete]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); deleteProject(b.dataset.projectDelete); }));
   document.querySelectorAll("[data-project-color]").forEach((b) => b.addEventListener("click", (e) => {
@@ -5144,9 +5143,16 @@ function setZoom(value, rerender = true, opts = {}) {
 
 /* ============================================================ MUTATIONS */
 
+/* Hub "Recent jobs" (shared/nd-recent-jobs.js): one entry per project, deep-linked. */
+function recordRecentProject(proj) {
+  if (!proj || !window.NDRecentJobs) return;
+  NDRecentJobs.record({ app: "planner", id: proj.id, label: NDRecentJobs.label(proj.name, proj.address), url: "/planner/#project=" + encodeURIComponent(proj.id) });
+}
+
 function selectProject(projectId) {
   state.selectedProjectId = projectId;
   const proj = project();
+  recordRecentProject(proj);
   state.selectedFolderId = proj?.folderId || (proj && !proj.folderId ? "unfiled" : "all");
   state.selectedFloorId = proj?.floors?.[0]?.id || null;
   state.selectedRoomId = "all";
@@ -5511,6 +5517,7 @@ async function handleProjectForm(event) {
     state.selectedFloorId = firstFloorObj.id;
     state.selectedFolderId = proj.folderId || "unfiled";
     state.modal = null; persist(); render();
+    recordRecentProject(proj);
     logAudit("Project Created", { projectId: proj.id, details: `Folder ${folderId || DRIVE_UNFILED_FOLDER}, floor ${firstFloor}` });
     if (isTokenValid()) ensureProjectDriveFolder(proj).then(() => ensureFloorDriveFolder(proj, firstFloorObj)).catch((e) => console.warn(e));
     toast(`Project ${proj.name} created`);
@@ -6280,7 +6287,7 @@ function hydrateFromHash() {
   const projMatch = location.hash.match(/project=([^&]+)/);
   if (projMatch) {
     const proj = projectById(decodeURIComponent(projMatch[1]));
-    if (proj) { state.selectedProjectId = proj.id; state.selectedFloorId = proj.floors?.[0]?.id || null; state.activeView = "map"; }
+    if (proj) { state.selectedProjectId = proj.id; state.selectedFloorId = proj.floors?.[0]?.id || null; state.activeView = "map"; recordRecentProject(proj); }
   }
   const match = location.hash.match(/node=([^&]+)/); if (!match) return;
   const node = state.nodes.find((n) => n.id === decodeURIComponent(match[1])); if (!node) return;
@@ -6288,6 +6295,7 @@ function hydrateFromHash() {
   state.selectedFloorId = node.floorId;
   state.selectedNodeId = node.id;
   state.drawerOpen = true;
+  recordRecentProject(projectById(node.projectId));
   state.activeView = "map";
 }
 

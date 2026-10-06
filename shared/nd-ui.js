@@ -393,10 +393,6 @@
     });
   }
 
-  /* §5.1 — continue-where-you-left-off. Apps record meaningful navigation;
-   * Hub renders the most recent few as one-tap deep links. Stored in
-   * nd-cache when available (spec) with a localStorage mirror so apps that
-   * don't load nd-cache still participate. */
   /* §5.3 — batch-fill: Upload's copy-to-all / first-to-all pattern as a
    * generic helper. Copies `fields` from source onto every target (or a
    * full deep list copy when fields is omitted and source is an array). */
@@ -412,37 +408,16 @@
     return targets;
   }
 
-  const RECENT_KEY = "nd:recent:v1";
-  const RECENT_MAX = 12;
-
-  function readRecentLocal() {
-    try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch (e) { return []; }
-  }
-
+  /* Superseded by shared/nd-recent-jobs.js (Hub 0.7.1 "Recent jobs"): same
+   * nd:recent:v1 key, localStorage only, cap 20, dedupe app+id. These two
+   * stay as thin wrappers so older callers keep working. */
   function recordVisit(app, context, label, url) {
-    const entry = { app: app, context: context || "", label: label || app, url: url || "", ts: Date.now() };
-    let list = readRecentLocal().filter(function (e) { return !(e.app === entry.app && e.context === entry.context); });
-    list.unshift(entry);
-    list = list.slice(0, RECENT_MAX);
-    try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {}
-    if (root.NDCache) { try { root.NDCache.put(RECENT_KEY, list); } catch (e) {} }
-    return entry;
+    if (root.NDRecentJobs) return root.NDRecentJobs.record({ app: app, id: context || app, label: label, url: url });
+    return null;
   }
 
   function recentVisits(limit) {
-    const local = readRecentLocal();
-    const finish = function (cacheList) {
-      const merged = {};
-      (cacheList || []).concat(local).forEach(function (e) {
-        const k = e.app + "|" + e.context;
-        if (!merged[k] || merged[k].ts < e.ts) merged[k] = e;
-      });
-      return Object.values(merged).sort(function (a, b) { return b.ts - a.ts; }).slice(0, limit || 5);
-    };
-    if (root.NDCache) {
-      return root.NDCache.get(RECENT_KEY).then(finish).catch(function () { return finish([]); });
-    }
-    return Promise.resolve(finish([]));
+    return Promise.resolve(root.NDRecentJobs ? root.NDRecentJobs.list(limit || 5) : []);
   }
 
   const API = {

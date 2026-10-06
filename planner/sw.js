@@ -11,14 +11,14 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'planner-0.20.4';
+const CACHE_VERSION = 'planner-0.20.5';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./photos.js",
-  "./room-geometry.js?v=0.20.4",
-  "./room-export.js?v=0.20.4",
+  "./room-geometry.js?v=0.20.5",
+  "./room-export.js?v=0.20.5",
   "../shared/vendor/exifr.umd.js",
   "../shared/nd-pdf.js",
   "../shared/vendor/papaparse/papaparse.min.js",
@@ -36,13 +36,14 @@ const SHELL_ASSETS = [
   "./favicon.svg",
   "../logo.png",
   "../shared/nd-core.css",
-  "./styles.css?v=0.20.4",
+  "./styles.css?v=0.20.5",
   "../shared/nd-config.js",
   "../assets/loading-bar.js",
   "../shared/nd-backend.js",
   "../shared/nd-auth.js",
   "../shared/nd-cache.js",
   "../shared/nd-ui.js",
+  "../shared/nd-recent-jobs.js?v=1",
   "../assets/here.js",
   "../assets/sync-fill.js",
   "../assets/drive-image.js",
@@ -50,7 +51,7 @@ const SHELL_ASSETS = [
   "../shared/nd-sheets.js",
   "../shared/nd-inbox.js?v=2",
   "../shared/nd-pwa.js",
-  "./app.js?v=0.20.4"
+  "./app.js?v=0.20.5"
 ];
 
 const IS_API_HOST = (url) =>
