@@ -32,6 +32,7 @@
 <script src="../assets/floaties.js"></script>
 <script src="../assets/pixel-cat.js"></script>
 <script src="../assets/dodge-button.js"></script>
+<script src="../ico/ico-canvas.js?v=0.1.6"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
@@ -81,6 +82,64 @@
   .np-nm.red::before { background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,0.24), 0 0 26px #ef4444; }
   .np-nm.red::after { border:2px solid #ef4444; animation: nppulse 1.15s ease-out infinite; }
   @keyframes nppulse { 0%{transform:scale(0.88);opacity:0.78;} 100%{transform:scale(2.55);opacity:0;} }
+  /* v1.1.1 design kit: category heads, icon rows, swatches, mirrored plan/report demos, reference table */
+  .cat-head { font-size: 18px; font-weight: 600; margin: 34px 0 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .cat-head .cat-note { font-size: 12px; font-weight: 400; color: var(--nd-muted, #888); }
+  .ic-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .ic-row figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--nd-muted, #888); text-align: center; max-width: 72px; }
+  .ic-row img { border-radius: 12px; display: block; }
+  .ic-row canvas { width: auto; border-radius: 4px; image-rendering: pixelated; }
+  .ic-row .ic-sep { border-left: 1px solid var(--nd-border, #2a2a2a); padding-left: 10px; }
+  .pi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px; color: var(--nd-text, #f0f0f0); }
+  .pi-grid svg { width: 22px; height: 22px; stroke-width: 1.8; display: block; margin: 0 auto; }
+  .pi-grid span.pi { display: block; padding: 5px 0; border-radius: 8px; background: rgba(255,255,255,0.03); }
+  .sw-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { display: flex; flex-direction: column; gap: 3px; width: 62px; font-family: var(--nd-mono, monospace); font-size: 9px; color: var(--nd-muted, #888); word-break: break-all; }
+  .sw i { display: block; height: 26px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); }
+  .sw-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--nd-muted, #888); margin: 10px 0 6px; }
+  .sw-label:first-child { margin-top: 0; }
+  .tok-list { font-family: var(--nd-mono, monospace); font-size: 10.5px; color: var(--nd-muted, #9aa0a8); margin-top: 10px; line-height: 1.6; word-break: break-word; }
+  .pm-plan { position: relative; height: 70px; border-radius: 10px; background: #14181f; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; }
+  .pm-nm { position: relative; width: 22px; height: 22px; }
+  .pm-nm::before, .pm-nm::after { content: ""; position: absolute; inset: 0; border-radius: 50%; }
+  .pm-nm::before { background: var(--s); border: 3px solid rgba(255,255,255,0.88); box-shadow: 0 0 0 4px rgba(14,165,233,0.14), 0 0 20px var(--s); }
+  .pm-nm::after { border: 1px solid var(--s); animation: nppulse 1.8s ease-out infinite; }
+  .pm-box { position: relative; display: grid; place-items: center; color: #fff; }
+  .pm-box svg { width: 15px; height: 15px; stroke-width: 2; }
+  .pm-portal { width: 30px; height: 30px; border-radius: 6px; background: linear-gradient(135deg,#6366f1,#a855f7); box-shadow: 0 0 0 3px rgba(255,255,255,0.18), 0 0 14px rgba(168,85,247,0.6); }
+  .pm-swb { width: 36px; height: 28px; border-radius: 6px; background: linear-gradient(135deg,#f59e0b,#d97706); box-shadow: 0 0 0 3px rgba(255,255,255,0.22), 0 0 16px rgba(245,158,11,0.55); }
+  .pm-sub { width: 30px; height: 24px; border-radius: 5px; background: linear-gradient(135deg,#3b82f6,#2563eb); box-shadow: 0 0 0 3px rgba(255,255,255,0.18), 0 0 12px rgba(59,130,246,0.5); }
+  .rm-plan { position: relative; height: 130px; border-radius: 10px; background: #14181f; overflow: hidden; }
+  .rm-plan svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .rm-poly { fill: rgba(14,165,233,0.18); stroke: rgba(56,189,248,0.85); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+  .rm-poly.rm-sel { fill: rgba(245,158,11,0.18); stroke: rgba(245,158,11,0.85); stroke-width: 1.8; }
+  .rm-draw { fill: rgba(34,197,94,0.16); stroke: #22c55e; stroke-width: 1.4; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
+  .rm-pin { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 1px; transform: translate(-50%, -100%); }
+  .rm-pin-label { padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.94); color: #111827; border: 1px solid #dc2626; font-weight: 700; font-size: 11px; line-height: 1.2; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .rm-pin-head { width: 13px; height: 13px; background: #dc2626; border: 2px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); margin-bottom: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .rc-sheet { width: 190px; aspect-ratio: 210 / 297; margin: 0 auto; background: #fff; color: #111; border-radius: 4px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 10px; box-sizing: border-box; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+  .rc-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 8%; }
+  .rc-main img { width: 56%; height: auto; margin-bottom: 2px; }
+  .rc-h1 { font-size: 11px; font-weight: 700; letter-spacing: -0.01em; }
+  .rc-h2 { font-size: 7.5px; font-weight: 500; color: #1f2937; margin-top: 4px; }
+  .rc-meta { font-size: 5px; line-height: 1.5; color: #4b5563; }
+  .rc-meta span { color: #6b7280; }
+  .ref-card { margin-top: 18px; }
+  .ref-wrap { overflow-x: auto; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: 12px; line-height: 1.45; }
+  table.ref th { text-align: left; font-weight: 600; color: var(--nd-muted, #888); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--nd-border-strong, #3a3a3a); padding: 6px 8px; }
+  table.ref td { border-bottom: 1px solid var(--nd-border, #2a2a2a); padding: 7px 8px; vertical-align: top; color: var(--nd-muted, #b0b4ba); }
+  table.ref td:first-child { color: var(--nd-text, #f0f0f0); font-weight: 600; }
+  table.ref { table-layout: fixed; }
+  table.ref th:nth-child(1) { width: 19%; } table.ref th:nth-child(2) { width: 19%; } table.ref th:nth-child(3) { width: 15%; }
+  table.ref td { overflow-wrap: anywhere; }
+  table.ref td:nth-child(3) { color: var(--nd-green-soft, #6ddba3); }
+  table.ref tr.inhouse td:nth-child(3) { color: var(--nd-amber-soft, #f5a05a); }
+  table.ref a { color: var(--nd-text, #f0f0f0); }
+  table.ref code, .ref-note code { font-size: 11px; }
+  .ref-note { margin: 10px 0 0; font-size: 12px; }
+  @font-face { font-family: "ND Ico Sans"; font-weight: 700; src: url("../ico/fonts/DejaVuSans-Bold.ttf") format("truetype"); font-display: swap; }
+  @font-face { font-family: "ND Ico Sans"; font-weight: 400; src: url("../ico/fonts/DejaVuSans.ttf") format("truetype"); font-display: swap; }
   .foot { margin-top: 30px; color: var(--nd-muted, #666); font-size: 12px; text-align: center; }
 </style>
 </head>
@@ -129,6 +188,7 @@
     <span class="muted" style="font-size:12px;color:var(--nd-muted,#888);" id="theme-name"></span>
   </section>
 
+  <h2 class="cat-head" id="components" style="margin-top:0;">Components <span class="cat-note">drop-in feature components (assets/*.js, shared/nd-ui)</span></h2>
   <div class="grid">
 
     <!-- Confetti -->
@@ -325,10 +385,170 @@
 
   </div>
 
-  <p class="foot">Neill Data Suite · internal assets library · update <code style="color:inherit;">assets/ASSETS.txt</code> as this grows.</p>
+  <!-- ── v1.1.1: Planner + suite design kit (2026-10-06). Items are referenced in place (canonical paths). ── -->
+  <h2 class="cat-head" id="favicons-icons">Favicons &amp; icons <span class="cat-note">same collection as the Studio's “Favicons &amp; icons” tab</span></h2>
+  <div class="grid">
+
+    <!-- ND suite logo (brand) -->
+    <div class="card">
+      <h2>Neill Data suite logo <span class="tag">brand</span></h2>
+      <p class="desc">The ND monogram and the stacked “Neill / Data” tile by Cinna, approved by Brandon. <strong>Brand/logo asset only.</strong> The Hub's own icon is the teal <em>Suite hub</em> icon (right), not this mark.</p>
+      <div class="demo">
+        <div class="ic-row">
+          <figure><img src="../assets/brand/nd-logo/nd-monogram.svg" width="56" height="56" alt="ND monogram" /><figcaption>monogram.svg</figcaption></figure>
+          <figure><img src="../assets/brand/nd-logo/nd-tile-180.png" width="56" height="56" alt="Neill Data stacked tile" /><figcaption>tile 180/192/512</figcaption></figure>
+          <figure><img src="../assets/brand/nd-logo/nd-maskable-192.png" width="56" height="56" style="border-radius:50%;" alt="ND maskable icon in a circle mask" /><figcaption>maskable</figcaption></figure>
+          <figure class="ic-sep"><img src="../assets/suite-icons/apps/hub.svg" width="56" height="56" alt="Suite hub icon" /><figcaption>Hub icon = Suite hub</figcaption></figure>
+        </div>
+      </div>
+      <code class="use">assets/brand/nd-logo/  (nd-monogram.svg, nd-tile-{180,192,512}.png,
+  nd-maskable-{192,512}.png). See README.md for provenance</code>
+    </div>
+
+    <!-- Per-app home-screen icons -->
+    <div class="card">
+      <h2>Home-screen icons <span class="tag">per app</span></h2>
+      <p class="desc">The opaque PNG <code>apple-touch-icon</code> (180) and manifest icons (192/512) for every app. They are the suite icon art flattened onto the solid <code>#101922</code> tile (iOS paints transparency black). Timesheet keeps its own orange clock.</p>
+      <div class="demo">
+        <div class="ic-row" id="hs-icons"></div>
+      </div>
+      <code class="use">npm run icons:render   # scripts/render-app-icons.cjs
+# → &lt;app&gt;/icons/icon-{180,192,512}.png (RGB, no alpha)</code>
+    </div>
+
+    <!-- Planner UI icons -->
+    <div class="card">
+      <h2>Planner UI icons <span class="tag">planner</span></h2>
+      <p class="desc">Planner's in-house 24 px stroke icon set (<span id="pi-count">38</span> icons: toolbar, plan, portal, switchboard/sub-board). These glyphs differ from the suite's 24 interface icons. Rendered live from <code>planner/app.js</code>:</p>
+      <div class="demo"><div class="pi-grid" id="pi-grid"><span class="status" style="color:var(--nd-muted,#888);">Loading from planner/app.js…</span></div></div>
+      <code class="use">icon("camera")   // planner/app.js iconPaths
+// &lt;svg viewBox="0 0 24 24" fill="none" stroke="currentColor"&gt;</code>
+    </div>
+
+    <!-- ICO generator output style -->
+    <div class="card">
+      <h2>ICO generator output <span class="tag">ico</span></h2>
+      <p class="desc">The multi-size Windows <code>.ico</code> look: two lines (name, then version at 80% of the text colour) in DejaVu Sans on Neill navy <code>#0B1F3A</code>, default sizes 16/32/48/256, plus a transparent option with a contrasting outline. Drawn here with the ICO app's own renderer:</p>
+      <div class="demo"><div class="ic-row" id="ico-demo"></div></div>
+      <code class="use">NDIco.drawFrame(canvas, NDIco.makeSpec({ name, version }), 256)
+// ico/ico-canvas.js · API GET /ico (ico/server.py) · CLI ico/cli.py</code>
+    </div>
+
+  </div>
+
+  <h2 class="cat-head" id="styles-tokens">Styles &amp; tokens <span class="cat-note">new category: colour, type and layout tokens and plan/report styles</span></h2>
+  <div class="grid">
+
+    <!-- nd-core tokens -->
+    <div class="card">
+      <h2>Suite design tokens <span class="tag">shared/nd-core</span></h2>
+      <p class="desc">The <code>--nd-*</code> custom properties every app shares: surfaces, text, amber/green/red accents, type stacks, spacing, radius and tap size. Read live from <code>shared/nd-core.css</code>:</p>
+      <div class="demo"><div class="sw-grid" id="tok-swatches"></div><div class="tok-list" id="tok-other"></div></div>
+      <code class="use">background: var(--nd-surface); color: var(--nd-text);
+border-radius: var(--nd-radius); min-height: var(--nd-tap);</code>
+    </div>
+
+    <!-- Planner palette -->
+    <div class="card">
+      <h2>Planner palette <span class="tag">planner</span></h2>
+      <p class="desc">Planner's theme colours, node status colours, default category tabs (Electrical / Data / AC) and folder colours. Read live from <code>planner/styles.css</code> and <code>planner/app.js</code>:</p>
+      <div class="demo" id="pp-demo"><span class="status" style="color:var(--nd-muted,#888);">Loading…</span></div>
+      <code class="use">:root { --blue --cyan --teal --amber --green --red --violet … }  // styles.css
+statusMeta · DEFAULT_CATEGORY_TABS · DEFAULT_FOLDER_COLORS  // app.js</code>
+    </div>
+
+    <!-- Node markers -->
+    <div class="card">
+      <h2>Plan node markers <span class="tag">planner</span></h2>
+      <p class="desc">The pulsing status marker (Not started / In progress / Complete / Issue), plus the portal, switchboard and sub-board markers. The no-photo variant is the existing “No-photo ping” card above.</p>
+      <div class="demo">
+        <div class="pm-plan">
+          <span class="pm-nm" style="--s:#2563eb" title="Not Started"></span>
+          <span class="pm-nm" style="--s:#f59e0b" title="In Progress"></span>
+          <span class="pm-nm" style="--s:#22c55e" title="Complete"></span>
+          <span class="pm-nm" style="--s:#ef4444" title="Issue"></span>
+          <span class="pm-box pm-portal" title="Portal" data-pi="portal"></span>
+          <span class="pm-box pm-swb" title="Switchboard" data-pi="switchboard"></span>
+          <span class="pm-box pm-sub" title="Sub-board" data-pi="subboard"></span>
+        </div>
+      </div>
+      <code class="use">.node-marker { --status } .is-portal .is-switchboard .is-subboard
+// planner/styles.css (demo mirrors the canonical rules)</code>
+    </div>
+
+    <!-- Rooms + title pin -->
+    <div class="card">
+      <h2>Room overlays &amp; title pin <span class="tag">planner</span></h2>
+      <p class="desc">Room polygons (sky fill and stroke, amber when selected, dashed green while drawing; opacity via <code>--room-fill</code>/<code>--room-border</code>) and the red map-pin room title label.</p>
+      <div class="demo">
+        <div class="rm-plan">
+          <svg viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">
+            <polygon class="rm-poly" points="4,6 40,6 40,44 4,44"></polygon>
+            <polygon class="rm-poly rm-sel" points="44,6 70,6 70,26 58,26 58,44 44,44"></polygon>
+            <polygon class="rm-draw" points="74,10 96,8 95,40 77,42"></polygon>
+          </svg>
+          <span class="rm-pin" style="left:22%;top:58%;"><span class="rm-pin-label">Comms Room</span><span class="rm-pin-head"></span></span>
+          <span class="rm-pin" style="left:57%;top:50%;"><span class="rm-pin-label">Office 2</span><span class="rm-pin-head"></span></span>
+        </div>
+      </div>
+      <code class="use">.room-poly polygon · .room-draw-poly · .title-pin-label · .title-pin-head
+// planner/styles.css (demo mirrors the canonical rules)</code>
+    </div>
+
+    <!-- Report cover + print -->
+    <div class="card">
+      <h2>Report cover &amp; print styles <span class="tag">planner</span></h2>
+      <p class="desc">Cinna's 0.20.1 cover: big Neill Data logo, <strong>Neill Planner</strong> (40/700), job name (26/500, balanced), address and Sydney-time “Generated” stamp small at the foot. The print pages follow, then the Lean Drive PDF (html2canvas-pro + jsPDF; caps of 3 photos per node, 48 images, 40 pages, 18 MB).</p>
+      <div class="demo">
+        <div class="rc-sheet">
+          <div class="rc-main"><img src="../logo.png" alt="Neill Data logo" /><div class="rc-h1">Neill Planner</div><div class="rc-h2">Wilson St Fit-out</div></div>
+          <div class="rc-meta">14 Wilson St, Frankston VIC<br /><span>Generated 6 Oct 2026, 10:42 am AEDT</span></div>
+        </div>
+      </div>
+      <code class="use">.print-cover { --cover-logo-w:440px; --cover-logo-gap:8px }
+REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</code>
+    </div>
+
+  </div>
+
+  <h2 class="cat-head" id="github-reference">GitHub reference assets <span class="cat-note">open-source libraries, assets and tooling the suite uses (permissive licences only)</span></h2>
+  <section class="card ref-card">
+    <p class="desc" style="margin-top:0;">Source of truth: <code>shared/vendor/README.md</code> and the vendored LICENSE files, <code>ico/requirements.txt</code>, <code>ico/LICENSE.Pillow.txt</code>, <code>ico/fonts/LICENSE.txt</code> and <code>planner/vendor/openseadragon/LICENSE.txt</code>. Upstream repos checked on 2026-10-06.</p>
+    <div class="ref-wrap">
+    <table class="ref">
+      <thead><tr><th>Name</th><th>Repo</th><th>Licence</th><th>What we use it for · where</th></tr></thead>
+      <tbody>
+        <tr><td>pdf.js 6.3.289 (legacy build)</td><td><a href="https://github.com/mozilla/pdf.js" target="_blank" rel="noopener">mozilla/pdf.js</a></td><td>Apache-2.0</td><td>Renders PDF floor plans · <code>shared/vendor/pdfjs/</code> via <code>shared/nd-pdf.js</code> (Planner, Fit-off, Checklist). Bundled wasm decoders: OpenJPEG BSD-2-Clause, PDFium JBIG2 BSD-3-Clause, qcms MIT, pdf.js glue Apache-2.0/BSD-2-Clause. <code>iccs/</code> profile is CC0-1.0 (public-domain dedication)</td></tr>
+        <tr><td>OpenSeadragon</td><td><a href="https://github.com/openseadragon/openseadragon" target="_blank" rel="noopener">openseadragon/openseadragon</a></td><td>BSD-3-Clause</td><td>Deep-zoom plan view for raster PDFs · <code>planner/vendor/openseadragon/</code></td></tr>
+        <tr><td>html2canvas-pro 2.5.0</td><td><a href="https://github.com/yorickshan/html2canvas-pro" target="_blank" rel="noopener">yorickshan/html2canvas-pro</a></td><td>MIT</td><td>Report pages to canvas for the Lean Drive PDF · <code>shared/vendor/html2canvas-pro/</code> (Planner)</td></tr>
+        <tr><td>jsPDF 2.5.1</td><td><a href="https://github.com/parallax/jsPDF" target="_blank" rel="noopener">parallax/jsPDF</a></td><td>MIT</td><td>PDF output · <code>shared/vendor/jspdf/</code> (Planner reports and room exports, Quote)</td></tr>
+        <tr><td>SheetJS Community Edition 0.20.3</td><td><a href="https://github.com/SheetJS/sheetjs" target="_blank" rel="noopener">SheetJS/sheetjs</a></td><td>Apache-2.0</td><td>Spreadsheet import/export · <code>shared/vendor/sheetjs/</code> (Checklist). The GitHub repo is no longer updated; active source is <a href="https://git.sheetjs.com/sheetjs/sheetjs" target="_blank" rel="noopener">git.sheetjs.com</a> and builds come from cdn.sheetjs.com</td></tr>
+        <tr><td>Papa Parse 5.7.0</td><td><a href="https://github.com/mholt/PapaParse" target="_blank" rel="noopener">mholt/PapaParse</a></td><td>MIT</td><td>CSV parsing · <code>shared/vendor/papaparse/</code> via <code>shared/nd-csv.js</code> (Planner, Quote, Timesheet, Checklist)</td></tr>
+        <tr><td>pica 10.0.3</td><td><a href="https://github.com/nodeca/pica" target="_blank" rel="noopener">nodeca/pica</a></td><td>MIT</td><td>High-quality photo downscale · <code>shared/vendor/pica/</code> via <code>shared/nd-resize.js</code> (Planner, Quote, camera-capture.js)</td></tr>
+        <tr><td>exifr 7.1.3</td><td><a href="https://github.com/MikeKovarik/exifr" target="_blank" rel="noopener">MikeKovarik/exifr</a></td><td>MIT</td><td>Photo EXIF GPS and capture time · <code>shared/vendor/exifr.umd.js</code> (Upload, Planner photos, exif-geo-detect.js)</td></tr>
+        <tr><td>Pillow 12.3.0</td><td><a href="https://github.com/python-pillow/Pillow" target="_blank" rel="noopener">python-pillow/Pillow</a></td><td>MIT-CMU (HPND family; permissive)</td><td>Draws and packs the .ico frames · <code>ico/generate.py</code> (ICO generator server and CLI). Licence text: <code>ico/LICENSE.Pillow.txt</code></td></tr>
+        <tr><td>FastAPI 0.142.2</td><td><a href="https://github.com/fastapi/fastapi" target="_blank" rel="noopener">fastapi/fastapi</a></td><td>MIT</td><td>ICO generator HTTP API (<code>GET /ico</code>, <code>POST /ico</code>, <code>/health</code>) · <code>ico/server.py</code>. Pulls in Starlette (<a href="https://github.com/Kludex/starlette" target="_blank" rel="noopener">Kludex/starlette</a>, BSD-3-Clause) and Pydantic (<a href="https://github.com/pydantic/pydantic" target="_blank" rel="noopener">pydantic/pydantic</a>, MIT)</td></tr>
+        <tr><td>Uvicorn 0.54.0</td><td><a href="https://github.com/Kludex/uvicorn" target="_blank" rel="noopener">Kludex/uvicorn</a></td><td>BSD-3-Clause</td><td>ASGI server that runs the ICO API · <code>ico/server.py</code> (repo moved from encode/uvicorn)</td></tr>
+        <tr><td>python-multipart 0.0.32</td><td><a href="https://github.com/Kludex/python-multipart" target="_blank" rel="noopener">Kludex/python-multipart</a></td><td>Apache-2.0</td><td>Multipart file uploads for <code>POST /ico</code> · <code>ico/server.py</code></td></tr>
+        <tr><td>DejaVu Sans / Sans Bold 2.37</td><td><a href="https://github.com/dejavu-fonts/dejavu-fonts" target="_blank" rel="noopener">dejavu-fonts/dejavu-fonts</a></td><td>Bitstream Vera Fonts licence (permissive)</td><td>DejaVu's own changes are public domain. Text glyphs in .ico output, server and in-page · <code>ico/fonts/</code> (licence: <code>ico/fonts/LICENSE.txt</code>)</td></tr>
+        <tr><td>sharp <span class="tag">build step only</span></td><td><a href="https://github.com/lovell/sharp" target="_blank" rel="noopener">lovell/sharp</a></td><td>Apache-2.0</td><td>SVG to PNG for suite-icon exports · <code>assets/suite-icons/build-assets.cjs</code> (<code>ND_SHARP_PATH</code>). Not committed or shipped. Its prebuilt libvips binary is LGPL, so libvips is not listed here</td></tr>
+        <tr><td>actions/checkout v4</td><td><a href="https://github.com/actions/checkout" target="_blank" rel="noopener">actions/checkout</a></td><td>MIT</td><td>Checks out the repo in the Hub apps workflow · <code>.github/workflows/hub-apps.yml</code></td></tr>
+        <tr class="inhouse"><td>Hub tile builder + “Hub apps” Action <span class="tag">in-house</span></td><td><a href="https://github.com/toxieon/toxieon.github.io/blob/main/hub/build-apps.cjs" target="_blank" rel="noopener">toxieon/toxieon.github.io</a></td><td>In-house (Neill Data)</td><td>Auto-discovers app folders into <code>hub/apps.json</code> (<code>npm run hub:apps</code>) · <code>hub/build-apps.cjs</code>, <code>hub/discover.json</code>, <code>.github/workflows/hub-apps.yml</code> (regenerates on push to main)</td></tr>
+        <tr class="inhouse"><td>Icon and symbol build scripts <span class="tag">in-house</span></td><td><a href="https://github.com/toxieon/toxieon.github.io/tree/main/scripts" target="_blank" rel="noopener">toxieon/toxieon.github.io</a></td><td>In-house (Neill Data)</td><td><code>scripts/render-app-icons.cjs</code> (opaque home-screen PNGs, Node built-ins only; <code>npm run icons:render</code>/<code>icons:check</code>), <code>assets/suite-icons/build-assets.cjs</code>, <code>assets/trade-symbols/build-assets.cjs</code></td></tr>
+        <tr class="inhouse"><td>Suite icons 1.2.0 + trade symbols <span class="tag">in-house</span></td><td><a href="https://github.com/toxieon/toxieon.github.io/tree/main/assets/suite-icons" target="_blank" rel="noopener">toxieon/toxieon.github.io</a></td><td>In-house original art</td><td>No third-party icon set is used anywhere in the suite. App/UI icons, trade symbols, Planner UI icons and the ND logo are all original</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="desc ref-note"><strong>Attribution-only notes:</strong> the Pillow wheels used by the ICO server bundle FreeType, which is dual-licensed FTL/GPLv2. We rely on the FTL, a permissive licence with a credit requirement, and the credit is carried in <code>ico/LICENSE.Pillow.txt</code>. The DejaVu fonts must keep the Bitstream copyright notice, which is in <code>ico/fonts/LICENSE.txt</code>.</p>
+    <p class="desc ref-note"><strong>Not listed:</strong> Google sign-in, Drive/Sheets and Maps scripts are hosted Google services under Google's terms, not open-source libraries. Leaflet and OpenStreetMap tiles are not used.</p>
+  </section>
+
+  <p class="foot">Neill Data Suite · internal assets library · <span id="app-version"></span> · update <code style="color:inherit;">assets/ASSETS.txt</code> as this grows.</p>
 </div>
 
 <script>
+  var APP_VERSION = "1.1.1";   // see 1234567890/VERSIONING.md
+  document.getElementById("app-version").textContent = "Assets v" + APP_VERSION;
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
 
   /* ---- Pixel-art animation demos (from Brandon's page) ---- */
@@ -603,6 +823,98 @@
       notify: function (msg) { out.style.color = "var(--nd-amber-soft,#f5a05a)"; out.textContent = msg; }
     });
   })();
+  /* ---- v1.1.1 design kit: everything below reads the canonical files in place ---- */
+  (function () {
+    function el(tag, attrs, html) { var e = document.createElement(tag); for (var k in (attrs || {})) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    function swatch(name, value) { var d = el("div", { "class": "sw", title: name + " " + value }); d.innerHTML = '<i style="background:' + esc(value) + '"></i>' + esc(name) + "<br>" + esc(value); return d; }
+
+    /* Home-screen icons (opaque PNGs rendered by scripts/render-app-icons.cjs) */
+    var hs = document.getElementById("hs-icons");
+    if (hs) {
+      [["planner","Planner"],["upload","Upload"],["search","Search"],["quote","Quote"],["swb","SWB"],["fitoff","Fit-off"],["1234567890","Assets"],["company","Company"],["ico","ICO"],["hub","Hub"]].forEach(function (a) {
+        hs.appendChild(el("figure", null, '<img src="../' + a[0] + '/icons/icon-180.png" width="44" height="44" alt="' + a[1] + ' home-screen icon" /><figcaption>' + a[1] + "</figcaption>"));
+      });
+      hs.appendChild(el("figure", { "class": "ic-sep" }, '<img src="../timesheet/assets/icons/icon-192.png" width="44" height="44" alt="Timesheet home-screen icon" /><figcaption>Timesheet (own)</figcaption>'));
+    }
+
+    /* ICO generator: draw with ico/ico-canvas.js + the bundled DejaVu fonts */
+    var icoBox = document.getElementById("ico-demo");
+    if (icoBox && window.NDIco) {
+      var fontsReady = (document.fonts && document.fonts.load) ? Promise.all([document.fonts.load('700 20px "ND Ico Sans"'), document.fonts.load('400 20px "ND Ico Sans"')]) : Promise.resolve();
+      fontsReady.catch(function () {}).then(function () {
+        [[{ name: "Planner", version: "0.20.4" }, [16, 32, 48, 256]], [{ name: "Planner", version: "0.20.4", bg: "transparent" }, [256]]].forEach(function (row) {
+          var spec; try { spec = NDIco.makeSpec(row[0]); } catch (e) { return; }
+          row[1].forEach(function (s) {
+            var c = NDIco.drawFrame(document.createElement("canvas"), spec, s), show = s < 64 ? s * 2 : 72;
+            c.style.width = show + "px"; c.style.height = show + "px";
+            if (row[0].bg) c.style.background = "repeating-conic-gradient(#3a3f47 0 25%, #20242a 0 50%) 0 0 / 12px 12px";
+            var f = el("figure"); f.appendChild(c); f.appendChild(el("figcaption", null, s + " px" + (row[0].bg ? " · transparent" : "")));
+            icoBox.appendChild(f);
+          });
+        });
+      });
+    }
+
+    /* Suite tokens: read the :root rule of shared/nd-core.css (not the live theme override) */
+    var tokBox = document.getElementById("tok-swatches"), tokOther = document.getElementById("tok-other");
+    if (tokBox) {
+      var rootRule = null;
+      Array.prototype.forEach.call(document.styleSheets, function (sh) {
+        if (rootRule || !/nd-core\.css/.test(sh.href || "")) return;
+        try { Array.prototype.forEach.call(sh.cssRules, function (r) { if (!rootRule && r.selectorText === ":root") rootRule = r; }); } catch (e) {}
+      });
+      if (rootRule) {
+        var other = [];
+        for (var i = 0; i < rootRule.style.length; i++) {
+          var p = rootRule.style[i]; if (p.indexOf("--nd-") !== 0) continue;
+          var v = rootRule.style.getPropertyValue(p).trim();
+          if (/^(#|rgba?\()/.test(v)) tokBox.appendChild(swatch(p.replace("--nd-", ""), v)); else other.push(p + ": " + v);
+        }
+        tokOther.textContent = other.join(" · ");
+      } else tokBox.textContent = "shared/nd-core.css not readable here.";
+    }
+
+    /* Planner UI icons + palette: parsed from planner/app.js and planner/styles.css */
+    var piGrid = document.getElementById("pi-grid"), ppDemo = document.getElementById("pp-demo");
+    function getText(url) { return fetch(url, { cache: "no-cache" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }); }
+    var appJs = getText("../planner/app.js"), stylesCss = getText("../planner/styles.css");
+
+    appJs.then(function (src) {
+      var i = src.indexOf("const iconPaths = {"), j = src.indexOf("\n};", i);
+      if (i < 0 || j < 0) throw new Error("iconPaths not found");
+      var paths = {}, re = /^\s+([A-Za-z0-9]+):\s*'([^']*)'/gm, m, block = src.slice(i, j);
+      while ((m = re.exec(block))) paths[m[1]] = m[2];
+      var names = Object.keys(paths);
+      function svg(n) { return '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + paths[n] + "</svg>"; }
+      piGrid.innerHTML = names.map(function (n) { return '<span class="pi" title="icon(&quot;' + n + '&quot;)">' + svg(n) + "</span>"; }).join("");
+      document.getElementById("pi-count").textContent = names.length;
+      document.querySelectorAll("[data-pi]").forEach(function (b) { var n = b.getAttribute("data-pi"); if (paths[n]) b.innerHTML = svg(n); });
+    }).catch(function () { piGrid.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/app.js. See iconPaths there.</span>'; });
+
+    Promise.all([stylesCss, appJs]).then(function (res) {
+      var css = res[0], js = res[1], rootM = /:root\s*\{([^}]*)\}/.exec(css), frag = document.createDocumentFragment();
+      function group(label, pairs) {
+        if (!pairs.length) return;
+        frag.appendChild(el("div", { "class": "sw-label" }, esc(label)));
+        var g = el("div", { "class": "sw-grid" }); pairs.forEach(function (p) { g.appendChild(swatch(p[0], p[1])); }); frag.appendChild(g);
+      }
+      var theme = [], m, re = /--([a-z0-9-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/g;
+      while (rootM && (m = re.exec(rootM[1]))) theme.push([m[1], m[2]]);
+      group("Theme (styles.css :root)", theme);
+      var sm = /const statusMeta = \{([\s\S]*?)\n\};/.exec(js), status = [];
+      if (sm) { var r2 = /"?([A-Za-z ]+?)"?:\s*\{\s*color:\s*"(#[0-9a-fA-F]{6})"/g; while ((m = r2.exec(sm[1]))) status.push([m[1].trim(), m[2]]); }
+      group("Node status (statusMeta)", status);
+      var ct = /const DEFAULT_CATEGORY_TABS = \[([\s\S]*?)\];/.exec(js), cats = [];
+      if (ct) { var r3 = /name:\s*"([^"]+)",\s*color:\s*"(#[0-9a-fA-F]{6})"/g; while ((m = r3.exec(ct[1]))) cats.push([m[1], m[2]]); }
+      group("Default category tabs", cats);
+      var fc = /const DEFAULT_FOLDER_COLORS = \[([^\]]*)\]/.exec(js), folders = [];
+      if (fc) (fc[1].match(/#[0-9a-fA-F]{6}/g) || []).forEach(function (c, k) { folders.push(["folder " + (k + 1), c]); });
+      group("Default folder colours", folders);
+      ppDemo.innerHTML = ""; ppDemo.appendChild(frag);
+    }).catch(function () { ppDemo.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/styles.css / app.js.</span>'; });
+  })();
+
 </script>
 </body>
 </html>

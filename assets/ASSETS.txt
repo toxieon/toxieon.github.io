@@ -3,7 +3,7 @@
  A growing library of drop-in feature components shared across the apps
  (uploader, quote, planner, timesheet, swb, hub).
  Update this file whenever an asset is added, changed, or wired into an app.
- Last updated: 2026-10-01
+ Last updated: 2026-10-06 (Assets 1.1.1)
 ========================================================================
 
 HOW THIS RELATES TO /shared
@@ -339,6 +339,117 @@ HOW THIS RELATES TO /shared
     Production dependencies: none added. SVG artwork is original.
 
 ------------------------------------------------------------------------
+ DESIGN KIT — PLANNER + SUITE  (Assets 1.1.1, 2026-10-06)
+ Referenced in place (canonical paths), shown in the /1234567890/ showroom.
+ Only copy: the retired ND suite logo, kept at assets/brand/nd-logo/.
+------------------------------------------------------------------------
+
+ FAVICONS & ICONS  (same collection as the Studio's "Favicons & icons")
+
+[27] Neill Data suite logo — BRAND/LOGO ASSET ONLY
+    Files:    assets/brand/nd-logo/nd-monogram.svg (ND monogram: N amber #E07B2A,
+              D #F4F6FA, navy #0F1420 tile) · nd-tile-{180,192,512}.png (stacked
+              "Neill / Data") · nd-maskable-{192,512}.png (safe-zone art)
+    Origin:   Cinna, Brandon-approved. Briefly the hub icon in Hub 0.6.4 (022d1f8).
+    Note:     NOT the hub icon. The Hub uses the teal "Suite hub" icon
+              (assets/suite-icons/apps/hub.svg) since Hub 0.6.5 (#38). Glyph
+              source typeface not recorded; confirm with Cinna before external use.
+
+[28] Home-screen icons (per app)
+    Files:    <app>/icons/icon-{180,192,512}.png for planner, upload, search,
+              quote, swb, fitoff, 1234567890, company, ico, hub (opaque RGB).
+              Timesheet keeps timesheet/assets/icons/icon-{192,512}.png (clock).
+    Build:    npm run icons:render  (scripts/render-app-icons.cjs flattens the
+              suite PNGs onto #101922)  ·  npm run icons:check
+    Used by:  each app's apple-touch-icon + manifest  (WIRED)
+
+[29] Planner UI icons
+    Where:    planner/app.js  iconPaths (38 icons) + icon(name)
+    Style:    24x24 viewBox, fill none, stroke currentColor, round caps/joins.
+              In-house glyphs, distinct from the suite's 24 UI icons.
+    Used by:  planner (WIRED). The showroom renders them from app.js.
+
+[30] ICO generator output style
+    Where:    ico/ico-canvas.js (NDIco.makeSpec / drawFrame), ico/generate.py,
+              API GET|POST /ico (ico/server.py), CLI ico/cli.py
+    Style:    two lines (name, then version at 80% fg) in DejaVu Sans (ico/fonts/)
+              on Neill navy #0B1F3A, white text, sizes 16/32/48/256; transparent
+              option draws a contrasting outline.
+
+ STYLES & TOKENS  (new category: no existing collection covered tokens/styles)
+
+[31] Suite design tokens
+    Where:    shared/nd-core.css :root  --nd-bg/surface/surface-2/border/text/
+              muted, --nd-amber(-soft/-glow), --nd-green(-soft/-glow), --nd-red,
+              --nd-sans, --nd-mono, --nd-space-1..6, --nd-radius(-sm), --nd-tap,
+              --nd-shadow, --nd-z-*
+    Used by:  every app (WIRED)
+
+[32] Planner palette
+    Where:    planner/styles.css :root (--bg #0f1117, --panel, --line, --text,
+              --muted, --blue #2563eb, --cyan #0ea5e9, --teal #14b8a6, --amber
+              #f59e0b, --green #22c55e, --red #ef4444, --violet #8b5cf6) ·
+              planner/app.js statusMeta (Not Started blue, In Progress amber,
+              Complete green, Issue red), DEFAULT_CATEGORY_TABS (Electrical
+              #f59e0b, Data #0ea5e9, AC #14b8a6), DEFAULT_FOLDER_COLORS
+
+[33] Plan node markers
+    Where:    planner/styles.css .node-marker (--status ring + pulse),
+              .is-portal (violet), .is-switchboard (amber), .is-subboard (blue)
+    Note:     the no-photo variant is the existing showroom "No-photo ping".
+
+[34] Room overlays & room title pin
+    Where:    planner/styles.css .room-poly (sky fill/stroke, amber selected,
+              --room-fill/--room-border opacity), .room-draw-* (dashed green),
+              .title-pin-label / .title-pin-head (red map pin, 0.16.1/0.17.1)
+
+[35] Report cover & print styles
+    Where:    planner/styles.css .print-cover (--cover-logo-w 440px,
+              --cover-logo-gap 8px; h1 40/700 #111, h2 26/500 #1f2937, meta 12px
+              #4b5563) + .print-* pages · planner/app.js REPORT_COVER_LOGO_SRC =
+              "../logo.png" (/logo.png, 500x500) · sydneyStamp() AEDT/AEST labels
+              · Lean Drive PDF caps 3 photos/node, 48 images, 40 pages, 18 MB
+    Origin:   Cinna's cover, Planner 0.20.1.
+
+ DUPLICATES NOT RE-ADDED: suite icons 1.2.0 (= [26]); electrical shorthand /
+ Planner category CSV (= [25] trade-symbols/planner-categories.csv; Planner has
+ no built-in list, shorthands live in each Categories sheet); no-photo ping and
+ sync tube (showroom cards); business logo upload (= [12] NDLogo).
+
+------------------------------------------------------------------------
+ GITHUB REFERENCE ASSETS  (permissive licences only; see showroom table)
+------------------------------------------------------------------------
+  pdf.js 6.3.289 ........ github.com/mozilla/pdf.js ............ Apache-2.0
+                          (wasm: OpenJPEG BSD-2, PDFium JBIG2 BSD-3, qcms MIT;
+                          iccs CC0-1.0)  shared/vendor/pdfjs via shared/nd-pdf.js
+  OpenSeadragon ......... github.com/openseadragon/openseadragon  BSD-3-Clause
+                          planner/vendor/openseadragon (raster plan deep zoom)
+  html2canvas-pro 2.5.0 . github.com/yorickshan/html2canvas-pro  MIT  (Lean PDF)
+  jsPDF 2.5.1 ........... github.com/parallax/jsPDF ............ MIT  (planner, quote)
+  SheetJS CE 0.20.3 ..... github.com/SheetJS/sheetjs ........... Apache-2.0
+                          (GitHub repo frozen; active at git.sheetjs.com)  checklist
+  Papa Parse 5.7.0 ...... github.com/mholt/PapaParse ........... MIT  via shared/nd-csv.js
+  pica 10.0.3 ........... github.com/nodeca/pica ............... MIT  via shared/nd-resize.js
+  exifr 7.1.3 ........... github.com/MikeKovarik/exifr ......... MIT  (upload, planner)
+  Pillow 12.3.0 ......... github.com/python-pillow/Pillow ...... MIT-CMU (HPND family)  ico
+  FastAPI 0.142.2 ....... github.com/fastapi/fastapi ........... MIT  ico/server.py
+                          (Starlette BSD-3 github.com/Kludex/starlette, Pydantic MIT)
+  Uvicorn 0.54.0 ........ github.com/Kludex/uvicorn ............ BSD-3-Clause  ico API server
+  python-multipart 0.0.32 github.com/Kludex/python-multipart ... Apache-2.0  POST /ico
+  DejaVu Sans 2.37 ...... github.com/dejavu-fonts/dejavu-fonts . Bitstream Vera Fonts
+                          licence (permissive)  ico/fonts
+  sharp (build only) .... github.com/lovell/sharp .............. Apache-2.0
+                          assets/suite-icons/build-assets.cjs; not shipped
+  actions/checkout v4 ... github.com/actions/checkout .......... MIT  hub-apps.yml
+  IN-HOUSE: hub/build-apps.cjs + .github/workflows/hub-apps.yml (hub tiles);
+            scripts/render-app-icons.cjs; assets/*/build-assets.cjs; all suite
+            art (no third-party icon set is used).
+  NOT LISTED: libvips (sharp's prebuilt binary, LGPL; build-time only); Google
+  sign-in/Drive/Maps (hosted services). Attribution: FreeType (FTL) inside the
+  Pillow wheels and the Bitstream notice for DejaVu are kept in
+  ico/LICENSE.Pillow.txt and ico/fonts/LICENSE.txt. No Leaflet/OSM.
+
+------------------------------------------------------------------------
  CANDIDATE ASSETS TO EXTRACT NEXT  (best-of from the other apps)
 ------------------------------------------------------------------------
   (library complete — all identified best-of components extracted)
@@ -349,6 +460,10 @@ HOW THIS RELATES TO /shared
 ------------------------------------------------------------------------
  CHANGELOG
 ------------------------------------------------------------------------
+  2026-10-06  Assets 1.1.1: design kit [27]-[35] (ND suite logo as a brand
+              asset, home-screen icons, Planner UI icons, ICO output; suite
+              tokens, Planner palette, node markers, rooms/title pin, report
+              cover) + GitHub reference assets. Versioning: 1234567890/VERSION.
   2026-10-06  Suite icons 1.1.0: add the ICO Generator app icon (13 apps), used
               by ico/favicon.svg and the new hub tile; pack and preview rebuilt.
   2026-10-01  Add the Field Collection: Photo Markup Studio, 36 trade symbols,
