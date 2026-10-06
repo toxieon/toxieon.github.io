@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.20.5";
+const APP_VERSION = "0.20.6";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -3786,7 +3786,8 @@ function renderFolderModal(folderId = null) {
 }
 
 function renderProjectModal(isEdit) {
-  const existing = isEdit ? project() : null;
+  // New project may carry a prefill from Quote's "Create job" (see quoteJobPrefillFromHash).
+  const existing = isEdit ? project() : (state.modal?.prefill || null);
   return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="projectForm" role="dialog"><div class="modal-header"><div><h3>${isEdit ? "Edit project" : "New project"}</h3><p>Drive folder will be created at /${DRIVE_ROOT_NAME}/${DRIVE_PROJECTS_FOLDER}/&lt;folder&gt;/&lt;project&gt;/</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label for="projectName">Name</label><input id="projectName" name="name" required value="${escapeHtml(existing?.name || "")}" placeholder="Tower A Stage 1" /></div><div class="field"><label for="projectFolder">Folder</label><select id="projectFolder" name="folderId"><option value="">${DRIVE_UNFILED_FOLDER}</option>${state.projectFolders.map((f) => `<option value="${f.id}" ${f.id === existing?.folderId ? "selected" : ""}>${escapeHtml(f.name)}</option>`).join("")}</select></div><div class="field"><label for="projectFirstFloor">First floor name</label><input id="projectFirstFloor" name="firstFloor" value="${escapeHtml(existing?.floors?.[0]?.name || "Ground floor")}" placeholder="Ground floor" /></div><div class="field full"><label for="projectAddress">Address</label><div class="field-with-here"><input id="projectAddress" name="address" value="${escapeHtml(existing?.address || "")}" placeholder="25 Watts Parade, Mount Eliza VIC" autocomplete="off" data-project-address /><button type="button" class="here-btn" data-here-project title="Use my current location">${icon("target")}Here</button></div></div><label class="check-row full"><input type="checkbox" name="protected" ${existing?.protected ? "checked" : ""} /><span><strong>Protect this job from format</strong><small>Keeps this project when Format data is run.</small></span></label><div class="field full"><label for="projectDescription">Description</label><textarea id="projectDescription" name="description">${escapeHtml(existing?.description || "")}</textarea></div></div></div><div class="modal-actions">${isEdit ? `<button type="button" class="danger-button" data-action="delete-project">${icon("trash")}Delete project</button>` : ""}<button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("check")}Save</button></div></form>`;
 }
 
@@ -6283,7 +6284,23 @@ function toast(message) {
 
 /* BOOT */
 
+/* Quote -> job handoff: Quote's "Create job" opens
+ *   /planner/#newproject=1&name=<client>&address=<site>&ref=<quote id>
+ * which opens the normal New project form prefilled (nothing is created until
+ * the user presses Save, so the Drive folder / Projects sheet path is unchanged). */
+function quoteJobPrefillFromHash() {
+  if (!/(^#|&)newproject=/.test(location.hash)) return null;
+  const p = new URLSearchParams(location.hash.slice(1));
+  const clip = (v, n) => String(v || "").replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, n);
+  const name = clip(p.get("name"), 120), address = clip(p.get("address"), 200), ref = clip(p.get("ref"), 60);
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}   // one-shot: a reload must not reopen it
+  if (!name && !address) return null;
+  return { name: name || address, address, description: ref ? `From Quote ${ref}` : "" };
+}
+
 function hydrateFromHash() {
+  const prefill = quoteJobPrefillFromHash();
+  if (prefill) { state.activeView = "projects"; state.modal = { mode: "new-project", prefill }; return; }
   const projMatch = location.hash.match(/project=([^&]+)/);
   if (projMatch) {
     const proj = projectById(decodeURIComponent(projMatch[1]));

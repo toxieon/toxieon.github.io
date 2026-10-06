@@ -1150,7 +1150,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
 /* =====================================================
    HARD-CODED CONSTANTS
    ===================================================== */
-const APP_VERSION = "0.1.4";   // see quote/VERSIONING.md
+const APP_VERSION = "0.1.5";   // see quote/VERSIONING.md
 document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("app-version"); if (v) v.textContent = "v" + APP_VERSION; });
 /* ▼▼▼ PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES BELOW ▼▼▼ */
 const HARDCODED_MAPS_KEY        = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
@@ -2765,6 +2765,10 @@ function renderHistory() {
     }
     if (jsKey === 'in_progress') {
       actions.push(`<button class="btn btn-complete" data-id="${q.id}" data-act="to_complete" title="Mark complete — becomes an Invoice">✓ Complete</button>`);
+      if (!isStaff()) {
+        actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="create_job" title="Open Planner's New project form prefilled with this client and address">＋ Create job</button>`);
+        actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="ts_job" title="Save this site as a job in Timesheet">⏱ Timesheet</button>`);
+      }
       if (!isStaff()) actions.push(`<button class="btn btn-revert" data-id="${q.id}" data-act="to_quote" title="Revert to quote for edits">↺ Back to Quote</button>`);
     }
     if (jsKey === 'complete' && !isStaff()) {
@@ -2808,8 +2812,33 @@ function renderHistory() {
       }
     } else if (act === 'to_in_progress' || act === 'to_quote' || act === 'to_complete') {
       changeJobStatus(q, act.replace('to_', ''));
+    } else if (act === 'create_job' || act === 'ts_job') {
+      openJobHandoff(q, act === 'create_job' ? 'planner' : 'timesheet');
     }
   });
+}
+
+/* Quote -> job handoff (accepted = In Progress). Client-side only: the
+ * prefill rides in the URL hash (never sent to a server, and it works even
+ * where installed apps don't share storage). Planner opens its New project
+ * form prefilled; Timesheet saves the site as a job (with the quote's
+ * geocoded lat/lng). No backend call. */
+function openJobHandoff(q, target) {
+  const c = q.client || {};
+  const p = new URLSearchParams();
+  if (target === 'planner') {
+    p.set('newproject', '1');
+    p.set('name', c.name || c.address || q.id);
+    p.set('address', c.address || '');
+    p.set('ref', q.id || '');
+  } else {
+    p.set('addjob', '1');
+    p.set('name', c.name || c.address || 'Neill Data job');
+    p.set('address', c.address || '');
+    if (Number.isFinite(q.clientLat) && Number.isFinite(q.clientLng)) { p.set('lat', String(q.clientLat)); p.set('lng', String(q.clientLng)); }
+    p.set('quote', q.id || '');
+  }
+  window.open('/' + target + '/#' + p.toString(), '_blank', 'noopener');
 }
 
 async function changeJobStatus(q, target) {
