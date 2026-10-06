@@ -60,7 +60,7 @@ node --test assets/suite-icons.test.cjs
 
 ### Home-screen (iPhone / PWA) icons
 
-Each app except Timesheet (which keeps its orange clock) uses this art for its `apple-touch-icon` (`<app>/icons/icon-180.png`) and manifest icons (`icon-192.png`, `icon-512.png`). The exported PNGs above have transparent rounded corners, which iOS paints black, so `scripts/render-app-icons.cjs` flattens them onto a solid square of the tile background (`#101922`) and writes 8-bit RGB PNGs with no alpha (Node built-ins only). After changing art:
+Each app except Timesheet (which keeps its orange clock) and the Hub (which uses the Neill Data ND suite logo in `hub/icons/`) uses this art for its `apple-touch-icon` (`<app>/icons/icon-180.png`) and manifest icons (`icon-192.png`, `icon-512.png`). The exported PNGs above have transparent rounded corners, which iOS paints black, so `scripts/render-app-icons.cjs` flattens them onto a solid square of the tile background (`#101922`) and writes 8-bit RGB PNGs with no alpha (Node built-ins only). After changing art:
 
 ```sh
 node assets/suite-icons/build-assets.cjs   # SVG -> apps/<name>-{32,180,192,512}.png (sharp)
