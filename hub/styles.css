@@ -121,6 +121,19 @@ a {
   font-size: 13px;
 }
 
+/* v0.6.3: keep the header clear of the shared sync tube + its "Online"/"Offline"
+ * badge (shared/nd-core.css: position:fixed, top-right, tube right:14px, badge
+ * right:40px). --sync-clear is how far from the viewport's right edge they reach
+ * (badge ~61px + 40px + 10px gap). The Apps button only moves left by what the
+ * frame's own right margin doesn't already cover, so wide screens are unchanged. */
+.topbar {
+  --sync-clear: 112px;
+}
+
+.topbar > .topbar-actions {
+  margin-right: max(0px, calc(var(--sync-clear) - (100vw - min(1380px, 100vw - 36px)) / 2));
+}
+
 .topbar-actions,
 .controls,
 .preset-row {
@@ -615,6 +628,11 @@ select {
 
   .topbar {
     margin-bottom: 10px;
+  }
+
+  /* stacked header: the Apps button is on the second row, below the tube */
+  .topbar > .topbar-actions {
+    margin-right: 0;
   }
 
   .topbar-actions {
