@@ -16,7 +16,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'hub-v6'; // v6: hub 0.6.2 — opaque PNG home-screen icons (icon-180 apple-touch-icon); v5: apps.json + HTML network-first
+const CACHE_VERSION = 'hub-v7'; // v7: hub 0.6.3 — header clears the sync badge; v6: hub 0.6.2 — opaque PNG home-screen icons (icon-180 apple-touch-icon); v5: apps.json + HTML network-first
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -27,12 +27,12 @@ const SHELL_ASSETS = [
   "./apps.json",
   "./favicon.svg?v=0.4.1",
   "../shared/nd-core.css",
-  "./styles.css?v=0.6.2",
+  "./styles.css?v=0.6.3",
   "../shared/nd-match.js",
   "../shared/nd-cache.js",
   "../shared/nd-ui.js",
   "../shared/nd-pwa.js",
-  "./app.js?v=0.6.2"
+  "./app.js?v=0.6.3"
 ];
 
 const IS_API_HOST = (url) =>
