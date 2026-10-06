@@ -10,7 +10,8 @@
  * transparency black, so this flattens them onto a SOLID square of the icon's own
  * background colour (the full-size <rect fill> in the SVG, else the suite tile colour)
  * and writes 8-bit RGB PNGs with no alpha channel. Node built-ins only (zlib).
- * Timesheet is not listed: it keeps its own orange clock icons.
+ * Timesheet is not listed: it keeps its own orange clock icons. The Hub is not listed either:
+ * its home-screen icons are the Neill Data suite logo (ND), copied into hub/icons/ (hub 0.6.3).
  */
 "use strict";
 const fs = require("node:fs");
@@ -29,8 +30,7 @@ const APPS = [
   { folder: "fitoff", icon: "fitoff", title: "Fit-off" },
   { folder: "1234567890", icon: "assets", title: "Assets" },
   { folder: "company", icon: "company", title: "Company" },
-  { folder: "ico", icon: "ico", title: "ICO" },
-  { folder: "hub", icon: "hub", title: "Hub" }
+  { folder: "ico", icon: "ico", title: "ICO" }
 ];
 
 /* ── PNG decode (8-bit RGB/RGBA, non-interlaced: what sharp writes) ── */

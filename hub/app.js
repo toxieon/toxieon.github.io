@@ -1,4 +1,4 @@
-/* Hub v0.6.3 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.6.4 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Continue where you left off" reads the shared recents feed. */
