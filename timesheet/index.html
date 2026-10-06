@@ -654,7 +654,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.1.3';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.1.4';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -3497,6 +3497,28 @@ function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
 }
+/* Quote -> job handoff: Quote's "Timesheet" button opens
+ *   /timesheet/#addjob=1&name=&address=&lat=&lng=&quote=<quote id>
+ * and the site is saved as a Neill Data job (deduped by quote id, then
+ * name/address). One-shot: the hash is cleared straight away. */
+function addJobFromHash() {
+  if (!/(^#|&)addjob=/.test(location.hash)) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  const clip = (v, n) => String(v || '').replace(/[\u0000-\u001f]+/g, ' ').trim().slice(0, n);
+  const name = clip(p.get('name'), 120), address = clip(p.get('address'), 200), quoteId = clip(p.get('quote'), 60);
+  if (!name && !address) return;
+  const lat = Number(p.get('lat')), lng = Number(p.get('lng'));
+  const hasLoc = p.get('lat') !== null && p.get('lng') !== null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const jobs = getState().jobs || [];
+  const existing = (quoteId && jobs.find(j => j.neill_quote_id === quoteId)) ||
+    jobs.find(j => (name && (j.job_name || '').trim().toLowerCase() === name.toLowerCase()) || (address && (j.address || '').trim().toLowerCase() === address.toLowerCase()));
+  if (existing) { toast('Already saved: ' + (existing.job_name || existing.address)); return; }
+  createJob({ job_name: name || address, address, lat: hasLoc ? lat : null, lng: hasLoc ? lng : null, job_type: 'neill_data', neill_quote_id: quoteId || null, neill_quote_status: 'working' });
+  refreshAllViews();
+  toast('Job saved from quote: ' + (name || address));
+}
+
 async function bootApp() {
   registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
   TsGeo.loadMapsJs().catch(() => {});   // preload so NDHere + reverseGeocode use the JS geocoder (referrer-safe)
@@ -3520,6 +3542,7 @@ async function bootApp() {
     document.dispatchEvent(new CustomEvent('ts:auth-changed', { detail: status }));
   };
   if (getState().currentSession) TsGeo.startWatching();
+  addJobFromHash();
   // Returning to a backgrounded PWA re-checks the daily sync.
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { reconcileOpenSessions(); maybeDailyForceSync(); } });
 }
