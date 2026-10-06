@@ -1580,9 +1580,10 @@ async function uploadBatch() {
     }
 
     state.step = "complete";
-    if (window.NDUI?.recordVisit) {
+    // Hub "Recent jobs": Upload has no deep link, so the entry reopens the app.
+    if (window.NDRecentJobs) {
       const addr = state.items[0] ? String(state.items[0].address || "").split(",")[0] : "";
-      NDUI.recordVisit("upload", "batch", `${state.upload.completed} photo${state.upload.completed === 1 ? "" : "s"} uploaded${addr ? " — " + addr : ""}`, "/upload/");
+      NDRecentJobs.record({ app: "upload", id: "batch", label: `${state.upload.completed} photo${state.upload.completed === 1 ? "" : "s"} uploaded${addr ? " — " + addr : ""}`, url: "/upload/" });
     }
     render();
   } catch (error) {

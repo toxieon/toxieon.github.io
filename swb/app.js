@@ -838,6 +838,7 @@ async function createProject(data) {
   state.selectedBoardId   = mainBoardId;
   state.activeView = "board";
   persist(); render();
+  recordRecentProject(proj);
   // Save to Drive
   if (isTokenValid()) {
     toast("Creating project sheet…");
@@ -977,6 +978,12 @@ function readDeepLinkParams() {
   state.deepLink.boardId   = p.get("board")   || null;
 }
 
+/* Hub "Recent jobs" (shared/nd-recent-jobs.js), reopened via the existing ?project= deep link. */
+function recordRecentProject(proj) {
+  if (!proj || !window.NDRecentJobs) return;
+  NDRecentJobs.record({ app: "swb", id: proj.id, label: NDRecentJobs.label(proj.name, proj.address), url: "/swb/?project=" + encodeURIComponent(proj.id) });
+}
+
 function applyDeepLink() {
   const { projectId, boardId } = state.deepLink;
   if (!projectId) return;
@@ -988,6 +995,7 @@ function applyDeepLink() {
     : proj.boards[0]?.id;
   state.activeView = "board";
   state.deepLink = { projectId: null, boardId: null }; // consume once
+  recordRecentProject(proj);
 }
 
 /* ── Toast ───────────────────────────────────────────────────────────────── */
@@ -1837,6 +1845,7 @@ function bindEvents() {
     const p=project(id);
     state.selectedBoardId=p?.boards[0]?.id||null;
     state.activeView="board"; persist(); render();
+    recordRecentProject(p);
   }));
 
   // Board tabs

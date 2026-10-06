@@ -16,6 +16,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-match.js"></script>
 <script src="../shared/nd-cache.js"></script>
+<script src="../shared/nd-recent-jobs.js?v=1"></script>
 <script src="../shared/nd-pdf.js"></script>
 <script src="../assets/here.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -101,7 +102,7 @@
 <div id="app"><div class="center"><div class="spinner"></div><p>Starting&hellip;</p></div></div>
 
 <script>
-var APP_VERSION = "0.1.3";   // see fitoff/VERSIONING.md
+var APP_VERSION = "0.1.4";   // see fitoff/VERSIONING.md
 (function () {
   "use strict";
   var cfg = (window.ND && ND.config) ? ND.config.forApp("planner") : {};
@@ -249,6 +250,9 @@ var APP_VERSION = "0.1.3";   // see fitoff/VERSIONING.md
 
   function openProject(pid) {
     view.projectId = pid;
+    // Hub "Recent jobs", reopened via the existing ?project= link.
+    var rp = data.projects.find(function (p) { return p.id === pid; });
+    if (rp && window.NDRecentJobs) NDRecentJobs.record({ app: "fitoff", id: rp.id, label: NDRecentJobs.label(rp.name, rp.address), url: "/fitoff/?project=" + encodeURIComponent(rp.id) });
     var floors = data.floors.filter(function (f) { return f.projectId === pid; }).sort(function (a, b) { return a.order - b.order; });
     view.floorId = floors.length ? floors[0].id : null;
     pan = { x: 0, y: 0, scale: 1 };

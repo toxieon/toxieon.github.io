@@ -1,2 +1,3 @@
+## 0.1.3 · 2026-10-06 · recent-jobs · Clocking on (and off) records the job in the Hub "Recent jobs" list (shared/nd-recent-jobs.js), replacing the old "Shift: <job>" recents entry: label = job name · address, link /timesheet/ (Timesheet has no deep link). Service worker timesheet-0.1.3 precaches the helper
 ## 0.1.2 · 2026-10-06 · stable-login-ready · Google sign-in can use the Neill Data Backend stable login (one sign-in, then silent server-side refresh; for iPhone home-screen apps) once shared/nd-backend.js sets plannerOAuth:true; switched OFF, so sign-in is unchanged today (GIS token client)
 ## 0.1.1 · 2026-10-01 · versioning-baseline · Version baseline; today's changes: CSV import via PapaParse (#22)
