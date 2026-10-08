@@ -1,4 +1,4 @@
-/* ts-time.js — Timesheet time helpers (0.2.1). Pure, no DOM; window.TsTime in
+/* ts-time.js — Timesheet time helpers (0.2.1; lanes + rule skips 0.3.1). Pure, no DOM; window.TsTime in
  * the app, CommonJS in tests (timesheet/ts-time.test.cjs).
  *
  *   parseTypedTime   typed clock times ("7:30", "730", "3:30 pm", "7a") -> "HH:MM"
@@ -64,28 +64,71 @@
     return LOCKED_STATUSES.indexOf(String(s.status || "").toLowerCase()) !== -1;
   }
 
-  /* ---- timeline ----
-   * entries: [{ on, off (minutes), locked }] sorted by start, same day, off > on.
-   * Adjacent entries whose times meet (A.off === B.on) share ONE handle that
-   * moves both. Returns handles with their allowed [min, max]. */
+  /* ---- timeline (0.3.1: lanes) ----
+   * entries: [{ on, off (minutes), locked, lane? }], same day, off >= on
+   * (zero-length allowed). Overlapping entries go on separate lanes (greedy:
+   * first lane whose last entry ends at or before this one starts). Entries
+   * that only TOUCH share a lane; a zero-length entry never shares a touching
+   * point, so its marker stays grabbable. */
+  function assignLanes(entries) {
+    var order = entries.map(function (e, i) { return i; }).sort(function (a, b) {
+      return entries[a].on - entries[b].on || entries[a].off - entries[b].off || a - b;
+    });
+    var lanes = [], out = new Array(entries.length);
+    order.forEach(function (i) {
+      var e = entries[i], zero = e.on === e.off, li = 0;
+      for (; li < lanes.length; li++) {
+        var L = lanes[li];
+        if (e.on > L.end || (e.on === L.end && !zero && !L.zero)) break;
+      }
+      lanes[li] = { end: Math.max(e.off, lanes[li] ? lanes[li].end : -1), zero: zero };
+      out[i] = li;
+    });
+    return { lanes: out, count: Math.max(1, lanes.length) };
+  }
+  /* Handles, one model for all lanes. Neighbours (and shared-boundary links)
+   * are on the SAME lane only. Keys: s<i> start, e<i> end, b<i> boundary
+   * shared by i-1 and i, p<i> zero-length marker (dragging it pulls the entry
+   * out: left moves the start, right moves the end). */
   function timelineHandles(entries, opts) {
     var a0 = opts.axisStart, a1 = opts.axisEnd, md = opts.minDur || 1, out = [];
-    entries.forEach(function (e, i) {
-      var prev = entries[i - 1], next = entries[i + 1];
-      if (prev && prev.off === e.on) {
-        out.push({ key: "b" + i, minutes: e.on, targets: [{ i: i - 1, field: "off" }, { i: i, field: "on" }],
-          min: prev.on + md, max: e.off - md, disabled: !!(prev.locked || e.locked) });
-      } else {
-        out.push({ key: "s" + i, minutes: e.on, targets: [{ i: i, field: "on" }],
-          min: prev ? prev.off : a0, max: e.off - md, disabled: !!e.locked });
-      }
-      if (!(next && next.on === e.off)) {
-        out.push({ key: "e" + i, minutes: e.off, targets: [{ i: i, field: "off" }],
-          min: e.on + md, max: next ? next.on : a1, disabled: !!e.locked });
-      }
+    var lanes = entries.some(function (e) { return e.lane == null; }) ? assignLanes(entries).lanes : entries.map(function (e) { return e.lane; });
+    var byLane = {};
+    entries.forEach(function (e, i) { (byLane[lanes[i]] = byLane[lanes[i]] || []).push(i); });
+    Object.keys(byLane).forEach(function (ln) {
+      var idx = byLane[ln].sort(function (a, b) { return entries[a].on - entries[b].on || entries[a].off - entries[b].off || a - b; });
+      idx.forEach(function (i, k) {
+        var e = entries[i], pi = idx[k - 1], ni = idx[k + 1];
+        var prev = pi == null ? null : entries[pi], next = ni == null ? null : entries[ni];
+        var lane = +ln;
+        if (e.on === e.off) {
+          out.push({ key: "p" + i, kind: "point", lane: lane, minutes: e.on, origin: e.on, targets: [{ i: i, field: "on" }, { i: i, field: "off" }],
+            min: prev ? prev.off : a0, max: next ? next.on : a1, disabled: !!e.locked });
+          return;
+        }
+        if (prev && prev.off === e.on && prev.on !== prev.off) {
+          out.push({ key: "b" + i, lane: lane, minutes: e.on, targets: [{ i: pi, field: "off" }, { i: i, field: "on" }],
+            min: prev.on + md, max: e.off - md, disabled: !!(prev.locked || e.locked) });
+        } else {
+          out.push({ key: "s" + i, lane: lane, minutes: e.on, targets: [{ i: i, field: "on" }],
+            min: prev ? prev.off : a0, max: e.off - md, disabled: !!e.locked });
+        }
+        if (!(next && next.on === e.off && next.on !== next.off)) {
+          out.push({ key: "e" + i, lane: lane, minutes: e.off, targets: [{ i: i, field: "off" }],
+            min: e.on + md, max: next ? next.on : a1, disabled: !!e.locked });
+        }
+      });
     });
     out.forEach(function (h) { h.min = Math.max(h.min, a0); h.max = Math.min(h.max, a1); });
     return out;
+  }
+  /* Apply a handle position to a working copy of the entries. */
+  function timelineApply(work, handle, v) {
+    if (handle.kind === "point") {
+      var e = work[handle.targets[0].i];
+      if (v < handle.origin) { e.on = v; e.off = handle.origin; } else { e.on = handle.origin; e.off = v; }
+    } else handle.targets.forEach(function (t) { work[t.i][t.field] = v; });
+    return work;
   }
   /* Snap a dragged position to the rounding step and clamp it to the handle's range. */
   function timelineSnap(minutes, handle, step) {
@@ -103,6 +146,61 @@
     var so = toMin(settings && settings.standardClockOn), sf = toMin(settings && settings.standardClockOff);
     if (so != null) lo = Math.min(lo, so); if (sf != null) hi = Math.max(hi, sf);
     return { axisStart: Math.max(0, Math.floor((lo - 60) / 60) * 60), axisEnd: Math.min(1440, Math.ceil((hi + 60) / 60) * 60) };
+  }
+
+  /* ---- static-day rules: skip dates / ranges (0.3.1) ----
+   * A static day template (Settings > Static days, e.g. type "School Day",
+   * shown as the SCHOOL DAY badge) repeats on its weekdays. Exceptions live
+   * ON the rule: skipDates ["YYYY-MM-DD"], skipRanges [{from,to}]; for the
+   * Google Sheet they're mirrored as one JSON column, `skips`. */
+  var ISO = /^\d{4}-\d{2}-\d{2}$/;
+  function ruleSkips(tpl) {
+    var d = Array.isArray(tpl && tpl.skipDates) ? tpl.skipDates : null, r = Array.isArray(tpl && tpl.skipRanges) ? tpl.skipRanges : null;
+    if ((!d || !r) && tpl && typeof tpl.skips === "string" && tpl.skips) {
+      try { var j = JSON.parse(tpl.skips); d = d || j.dates; r = r || j.ranges; } catch (e) {}
+    }
+    var dates = (d || []).filter(function (x) { return ISO.test(x); });
+    var ranges = (r || []).filter(function (x) { return x && ISO.test(x.from) && ISO.test(x.to); })
+      .map(function (x) { return x.from <= x.to ? { from: x.from, to: x.to } : { from: x.to, to: x.from }; });
+    return { dates: dates, ranges: ranges };
+  }
+  function setRuleSkips(tpl, dates, ranges) {
+    var seen = {};
+    tpl.skipDates = dates.filter(function (x) { return ISO.test(x) && !seen[x] && (seen[x] = true); }).sort();
+    var rs = {};
+    tpl.skipRanges = ranges.map(function (x) { return x.from <= x.to ? { from: x.from, to: x.to } : { from: x.to, to: x.from }; })
+      .filter(function (x) { var k = x.from + "/" + x.to; return ISO.test(x.from) && ISO.test(x.to) && !rs[k] && (rs[k] = true); })
+      .sort(function (a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : 0; });
+    tpl.skips = (tpl.skipDates.length || tpl.skipRanges.length) ? JSON.stringify({ dates: tpl.skipDates, ranges: tpl.skipRanges }) : "";
+    return tpl;
+  }
+  function normaliseRuleSkips(tpl) { var k = ruleSkips(tpl); return setRuleSkips(tpl, k.dates, k.ranges); }
+  function addRuleSkip(tpl, from, to) {
+    var k = ruleSkips(tpl);
+    if (!ISO.test(from || "")) return false;
+    if (to && ISO.test(to) && to !== from) k.ranges.push({ from: from, to: to }); else k.dates.push(from);
+    setRuleSkips(tpl, k.dates, k.ranges); return true;
+  }
+  function removeRuleSkip(tpl, from, to) {
+    var k = ruleSkips(tpl);
+    if (to && to !== from) k.ranges = k.ranges.filter(function (x) { return !(x.from === from && x.to === to); });
+    else k.dates = k.dates.filter(function (x) { return x !== from; });
+    setRuleSkips(tpl, k.dates, k.ranges); return tpl;
+  }
+  function isRuleSkipped(tpl, iso) {
+    var k = ruleSkips(tpl);
+    return k.dates.indexOf(iso) !== -1 || k.ranges.some(function (x) { return iso >= x.from && iso <= x.to; });
+  }
+  /* The generator: days [{ iso, dow }] -> [{ date, dow, template }] for every
+   * active rule on that weekday, minus its skip dates/ranges. */
+  function staticDaysFor(templates, days) {
+    var out = [];
+    days.forEach(function (d) {
+      (templates || []).forEach(function (t) {
+        if (t.active && (t.days || []).indexOf(d.dow) !== -1 && !isRuleSkipped(t, d.iso)) out.push({ date: d.iso, dow: d.dow, template: t });
+      });
+    });
+    return out;
   }
 
   /* ---- one-time start/finish migration ----
@@ -153,6 +251,7 @@
   }
 
   return { parseTypedTime: parseTypedTime, snapClock: snapClock, isEntryLocked: isEntryLocked, toMin: toMin, toHHMM: toHHMM,
-    timelineHandles: timelineHandles, timelineSnap: timelineSnap, timelineAxis: timelineAxis,
+    timelineHandles: timelineHandles, timelineSnap: timelineSnap, timelineAxis: timelineAxis, assignLanes: assignLanes, timelineApply: timelineApply,
+    ruleSkips: ruleSkips, addRuleSkip: addRuleSkip, removeRuleSkip: removeRuleSkip, isRuleSkipped: isRuleSkipped, normaliseRuleSkips: normaliseRuleSkips, staticDaysFor: staticDaysFor,
     migrateStartFinish: migrateStartFinish, MIGRATION_FLAG: FLAG, NEW_START: NEW_START, NEW_FINISH: NEW_FINISH };
 });

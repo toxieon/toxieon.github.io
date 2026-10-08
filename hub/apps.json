@@ -5,7 +5,7 @@
     { "id": "upload", "name": "Upload", "path": "/upload/", "icon": "/assets/suite-icons/apps/upload.svg?v=1.2.0", "color": "#a855f7", "order": 2, "hidden": false },
     { "id": "search", "name": "Search", "path": "/search/", "icon": "/assets/suite-icons/apps/search.svg?v=1.2.0", "color": "#facc15", "order": 3, "hidden": false },
     { "id": "quote", "name": "Quote", "path": "/quote/", "icon": "/assets/suite-icons/apps/quote.svg?v=1.2.0", "color": "#31d0ff", "order": 4, "hidden": false, "version": "0.1.5" },
-    { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false, "version": "0.2.1" },
+    { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false, "version": "0.3.1" },
     { "id": "swb", "name": "SWB", "path": "/swb/", "icon": "/assets/suite-icons/apps/swb.svg?v=1.2.0", "color": "#f59e0b", "order": 6, "hidden": false },
     { "id": "fitoff", "name": "Fit-off", "path": "/fitoff/", "icon": "/assets/suite-icons/apps/fitoff.svg?v=1.2.0", "color": "#3ab87a", "order": 7, "hidden": false, "version": "0.1.4" },
     { "id": "assets", "name": "Assets", "path": "/1234567890/", "icon": "/assets/suite-icons/apps/assets.svg?v=1.2.0", "color": "#6ddba3", "order": 8, "hidden": false, "version": "1.1.1" },

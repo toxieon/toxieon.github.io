@@ -15,7 +15,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.2.1"></script>
+<script src="ts-time.js?v=0.3.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -343,6 +343,18 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .ts-tl-tip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 3px 7px; border-radius: 6px; background: #fff; color: #111; font: 600 12px var(--mono-font); white-space: nowrap; pointer-events: none; }
 .ts-tl-h.active .ts-tl-tip { display: block; }
 body.ts-tl-dragging { overscroll-behavior: none; }
+/* 0.3.1 — timeline lanes + zero-length markers */
+.ts-tl-track.ts-tl-lanes .ts-tl-tick::before { top: calc(-1 * var(--tl-h)); height: var(--tl-h); }
+.ts-tl-seg.zero { background: transparent; border: 0; padding: 0 0 0 16px; overflow: visible; }
+.ts-tl-seg.zero span { max-width: 96px; }
+.ts-tl-h.ts-tl-pt::before { left: 12px; top: 12px; width: 20px; height: 20px; border-radius: 50%; }
+.ts-tl-h.ts-tl-pt.active::before { width: 6px; left: 19px; top: 4px; height: 36px; border-radius: 3px; }
+.tpl-skip-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tpl-skip-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); font-size: 12px; }
+.tpl-skip-chip button { min-width: 32px; min-height: 32px; border: 0; background: transparent; color: var(--text-muted); font-size: 14px; }
+.tpl-skip-add { display: flex; gap: 6px; align-items: end; flex-wrap: wrap; }
+.tpl-skip-add label { flex: 1 1 120px; font-size: 12px; color: var(--text-muted); }
+.tpl-skip-add input { width: 100%; }
 </style>
 </head>
 <body>
@@ -680,7 +692,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.2.1';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.3.1';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1247,6 +1259,7 @@ function coerceJob(r) {
 function coerceStatic(r) {
   r.active = truthy(r.active);
   r.days = typeof r.days === 'string' ? (r.days ? r.days.split('|') : []) : (r.days || []);
+  if (window.TsTime && TsTime.normaliseRuleSkips) TsTime.normaliseRuleSkips(r);   // 0.3.1: `skips` column -> skipDates / skipRanges
   return r;
 }
 function pendingRecordIds() {
@@ -1286,6 +1299,7 @@ function staticDaysForWeek(weekStartDate) {
   const start = startOfWeek(weekStartDate, state.settings.firstDayOfWeek); const out = [];
   for (let i = 0; i < 7; i++) {
     const day = addDays(start, i); const dow = dayOfWeek(day);
+    if (window.TsTime && TsTime.staticDaysFor) { out.push(...TsTime.staticDaysFor(state.staticDays, [{ iso: isoDate(day), dow }])); continue; }   // 0.3.1: honours rule skip dates/ranges
     for (const tpl of state.staticDays.filter(t => t.active && (t.days || []).includes(dow))) { out.push({ date: isoDate(day), dow, template: tpl }); }
   }
   return out;
@@ -1566,7 +1580,7 @@ const TsSheets = (() => {
     sessions: ['session_id','date','day_of_week','job_id','job_name','address_confirmed','lat_on','lng_on','lat_off','lng_off','time_on','time_off','time_on_rounded','time_off_rounded','break_taken','break_minutes','total_hours','overtime_hours','job_type','notes','departed_offsite','manual_departure_time','missed_clockoff','pay_period','entry_method','user'],
     jobs: ['job_id','job_name','address','lat','lng','radius_m','job_type','neill_quote_id','neill_quote_status','first_visit','visit_count','last_visit','user','notes'],
     pay_periods: ['week_start','label'],
-    static_days: ['id','name','type','days','clock_on','clock_off','location','active'],
+    static_days: ['id','name','type','days','clock_on','clock_off','location','active','skips'],
     account_link: ['google_email','neill_quote_connected','device_fingerprint','linked_at']
   };
   // Multi-user: each signed-in Google account gets its own tab-set in the one
@@ -3097,7 +3111,7 @@ window.TsLocPicker = TsLocPicker;
   function renderTemplates() {
     const st = getState(); const list = $('tpl-list');
     if (!st.staticDays.length) { list.innerHTML = `<div class="muted" style="font-size:13px;">No templates yet.</div>`; return; }
-    list.innerHTML = st.staticDays.map(t => `<div class="tpl-card"><div><div class="tpl-name">${escapeHtml(t.name)} ${t.active ? '' : '<span class="muted">(off)</span>'}</div><div class="tpl-meta">${escapeHtml(t.type)} · ${(t.days || []).map(d => d.slice(0,3)).join(' ')} · ${fmtTime(t.clock_on, st.settings.use24hr)}–${fmtTime(t.clock_off, st.settings.use24hr)}</div></div><div class="row"><button class="icon-btn" data-tpl-edit="${t.id}">Edit</button><button class="icon-btn" data-tpl-del="${t.id}">✕</button></div></div>`).join('');
+    list.innerHTML = st.staticDays.map(t => `<div class="tpl-card"><div><div class="tpl-name">${escapeHtml(t.name)} ${t.active ? '' : '<span class="muted">(off)</span>'}</div><div class="tpl-meta">${escapeHtml(t.type)} · ${(t.days || []).map(d => d.slice(0,3)).join(' ')} · ${fmtTime(t.clock_on, st.settings.use24hr)}–${fmtTime(t.clock_off, st.settings.use24hr)}${tplSkipMeta(t)}</div></div><div class="row"><button class="icon-btn" data-tpl-edit="${t.id}">Edit</button><button class="icon-btn" data-tpl-del="${t.id}">✕</button></div></div>`).join('');
     list.querySelectorAll('[data-tpl-edit]').forEach(b => b.addEventListener('click', () => openTplModal(b.dataset.tplEdit)));
     list.querySelectorAll('[data-tpl-del]').forEach(b => b.addEventListener('click', () => { removeStaticDay(b.dataset.tplDel); renderTemplates(); }));
   }
@@ -3105,16 +3119,41 @@ window.TsLocPicker = TsLocPicker;
     editingTplId = id || null; const st = getState();
     const tpl = id ? st.staticDays.find(t => t.id === id) : { name: '', type: 'School Day', days: [], clock_on: '09:00', clock_off: '15:00', location: '', active: true };
     tplDraftDays = (tpl.days || []).slice();
-    $('tpl-body').innerHTML = `<div class="field"><label>Name</label><input id="tpl-name" value="${escapeHtml(tpl.name)}"></div><div class="field"><label>Type</label><select id="tpl-type">${TPL_TYPES.map(t => `<option ${t === tpl.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="field"><label>Days</label><div class="day-chips" id="tpl-days">${DAYS.map(d => `<span class="day-chip ${tplDraftDays.includes(d) ? 'sel' : ''}" data-day="${d}">${d.slice(0,3)}</span>`).join('')}</div></div><div class="row"><div class="field" style="flex:1;"><label>Clock On</label><input type="time" id="tpl-on" value="${tpl.clock_on}"></div><div class="field" style="flex:1;"><label>Clock Off</label><input type="time" id="tpl-off" value="${tpl.clock_off}"></div></div><div class="field"><label>Location (optional)</label><input id="tpl-loc" value="${escapeHtml(tpl.location || '')}"></div><div class="field row-between"><label style="margin:0;">Active</label><div class="switch ${tpl.active !== false ? 'on' : ''}"><input type="checkbox" id="tpl-active" ${tpl.active !== false ? 'checked' : ''}><span class="knob"></span></div></div>`;
+    tplDraftSkips = { skipDates: [], skipRanges: [] }; if (window.TsTime) { const k = TsTime.ruleSkips(tpl); tplDraftSkips = { skipDates: k.dates.slice(), skipRanges: k.ranges.slice() }; TsTime.normaliseRuleSkips(tplDraftSkips); }
+    $('tpl-body').innerHTML = `<div class="field"><label>Name</label><input id="tpl-name" value="${escapeHtml(tpl.name)}"></div><div class="field"><label>Type</label><select id="tpl-type">${TPL_TYPES.map(t => `<option ${t === tpl.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="field"><label>Days</label><div class="day-chips" id="tpl-days">${DAYS.map(d => `<span class="day-chip ${tplDraftDays.includes(d) ? 'sel' : ''}" data-day="${d}">${d.slice(0,3)}</span>`).join('')}</div></div><div class="row"><div class="field" style="flex:1;"><label>Clock On</label><input type="time" id="tpl-on" value="${tpl.clock_on}"></div><div class="field" style="flex:1;"><label>Clock Off</label><input type="time" id="tpl-off" value="${tpl.clock_off}"></div></div><div class="field"><label>Location (optional)</label><input id="tpl-loc" value="${escapeHtml(tpl.location || '')}"></div><div class="field row-between"><label style="margin:0;">Active</label><div class="switch ${tpl.active !== false ? 'on' : ''}"><input type="checkbox" id="tpl-active" ${tpl.active !== false ? 'checked' : ''}><span class="knob"></span></div></div>${window.TsTime ? tplSkipHtml() : ''}`;
+    if (window.TsTime) wireTplSkips();
     $('tpl-days').querySelectorAll('.day-chip').forEach(chip => {
       chip.addEventListener('click', () => { const d = chip.dataset.day; if (tplDraftDays.includes(d)) tplDraftDays = tplDraftDays.filter(x => x !== d); else tplDraftDays.push(d); chip.classList.toggle('sel'); });
     });
     $('tpl-active').addEventListener('change', e => e.target.closest('.switch').classList.toggle('on', e.target.checked));
     $('tpl-backdrop').style.display = 'flex';
   }
+  /* 0.3.1 — skip a rule (e.g. a School Day template) on chosen dates or
+   * ranges without deleting it. Held as a draft until Save; the generator
+   * (staticDaysForWeek -> TsTime.staticDaysFor) leaves those dates out. */
+  let tplDraftSkips = null;
+  function tplSkipMeta(t) { if (!window.TsTime) return ''; const k = TsTime.ruleSkips(t), n = k.dates.length + k.ranges.length; return n ? ` · ${n} skip${n === 1 ? '' : 's'}` : ''; }
+  function fmtSkipDay(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function tplSkipHtml() {
+    const k = tplDraftSkips || { skipDates: [], skipRanges: [] };
+    const chips = k.skipDates.map(d => `<span class="tpl-skip-chip">${escapeHtml(fmtSkipDay(d))}<button type="button" data-skip-del="${d}" aria-label="Remove skip ${escapeHtml(fmtSkipDay(d))}">✕</button></span>`)
+      .concat(k.skipRanges.map(r => `<span class="tpl-skip-chip">${escapeHtml(fmtSkipDay(r.from))} – ${escapeHtml(fmtSkipDay(r.to))}<button type="button" data-skip-del="${r.from}" data-skip-to="${r.to}" aria-label="Remove skip range">✕</button></span>`)).join('');
+    return `<div class="field" id="tpl-skips"><label>Skip dates</label><div class="muted" style="font-size:12px;">No entries from this rule on these dates. The rule itself stays.</div><div class="tpl-skip-list" id="tpl-skip-list">${chips || '<span class="muted" style="font-size:12px;">None</span>'}</div><div class="tpl-skip-add"><label>From<input type="date" id="tpl-skip-from"></label><label>To (optional)<input type="date" id="tpl-skip-to"></label><button type="button" class="btn btn-ghost" id="tpl-skip-add">Add skip</button></div></div>`;
+  }
+  function wireTplSkips() {
+    const box = $('tpl-skips'); if (!box) return;
+    const redraw = () => { box.outerHTML = tplSkipHtml(); wireTplSkips(); };
+    $('tpl-skip-add').addEventListener('click', () => {
+      const from = $('tpl-skip-from').value, to = $('tpl-skip-to').value;
+      if (!TsTime.addRuleSkip(tplDraftSkips, from, to)) { toast('Pick a date to skip'); return; }
+      redraw();
+    });
+    box.querySelectorAll('[data-skip-del]').forEach(b => b.addEventListener('click', () => { TsTime.removeRuleSkip(tplDraftSkips, b.dataset.skipDel, b.dataset.skipTo || ''); redraw(); }));
+  }
   function saveTplModal() {
     const payload = { name: $('tpl-name').value.trim() || 'Static Day', type: $('tpl-type').value, days: tplDraftDays, clock_on: $('tpl-on').value, clock_off: $('tpl-off').value, location: $('tpl-loc').value.trim(), active: $('tpl-active').checked };
-    if (editingTplId) updateStaticDay(editingTplId, payload); else addStaticDay(payload);
+    if (window.TsTime && tplDraftSkips) Object.assign(payload, { skipDates: tplDraftSkips.skipDates, skipRanges: tplDraftSkips.skipRanges, skips: tplDraftSkips.skips || '' });   // 0.3.1
+    if (editingTplId) updateStaticDay(editingTplId, payload); else { const row = addStaticDay(payload); if (payload.skips) updateStaticDay(row.id, { skipDates: payload.skipDates, skipRanges: payload.skipRanges, skips: payload.skips }); }
     $('tpl-backdrop').style.display = 'none'; renderTemplates();
   }
   function renderAccountStatus() {
@@ -3607,31 +3646,41 @@ window.TsTypedTime = TsTypedTime;
  * (TsTime.isEntryLocked) can't be dragged. Pointer events, 44px targets,
  * touch-action:none, page scroll blocked while dragging. */
 const TsTimeline = (() => {
-  const models = {};
+  /* 0.3.1 — lanes. Overlapping and zero-length shifts no longer hide the
+   * timeline: they stack on lanes (TsTime.assignLanes, greedy), shifts that
+   * touch on the same lane share a handle, and a zero-length shift is a round
+   * marker you pull left (start) or right (end). Open/blank/overnight shifts
+   * stay off the timeline (editor only). */
+  const models = {}, LANE = 48, PAD = 8;
   function entriesFor(daySessions) {
     const list = daySessions.map(s => ({ s, on: TsTime.toMin(s.time_on_rounded), off: TsTime.toMin(s.time_off_rounded) }));
-    if (!list.length || list.some(e => e.on == null || e.off == null || e.off <= e.on)) return null;   // open, blank or overnight: editor only
-    list.sort((a, b) => a.on - b.on);
-    for (let i = 1; i < list.length; i++) if (list[i].on < list[i - 1].off) return null;            // overlapping: editor only
-    return list.map(e => ({ id: e.s.session_id, name: e.s.job_name || 'Job', on: e.on, off: e.off, locked: TsTime.isEntryLocked(e.s) }));
+    const ok = list.filter(e => !e.s._open && e.on != null && e.off != null && e.off >= e.on);
+    ok.sort((a, b) => a.on - b.on || a.off - b.off);
+    const entries = ok.map(e => ({ id: e.s.session_id, name: e.s.job_name || 'Job', on: e.on, off: e.off, locked: TsTime.isEntryLocked(e.s) }));
+    const L = TsTime.assignLanes(entries);
+    entries.forEach((e, i) => { e.lane = L.lanes[i]; });
+    return { entries, lanes: L.count, hidden: list.length - ok.length };
   }
   function pct(m, ax) { return ((m - ax.axisStart) / (ax.axisEnd - ax.axisStart)) * 100; }
   function t(m) { return fmtTime(TsTime.toHHMM(m), getState().settings.use24hr !== false); }
   function html(iso, daySessions) {
     const st = getState();
-    const entries = entriesFor(daySessions); if (!entries) return '';
+    const { entries, lanes, hidden } = entriesFor(daySessions); if (!entries.length) return '';
     const ax = TsTime.timelineAxis(entries, st.settings);
     const step = Number(st.settings.roundingMin) || 0;
     models[iso] = { entries, ax, step, minDur: step > 0 ? step : 5, axisStart: ax.axisStart, axisEnd: ax.axisEnd };   // also the timelineHandles() opts
     const span = ax.axisEnd - ax.axisStart, every = span > 12 * 60 ? 180 : (span > 6 * 60 ? 120 : 60);
+    const H = lanes * LANE + PAD * 2;
     let ticks = '';
     for (let m = ax.axisStart; m <= ax.axisEnd; m += every) ticks += `<span class="ts-tl-tick" style="left:${pct(m, ax)}%">${escapeHtml(TsTime.toHHMM(m).replace(/^0/, ''))}</span>`;
-    const segs = entries.map((e, i) => `<div class="ts-tl-seg${e.locked ? ' locked' : ''}" data-tl-seg="${i}" style="left:${pct(e.on, ax)}%;width:${pct(e.off, ax) - pct(e.on, ax)}%"><span>${escapeHtml(e.name)}</span><span class="ts-tl-times">${t(e.on)}–${t(e.off)}</span></div>`).join('');
+    const segs = entries.map((e, i) => `<div class="ts-tl-seg${e.locked ? ' locked' : ''}${e.on === e.off ? ' zero' : ''}" data-tl-seg="${i}" style="left:${pct(e.on, ax)}%;width:${pct(e.off, ax) - pct(e.on, ax)}%;top:${PAD + e.lane * LANE + 4}px;height:${LANE - 8}px;bottom:auto"><span>${escapeHtml(e.name)}</span><span class="ts-tl-times">${t(e.on)}–${t(e.off)}</span></div>`).join('');
     const hs = TsTime.timelineHandles(entries, models[iso]).map(h => {
-      const what = h.targets.length > 1 ? `Between ${entries[h.targets[0].i].name} and ${entries[h.targets[1].i].name}` : `${h.targets[0].field === 'on' ? 'Start' : 'End'} of ${entries[h.targets[0].i].name}`;
-      return `<button type="button" class="ts-tl-h" data-tl-h="${h.key}" style="left:${pct(h.minutes, ax)}%" aria-label="${escapeHtml(what + ', ' + t(h.minutes))}"${h.disabled ? ' disabled title="Locked"' : ''}><span class="ts-tl-tip">${t(h.minutes)}</span></button>`;
+      const n0 = entries[h.targets[0].i].name;
+      const what = h.kind === 'point' ? `${n0} (no length yet): drag left to set start, right to set end` : h.targets.length > 1 ? `Between ${n0} and ${entries[h.targets[1].i].name}` : `${h.targets[0].field === 'on' ? 'Start' : 'End'} of ${n0}`;
+      return `<button type="button" class="ts-tl-h${h.kind === 'point' ? ' ts-tl-pt' : ''}" data-tl-h="${h.key}" style="left:${pct(h.minutes, ax)}%;top:${PAD + h.lane * LANE + 2}px" aria-label="${escapeHtml(what + ', ' + t(h.minutes))}"${h.disabled ? ' disabled title="Locked"' : ''}><span class="ts-tl-tip">${t(h.minutes)}</span></button>`;
     }).join('');
-    return `<div class="ts-tl" data-tl-day="${iso}"><div class="ts-tl-head"><span>Timeline</span><span class="ts-tl-hint">Drag a handle to adjust</span></div><div class="ts-tl-track">${ticks}${segs}${hs}</div></div>`;
+    const hint = (lanes > 1 ? 'Overlaps on separate rows · drag a handle' : 'Drag a handle to adjust') + (hidden ? ` · ${hidden} open/overnight not shown` : '');
+    return `<div class="ts-tl" data-tl-day="${iso}"><div class="ts-tl-head"><span>Timeline</span><span class="ts-tl-hint">${escapeHtml(hint)}</span></div><div class="ts-tl-track ts-tl-lanes" style="height:${H}px;--tl-h:${H}px">${ticks}${segs}${hs}</div></div>`;
   }
   let dragging = null;
   // A re-render mid-drag (sync, timers) detaches the handle: drop the drag so scrolling is never left blocked.
@@ -3642,14 +3691,14 @@ const TsTimeline = (() => {
     root.querySelectorAll('.ts-tl[data-tl-day]').forEach(tl => {
       const iso = tl.dataset.tlDay, model = models[iso]; if (!model) return;
       const track = tl.querySelector('.ts-tl-track');
-      // Listen on the track and pick the NEAREST enabled handle: 44px targets
-      // overlap when two times are close on a phone, and the nearest wins.
+      // Listen on the track and pick the NEAREST enabled handle in the touched
+      // lane: 44px targets overlap when two times are close on a phone.
       track.addEventListener('pointerdown', (ev) => {
         if (ev.button !== undefined && ev.button > 0) return;
         let btn = null, best = 23;
         track.querySelectorAll('.ts-tl-h').forEach(b => {
           const r = b.getBoundingClientRect(), d = Math.abs(ev.clientX - (r.left + r.width / 2));
-          if (ev.clientY >= r.top - 4 && ev.clientY <= r.bottom + 4 && d < best) { best = d; btn = b; }
+          if (ev.clientY >= r.top - 2 && ev.clientY <= r.bottom + 2 && d < best) { best = d; btn = b; }
         });
         if (!btn || btn.disabled) return;
         const h = TsTime.timelineHandles(model.entries, model).find(x => x.key === btn.dataset.tlH); if (!h || h.disabled) return;
@@ -3667,7 +3716,7 @@ const TsTimeline = (() => {
         const v = TsTime.timelineSnap(raw, dragging.h, model.step);
         if (v === dragging.value) return;
         dragging.value = v;
-        dragging.h.targets.forEach(tg => { dragging.work[tg.i][tg.field] = v; });
+        TsTime.timelineApply(dragging.work, dragging.h, v);
         paint(tl, model, dragging);
       });
       const end = (ev, cancelled) => {
@@ -3695,7 +3744,7 @@ const TsTimeline = (() => {
     d.h.targets.forEach(tg => {
       const e = d.work[tg.i];
       const seg = tl.querySelector(`[data-tl-seg="${tg.i}"]`);
-      if (seg) { seg.style.left = pct(e.on, ax) + '%'; seg.style.width = (pct(e.off, ax) - pct(e.on, ax)) + '%'; seg.querySelector('.ts-tl-times').textContent = `${t(e.on)}–${t(e.off)}`; }
+      if (seg) { seg.style.left = pct(e.on, ax) + '%'; seg.style.width = (pct(e.off, ax) - pct(e.on, ax)) + '%'; seg.classList.toggle('zero', e.on === e.off); seg.querySelector('.ts-tl-times').textContent = `${t(e.on)}–${t(e.off)}`; }
       const row = tl.closest('.day-card')?.querySelector(`.session-row[data-session="${e.id}"] .stime`);
       if (row) row.innerHTML = `${escapeHtml(t(e.on))} &rarr; ${escapeHtml(t(e.off))}`;
     });
