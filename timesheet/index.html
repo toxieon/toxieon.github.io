@@ -15,6 +15,7 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
+<script src="ts-time.js?v=0.2.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -317,6 +318,31 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 #view-settings .nd-acc-danger.fill-empty         { box-shadow: 0 0 18px rgba(224,71,63,0.26); }
 #view-settings .nd-acc-danger.fill-filling::before { animation: acc-fillbob 1.6s ease-in-out infinite alternate; }
 @keyframes acc-fillbob { from { height: 26%; } to { height: 100%; } }
+/* 0.2.1 — typed time entry (next to every time picker) */
+.tt-typed { margin-top: 6px; width: 100%; font-size: 16px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px dashed var(--border); background: transparent; color: var(--text-primary); }
+.tt-typed::placeholder { color: var(--text-muted); }
+.tt-typed.tt-bad { border-color: #c98a2b; }
+.tt-err { font-size: 12px; color: #e0a64a; margin-top: 4px; }
+/* 0.2.1 — History day timeline slider */
+.ts-tl { margin: 10px 0 4px; }
+.ts-tl-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.ts-tl-head .ts-tl-hint { text-transform: none; letter-spacing: 0; }
+.ts-tl-track { position: relative; height: 64px; margin: 0 22px 18px; border-radius: var(--radius-sm); background: rgba(255,255,255,0.03); user-select: none; -webkit-user-select: none; }
+.ts-tl-tick { position: absolute; top: 100%; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); padding-top: 3px; }
+.ts-tl-tick::before { content: ''; position: absolute; left: 50%; top: -64px; height: 64px; border-left: 1px solid rgba(255,255,255,0.06); }
+.ts-tl-seg { position: absolute; top: 10px; bottom: 10px; border-radius: 6px; background: color-mix(in srgb, var(--on-primary) 30%, transparent); border: 1px solid var(--on-primary); overflow: hidden; padding: 3px 6px; display: flex; flex-direction: column; justify-content: center; min-width: 2px; }
+.ts-tl-seg.locked { background: rgba(255,255,255,0.06); border-color: var(--border); }
+.ts-tl-seg span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; line-height: 1.25; }
+.ts-tl-seg .ts-tl-times { color: var(--text-muted); font-family: var(--mono-font); font-size: 10px; }
+.ts-tl-track { touch-action: pan-y; }
+.ts-tl-h { position: absolute; top: 10px; width: 44px; height: 44px; margin-left: -22px; padding: 0; border: 0; background: transparent; touch-action: none; cursor: ew-resize; z-index: 2; -webkit-tap-highlight-color: transparent; }
+.ts-tl-h::before { content: ''; position: absolute; left: 19px; top: 4px; width: 6px; height: 36px; border-radius: 3px; background: var(--on-accent); box-shadow: 0 0 0 2px var(--bg-base); }
+.ts-tl-h[disabled] { cursor: not-allowed; }
+.ts-tl-h[disabled]::before { background: #555; }
+.ts-tl-h.active::before { background: #fff; }
+.ts-tl-tip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 3px 7px; border-radius: 6px; background: #fff; color: #111; font: 600 12px var(--mono-font); white-space: nowrap; pointer-events: none; }
+.ts-tl-h.active .ts-tl-tip { display: block; }
+body.ts-tl-dragging { overscroll-behavior: none; }
 </style>
 </head>
 <body>
@@ -654,7 +680,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.1.4';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.2.1';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -680,7 +706,7 @@ window.TIMESHEET_CONFIG = {
   primaryUserEmail: "brandon.j.neill@gmail.com",
   defaults: {
     radiusM: 200, missedClockOffDelayMin: 30, missedClockOffDistanceM: 300,
-    standardClockOn: "07:00", standardClockOff: "15:30",
+    standardClockOn: "07:30", standardClockOff: "15:30",   // 0.2.1: start 7:30 (was 07:00)
     otThresholdDay: 8, otThresholdWeek: 38, otMultiplier: 1.5, roundingMin: 30,
     payPeriodType: "Weekly", payPeriodStartDay: "Monday", firstDayOfWeek: "Monday",
     preferredMailApp: "Gmail", mapApp: "google",
@@ -1034,7 +1060,7 @@ function clockOn({ job, lat, lng, addressConfirmed }) {
     job_id: job.job_id, job_name: job.job_name, address_confirmed: addressConfirmed || job.address || '',
     lat_on: lat ?? null, lng_on: lng ?? null, lat_off: null, lng_off: null,
     time_on: hhmm(now), time_off: null,
-    time_on_rounded: roundToNearest(hhmm(now), state.settings.roundingMin), time_off_rounded: null,
+    time_on_rounded: TsTime.snapClock(hhmm(now), 'on', state.settings), time_off_rounded: null,
     break_taken: false, break_minutes: 0, total_hours: null, overtime_hours: null, job_type: job.job_type,
     notes: state.settings.defaultJobNote || '', departed_offsite: false, manual_departure_time: null,
     missed_clockoff: false, pay_period: payPeriodFor(now), entry_method: 'gps', _open: true
@@ -1056,7 +1082,7 @@ function clockOff({ lat, lng, breakMinutes, notes, manualTime, departedOffsite, 
   const jobRec = state.jobs.find(j => j.job_id === session.job_id);
   if (jobRec) jobRec.last_visit = new Date().toISOString();
   session.lat_off = lat ?? null; session.lng_off = lng ?? null; session.time_off = offTime;
-  session.time_off_rounded = roundToNearest(offTime, state.settings.roundingMin);
+  session.time_off_rounded = TsTime.snapClock(offTime, 'off', state.settings);
   // §4: break is only ever what the user typed, default 0. No automatic break.
   session.break_minutes = Number(breakMinutes) || 0;
   session.break_taken = session.break_minutes > 0;
@@ -1088,7 +1114,7 @@ function reconcileOpenSessions() {
   let snapped = 0;
   function closeAt(s, offHHMM) {
     s.time_off = offHHMM;
-    s.time_off_rounded = roundToNearest(offHHMM, st.settings.roundingMin);
+    s.time_off_rounded = TsTime.snapClock(offHHMM, 'off', st.settings);
     s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, sessionBreakMinutes(s));
     s.overtime_hours = overtimeHours(s.total_hours, st.settings.otThresholdDay);
     s.missed_clockoff = true;
@@ -1117,7 +1143,7 @@ function reconcileOpenSessions() {
 // the next job's start (ends of the day fall back to the standard times).
 function snapTimes() {
   const st = getState();
-  const stdOn = st.settings.standardClockOn || '07:00';
+  const stdOn = st.settings.standardClockOn || '07:30';
   const stdOff = st.settings.standardClockOff || '15:30';
   const byDate = {};
   st.sessions.forEach(s => { if (s.date) (byDate[s.date] = byDate[s.date] || []).push(s); });
@@ -1129,8 +1155,8 @@ function snapTimes() {
       if (!s.time_on) { const prev = ds[k - 1]; s.time_on = (prev && prev.time_off) ? prev.time_off : stdOn; touched = true; }
       if (!s.time_off) { const next = ds[k + 1]; s.time_off = (next && next.time_on) ? next.time_on : stdOff; touched = true; }
       if (touched) {
-        s.time_on_rounded = roundToNearest(s.time_on, st.settings.roundingMin);
-        s.time_off_rounded = roundToNearest(s.time_off, st.settings.roundingMin);
+        s.time_on_rounded = TsTime.snapClock(s.time_on, 'on', st.settings);
+        s.time_off_rounded = TsTime.snapClock(s.time_off, 'off', st.settings);
         s.total_hours = netHours(s.time_on_rounded, s.time_off_rounded, sessionBreakMinutes(s));
         s.overtime_hours = overtimeHours(s.total_hours, st.settings.otThresholdDay);
         s.entry_method = s.entry_method || 'auto';
@@ -1180,8 +1206,8 @@ function importSessions(records) {
     const breakMin = (rec.break_minutes !== undefined && rec.break_minutes !== '')
       ? (Number(rec.break_minutes) || 0)
       : (truthy(rec.break_taken || rec.break) ? 30 : 0);
-    const onR = roundToNearest(timeOn, state.settings.roundingMin);
-    const offR = roundToNearest(timeOff, state.settings.roundingMin);
+    const onR = TsTime.snapClock(timeOn, 'on', state.settings);
+    const offR = TsTime.snapClock(timeOff, 'off', state.settings);
     const total = netHours(onR, offR, breakMin);
     const jobName = rec.job_name || rec.job || rec.address || rec.location || 'Imported';
     const addr = rec.address || rec.address_confirmed || rec.location || '';
@@ -2682,11 +2708,12 @@ window.TsLocPicker = TsLocPicker;
       const headAttrs = canExpand
         ? ` data-day-toggle="${iso}" role="button" aria-expanded="${isExpanded ? 'true' : 'false'}"`
         : '';
-      daysHtml.push(`<div class="card day-card ${canExpand ? 'expandable' : ''} ${dayCls}${isExpanded ? ' expanded' : ''}" data-day="${iso}"><div class="day-head"${headAttrs}><span class="dname">${dayOfWeek(day)}${chevron}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div>${travelStub}</div>`);
+      daysHtml.push(`<div class="card day-card ${canExpand ? 'expandable' : ''} ${dayCls}${isExpanded ? ' expanded' : ''}" data-day="${iso}"><div class="day-head"${headAttrs}><span class="dname">${dayOfWeek(day)}${chevron}</span><span class="ddate">${fmtDateHeader(day)}</span><button class="add-shift-mini" data-add-shift="${iso}" aria-label="Add shift on ${dayOfWeek(day)}">+</button></div>${rows}${staticRows}<div class="day-foot"><span>Total: ${dayTotal.toFixed(2)} hrs</span><span class="${dayOt > 0 ? 'ot-flag' : ''}">${dayOt > 0 ? 'OT ' + dayOt.toFixed(2) + ' hrs' : ''}</span></div>${isExpanded && window.TsTimeline ? TsTimeline.html(iso, daySessions) : ''}${travelStub}</div>`);
     }
     $('day-cards').innerHTML = daysWithData ? daysHtml.join('') : '<div class="empty-week">No sessions this week.</div>';
     $('day-cards').querySelectorAll('.session-row[data-session]').forEach(el => { el.addEventListener('click', (e) => { e.stopPropagation(); openDetail(el.dataset.session); }); });
     $('day-cards').querySelectorAll('[data-add-shift]').forEach(el => { el.addEventListener('click', (e) => { e.stopPropagation(); openAddShift(el.dataset.addShift); }); });
+    if (window.TsTimeline) TsTimeline.wire($('day-cards'), (saved) => { render(); if (saved) toast('Times updated'); });
     $('day-cards').querySelectorAll('[data-day-toggle]').forEach(el => {
       el.addEventListener('click', (e) => {
         if (e.target.closest('[data-add-shift]')) return;
@@ -2845,7 +2872,7 @@ window.TsLocPicker = TsLocPicker;
   function openAddShift(dateIso) {
     const st = getState();
     const date = dateIso || isoDate(weekCursor <= new Date() ? new Date() : weekCursor);
-    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="" placeholder="Optional"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div>${LOC_PICK_ROW}</div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:00'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
+    $('detail-body').innerHTML = `<div class="field"><label>Date</label><input type="date" id="d-date" value="${date}"></div><div class="field"><label>Job / name</label><input id="d-job" value="" placeholder="Job or site name"></div><div class="field"><label>Address</label><div class="field-with-here"><input id="d-addr" value="" placeholder="Optional"><button type="button" class="btn btn-ghost here-btn" id="d-here" title="Use my current location">Here</button></div>${LOC_PICK_ROW}</div><div class="row"><div class="field" style="flex:1;"><label>Clock on</label><input type="time" id="d-on" value="${st.settings.standardClockOn || '07:30'}"></div><div class="field" style="flex:1;"><label>Clock off</label><input type="time" id="d-off" value="${st.settings.standardClockOff || '15:30'}"></div></div><div class="field"><label>Job type</label><select id="d-type"><option value="employer">Employer</option><option value="neill_data">Neill Data</option><option value="unclassified">Unclassified</option></select></div><div class="field"><label>Break (minutes)</label><div class="row"><input type="number" min="0" step="5" id="d-breakmin" value="0" style="flex:1;"><span class="chip-row"><button type="button" class="mini-chip-btn" data-break="0">0</button><button type="button" class="mini-chip-btn" data-break="30">30</button><button type="button" class="mini-chip-btn" data-break="60">60</button></span></div></div><div class="field"><label>Notes</label><textarea id="d-notes"></textarea></div>`;
     $('detail-backdrop').style.display = 'flex';
     document.querySelectorAll('[data-break]').forEach(b => b.addEventListener('click', () => { $('d-breakmin').value = b.dataset.break; }));
     wireDetailHere(); wireLocPick();
@@ -2853,8 +2880,8 @@ window.TsLocPicker = TsLocPicker;
     $('detail-save').onclick = async () => {
       const jobName = $('d-job').value.trim();
       if (!jobName) { toast('Give the shift a job name'); return; }
-      const on = roundToNearest($('d-on').value, st.settings.roundingMin);
-      const off = roundToNearest($('d-off').value, st.settings.roundingMin);
+      const on = TsTime.snapClock($('d-on').value, 'on', st.settings);
+      const off = TsTime.snapClock($('d-off').value, 'off', st.settings);
       const breakMin = Number($('d-breakmin').value) || 0;
       const d = $('d-date').value || date;
       const addr = $('d-addr').value.trim();
@@ -3039,6 +3066,9 @@ window.TsLocPicker = TsLocPicker;
     wireHomeLocation(s);
     bindToggle('s-includeCommute', () => !!s.includeCommute, v => saveSettings({ includeCommute: v }));
     bindText('s-standardClockOn', 'standardClockOn', s); bindText('s-standardClockOff', 'standardClockOff', s);
+    // 0.2.1: remember that start/finish were chosen by the user (the 7:30 migration never overrides that)
+    ['s-standardClockOn', 's-standardClockOff'].forEach(id => { const el = $(id); if (el && !el._tsUserSet) { el._tsUserSet = true; el.addEventListener('change', () => saveSettings({ startFinishSetByUser: true })); } });
+    if (window.TsTypedTime) TsTypedTime.syncAll();
     bindNumber('s-otThresholdDay', 'otThresholdDay', s); bindNumber('s-otThresholdWeek', 'otThresholdWeek', s); bindNumber('s-otMultiplier', 'otMultiplier', s);
     $('s-roundingMin').value = String(s.roundingMin ?? 30);
     if (!$('s-roundingMin')._tsBound) { $('s-roundingMin')._tsBound = true; $('s-roundingMin').addEventListener('change', e => saveSettings({ roundingMin: parseInt(e.target.value, 10) })); }
@@ -3519,9 +3549,196 @@ function addJobFromHash() {
   toast('Job saved from quote: ' + (name || address));
 }
 
+/* 0.2.1 — typed time entry. Every <input type="time"> (the pickers) gets a
+ * small text box under it: type 7:30, 730, 7.30, 1530, 3:30 pm, 3pm, 7a...
+ * It normalises to the picker's value (and fires its input/change events, so
+ * the existing save paths run); the picker updates the text box. Invalid
+ * input shows a gentle hint and leaves the value unchanged. */
+const TsTypedTime = (() => {
+  function display(v) { return v ? fmtTime(v, getState().settings.use24hr !== false) : ''; }
+  function enhance(input) {
+    if (input._tsTypedTxt || !input.parentNode) return;
+    const txt = document.createElement('input');
+    txt.type = 'text'; txt.className = 'tt-typed'; txt.autocomplete = 'off'; txt.spellcheck = false;
+    txt.setAttribute('autocapitalize', 'off'); txt.setAttribute('enterkeyhint', 'done');
+    txt.placeholder = 'or type, e.g. 7:30';
+    const label = input.closest('.field')?.querySelector('label')?.textContent?.trim();
+    txt.setAttribute('aria-label', (label ? label + ': ' : '') + 'type a time');
+    const err = document.createElement('div'); err.className = 'tt-err'; err.setAttribute('role', 'status'); err.hidden = true;
+    input.after(txt); txt.after(err);
+    input._tsTypedTxt = txt;
+    const ok = () => { err.hidden = true; err.textContent = ''; txt.classList.remove('tt-bad'); };
+    const sync = () => { if (document.activeElement !== txt) txt.value = display(input.value); ok(); };
+    input.addEventListener('input', sync); input.addEventListener('change', sync);
+    const commit = () => {
+      const raw = txt.value.trim();
+      if (!raw) { txt.value = display(input.value); ok(); return; }
+      const v = TsTime.parseTypedTime(raw);
+      if (!v) {
+        err.textContent = `Couldn't read "${raw}" — try 7:30, 1530 or 3:30pm. Time not changed.`;
+        err.hidden = false; txt.classList.add('tt-bad'); return;
+      }
+      if (v !== input.value) {
+        input.value = v;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      txt.value = display(v); ok();
+    };
+    txt.addEventListener('change', commit);
+    txt.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); txt.blur(); } });
+    txt.value = display(input.value);
+  }
+  function scan(root) { (root || document).querySelectorAll('input[type="time"]').forEach(enhance); }
+  function syncAll() { document.querySelectorAll('input[type="time"]').forEach(i => { if (i._tsTypedTxt && document.activeElement !== i._tsTypedTxt) i._tsTypedTxt.value = display(i.value); }); }
+  document.addEventListener('DOMContentLoaded', () => {
+    scan();
+    new MutationObserver(() => scan()).observe(document.body, { childList: true, subtree: true });
+  });
+  return { scan, syncAll, enhance };
+})();
+window.TsTypedTime = TsTypedTime;
+
+/* 0.2.1 — History day timeline slider. An expanded day shows its shifts in
+ * order on a time axis with a handle at each start and end. Shifts that meet
+ * share one handle (moving it moves both). Handles snap to the rounding step,
+ * can't cross a neighbour or the axis edges, and save on release through
+ * updateSession() (the same path the shift editor uses). Locked entries
+ * (TsTime.isEntryLocked) can't be dragged. Pointer events, 44px targets,
+ * touch-action:none, page scroll blocked while dragging. */
+const TsTimeline = (() => {
+  const models = {};
+  function entriesFor(daySessions) {
+    const list = daySessions.map(s => ({ s, on: TsTime.toMin(s.time_on_rounded), off: TsTime.toMin(s.time_off_rounded) }));
+    if (!list.length || list.some(e => e.on == null || e.off == null || e.off <= e.on)) return null;   // open, blank or overnight: editor only
+    list.sort((a, b) => a.on - b.on);
+    for (let i = 1; i < list.length; i++) if (list[i].on < list[i - 1].off) return null;            // overlapping: editor only
+    return list.map(e => ({ id: e.s.session_id, name: e.s.job_name || 'Job', on: e.on, off: e.off, locked: TsTime.isEntryLocked(e.s) }));
+  }
+  function pct(m, ax) { return ((m - ax.axisStart) / (ax.axisEnd - ax.axisStart)) * 100; }
+  function t(m) { return fmtTime(TsTime.toHHMM(m), getState().settings.use24hr !== false); }
+  function html(iso, daySessions) {
+    const st = getState();
+    const entries = entriesFor(daySessions); if (!entries) return '';
+    const ax = TsTime.timelineAxis(entries, st.settings);
+    const step = Number(st.settings.roundingMin) || 0;
+    models[iso] = { entries, ax, step, minDur: step > 0 ? step : 5, axisStart: ax.axisStart, axisEnd: ax.axisEnd };   // also the timelineHandles() opts
+    const span = ax.axisEnd - ax.axisStart, every = span > 12 * 60 ? 180 : (span > 6 * 60 ? 120 : 60);
+    let ticks = '';
+    for (let m = ax.axisStart; m <= ax.axisEnd; m += every) ticks += `<span class="ts-tl-tick" style="left:${pct(m, ax)}%">${escapeHtml(TsTime.toHHMM(m).replace(/^0/, ''))}</span>`;
+    const segs = entries.map((e, i) => `<div class="ts-tl-seg${e.locked ? ' locked' : ''}" data-tl-seg="${i}" style="left:${pct(e.on, ax)}%;width:${pct(e.off, ax) - pct(e.on, ax)}%"><span>${escapeHtml(e.name)}</span><span class="ts-tl-times">${t(e.on)}–${t(e.off)}</span></div>`).join('');
+    const hs = TsTime.timelineHandles(entries, models[iso]).map(h => {
+      const what = h.targets.length > 1 ? `Between ${entries[h.targets[0].i].name} and ${entries[h.targets[1].i].name}` : `${h.targets[0].field === 'on' ? 'Start' : 'End'} of ${entries[h.targets[0].i].name}`;
+      return `<button type="button" class="ts-tl-h" data-tl-h="${h.key}" style="left:${pct(h.minutes, ax)}%" aria-label="${escapeHtml(what + ', ' + t(h.minutes))}"${h.disabled ? ' disabled title="Locked"' : ''}><span class="ts-tl-tip">${t(h.minutes)}</span></button>`;
+    }).join('');
+    return `<div class="ts-tl" data-tl-day="${iso}"><div class="ts-tl-head"><span>Timeline</span><span class="ts-tl-hint">Drag a handle to adjust</span></div><div class="ts-tl-track">${ticks}${segs}${hs}</div></div>`;
+  }
+  let dragging = null;
+  // A re-render mid-drag (sync, timers) detaches the handle: drop the drag so scrolling is never left blocked.
+  const live = () => { if (dragging && !dragging.btn.isConnected) { dragging = null; document.body.classList.remove('ts-tl-dragging'); } return !!dragging; };
+  document.addEventListener('touchmove', (e) => { if (live()) e.preventDefault(); }, { passive: false });
+  ['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, () => { live(); }));
+  function wire(root, onSaved) {
+    root.querySelectorAll('.ts-tl[data-tl-day]').forEach(tl => {
+      const iso = tl.dataset.tlDay, model = models[iso]; if (!model) return;
+      const track = tl.querySelector('.ts-tl-track');
+      // Listen on the track and pick the NEAREST enabled handle: 44px targets
+      // overlap when two times are close on a phone, and the nearest wins.
+      track.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== undefined && ev.button > 0) return;
+        let btn = null, best = 23;
+        track.querySelectorAll('.ts-tl-h').forEach(b => {
+          const r = b.getBoundingClientRect(), d = Math.abs(ev.clientX - (r.left + r.width / 2));
+          if (ev.clientY >= r.top - 4 && ev.clientY <= r.bottom + 4 && d < best) { best = d; btn = b; }
+        });
+        if (!btn || btn.disabled) return;
+        const h = TsTime.timelineHandles(model.entries, model).find(x => x.key === btn.dataset.tlH); if (!h || h.disabled) return;
+        ev.preventDefault(); ev.stopPropagation();
+        try { track.setPointerCapture(ev.pointerId); } catch (e) {}
+        dragging = { h, work: model.entries.map(e => ({ ...e })), btn, value: h.minutes, start: h.minutes, pointerId: ev.pointerId };
+        btn.classList.add('active'); document.body.classList.add('ts-tl-dragging');
+        vibrate(10);
+      });
+      track.addEventListener('pointermove', (ev) => {
+        if (!dragging || !track.contains(dragging.btn) || ev.pointerId !== dragging.pointerId) return;
+        ev.preventDefault();
+        const r = track.getBoundingClientRect();
+        const raw = model.ax.axisStart + ((ev.clientX - r.left) / r.width) * (model.ax.axisEnd - model.ax.axisStart);
+        const v = TsTime.timelineSnap(raw, dragging.h, model.step);
+        if (v === dragging.value) return;
+        dragging.value = v;
+        dragging.h.targets.forEach(tg => { dragging.work[tg.i][tg.field] = v; });
+        paint(tl, model, dragging);
+      });
+      const end = (ev, cancelled) => {
+        if (!dragging || !track.contains(dragging.btn) || ev.pointerId !== dragging.pointerId) return;
+        const d = dragging; dragging = null;
+        d.btn.classList.remove('active'); document.body.classList.remove('ts-tl-dragging');
+        try { track.releasePointerCapture(ev.pointerId); } catch (e) {}
+        if (cancelled || d.value === d.start) { onSaved(false); return; }
+        new Set(d.h.targets.map(tg => tg.i)).forEach(i => {
+          const e = d.work[i];
+          updateSession(e.id, { time_on_rounded: TsTime.toHHMM(e.on), time_off_rounded: TsTime.toHHMM(e.off) });
+        });
+        onSaved(true);
+      };
+      track.addEventListener('pointerup', (ev) => end(ev, false));
+      track.addEventListener('pointercancel', (ev) => end(ev, true));
+      track.addEventListener('click', (ev) => ev.stopPropagation());
+    });
+  }
+  // live update while dragging: handle, its time label, the segments and the day's rows
+  function paint(tl, model, d) {
+    const ax = model.ax;
+    d.btn.style.left = pct(d.value, ax) + '%';
+    d.btn.querySelector('.ts-tl-tip').textContent = t(d.value);
+    d.h.targets.forEach(tg => {
+      const e = d.work[tg.i];
+      const seg = tl.querySelector(`[data-tl-seg="${tg.i}"]`);
+      if (seg) { seg.style.left = pct(e.on, ax) + '%'; seg.style.width = (pct(e.off, ax) - pct(e.on, ax)) + '%'; seg.querySelector('.ts-tl-times').textContent = `${t(e.on)}–${t(e.off)}`; }
+      const row = tl.closest('.day-card')?.querySelector(`.session-row[data-session="${e.id}"] .stime`);
+      if (row) row.innerHTML = `${escapeHtml(t(e.on))} &rarr; ${escapeHtml(t(e.off))}`;
+    });
+  }
+  return { html, wire };
+})();
+window.TsTimeline = TsTimeline;
+
+/* 0.2.1 — one-time start/finish migration (TsTime.migrateStartFinish): on
+ * Brandon's account only, start/finish -> 7:30 AM / 3:30 PM if still on an old
+ * default and never set by the user, then re-snap PENDING (current-week,
+ * unlocked) entries sitting on 08:00. Flagged in state.migrations so it runs
+ * once; the result (incl. the count) is stored there and toasted once. */
+function runStartFinishMigration(opts = {}) {
+  if (!window.TsTime) return;
+  const st = getState();
+  const r = TsTime.migrateStartFinish(st, {
+    primaryEmail: window.TIMESHEET_CONFIG.primaryUserEmail,
+    currentWeekStart: isoDate(startOfWeek(new Date(), st.settings.firstDayOfWeek)),
+    recompute: (e) => {
+      e.total_hours = netHours(e.time_on_rounded, e.time_off_rounded, sessionBreakMinutes(e));
+      e.overtime_hours = overtimeHours(e.total_hours, st.settings.otThresholdDay);
+    }
+  });
+  if (r.reason === 'identity-unknown') return;   // try again once signed in
+  if (r.ran) {
+    (r.ids || []).forEach(id => { const e = st.sessions.find(x => x.session_id === id); if (e) upsertSession(e); });
+    saveState();
+    if (r.record.startChanged || r.record.finishChanged) queueSheetWrite('settings', st.settings, true);
+  } else saveState();
+  const rec = st.migrations && st.migrations[TsTime.MIGRATION_FLAG];
+  if (rec && !rec.skipped && !rec.toastShown) {
+    rec.toastShown = true; saveState();
+    const n = rec.resnapped || 0;
+    toast(`Start/finish set to ${fmtTime(st.settings.standardClockOn, false)} – ${fmtTime(st.settings.standardClockOff, false)} · re-snapped ${n} pending ${n === 1 ? 'entry' : 'entries'} from 8:00`, 6000);
+  }
+  if (r.ran && opts.refresh !== false && typeof refreshAllViews === 'function') refreshAllViews();
+}
+
 async function bootApp() {
   registerServiceWorker(); ensureSyncIndicator(); renderLastSynced(); renderTabbar();
   TsGeo.loadMapsJs().catch(() => {});   // preload so NDHere + reverseGeocode use the JS geocoder (referrer-safe)
+  runStartFinishMigration({ refresh: false });  // 0.2.1 — views aren't initialised yet; before the missed clock-off snap so it uses the new finish
   reconcileOpenSessions();   // §54 — snap any missed clock-offs before rendering
   const snapFab = document.getElementById('snap-fab'); if (snapFab) snapFab.addEventListener('click', snapTimes);
   window.Views.clock.init(); window.Views.history.init(); window.Views.jobs.init(); window.Views.settings.init();
@@ -3535,6 +3752,7 @@ async function bootApp() {
       // which per-user tab-set this device syncs to.
       if (email && (getState().settings.googleEmail !== email || getState().settings.currentUser !== email)) saveSettings({ googleEmail: email, currentUser: email });
       linkAccount();
+      runStartFinishMigration();   // 0.2.1 — identity is known now
       // Push local changes up, pull this user's rows down, refresh, then run the
       // once-a-day full sync check.
       flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) { markSynced(); refreshAllViews(); } }).then(() => maybeDailyForceSync()).then(() => TsLive.schedule(500));
