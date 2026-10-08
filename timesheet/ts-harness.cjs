@@ -50,7 +50,7 @@ function loadApp(seedState, extra = {}) {
   };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
-  for (const f of ["ts-time.js"]) { const p = path.join(__dirname, f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, "utf8"), ctx, { filename: f }); }
+  for (const f of ["ts-time.js", "ts-map.js"]) { const p = path.join(__dirname, f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, "utf8"), ctx, { filename: f }); }
   vm.runInContext(main, ctx, { filename: "timesheet-inline.js" });
   return ctx;
 }
