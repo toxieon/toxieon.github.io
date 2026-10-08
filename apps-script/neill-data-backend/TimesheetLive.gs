@@ -37,8 +37,8 @@ function tslLogin_(body) {
   if (code.length > 128) return { ok: false, error: 'Wrong passcode' };
   const pepper = pepper_();
   if (!pepper || !PropertiesService.getScriptProperties().getProperty(PROP.privateSheet)) return { ok: false, error: 'Live view not set up yet' };
-  const gate = loginGate_('tsl', '');
-  if (gate) return { ok: false, error: 'Too many attempts', cooldownMs: gate.cooldownMs };
+  const early = loginGate_('tsl', '');
+  if (early) return { ok: false, error: 'Too many attempts', cooldownMs: early.cooldownMs };
 
   const legacy = sha256Hex_(code);
   const v2 = credFromLegacy_(legacy, pepper);
@@ -51,12 +51,16 @@ function tslLogin_(body) {
     label = String(values[i][0] || 'Viewer').trim() || 'Viewer';
     break;
   }
-  if (!label) {
-    const left = loginFail_('tsl', '');
-    tslLog_('', 'fail');
-    const res = { ok: false, error: 'Wrong passcode' };
-    if (left <= 0) { const g = loginGate_('tsl', ''); res.cooldownMs = g ? g.cooldownMs : FAIL_WINDOW_MS; } else res.attemptsRemaining = left;
-    return res;
+  const blocked = settleLogin_('tsl', '', label ? 'ok' : 'fail');
+  if (blocked) {
+    if (!label) tslLog_('', 'fail');
+    if (blocked.error === 'invalid passcode') {
+      const res = { ok: false, error: 'Wrong passcode' };
+      if (blocked.cooldownMs) res.cooldownMs = blocked.cooldownMs;
+      if (blocked.attemptsRemaining !== undefined) res.attemptsRemaining = blocked.attemptsRemaining;
+      return res;
+    }
+    return { ok: false, error: 'Too many attempts', cooldownMs: blocked.cooldownMs || FAIL_WINDOW_MS };
   }
   const token = newSession_('tsl', label, TSL_SESSION_TTL_MS);
   tslLog_(label, 'unlock');

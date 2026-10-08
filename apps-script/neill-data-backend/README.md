@@ -60,6 +60,30 @@ Script Properties (created by `setup()`, never in the repo): `ND_PEPPER`,
 Updating the code later: **Deploy → Manage deployments → Edit → Version: New
 version → Deploy** (keeps the same `/exec` URL).
 
+## Quote lockdown (after this code is deployed)
+
+Do these in order. Until step 3 is live on the site, Quote, Timesheet and
+Checklist keep calling the old script and keep working.
+
+1. Redeploy **Neill Data Backend** (the project in this folder), not the old
+   Quote script. Deploy → Manage deployments → Edit → Version: New version →
+   Deploy. Execute as **Me**, access **Anyone**.
+2. Run `setup()` once if you have not already (creates `ND_PEPPER` and the
+   public price sheet). Share that price sheet: Anyone with the link → Viewer.
+   Leave the private sheet Restricted.
+3. Put this project's `/exec` URL in `shared/nd-backend.js` → `endpoint` and
+   publish the site. That is the switch. Do not paste this code over the old
+   Quote script while the site still points at it: Timesheet and Checklist
+   would stop signing in.
+4. Restrict the **Quote spreadsheet** (`QUOTE_SHEET_ID` in `Config.gs`) to your
+   Google account only (the account the web app runs as). It must not be
+   "anyone with the link".
+5. Rotate Quote passcodes (Staff tab → New passcode, or `setCode` /
+   `applyCodeChanges`). New codes must be at least 6 characters. That also
+   signs those users out. Then rotate Timesheet Live codes with
+   `setTimesheetLiveCode` if those viewers should change too.
+6. Leave `ND_PEPPER` in place. Run `migrateAllUsers()` only after step 3 works.
+
 ## Editor functions (Run ▸ pick the function)
 
 | Function | What it does |

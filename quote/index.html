@@ -1150,7 +1150,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
 /* =====================================================
    HARD-CODED CONSTANTS
    ===================================================== */
-const APP_VERSION = "0.1.5";   // see quote/VERSIONING.md
+const APP_VERSION = "0.1.6";   // see quote/VERSIONING.md
 document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("app-version"); if (v) v.textContent = "v" + APP_VERSION; });
 /* ▼▼▼ PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES BELOW ▼▼▼ */
 const HARDCODED_MAPS_KEY        = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
@@ -1172,6 +1172,12 @@ const LEGACY_APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzkrn
  * Empty = the legacy Quote backend, unchanged, until Brandon deploys. */
 const ND_ENDPOINT     = String((window.ND_BACKEND && window.ND_BACKEND.endpoint) || '').trim();
 const USE_NEW_BACKEND = !!ND_ENDPOINT;
+if (USE_NEW_BACKEND) {
+  const nsPass = document.getElementById('ns-passcode');
+  if (nsPass) nsPass.placeholder = 'at least 6 characters';
+  const sdPass = document.getElementById('sd-newpasscode');
+  if (sdPass) sdPass.placeholder = 'at least 6 characters, blank keeps the current one';
+}
 const PRICE_SHEET_KEY = 'nq_price_sheet_v1';
 // Backend-owned tabs — never fetched by the price sync, whatever sheet it points at
 const PRIVATE_TABS = ['Users', 'Quotes', 'Invoices', 'Activity', 'Photos', 'Tags', 'TimesheetLive', 'TimesheetLiveLog'];
@@ -1819,6 +1825,21 @@ function fmt(n) { return '$' + (Math.round(n * 100) / 100).toLocaleString('en-AU
 function fmtShort(n) { return '$' + Math.round(n).toLocaleString('en-AU'); }
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+/* Sheet and quote values are rendered as HTML in places. Only real image
+ * payloads may become an img src — a quote or catalogue cell must not. */
+function safeImgSrc(url) {
+  const s = String(url || '');
+  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(s)) return s;
+  if (/^blob:[^\s"'<>]+$/i.test(s)) return s;
+  return '';
+}
+function newPasscodeProblem(code) {
+  code = String(code || '').trim();
+  if (code.length < 6) return 'Passcode must be at least 6 characters.';
+  if (/^(.)\1+$/.test(code)) return 'That passcode is too easy to guess.';
+  if (['123456', '12345678', '000000', '111111', 'password', 'passcode'].indexOf(code.toLowerCase()) >= 0) return 'That passcode is too easy to guess.';
+  return '';
+}
 function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
 function migrateCustomLine(line) {
@@ -1962,7 +1983,7 @@ function renderPickerSection(targetEl, section, items, opts) {
   const lines = currentQuote.pickerLines[section];
   targetEl.innerHTML = '';
   if (!items.length && !lines.length) {
-    targetEl.innerHTML = `<div class="item-empty">No items in "${section}". Add rows to the ${section} tab in your sheet.</div>`;
+    targetEl.innerHTML = `<div class="item-empty">No items in "${escapeHtml(section)}". Add rows to the ${escapeHtml(section)} tab in your sheet.</div>`;
     return;
   }
   lines.forEach((key, idx) => {
@@ -2056,11 +2077,11 @@ function renderListSection(targetEl, section) {
     const row = document.createElement('div');
     row.className = 'item-row' + (fav ? ' fav' : '') + (qty > 0 ? ' has-qty' : '');
     const capBadge = (item.discountCap !== null && item.discountCap !== undefined && item.discountCap !== '')
-      ? ` <span style="background:rgba(49,208,255,0.15);color:var(--brand);padding:1px 6px;border-radius:999px;font-size:0.7rem;font-weight:700;margin-left:6px;">cap ${item.discountCap}%</span>` : '';
+      ? ` <span style="background:rgba(49,208,255,0.15);color:var(--brand);padding:1px 6px;border-radius:999px;font-size:0.7rem;font-weight:700;margin-left:6px;">cap ${escapeHtml(item.discountCap)}%</span>` : '';
     row.innerHTML = `
       <button class="item-star ${fav ? 'on' : ''}" data-key="${escapeAttr(key)}" data-sheetfav="${item.favourite ? 1 : 0}">${fav ? '★' : '☆'}</button>
       <div class="item-info">
-        <div class="item-name">${escapeHtml(item.type)}${capBadge}${section === 'favourites' ? ` <span style="color:var(--muted);font-weight:500;font-size:0.8em;">· ${sec}</span>` : ''}</div>
+        <div class="item-name">${escapeHtml(item.type)}${capBadge}${section === 'favourites' ? ` <span style="color:var(--muted);font-weight:500;font-size:0.8em;">· ${escapeHtml(sec)}</span>` : ''}</div>
         ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
       </div>
       ${renderQtyControlsHTML(key, qty)}
@@ -2253,7 +2274,7 @@ function renderTotals() {
   if (c.travelRaw) rows.push([`Travel (${settings.discountCaps.travel}% cap)`, c.travelNet, c.travelRaw]);
   let html = '';
   rows.forEach(([label, net, raw]) => {
-    html += `<div class="total-row"><span>${label}</span><span>`;
+    html += `<div class="total-row"><span>${escapeHtml(label)}</span><span>`;
     if (raw && Math.abs(raw - net) > 0.001) html += `<span class="strike">${fmt(raw)}</span>`;
     html += `${fmt(net)}</span></div>`;
   });
@@ -2626,10 +2647,10 @@ async function syncFromSheet(silent) {
     settings.sheetLastStatus = '✓ Synced from sheet at ' + new Date().toLocaleTimeString() +
       (allTabs ? ' (auto-discovered ' + tabsList.length + ' tabs)' : (manualExtras ? ' (used extra_tabs from Rates)' : ' (used fallback tab list)'));
     saveSettings(); syncQuoteFromSettings(); renderAll();
-    if (status) { status.style.display='block'; status.className='tip ok'; status.innerHTML='<b>✓</b> ' + settings.sheetLastStatus.slice(2); }
+    if (status) { status.style.display='block'; status.className='tip ok'; status.innerHTML='<b>✓</b> ' + escapeHtml(settings.sheetLastStatus.slice(2)); }
   } catch (e) {
     settings.sheetLastStatus = 'Sync failed: ' + e.message;
-    if (status) { status.style.display='block'; status.className='tip warn'; status.innerHTML='<b>!</b> ' + settings.sheetLastStatus; }
+    if (status) { status.style.display='block'; status.className='tip warn'; status.innerHTML='<b>!</b> ' + escapeHtml(settings.sheetLastStatus); }
   }
 }
 /* Local (device time zone) YYYY-MM-DD. toISOString() is UTC and gives yesterday before 10am in Sydney. */
@@ -2757,24 +2778,24 @@ function renderHistory() {
     const jsKey = jobStatus(q);
     const jsBadge = `<span class="status-badge ${jsKey}">${jobStatusLabel(jsKey)}</span>`;
     const actions = [];
-    actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="open">Open</button>`);
-    if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="pdf">PDF</button>`);
-    if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="image">Image</button>`);
+    actions.push(`<button class="btn btn-secondary" data-id="${escapeAttr(q.id)}" data-act="open">Open</button>`);
+    if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${escapeAttr(q.id)}" data-act="pdf">PDF</button>`);
+    if (!isStaff()) actions.push(`<button class="btn btn-secondary" data-id="${escapeAttr(q.id)}" data-act="image">Image</button>`);
     if (jsKey === 'quote' && !isStaff()) {
-      actions.push(`<button class="btn btn-progress" data-id="${q.id}" data-act="to_in_progress" title="Release this quote — staff can now see materials and address">▶ In Progress</button>`);
+      actions.push(`<button class="btn btn-progress" data-id="${escapeAttr(q.id)}" data-act="to_in_progress" title="Release this quote — staff can now see materials and address">▶ In Progress</button>`);
     }
     if (jsKey === 'in_progress') {
-      actions.push(`<button class="btn btn-complete" data-id="${q.id}" data-act="to_complete" title="Mark complete — becomes an Invoice">✓ Complete</button>`);
+      actions.push(`<button class="btn btn-complete" data-id="${escapeAttr(q.id)}" data-act="to_complete" title="Mark complete — becomes an Invoice">✓ Complete</button>`);
       if (!isStaff()) {
-        actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="create_job" title="Open Planner's New project form prefilled with this client and address">＋ Create job</button>`);
-        actions.push(`<button class="btn btn-secondary" data-id="${q.id}" data-act="ts_job" title="Save this site as a job in Timesheet">⏱ Timesheet</button>`);
+        actions.push(`<button class="btn btn-secondary" data-id="${escapeAttr(q.id)}" data-act="create_job" title="Open Planner's New project form prefilled with this client and address">＋ Create job</button>`);
+        actions.push(`<button class="btn btn-secondary" data-id="${escapeAttr(q.id)}" data-act="ts_job" title="Save this site as a job in Timesheet">⏱ Timesheet</button>`);
       }
-      if (!isStaff()) actions.push(`<button class="btn btn-revert" data-id="${q.id}" data-act="to_quote" title="Revert to quote for edits">↺ Back to Quote</button>`);
+      if (!isStaff()) actions.push(`<button class="btn btn-revert" data-id="${escapeAttr(q.id)}" data-act="to_quote" title="Revert to quote for edits">↺ Back to Quote</button>`);
     }
     if (jsKey === 'complete' && !isStaff()) {
-      actions.push(`<button class="btn btn-uncomplete" data-id="${q.id}" data-act="to_in_progress" title="Move back to In Progress">↶ Uncomplete</button>`);
+      actions.push(`<button class="btn btn-uncomplete" data-id="${escapeAttr(q.id)}" data-act="to_in_progress" title="Move back to In Progress">↶ Uncomplete</button>`);
     }
-    if (!isStaff()) actions.push(`<button class="btn btn-danger" data-id="${q.id}" data-act="del">×</button>`);
+    if (!isStaff()) actions.push(`<button class="btn btn-danger" data-id="${escapeAttr(q.id)}" data-act="del">×</button>`);
     const totalCell = canSeePricing() ? `<span class="history-item-total">${fmt(q.grand || 0)}</span>` : '<span style="color:var(--muted);font-size:0.8rem;">—</span>';
     item.innerHTML = `
       <div class="history-item-meta">
@@ -3578,8 +3599,11 @@ document.getElementById('sd-save').onclick = async () => {
   updates.notes = document.getElementById('sd-notes').value;
   const newPasscode = document.getElementById('sd-newpasscode').value.trim();
   if (newPasscode) {
-    if (USE_NEW_BACKEND) updates.newCode = newPasscode;     // hashed + peppered server-side
-    else {
+    if (USE_NEW_BACKEND) {
+      const problem = newPasscodeProblem(newPasscode);
+      if (problem) { alert(problem); return; }
+      updates.newCode = newPasscode;     // hashed + peppered server-side
+    } else {
       try { updates.passwordHash = await sha256Hex(newPasscode); }
       catch (e) { alert('Hash error: ' + e.message); return; }
     }
@@ -3626,6 +3650,10 @@ document.getElementById('ns-submit').onclick = async () => {
   const username = document.getElementById('ns-name').value.trim();
   const passcode = document.getElementById('ns-passcode').value.trim();
   if (!username || !passcode) { alert('Display name and passcode are required.'); return; }
+  if (USE_NEW_BACKEND) {
+    const problem = newPasscodeProblem(passcode);
+    if (problem) { alert(problem); return; }
+  }
   const newUser = { username };
   if (USE_NEW_BACKEND) newUser.code = passcode;             // hashed + peppered server-side
   else {
@@ -3708,8 +3736,8 @@ function renderSettings() {
   const status = document.getElementById('sheet-status');
   if (settings.sheetLastStatus) {
     status.style.display = 'block';
-    if (settings.sheetLastStatus.startsWith('✓')) { status.className = 'tip ok'; status.innerHTML = '<b>✓</b> ' + settings.sheetLastStatus.slice(2); }
-    else { status.className = 'tip warn'; status.innerHTML = '<b>!</b> ' + settings.sheetLastStatus; }
+    if (settings.sheetLastStatus.startsWith('✓')) { status.className = 'tip ok'; status.innerHTML = '<b>✓</b> ' + escapeHtml(settings.sheetLastStatus.slice(2)); }
+    else { status.className = 'tip warn'; status.innerHTML = '<b>!</b> ' + escapeHtml(settings.sheetLastStatus); }
   }
 }
 // Wire phone book search + initial render when Settings opens
@@ -5076,18 +5104,18 @@ async function fetchPhotoData(ref) {
   if (photoDataCache[ref]) return photoDataCache[ref];
   try {
     const r = await backendCall('get_photo_data', { ref });
-    if (r && r.dataUrl) {
-      photoDataCache[ref] = r.dataUrl;
+    if (r && r.dataUrl && safeImgSrc(r.dataUrl)) {
+      photoDataCache[ref] = safeImgSrc(r.dataUrl);
       // Also stash into the corresponding local photo so we don't refetch
       const found = findLocalPhotoByRef(ref);
       if (found) {
-        found.photo.url = r.dataUrl;
+        found.photo.url = photoDataCache[ref];
         // Persist back into the array element (migratePhoto returns the object reference for non-string)
         if (found.qi >= 0) history[found.qi].photos[found.pi] = found.photo;
         else if (Array.isArray(currentQuote.photos)) currentQuote.photos[found.pi] = found.photo;
         saveHistory();
       }
-      return r.dataUrl;
+      return photoDataCache[ref];
     }
   } catch (e) {
     console.warn('photo data fetch failed for', ref, e.message);
@@ -5324,7 +5352,7 @@ function renderGalleryGrid() {
     tile.className = 'photo-tile' + (p.url ? '' : ' lazy-placeholder lazy-loading');
     tile.style.aspectRatio = '1';
     tile.innerHTML =
-      '<img src="' + (p.url || transparentPx()) + '" alt="' + escapeAttr(p.ref) + '">' +
+      '<img src="' + escapeAttr(safeImgSrc(p.url) || transparentPx()) + '" alt="' + escapeAttr(p.ref) + '">' +
       '<span class="photo-ref">' + escapeHtml(p.ref) + '</span>' +
       (p.tags.length ? '<div class="photo-tag-strip">' + p.tags.slice(0, 2).map(t => '<span class="tag-mini">' + escapeHtml(t) + '</span>').join('') + '</div>' : '');
     tile.onclick = async () => {
@@ -5475,14 +5503,14 @@ function renderPhotos() {
     const tile = document.createElement('div');
     tile.className = 'photo-tile' + (visible ? '' : ' hidden-from-customer');
     const showEye = currentQuote.includePhotosInPdf !== false;
-    const imgSrc = m.url || transparentPx();
+    const imgSrc = safeImgSrc(m.url) || transparentPx();
     const isLazy = !m.url && m.ref;
     if (isLazy) tile.classList.add('lazy-placeholder', 'lazy-loading');
     const tagStrip = (m.tags && m.tags.length)
       ? '<div class="photo-tag-strip">' + m.tags.slice(0, 2).map(t => '<span class="tag-mini">' + escapeHtml(t) + '</span>').join('') + '</div>'
       : '';
     tile.innerHTML =
-      '<img src="' + imgSrc + '" alt="Site photo ' + (i+1) + '">' +
+      '<img src="' + escapeAttr(imgSrc) + '" alt="Site photo ' + (i+1) + '">' +
       '<span class="photo-num">' + (i+1) + '</span>' +
       (m.ref ? '<span class="photo-ref">' + escapeHtml(m.ref) + '</span>' : '') +
       tagStrip +
@@ -5575,7 +5603,7 @@ async function openPhotoLightbox(idx) {
   const imgEl = document.getElementById('photo-lightbox-img');
   document.getElementById('photo-lightbox').classList.add('open');
   if (m.url) {
-    imgEl.src = m.url;
+    imgEl.src = safeImgSrc(m.url) || transparentPx();
   } else if (m.ref) {
     imgEl.src = transparentPx();
     const url = await fetchPhotoData(m.ref);

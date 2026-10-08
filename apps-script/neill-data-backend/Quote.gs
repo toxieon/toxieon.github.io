@@ -39,6 +39,7 @@ function ensureCol_(t, name) {
 }
 function cellGet_(t, r, name) { const i = col_(t, name); return i < 0 ? '' : r[i]; }
 function cellSet_(t, rowIdx, name, value) {
+  value = plainCell_(value);
   const i = ensureCol_(t, name);
   t.sh.getRange(rowIdx + 2, i + 1).setValue(value);
   if (t.rows[rowIdx]) t.rows[rowIdx][i] = value;
@@ -46,7 +47,7 @@ function cellSet_(t, rowIdx, name, value) {
 function rowFromObj_(t, obj) {
   Object.keys(obj).forEach(function (k) { ensureCol_(t, k); });
   const row = t.head.map(function () { return ''; });
-  Object.keys(obj).forEach(function (k) { row[col_(t, k)] = obj[k]; });
+  Object.keys(obj).forEach(function (k) { row[col_(t, k)] = plainCell_(obj[k]); });
   return row;
 }
 function withLock_(fn) {
@@ -106,8 +107,11 @@ function codeOwnerIdx_(t, code, exceptIdx) {
 function validCode_(code) {
   code = String(code == null ? '' : code).trim();
   if (!code) return 'passcode is required';
-  if (code.length < 4) return 'passcode must be at least 4 characters';
+  if (code.length < 6) return 'passcode must be at least 6 characters';
   if (code.length > 64) return 'passcode is too long';
+  if (/^(.)\1+$/.test(code)) return 'passcode is too easy to guess';
+  const weak = { '123456': 1, '12345678': 1, '000000': 1, '111111': 1, 'password': 1, 'passcode': 1 };
+  if (weak[code.toLowerCase()]) return 'passcode is too easy to guess';
   return '';
 }
 function unlockedMasters_(t) {
@@ -127,8 +131,8 @@ function quoteLogin_(body) {
   if (!named && PropertiesService.getScriptProperties().getProperty(PROP.requireUsername) === 'true') {
     return { ok: false, error: 'enter your name and passcode', needUsername: true };
   }
-  const gate = loginGate_('q', named);
-  if (gate) return gate;
+  const early = loginGate_('q', named);
+  if (early) return early;
 
   const t = table_(TAB.users, false);
   const legacy = sha256Hex_(code);
@@ -140,18 +144,19 @@ function quoteLogin_(body) {
     kind = credMatch_(t.rows[i][hc], legacy, v2);
     if (kind) { idx = i; break; }
   }
-  if (idx < 0) {
-    const left = loginFail_('q', named);
-    logActivity_('', '', 'login', 'invalid passcode', fp, 'fail');
-    return failResponse_(left, 'q', named);
+  const outcome = idx < 0 ? 'fail' : (truthy_(cellGet_(t, t.rows[idx], 'Locked')) ? 'locked' : 'ok');
+  const blocked = settleLogin_('q', named, outcome);
+  if (blocked) {
+    if (blocked.locked) {
+      const u = publicUser_(t, t.rows[idx]);
+      logActivity_(u.username, u.role, 'login', 'account locked', fp, 'fail');
+    } else if (blocked.error === 'invalid passcode') {
+      logActivity_('', '', 'login', 'invalid passcode', fp, 'fail');
+    }
+    return blocked;
   }
   const r = t.rows[idx];
   const user = publicUser_(t, r);
-  if (user.locked) {
-    logActivity_(user.username, user.role, 'login', 'account locked', fp, 'fail');
-    return { ok: false, error: 'account locked', locked: true };
-  }
-  loginOk_('q', named);
   if (kind === 'legacy') {   // one-time upgrade of the plain SHA-256 row
     withLock_(function () { t.sh.getRange(idx + 2, hc + 1).setValue(v2); return null; });
   }
@@ -177,7 +182,10 @@ function log_(ctx, action, detail, result) { logActivity_(ctx.user.username, ctx
 
 function logActivity_(username, role, action, detail, fp, result) {
   try {
-    sheet_(TAB.activity, true).appendRow([new Date(), username || '', role || '', action, str_(detail, 500), str_(fp, 64), result || 'ok']);
+    sheet_(TAB.activity, true).appendRow([
+      new Date(), plainCell_(username || ''), plainCell_(role || ''), plainCell_(String(action || '')),
+      plainCell_(str_(detail, 500)), plainCell_(str_(fp, 64)), plainCell_(result || 'ok')
+    ]);
   } catch (e) { console.warn('activity log failed', e); }
 }
 
@@ -230,12 +238,30 @@ function getQuotes_(body, ctx) {
   return { ok: true, quotes: out };
 }
 
+/** Staff change job stage only through set_status, not by rewriting the saved quote. */
+function freezeStaffStatus_(quote, existing) {
+  if (existing) {
+    quote.status = existing.status;
+    if (existing.completed) {
+      quote.completed = true;
+      if (existing.completedAt) quote.completedAt = existing.completedAt;
+    } else {
+      quote.completed = false;
+      delete quote.completedAt;
+    }
+    if (existing.inProgressAt) quote.inProgressAt = existing.inProgressAt;
+    else delete quote.inProgressAt;
+  } else {
+    quote.status = 'quote';
+    quote.completed = false;
+    delete quote.completedAt;
+    delete quote.inProgressAt;
+  }
+}
 function saveQuote_(body, ctx) {
   const quote = body.quote;
   if (!quote || typeof quote !== 'object' || !quote.id) return { error: 'quote with id required' };
   const id = str_(quote.id, 80);
-  const json = JSON.stringify(quote);
-  if (json.length > MAX_CELL) return { error: 'quote too large to save (' + json.length + ' chars) — remove photos from the quote data' };
   return withLock_(function () {
     const t = table_(TAB.quotes, true);
     const i = findQuoteIdx_(t, id);
@@ -243,6 +269,9 @@ function saveQuote_(body, ctx) {
     if (i >= 0) {
       const existing = quoteFromRow_(t, t.rows[i]);
       if (isStaffCtx_(ctx) && !staffCanSee_(existing, ctx.user.username)) return { error: 'not allowed' };
+      if (isStaffCtx_(ctx)) freezeStaffStatus_(quote, existing);
+      const json = JSON.stringify(quote);
+      if (json.length > MAX_CELL) return { error: 'quote too large to save (' + json.length + ' chars) — remove photos from the quote data' };
       const owner = String(cellGet_(t, t.rows[i], 'Username') || '') || ctx.user.username;
       const row = rowFromObj_(t, {
         'ID': id, 'Username': owner, 'Created At': cellGet_(t, t.rows[i], 'Created At') || quote.createdAt || new Date().toISOString(),
@@ -253,6 +282,9 @@ function saveQuote_(body, ctx) {
       syncInvoiceJson_(id, json, quoteTotal_(quote));
       log_(ctx, 'save_quote', 'id=' + id + ' (update)');
     } else {
+      if (isStaffCtx_(ctx)) freezeStaffStatus_(quote, null);
+      const json = JSON.stringify(quote);
+      if (json.length > MAX_CELL) return { error: 'quote too large to save (' + json.length + ' chars) — remove photos from the quote data' };
       t.sh.appendRow(rowFromObj_(t, {
         'ID': id, 'Username': ctx.user.username, 'Created At': quote.createdAt || new Date().toISOString(),
         'Client Name': str_(client.name), 'Client Address': str_(client.address), 'Total': quoteTotal_(quote),
@@ -293,8 +325,8 @@ function invoiceRowIdx_(sh, id) {
 }
 function upsertInvoice_(owner, q) {
   const sh = invoiceSheet_(true);
-  const row = [q.id, owner, q.createdAt || '', q.completedAt || new Date().toISOString(),
-    str_(q.client && q.client.name), str_(q.client && q.client.address), quoteTotal_(q), !!q.cashMode, JSON.stringify(q)];
+  const row = [plainCell_(String(q.id)), plainCell_(String(owner || '')), q.createdAt || '', q.completedAt || new Date().toISOString(),
+    plainCell_(str_(q.client && q.client.name)), plainCell_(str_(q.client && q.client.address)), quoteTotal_(q), !!q.cashMode, JSON.stringify(q)];
   const at = invoiceRowIdx_(sh, q.id);
   if (at > 0) sh.getRange(at, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
 }
@@ -435,7 +467,7 @@ function renameOwner_(from, to) {
   const t = table_(TAB.quotes, false);
   const c = col_(t, 'Username'), jc = col_(t, 'JSON Data');
   t.rows.forEach(function (r, i) {
-    if (c >= 0 && String(r[c]).toLowerCase() === lc) t.sh.getRange(i + 2, c + 1).setValue(to);
+    if (c >= 0 && String(r[c]).toLowerCase() === lc) t.sh.getRange(i + 2, c + 1).setValue(plainCell_(to));
     if (jc < 0) return;
     const q = parseJson_(r[jc], null);
     if (!q || typeof q !== 'object') return;
@@ -447,7 +479,7 @@ function renameOwner_(from, to) {
   const inv = invoiceSheet_(false);
   if (inv && inv.getLastRow() > 0) {
     const vals = inv.getRange(1, 2, inv.getLastRow(), 1).getValues();
-    vals.forEach(function (v, i) { if (String(v[0]).toLowerCase() === from.toLowerCase()) inv.getRange(i + 1, 2).setValue(to); });
+    vals.forEach(function (v, i) { if (String(v[0]).toLowerCase() === from.toLowerCase()) inv.getRange(i + 1, 2).setValue(plainCell_(to)); });
   }
 }
 
@@ -554,9 +586,9 @@ function savePhoto_(body, ctx) {
     deletePhotoRows_(sh, p.ref);
     const rows = [];
     for (let i = 0; i < total; i++) {
-      rows.push([String(p.ref), i, total, str_(p.quoteId, 80), ctx.user.username, Number(p.width) || '', Number(p.height) || '',
-        JSON.stringify(Array.isArray(p.tags) ? p.tags.map(String) : []), str_(p.notes, 5000), p.customerVisible !== false,
-        str_(p.createdAt, 40) || new Date().toISOString(), data.slice(i * PHOTO_CHUNK, (i + 1) * PHOTO_CHUNK)]);
+      rows.push([plainCell_(String(p.ref)), i, total, plainCell_(str_(p.quoteId, 80)), plainCell_(ctx.user.username), Number(p.width) || '', Number(p.height) || '',
+        JSON.stringify(Array.isArray(p.tags) ? p.tags.map(String) : []), plainCell_(str_(p.notes, 5000)), p.customerVisible !== false,
+        plainCell_(str_(p.createdAt, 40) || new Date().toISOString()), data.slice(i * PHOTO_CHUNK, (i + 1) * PHOTO_CHUNK)]);
     }
     sh.getRange(sh.getLastRow() + 1, 1, rows.length, 12).setValues(rows);
     log_(ctx, 'save_photo', 'ref=' + p.ref + ' quote=' + str_(p.quoteId, 80));
