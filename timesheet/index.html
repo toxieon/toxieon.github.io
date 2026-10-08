@@ -15,7 +15,11 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.3.1"></script>
+<script src="ts-time.js?v=0.4.1"></script>
+<!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="ts-map.js?v=0.4.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -206,6 +210,25 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .preview-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-family: var(--mono-font); font-size: 12.5px; white-space: pre-wrap; line-height: 1.6; max-height: 50vh; overflow-y: auto; }
 .export-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .export-actions .btn { width: 100%; }
+.export-actions .export-map-row { display: flex; gap: 8px; }
+.export-actions .export-map-row .btn { flex: 1; width: auto; padding: 14px 8px; font-size: 12.5px; }
+.week-map-wrap { margin-top: 12px; }
+.week-map-wrap[hidden] { display: none !important; }
+.week-map { height: 240px; border-radius: 12px; overflow: hidden; background: #dfe6ea; }
+.week-map[hidden] { display: none !important; }
+.week-map-note { font-size: 12px; margin: 8px 0 0; line-height: 1.4; }
+.week-map-note[hidden] { display: none !important; }
+.ts-pin { background: transparent !important; border: none !important; }
+.ts-pin-body { width: 28px; height: 28px; background: #d21f1f; color: #fff; border: 2px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 1px 3px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; }
+.ts-pin-body span { transform: rotate(45deg); font: 700 12px/1 system-ui, sans-serif; }
+.week-map .leaflet-control-attribution { background: rgba(255,255,255,.9); color: #222; font-size: 11px; }
+.week-map .leaflet-control-attribution a { color: #0078a8; }
+.week-map .leaflet-control-zoom a { background: #fff; color: #111; width: 30px; height: 30px; line-height: 30px; text-align: center; text-decoration: none; }
+/* The page sets border-box on every element, and Leaflet 1.9.4's plus-lighter
+   tile blend drops tiles in Chrome while zooming. Keep the map on content-box
+   and a normal blend so OSM tiles stay put. */
+.week-map, .week-map .leaflet-pane, .week-map .leaflet-map-pane, .week-map .leaflet-control, .week-map .leaflet-tile-container { box-sizing: content-box; }
+.week-map img.leaflet-tile { mix-blend-mode: normal !important; box-sizing: content-box; }
 
 /* ── Slice 3 additions ── */
 .today-chip { display:inline-flex; align-items:center; min-height:34px; margin:0 0 10px; padding:4px 16px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-primary); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; }
@@ -251,7 +274,7 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .lp-card-addr { font-size:12px; overflow:hidden; text-overflow:ellipsis; }
 .lp-card .btn { flex:none; min-height:44px; }
 
-@media print { .tabbar, .nd-sync-tube, .nd-sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
+@media print { .tabbar, .nd-sync-tube, .nd-sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card, .week-map-wrap { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
 .settings-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 10px; }
 .msg-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
@@ -402,8 +425,15 @@ body.ts-tl-dragging { overscroll-behavior: none; }
     <details class="export-panel" id="export-panel">
       <summary>Export this week</summary>
       <div class="preview-box" id="preview"></div>
+      <div class="week-map-wrap" id="week-map-wrap" hidden>
+        <div id="week-map" class="week-map" hidden></div>
+        <p class="muted week-map-note" id="week-map-note" hidden></p>
+      </div>
       <div class="export-actions">
-        <button class="btn btn-primary btn-block" id="btn-copy">Copy timesheet</button>
+        <div class="export-map-row">
+          <button class="btn btn-primary" id="btn-copy">Copy timesheet</button>
+          <button class="btn btn-ghost" id="btn-copy-map">Copy map</button>
+        </div>
         <button class="btn btn-ghost btn-block" id="btn-open">Open in mail app</button>
         <button class="btn btn-ghost btn-block" id="btn-csv">Export CSV</button>
         <button class="btn btn-ghost btn-block" id="btn-pdf">Export / Print PDF</button>
@@ -500,7 +530,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
         <div class="field"><label>Preferred mail app</label>
           <select id="s-preferredMailApp"><option>Gmail</option><option>Outlook (web)</option><option>Apple / default mail</option><option>Just copy</option></select>
         </div>
-        <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email.</p>
+        <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email. Copy timesheet also adds a map of that week's sites when the clipboard can take both; otherwise use Copy map (or Download map).</p>
       </div>
       <div class="card">
         <div class="row-between"><div style="font-weight:500;">Timesheet Live</div><a href="../timesheetlive/" target="_blank" rel="noopener" style="font-size:13px; color:var(--on-accent);">Open ↗</a></div>
@@ -692,7 +722,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.3.1';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.1';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1976,6 +2006,217 @@ const TsExport = (() => {
 })();
 window.TsExport = TsExport;
 
+/* ----- WEEK SITE MAP (0.4.1) -----
+ * Copy timesheet also builds a PNG of the week's sites. Leaflet draws the
+ * on-screen map; the PNG is painted on a canvas (OSM tiles, crossOrigin) so
+ * the clipboard image isn't tainted. Text export is unchanged. */
+const TsWeekMap = (() => {
+  const REF = 'https://www.neilldata.com/timesheet/';
+  const GEO_KEY = 'ts_geocode_cache_v1';
+  const cache = new Map();
+  let geo = null, map = null, markers = [], shownKey = '', inflight = null, inflightKey = '';
+
+  function loadCache() { try { return JSON.parse(localStorage.getItem(GEO_KEY) || '{}'); } catch (e) { return {}; } }
+  function saveCache(obj) { try { localStorage.setItem(GEO_KEY, JSON.stringify(obj)); } catch (e) {} }
+  function geocoder() {
+    if (geo) return geo;
+    const stored = loadCache();
+    geo = TsMap.createGeocoder({
+      cache: stored, version: APP_VERSION, onCache: () => saveCache(stored),
+      fetch: (url, opts) => fetch(url, {
+        headers: opts && opts.headers, referrer: REF, referrerPolicy: 'strict-origin-when-cross-origin'
+      })
+    });
+    return geo;
+  }
+  function inputFor(weekStart) {
+    const st = getState();
+    const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const end = addDays(start, 7);
+    return {
+      sessions: st.sessions || [], currentSession: st.currentSession, jobs: st.jobs || [],
+      staticDays: staticDaysForWeek(start), startIso: isoDate(start), endIso: isoDate(end)
+    };
+  }
+  function dataKey(weekStart) {
+    const inp = inputFor(weekStart);
+    const sessions = (inp.sessions || []).filter(s => s.date >= inp.startIso && s.date < inp.endIso)
+      .map(s => [s.session_id, s.job_id, s.job_name, s.address_confirmed, s.lat_on, s.lng_on, s.date]);
+    const cs = inp.currentSession;
+    return inp.startIso + '|' + JSON.stringify({
+      s: sessions,
+      c: cs ? [cs.session_id, cs.date, cs.job_id, cs.job_name, cs.address_confirmed, cs.lat_on, cs.lng_on] : null,
+      j: (inp.jobs || []).map(j => [j.job_id, j.job_name, j.address, j.lat, j.lng]),
+      t: (inp.staticDays || []).map(sd => [sd.date, sd.template && sd.template.id, sd.template && sd.template.name, sd.template && sd.template.type, sd.template && sd.template.location])
+    });
+  }
+  function mapFilename(weekStart) {
+    const st = getState();
+    return 'timesheet-map-' + isoDate(startOfWeek(weekStart, st.settings.firstDayOfWeek)) + '.png';
+  }
+  function imageOk() {
+    return !!(window.TsMap && TsMap.clipboardSupport({
+      write: !!(navigator.clipboard && navigator.clipboard.write),
+      ClipboardItem: window.ClipboardItem
+    }).image);
+  }
+  function syncButton() {
+    const btn = document.getElementById('btn-copy-map');
+    if (!btn) return;
+    const ok = imageOk();
+    btn.textContent = ok ? 'Copy map' : 'Download map';
+  }
+  function loadTile(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.referrerPolicy = 'strict-origin-when-cross-origin';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  async function renderPng(pins) {
+    const plan = TsMap.planMap(pins);
+    if (!plan) return null;
+    const tiles = {};
+    await Promise.all(plan.tiles.map(async (t) => { tiles[t.key] = await loadTile(t.url); }));
+    const canvas = document.createElement('canvas');
+    const scale = 2;
+    canvas.width = plan.width * scale; canvas.height = plan.height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    TsMap.drawMap(ctx, plan, tiles);
+    return new Promise((res) => canvas.toBlob(res, 'image/png'));
+  }
+  function show(located, key) {
+    const wrap = document.getElementById('week-map-wrap');
+    const note = document.getElementById('week-map-note');
+    const el = document.getElementById('week-map');
+    if (!wrap || !el) return;
+    const text = TsMap.skippedNote(located.skipped);
+    if (note) { note.textContent = text; note.hidden = !text; }
+    const pins = located.pins || [];
+    if (!pins.length || !(window.L && L.map)) {
+      el.hidden = true;
+      wrap.hidden = !text;
+      shownKey = text ? key : '';
+      markers.forEach(m => m.remove()); markers = [];
+      return;
+    }
+    wrap.hidden = false; el.hidden = false;
+    if (!map) {
+      map = L.map(el, { zoomControl: true, attributionControl: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        crossOrigin: 'anonymous'
+      }).addTo(map);
+    }
+    markers.forEach(m => m.remove()); markers = [];
+    const bounds = [];
+    pins.forEach(p => {
+      const icon = L.divIcon({
+        className: 'ts-pin',
+        html: '<div class="ts-pin-body"><span>' + escapeHtml(String(p.visits)) + '</span></div>',
+        iconSize: [28, 28], iconAnchor: [14, 28]
+      });
+      markers.push(L.marker([p.lat, p.lng], { icon, title: p.name + ' · ' + p.visits }).addTo(map));
+      bounds.push([p.lat, p.lng]);
+    });
+    shownKey = key;
+    setTimeout(() => {
+      if (!map) return;
+      map.invalidateSize();
+      if (bounds.length === 1) map.setView(bounds[0], 15);
+      else map.fitBounds(bounds, { padding: [36, 36], maxZoom: 15 });
+    }, 40);
+  }
+  function onWeek(weekStart) {
+    syncButton();
+    let key = '';
+    try { key = dataKey(weekStart); } catch (e) { return; }
+    if (key && key === shownKey) return;
+    const hit = key && cache.get(key);
+    if (hit) show(hit, key);
+    else {
+      shownKey = '';
+      const wrap = document.getElementById('week-map-wrap');
+      if (wrap) wrap.hidden = true;
+      markers.forEach(m => m.remove()); markers = [];
+    }
+  }
+  async function ensure(weekStart) {
+    const key = dataKey(weekStart);
+    if (cache.has(key)) { const hit = cache.get(key); show(hit, key); return hit; }
+    if (inflight && inflightKey === key) return inflight;
+    inflightKey = key;
+    const job = (async () => {
+      const inp = inputFor(weekStart);
+      if (TsMap.weekSites(inp).pending.length) toast('Looking up site addresses…');
+      const located = await TsMap.locateWeek(inp, geocoder());
+      if (dataKey(weekStart) === key) show(located, key);
+      let blob = null;
+      if (located.pins.length) {
+        try { blob = await renderPng(located.pins); } catch (e) { console.warn('week map png failed', e); }
+      }
+      const result = { pins: located.pins, skipped: located.skipped, blob, note: TsMap.skippedNote(located.skipped) };
+      cache.set(key, result);
+      return result;
+    })();
+    inflight = job;
+    try { return await job; } finally { if (inflight === job) inflight = null; }
+  }
+  function noMap(m) {
+    toast(m && m.pins && m.pins.length ? 'Could not build the map image' : 'No sites to map this week');
+  }
+  async function copyWithText(weekStart, text) {
+    const mapP = ensure(weekStart);
+    if (!imageOk()) {
+      const ok = await copyText(text);
+      toast(ok ? 'Timesheet copied' : 'Copy failed — select the preview text manually');
+      mapP.catch(e => console.warn('week map failed', e));
+      return ok;
+    }
+    let both = false;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/plain': Promise.resolve(new Blob([text], { type: 'text/plain' })),
+        'image/png': mapP.then(m => { if (!m || !m.blob) throw new Error('no map'); return m.blob; })
+      })]);
+      both = true;
+    } catch (e) { both = false; }
+    try { await mapP; } catch (e) { console.warn('week map failed', e); }
+    if (both) { toast('Timesheet and map copied'); return true; }
+    const ok = await copyText(text);
+    toast(ok ? 'Timesheet copied' : 'Copy failed — select the preview text manually');
+    return ok;
+  }
+  function copyMapOnly(weekStart) {
+    const name = mapFilename(weekStart);
+    const deliver = (m, msg) => {
+      if (!m || !m.blob) { noMap(m); return; }
+      downloadBlob(m.blob, name);
+      toast(msg || 'Map downloaded');
+    };
+    const ready = cache.has(dataKey(weekStart)) ? Promise.resolve(cache.get(dataKey(weekStart))) : ensure(weekStart);
+    if (!imageOk()) { ready.then(m => deliver(m)).catch(() => toast('Could not build the map')); return; }
+    try {
+      const item = new ClipboardItem({
+        'image/png': ready.then(m => { if (!m || !m.blob) throw new Error('no map'); return m.blob; })
+      });
+      navigator.clipboard.write([item]).then(() => toast('Map copied')).catch(() => {
+        ready.then(m => deliver(m, "Image copy isn't supported — map downloaded")).catch(() => toast('Could not build the map'));
+      });
+    } catch (e) {
+      ready.then(m => deliver(m, "Image copy isn't supported — map downloaded")).catch(() => toast('Could not build the map'));
+    }
+  }
+  function invalidate() { if (map) setTimeout(() => { if (map) map.invalidateSize(); }, 40); }
+  return { ensure, copyWithText, copyMapOnly, onWeek, invalidate, syncButton };
+})();
+window.TsWeekMap = TsWeekMap;
+
 /* ----- TIMESHEET LIVE PUBLISHER (/timesheetlive) -----
  * After every local save (debounced), the PRIMARY account's app writes a
  * sanitized snapshot of the CURRENT week into the `live_snapshot` tab of its
@@ -2678,6 +2919,7 @@ window.TsLocPicker = TsLocPicker;
     const st = getState();
     const sessions = sessionsForWeek(weekCursor); const staticDays = staticDaysForWeek(weekCursor);
     const totals = weekTotals(sessions, staticDays);
+    if (window.TsWeekMap) TsWeekMap.onWeek(weekCursor);
     $('wk-label').textContent = `${fmtDateHeader(weekCursor)} – ${fmtDateHeader(addDays(weekCursor, 6))}`;
     $('wk-sub').textContent = payPeriodFor(weekCursor) === isoDate(weekCursor) ? 'Calendar week' : payPeriodFor(weekCursor);
     $('wk-total').textContent = totals.total.toFixed(2) + ' hrs';
@@ -2936,8 +3178,13 @@ window.TsLocPicker = TsLocPicker;
     $('wk-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
     $('wk-today').addEventListener('click', () => { weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek); render(); });
     $('btn-add-shift').addEventListener('click', () => openAddShift(isoDate(new Date())));
-    $('export-panel').addEventListener('toggle', () => { if ($('export-panel').open) renderExportPreview(); });
-    $('btn-copy').addEventListener('click', () => TsExport.copyTimesheet(weekCursor));
+    $('export-panel').addEventListener('toggle', () => { if ($('export-panel').open) { renderExportPreview(); if (window.TsWeekMap) TsWeekMap.invalidate(); } });
+    $('btn-copy').addEventListener('click', () => {
+      const text = TsExport.buildTimesheetText(weekCursor).body;
+      if (window.TsWeekMap) TsWeekMap.copyWithText(weekCursor, text);
+      else TsExport.copyTimesheet(weekCursor);
+    });
+    $('btn-copy-map').addEventListener('click', () => { if (window.TsWeekMap) TsWeekMap.copyMapOnly(weekCursor); });
     $('btn-open').addEventListener('click', () => TsExport.openInMail(weekCursor));
     $('btn-csv').addEventListener('click', () => TsExport.exportCsv(weekCursor));
     $('btn-pdf').addEventListener('click', () => { renderExportPreview(); $('export-panel').open = true; TsExport.printPdf(); });

@@ -1,0 +1,16 @@
+Map tiles and address lookup for the Timesheet week map.
+
+Tiles: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+© OpenStreetMap contributors
+https://www.openstreetmap.org/copyright
+Tile usage policy: https://operations.osmfoundation.org/policies/tiles/
+
+Address lookup (only when a site has a saved address and no coordinates):
+https://nominatim.openstreetmap.org/
+Nominatim usage policy: https://operations.osmfoundation.org/policies/nominatim/
+This app sends at most one request per second, sends a User-Agent and Referer
+identifying Neill Data Timesheet (https://www.neilldata.com/timesheet/), and
+caches every result so an address is looked up once.
+
+Leaflet, which draws the on-screen map, is BSD-2-Clause. See vendor/leaflet/LICENSE.
+No GPL code is included.
