@@ -66,4 +66,4 @@ const MAX_FAILS_PER_USER   = 5;    // wrong codes per 15 min against one named u
 const PHOTO_CHUNK          = 45000; // chars per Photos row (cell limit is 50,000)
 const MAX_CELL             = 49000;
 const SNAPSHOT_CACHE_S     = 10;
-const BACKEND_VERSION      = 'neill-data-backend 1';
+const BACKEND_VERSION      = 'neill-data-backend 2';

@@ -125,21 +125,47 @@ function loginGate_(scope, user) {
   const ms = Math.max(1000, until - now);
   return { ok: false, error: 'too many failed attempts — try again in ' + Math.ceil(ms / 1000) + ' seconds', cooldownMs: ms };
 }
+function withLoginLock_(fn) {
+  const lock = LockService.getScriptLock();
+  // Fail closed: a burst that can't take the lock must not skip the counter.
+  if (!lock.tryLock(8000)) return { ok: false, error: 'busy — try again shortly', cooldownMs: 2000 };
+  try { return fn(); }
+  finally { try { lock.releaseLock(); } catch (e) {} }
+}
+/** Count a failure. Caller must already hold the script lock. */
+function loginFailUnlocked_(scope, user) {
+  const now = Date.now();
+  const c = counters_(scope, user, now);
+  const cache = CacheService.getScriptCache();
+  c.g.n++; c.d.n++;
+  cache.put('rl_' + scope + '_g', JSON.stringify(c.g), Math.ceil(FAIL_WINDOW_MS / 1000));
+  PropertiesService.getScriptProperties().setProperty('rl_' + scope + '_day', JSON.stringify(c.d));
+  let left = Math.min(MAX_FAILS_GLOBAL - c.g.n, MAX_FAILS_GLOBAL_DAY - c.d.n);
+  if (c.u) { c.u.n++; cache.put(rlUserKey_(scope, user), JSON.stringify(c.u), Math.ceil(FAIL_WINDOW_MS / 1000)); left = Math.min(left, MAX_FAILS_PER_USER - c.u.n); }
+  return left;
+}
 /** Count a failure; returns attempts left before the tightest limit trips (<= 0 → locked out). */
 function loginFail_(scope, user) {
-  const lock = LockService.getScriptLock();
-  lock.tryLock(5000);
-  try {
-    const now = Date.now();
-    const c = counters_(scope, user, now);
-    const cache = CacheService.getScriptCache();
-    c.g.n++; c.d.n++;
-    cache.put('rl_' + scope + '_g', JSON.stringify(c.g), Math.ceil(FAIL_WINDOW_MS / 1000));
-    PropertiesService.getScriptProperties().setProperty('rl_' + scope + '_day', JSON.stringify(c.d));
-    let left = Math.min(MAX_FAILS_GLOBAL - c.g.n, MAX_FAILS_GLOBAL_DAY - c.d.n);
-    if (c.u) { c.u.n++; cache.put(rlUserKey_(scope, user), JSON.stringify(c.u), Math.ceil(FAIL_WINDOW_MS / 1000)); left = Math.min(left, MAX_FAILS_PER_USER - c.u.n); }
-    return left;
-  } finally { try { lock.releaseLock(); } catch (e) {} }
+  const res = withLoginLock_(function () { return { left: loginFailUnlocked_(scope, user) }; });
+  return (res && res.left !== undefined) ? res.left : 0;
+}
+/**
+ * Record one login attempt while holding the script lock. Parallel requests
+ * used to all read "under the limit" and then all run; the counter is now
+ * checked again inside the lock before a result is returned.
+ * outcome: 'ok' | 'fail' | 'locked'
+ * Returns null only for 'ok' while the limit is still open. A closed gate
+ * beats a correct code, and that response does not say the code was right.
+ */
+function settleLogin_(scope, user, outcome) {
+  return withLoginLock_(function () {
+    const gate = loginGate_(scope, user);
+    if (gate) return gate;
+    if (outcome === 'fail') return failResponse_(loginFailUnlocked_(scope, user), scope, user);
+    if (outcome === 'locked') return { ok: false, error: 'account locked', locked: true };
+    loginOk_(scope, user);
+    return null;
+  });
 }
 function loginOk_(scope, user) {
   if (user) CacheService.getScriptCache().remove(rlUserKey_(scope, user));
@@ -162,6 +188,13 @@ function randomHex_(n) {
   return s.slice(0, n);
 }
 function truthy_(v) { return v === true || /^(true|yes|y|1)$/i.test(String(v == null ? '' : v).trim()); }
+/** Stop a user-typed cell from being stored as a formula (=, +, -, @). */
+function plainCell_(v) {
+  if (typeof v !== 'string' || !v) return v;
+  const c = v.charAt(0);
+  if (c === '=' || c === '+' || c === '-' || c === '@' || c === '\t' || c === '\r') return "'" + v;
+  return v;
+}
 function str_(v, n) { return String(v == null ? '' : v).slice(0, n || 500); }
 function normKey_(s) { return String(s || '').toLowerCase().replace(/[\s_]/g, ''); }
 function isDate_(v) { return Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime()); }
