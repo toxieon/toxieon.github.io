@@ -1065,7 +1065,9 @@ function renderLoadingOverlay(msg="Loading…") {
 function renderTopbar() {
   const proj = project();
   const profile = state.googleAuth.profile;
-  const initials = profile ? (profile.given_name?.[0]||""+(profile.family_name?.[0]||"")) : "?";
+  const initials = profile
+    ? ((profile.given_name?.[0] || "") + (profile.family_name?.[0] || "")).trim() || "?"
+    : "?";
   return `
     <header class="topbar">
       <div class="topbar-brand">
