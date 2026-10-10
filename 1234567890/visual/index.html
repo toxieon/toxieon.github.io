@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Visual library · Assets · Neill Data Suite</title>
+<link rel="icon" href="../../assets/suite-icons/apps/assets.svg?v=1.2.0" />
+<link rel="manifest" href="../manifest.json" />
+<link rel="apple-touch-icon" sizes="180x180" href="../icons/icon-180.png" />
+<link rel="stylesheet" href="../../shared/nd-core.css" />
+<link rel="stylesheet" href="visual.css?v=1.2.1" />
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <p class="crumb"><a href="../">← Assets showroom</a></p>
+    <h1>Visual asset library</h1>
+    <p class="lede">Logos, icons, illustrations and marks from every suite app, plus TipDash art (bookmaker marks, match FX, brand icons, AFL guernseys).</p>
+    <div class="toolbar">
+      <span class="count-pill" id="count">— assets</span>
+      <input type="search" id="q" placeholder="Filter by name or path…" autocomplete="off" />
+      <select id="cat-filter" aria-label="Category">
+        <option value="">All categories</option>
+      </select>
+    </div>
+  </header>
+  <div id="gallery"></div>
+  <p class="foot">Neill Data Suite · visual inventory · <span id="app-version"></span></p>
+</div>
+<script>
+  var APP_VERSION = "1.2.1";
+  document.getElementById("app-version").textContent = "Assets v" + APP_VERSION;
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("../sw.js").catch(function () {});
+    });
+  }
+</script>
+<script src="visual.js?v=1.2.1"></script>
+</body>
+</html>

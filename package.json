@@ -8,6 +8,8 @@
     "test:hub": "node --test hub/build-apps.test.cjs assets/suite-icons.test.cjs",
     "test": "node --test && node --test swb/board-filter.test.cjs",
     "icons:render": "node scripts/render-app-icons.cjs",
-    "icons:check": "node scripts/render-app-icons.cjs --check"
+    "icons:check": "node scripts/render-app-icons.cjs --check",
+    "visual:catalog": "node scripts/build-visual-catalog.cjs",
+    "visual:check": "node scripts/build-visual-catalog.cjs --check"
   }
 }

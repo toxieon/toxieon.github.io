@@ -1,0 +1,11 @@
+TipDash visual assets: notices
+
+All files in this folder are original TipDash artwork by Neill Data (toxieon), published here
+for the Neill Data Suite visual library. Bookmaker and AFL club names, colours and
+marks belong to their respective owners and are shown for identification only; no official
+logos are included (the bookmaker marks are plain text on a colour tile, and the guernseys
+use club colours with generic patterns).
+
+Fonts: none are included. The TipDash web fonts (Geist, Instrument Sans) are licensed
+under the SIL Open Font License 1.1, which is outside this site's MIT/BSD/Apache/ISC
+policy, so they were removed; the library previews use the system font stack.

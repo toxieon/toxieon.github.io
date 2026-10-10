@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 88" aria-hidden="true" role="presentation">
+  <line class="tbfx-post-behind" x1="18" y1="52" x2="18" y2="28"/>
+  <line class="tbfx-post" x1="48" y1="56" x2="48" y2="12"/>
+  <line class="tbfx-post" x1="84" y1="56" x2="84" y2="12"/>
+  <line class="tbfx-post-behind" x1="114" y1="52" x2="114" y2="28"/>
+  <line class="tbfx-ground" x1="12" y1="56" x2="120" y2="56"/>
+  <circle class="tbfx-ball tbfx-ball-behind tbfx-ball-anim" r="5" cx="8" cy="58"/>
+  <g class="tbfx-ump tbfx-signal" transform="translate(98,58)">
+    <circle class="tbfx-ump-head" r="7" cy="-10"/>
+    <rect class="tbfx-ump-body" x="-5" y="-4" width="10" height="16" rx="3"/>
+    <line class="tbfx-finger" x1="2" y1="-18" x2="2" y2="-28"/>
+  </g>
+</svg>
