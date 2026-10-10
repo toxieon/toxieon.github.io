@@ -1,35 +1,20 @@
-/* Service worker — offline app shell for the Neill Data suite (§1.8).
- *
- * Strategy (v2 — fixes the frozen-deploy bug):
- *   - navigations (HTML): network-first, cache fallback when offline
- *   - same-origin assets (js/css/img): stale-while-revalidate — served from
- *     cache instantly, refreshed in the background, so a deploy lands on
- *     the next load instead of never
- *   - Google APIs (Sheets/Drive/Maps/OAuth): network-only, never cached —
- *     nd-queue owns write resilience, not this cache
- *   - install precaches with {cache:'reload'} to bypass the HTTP cache
- *     (a stale CDN copy must not get frozen into the SW cache)
- */
+/* Service worker — offline app shell for Company (Neill Data suite). */
 
-const CACHE_VERSION = 'swb-v9';
+const CACHE_VERSION = 'company-0.1.1';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
+  "./favicon.svg",
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./favicon.svg",
-  "./styles.css?v=2.0.0",
+  "../shared/nd-core.css",
   "../shared/nd-config.js",
+  "../assets/loading-bar.js",
   "../shared/nd-backend.js",
   "../shared/nd-auth.js",
-  "../shared/nd-ui.js",
-  "../shared/nd-recent-jobs.js?v=1",
-  "../shared/nd-core.css",
-  "../shared/nd-pwa.js",
-  "./swb_engine.js?v=2.0.2",
-  "./app.js?v=2.0.5"
+  "../shared/nd-pwa.js"
 ];
 
 const IS_API_HOST = (url) =>
@@ -50,19 +35,18 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('company-') && k !== CACHE_VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return;    // writes belong to nd-queue, never the cache
-  if (IS_API_HOST(req.url)) return;    // Sheets/Drive/Maps/OAuth always hit the network
-  if (new URL(req.url).origin !== self.location.origin) return; // CDN etc: browser default
+  if (req.method !== 'GET') return;
+  if (IS_API_HOST(req.url)) return;
+  if (new URL(req.url).origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {
-    // network-first: fresh HTML when online, cached shell when offline
     event.respondWith(
       fetch(req)
         .then((res) => {
@@ -75,7 +59,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // stale-while-revalidate for everything else same-origin
   event.respondWith(
     caches.open(CACHE_VERSION).then((cache) =>
       cache.match(req).then((cached) => {

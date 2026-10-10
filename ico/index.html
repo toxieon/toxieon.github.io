@@ -50,6 +50,7 @@ pre { background: rgba(0,0,0,.35); border-radius: 10px; padding: 10px 12px; over
 footer { color: var(--muted); font-size: .8rem; text-align: center; }
 a { color: var(--brand); }
 </style>
+<script src="../shared/nd-pwa.js" defer></script>
 </head>
 <body>
 <main>
@@ -117,9 +118,9 @@ python -m ico.cli --image logo.png -o logo.ico</pre>
 
   <footer>Neill Data · ICO Generator <span id="app-version"></span> · fonts: DejaVu Sans (Bitstream Vera licence)</footer>
 </main>
-<script src="ico-canvas.js?v=0.1.6"></script>
+<script src="ico-canvas.js?v=0.1.7"></script>
 <script>
-const APP_VERSION = "0.1.6";   // see ico/VERSIONING.md
+const APP_VERSION = "0.1.7";   // see ico/VERSIONING.md
 document.getElementById("app-version").textContent = "v" + APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const API_KEY = "nd:ico:apiBase";
