@@ -1,4 +1,4 @@
-/* Hub v0.7.1 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.7.2 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
