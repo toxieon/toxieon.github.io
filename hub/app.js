@@ -1,4 +1,4 @@
-/* Hub v0.7.1 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.7.2 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -33,7 +33,7 @@ async function loadHub() {
 function filteredApps() {
   const q = (searchInput.value || "").trim();
   if (!q || !window.NDMatch) return apps;
-  return NDMatch.fuzzyFilter(q, apps, (a) => [a.name, a.id, a.path]);
+  return window.NDMatch.fuzzyFilter(q, apps, (a) => [a.name, a.id, a.path]);
 }
 
 function renderGrid() {
@@ -83,7 +83,7 @@ function renderRecents() {
 
 // Another tab (e.g. Planner) opening a job updates the list live.
 window.addEventListener("storage", (e) => {
-  if (!window.NDRecentJobs || e.key === null || e.key === NDRecentJobs.KEY) renderRecents();
+  if (!window.NDRecentJobs || e.key === null || e.key === window.NDRecentJobs.KEY) renderRecents();
 });
 
 function timeAgo(ts) {
@@ -108,6 +108,6 @@ loadHub();
 
 /* §1.6 suite-wide water-fill sync tube (shared). The hub is a launcher with no
  * write queue, so the tube reflects connection state to stay visually consistent. */
-if (window.NDUI && NDUI.syncTube) {
-  NDUI.syncTube(null, { labels: { synced: "Online", pending: "Offline" } });
+if (window.NDUI && window.NDUI.syncTube) {
+  window.NDUI.syncTube(null, { labels: { synced: "Online", pending: "Offline" } });
 }
