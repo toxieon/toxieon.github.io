@@ -4,7 +4,7 @@
  *   node scripts/build-visual-catalog.cjs          write 1234567890/visual-catalog.json
  *   node scripts/build-visual-catalog.cjs --check  exit 1 if catalog is stale
  *
- * TipDash static files live under assets/tipdash/ (copied from tipbot-dashboard/assets/).
+ * TipDash static files live under assets/tipdash/ (allow-listed folders only).
  * AFL guernsey previews are materialised as SVG from assets/tipdash/source/afl-guernseys.js.
  */
 "use strict";
@@ -20,7 +20,11 @@ const GUERNSEY_DIR = path.join(TIPDASH_ROOT, "guernseys");
 const GUERNSEY_SRC = path.join(TIPDASH_ROOT, "source", "afl-guernseys.js");
 
 const EXT = new Set([".svg", ".png", ".ico", ".jpg", ".jpeg", ".webp", ".gif", ".woff2"]);
-const EXCLUDE_RE = /(?:^|\/)(?:labs|demos?)(?:\/|$)|master|mirror|forward|consensus|ops|owner/i;
+const EXCLUDE_RE = /(?:^|\/)demos?(?:\/|$)/i;
+// TipDash: only these vendored files/folders are public (allow-list).
+const TIPDASH_ALLOW_DIRS = ["bookies/", "fx/", "guernseys/"];
+const TIPDASH_ALLOW_FILES = ["logo.svg", "favicon.svg", "favicon.ico", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
+function tipdashAllowed(rest) { return rest === "" || TIPDASH_ALLOW_DIRS.includes(rest + "/") || TIPDASH_ALLOW_FILES.includes(rest) || TIPDASH_ALLOW_DIRS.some((d) => rest.startsWith(d) && !rest.slice(d.length).includes("/")); }
 
 const APP_NAMES = {
   hub: "Hub",
@@ -47,6 +51,7 @@ const SKIP_DIRS = new Set([
   "areas",
   ".github",
   "reference_data",
+  "mathbuilder",
 ]);
 
 function shouldSkip(rel) {
@@ -56,7 +61,7 @@ function shouldSkip(rel) {
   for (const p of parts) {
     if (SKIP_DIRS.has(p)) return true;
   }
-  if (norm.startsWith("assets/tipdash/source/")) return true;
+  if (norm.startsWith("assets/tipdash/")) return !tipdashAllowed(norm.slice("assets/tipdash/".length));
   return false;
 }
 

@@ -1003,25 +1003,70 @@ let _toastTimer = null;
 function toast(msg) {
   state.toast = msg;
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(()=>{ state.toast=""; render(); }, 2800);
-  render();
+  _toastTimer = setTimeout(() => { state.toast = ""; updateToastEl(); }, 2800);
+  updateToastEl();
+}
+
+function updateToastEl() {
+  const shell = document.querySelector(".app-shell");
+  if (!shell) { render(); return; }
+  let el = shell.querySelector(".toast");
+  if (!state.toast) { el?.remove(); return; }
+  if (!el) { el = document.createElement("div"); el.className = "toast"; shell.appendChild(el); }
+  el.textContent = state.toast;
+}
+
+function saveFocusSnapshot() {
+  const el = document.activeElement;
+  if (!el || el === document.body || !el.closest("#app")) return null;
+  const snap = {
+    id: el.id || "",
+    name: el.name || "",
+    sel: typeof el.selectionStart === "number" ? [el.selectionStart, el.selectionEnd] : null,
+    qtyInput: el.dataset?.qtyInput || "",
+    ampOverride: el.dataset?.ampOverride || "",
+    filterQuery: el.matches?.("[data-filter='query']") ? true : false,
+    deviceSearch: el.id === "deviceSearch",
+  };
+  return snap;
+}
+
+function restoreFocusSnapshot(snap) {
+  if (!snap) return;
+  let el = snap.id ? document.getElementById(snap.id) : null;
+  if (!el && snap.name) el = document.querySelector(`[name="${CSS.escape(snap.name)}"]`);
+  if (!el && snap.qtyInput) el = document.querySelector(`[data-qty-input="${CSS.escape(snap.qtyInput)}"]`);
+  if (!el && snap.ampOverride) el = document.querySelector(`[data-amp-override="${CSS.escape(snap.ampOverride)}"]`);
+  if (!el && snap.filterQuery) el = document.querySelector("[data-filter='query']");
+  if (!el && snap.deviceSearch) el = document.getElementById("deviceSearch");
+  if (!el || !el.focus) return;
+  el.focus();
+  if (snap.sel && typeof el.setSelectionRange === "function") {
+    try { el.setSelectionRange(snap.sel[0], snap.sel[1]); } catch (e) {}
+  }
 }
 
 /* ── Main Render ─────────────────────────────────────────────────────────── */
 function render() {
   const app = document.getElementById("app");
   if (!app) return;
+  const focusSnap = saveFocusSnapshot();
 
   // Gate 1: Never authenticated → show login button
   if (!state.googleAuth.bootstrapped && !state.googleAuth.signedIn) {
-    app.innerHTML = renderLoginGate(); bindEvents(); return;
+    app.innerHTML = renderLoginGate();
+    ensureDelegatedEvents();
+    restoreFocusSnapshot(focusSnap);
+    return;
   }
   // Gate 2: Returning user — libraries loading or silent re-auth in flight
   if (state.googleAuth.bootstrapped && !state.googleAuth.signedIn) {
-    app.innerHTML = renderLoadingOverlay("Reconnecting…"); return;
+    app.innerHTML = renderLoadingOverlay("Reconnecting…");
+    return;
   }
   if (state.loading) {
-    app.innerHTML = renderLoadingOverlay(state.loadingMsg); return;
+    app.innerHTML = renderLoadingOverlay(state.loadingMsg);
+    return;
   }
   app.innerHTML = `
     <div class="app-shell">
@@ -1031,7 +1076,13 @@ function render() {
       ${state.modal ? renderModal() : ""}
       ${state.toast ? `<div class="toast">${escHtml(state.toast)}</div>` : ""}
     </div>`;
-  bindEvents();
+  ensureDelegatedEvents();
+  if (state.modal && (state.modal.mode === "new-circuit" || state.modal.mode === "edit-circuit")) {
+    filterDevicePickerList();
+    const brkTypeEl = document.querySelector('[name="breakerType"]');
+    if (brkTypeEl) toggleRcdFieldsFrom(brkTypeEl);
+  }
+  restoreFocusSnapshot(focusSnap);
 }
 
 /* ── Login Gate ──────────────────────────────────────────────────────────── */
@@ -1065,7 +1116,9 @@ function renderLoadingOverlay(msg="Loading…") {
 function renderTopbar() {
   const proj = project();
   const profile = state.googleAuth.profile;
-  const initials = profile ? (profile.given_name?.[0]||""+(profile.family_name?.[0]||"")) : "?";
+  const initials = profile
+    ? ((profile.given_name?.[0] || "") + (profile.family_name?.[0] || "")).trim() || "?"
+    : "?";
   return `
     <header class="topbar">
       <div class="topbar-brand">
@@ -1199,8 +1252,59 @@ function renderBoardView() {
       ${renderFilterPills()}
     </div>
     <div class="circuit-list">
-      ${filtered.length===0?`<div class="empty-state" style="padding:32px">${I.zap}<h3>No circuits${state.filters.query||state.filters.type!=="all"||state.filters.status!=="all"||state.filters.phase!=="all"?" matching filters":""}</h3><p>${circs.length===0?"Add your first circuit to this board.":"Try clearing the filters."}</p>${circs.length===0?`<button class="btn btn-primary" data-action="new-circuit">${I.plus} Add circuit</button>`:""}</div>`:filtered.map((c,i)=>renderCircuitCard(c,i)).join("")}
+      ${boardCircuitListInnerHtml(circs, filtered)}
     </div>`;
+}
+
+function boardCircuitListInnerHtml(circs, filtered) {
+  const list = filtered ?? applyFilters(circs);
+  return list.length === 0
+    ? `<div class="empty-state" style="padding:32px">${I.zap}<h3>No circuits${state.filters.query || state.filters.type !== "all" || state.filters.status !== "all" || state.filters.phase !== "all" ? " matching filters" : ""}</h3><p>${circs.length === 0 ? "Add your first circuit to this board." : "Try clearing the filters."}</p>${circs.length === 0 ? `<button class="btn btn-primary" data-action="new-circuit">${I.plus} Add circuit</button>` : ""}</div>`
+    : list.map((c, i) => renderCircuitCard(c, i)).join("");
+}
+
+function refreshBoardCircuitList() {
+  if (state.activeView !== "board") return;
+  const list = document.querySelector(".circuit-list");
+  if (!list) return;
+  const proj = project();
+  if (!proj) return;
+  const curBoardId = state.selectedBoardId || proj.boards?.[0]?.id;
+  const curBoard = (proj.boards || []).find((b) => b.id === curBoardId) || proj.boards?.[0];
+  if (!curBoard) return;
+  const circs = circuits(curBoard.id);
+  list.innerHTML = boardCircuitListInnerHtml(circs, applyFilters(circs));
+}
+
+function syncFilterPills() {
+  document.querySelectorAll("[data-filter-type]").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.filterType === state.filters.type);
+  });
+  document.querySelectorAll("[data-filter-status]").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.filterStatus === state.filters.status);
+  });
+  document.querySelectorAll("[data-filter-phase]").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.filterPhase === state.filters.phase);
+  });
+}
+
+function filterDevicePickerList() {
+  const q = (state.deviceSearch || "").toLowerCase().trim();
+  const list = document.querySelector(".device-picker-list");
+  if (!list) return;
+  list.querySelectorAll(".device-group-title").forEach((title) => {
+    let row = title.nextElementSibling;
+    let anyVisible = false;
+    while (row && row.classList.contains("device-row")) {
+      const name = row.querySelector(".device-row-name")?.textContent?.toLowerCase() || "";
+      const cat = title.textContent?.toLowerCase() || "";
+      const show = !q || name.includes(q) || cat.includes(q);
+      row.style.display = show ? "" : "none";
+      if (show) anyVisible = true;
+      row = row.nextElementSibling;
+    }
+    title.style.display = anyVisible ? "" : "none";
+  });
 }
 
 function applyFilters(circs) {
@@ -1632,13 +1736,11 @@ function renderCircuitModal(m) {
   const selDevices = _modalDevices;
   const devs   = projectDevices();
   const cats   = [...new Set(devs.map(d=>d.cat))];
-  const devSearch = (state.deviceSearch||"").toLowerCase();
-  const filtDevs  = devSearch ? devs.filter(d=>d.name.toLowerCase().includes(devSearch)||d.cat.toLowerCase().includes(devSearch)) : devs;
-
-  // Build device rows grouped by category
-  const groupedDevs = cats.map(cat=>({
-    cat, devs: filtDevs.filter(d=>d.cat===cat)
-  })).filter(g=>g.devs.length);
+  // Device search filters rows in the DOM (filterDevicePickerList) so typing
+  // never triggers a full re-render and focus stays in the search box.
+  const groupedDevs = cats.map(cat => ({
+    cat, devs: devs.filter(d => d.cat === cat)
+  })).filter(g => g.devs.length);
 
   const selectedRows = selDevices.map(sel=>{
     const dev=devs.find(d=>d.id===sel.id); if (!dev) return "";
@@ -1827,135 +1929,162 @@ function renderDeviceModal(m) {
 
 // Tracks circuit device selections during modal editing
 let _modalDevices = [];
+let _delegatedBound = false;
 
-function bindEvents() {
-  // Bottom nav
-  document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{
-    if (b.disabled) return;
-    state.activeView=b.dataset.view; persist(); render();
-  }));
+function toggleRcdFieldsFrom(brkTypeEl) {
+  if (!brkTypeEl) return;
+  const rcbo = brkTypeEl.value === "RCBO";
+  document.querySelectorAll(".rcd-field").forEach((el) => { el.style.display = rcbo ? "none" : ""; });
+}
 
-  // Data actions
-  document.querySelectorAll("[data-action]").forEach(el=>el.addEventListener("click", handleAction));
+function autoCableCsaFrom(brkRatingEl) {
+  const cableCsaEl = document.querySelector('[name="cableCsa"]');
+  if (!brkRatingEl || !cableCsaEl) return;
+  const r = parseInt(brkRatingEl.value, 10);
+  const csa = r <= 10 ? 1.5 : r <= 20 ? 2.5 : r <= 32 ? 4 : r <= 40 ? 6 : 10;
+  cableCsaEl.value = csa;
+}
 
-  // Open project card
-  document.querySelectorAll("[data-open-project]").forEach(el=>el.addEventListener("click",()=>{
-    const id=el.dataset.openProject;
-    state.selectedProjectId=id;
-    const p=project(id);
-    state.selectedBoardId=p?.boards[0]?.id||null;
-    state.activeView="board"; persist(); render();
-    recordRecentProject(p);
-  }));
+function ensureDelegatedEvents() {
+  if (_delegatedBound) return;
+  const app = document.getElementById("app");
+  if (!app) return;
+  _delegatedBound = true;
 
-  // Board tabs
-  document.querySelectorAll("[data-board]").forEach(b=>b.addEventListener("click",()=>{
-    state.selectedBoardId=b.dataset.board; persist(); render();
-  }));
-
-  // Filter pills
-  document.querySelectorAll("[data-filter-type]").forEach(b=>b.addEventListener("click",()=>{ state.filters.type=b.dataset.filterType; render(); }));
-  document.querySelectorAll("[data-filter-status]").forEach(b=>b.addEventListener("click",()=>{ state.filters.status=b.dataset.filterStatus; render(); }));
-  document.querySelectorAll("[data-filter-phase]").forEach(b=>b.addEventListener("click",()=>{ state.filters.phase=b.dataset.filterPhase; render(); }));
-
-  // Search filter — preserve focus/caret so typing doesn't shake the screen
-  const qInput = document.querySelector("[data-filter='query']");
-  if (qInput) qInput.addEventListener("input", () => {
-    state.filters.query = qInput.value;
-    const sel = [qInput.selectionStart, qInput.selectionEnd];
-    render();
-    const el = document.querySelector("[data-filter='query']");
-    if (el) { el.focus(); try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} }
+  app.addEventListener("click", (e) => {
+    const viewBtn = e.target.closest("[data-view]");
+    if (viewBtn && app.contains(viewBtn)) {
+      if (viewBtn.disabled) return;
+      state.activeView = viewBtn.dataset.view;
+      persist();
+      render();
+      return;
+    }
+    const boardBtn = e.target.closest("[data-board]");
+    if (boardBtn && app.contains(boardBtn)) {
+      state.selectedBoardId = boardBtn.dataset.board;
+      persist();
+      render();
+      return;
+    }
+    const projCard = e.target.closest("[data-open-project]");
+    if (projCard && app.contains(projCard)) {
+      const id = projCard.dataset.openProject;
+      state.selectedProjectId = id;
+      const p = project(id);
+      state.selectedBoardId = p?.boards[0]?.id || null;
+      state.activeView = "board";
+      persist();
+      render();
+      recordRecentProject(p);
+      return;
+    }
+    const pillType = e.target.closest("[data-filter-type]");
+    if (pillType && app.contains(pillType)) {
+      state.filters.type = pillType.dataset.filterType;
+      syncFilterPills();
+      refreshBoardCircuitList();
+      return;
+    }
+    const pillStatus = e.target.closest("[data-filter-status]");
+    if (pillStatus && app.contains(pillStatus)) {
+      state.filters.status = pillStatus.dataset.filterStatus;
+      syncFilterPills();
+      refreshBoardCircuitList();
+      return;
+    }
+    const pillPhase = e.target.closest("[data-filter-phase]");
+    if (pillPhase && app.contains(pillPhase)) {
+      state.filters.phase = pillPhase.dataset.filterPhase;
+      syncFilterPills();
+      refreshBoardCircuitList();
+      return;
+    }
+    const qtyInc = e.target.closest("[data-qty-inc]");
+    if (qtyInc && app.contains(qtyInc)) {
+      const devId = qtyInc.dataset.qtyInc;
+      const entry = _modalDevices.find((d) => d.id === devId);
+      if (entry) entry.qty++;
+      else _modalDevices.push({ id: devId, qty: 1 });
+      updateQtyDisplay();
+      return;
+    }
+    const qtyDec = e.target.closest("[data-qty-dec]");
+    if (qtyDec && app.contains(qtyDec)) {
+      const devId = qtyDec.dataset.qtyDec;
+      const entry = _modalDevices.find((d) => d.id === devId);
+      if (entry && entry.qty > 0) entry.qty--;
+      _modalDevices = _modalDevices.filter((d) => d.qty > 0);
+      updateQtyDisplay();
+      return;
+    }
+    const remDev = e.target.closest("[data-remove-device]");
+    if (remDev && app.contains(remDev)) {
+      e.stopPropagation();
+      _modalDevices = _modalDevices.filter((d) => d.id !== remDev.dataset.removeDevice);
+      updateQtyDisplay();
+      return;
+    }
+    const actionEl = e.target.closest("[data-action]");
+    if (actionEl && app.contains(actionEl)) handleAction({ ...e, currentTarget: actionEl, stopPropagation: () => e.stopPropagation() });
   });
 
-  // Device search — same focus-preserve trick
-  const dSearch = document.getElementById("deviceSearch");
-  if (dSearch) dSearch.addEventListener("input", () => {
-    state.deviceSearch = dSearch.value;
-    const sel = [dSearch.selectionStart, dSearch.selectionEnd];
-    render();
-    const el = document.getElementById("deviceSearch");
-    if (el) { el.focus(); try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} }
+  app.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!app.contains(t)) return;
+    if (t.matches("[data-filter='query']")) {
+      state.filters.query = t.value;
+      refreshBoardCircuitList();
+      return;
+    }
+    if (t.id === "deviceSearch") {
+      state.deviceSearch = t.value;
+      filterDevicePickerList();
+      return;
+    }
+    if (t.matches("[data-qty-input]")) {
+      const devId = t.dataset.qtyInput;
+      const q = Math.max(0, parseInt(t.value, 10) || 0);
+      let entry = _modalDevices.find((d) => d.id === devId);
+      if (entry) entry.qty = q;
+      else if (q > 0) _modalDevices.push({ id: devId, qty: q });
+      _modalDevices = _modalDevices.filter((d) => d.qty > 0);
+      updateQtyDisplay();
+      return;
+    }
+    if (t.matches("[data-amp-override]")) {
+      const devId = t.dataset.ampOverride;
+      let entry = _modalDevices.find((d) => d.id === devId);
+      if (!entry) { entry = { id: devId, qty: 0 }; _modalDevices.push(entry); }
+      entry.value = t.value;
+      updateQtyDisplay();
+    }
   });
 
-  // Qty controls in circuit modal
-  const copySel = document.getElementById("copyDevicesFrom");
-  if (copySel) copySel.addEventListener("change", ()=>{
-    const src = (project()?.circuits||[]).find(x=>x.id===copySel.value);
-    if (!src) return;
-    _modalDevices = window.NDUI?.batchFill ? NDUI.batchFill(src.devices||[]) : (src.devices||[]).map(d=>({ ...d }));
-    render();
-    toast(`Copied ${_modalDevices.length} device type(s) from ${src.name}`);
+  app.addEventListener("change", (e) => {
+    const t = e.target;
+    if (!app.contains(t)) return;
+    if (t.id === "copyDevicesFrom") {
+      const src = (project()?.circuits || []).find((x) => x.id === t.value);
+      if (!src) return;
+      _modalDevices = window.NDUI?.batchFill ? NDUI.batchFill(src.devices || []) : (src.devices || []).map((d) => ({ ...d }));
+      render();
+      toast(`Copied ${_modalDevices.length} device type(s) from ${src.name}`);
+      return;
+    }
+    if (t.matches('[name="breakerType"]')) toggleRcdFieldsFrom(t);
+    if (t.matches('[name="breakerRating"]')) autoCableCsaFrom(t);
   });
-  document.querySelectorAll("[data-qty-inc]").forEach(b=>b.addEventListener("click",()=>{
-    const devId=b.dataset.qtyInc;
-    const entry=_modalDevices.find(d=>d.id===devId);
-    if (entry) entry.qty++; else _modalDevices.push({ id:devId, qty:1 });
-    updateQtyDisplay();
-  }));
-  document.querySelectorAll("[data-qty-dec]").forEach(b=>b.addEventListener("click",()=>{
-    const devId=b.dataset.qtyDec;
-    const entry=_modalDevices.find(d=>d.id===devId);
-    if (entry && entry.qty>0) entry.qty--;
-    _modalDevices=_modalDevices.filter(d=>d.qty>0);
-    updateQtyDisplay();
-  }));
-  // v2.0 — typeable qty box (Sprint 2): update in place, never full-render
-  document.querySelectorAll("[data-qty-input]").forEach(inp=>inp.addEventListener("input",()=>{
-    const devId=inp.dataset.qtyInput;
-    const q=Math.max(0, parseInt(inp.value)||0);
-    let entry=_modalDevices.find(d=>d.id===devId);
-    if (entry) entry.qty=q; else if (q>0) _modalDevices.push({ id:devId, qty:q });
-    _modalDevices=_modalDevices.filter(d=>d.qty>0);
-    updateQtyDisplay();
-  }));
-  // v2.0 — per-circuit draw override (Sprint 3): editable amps on each device row
-  document.querySelectorAll("[data-amp-override]").forEach(inp=>inp.addEventListener("input",()=>{
-    const devId=inp.dataset.ampOverride;
-    let entry=_modalDevices.find(d=>d.id===devId);
-    if (!entry) { entry={ id:devId, qty:0 }; _modalDevices.push(entry); }
-    entry.value=inp.value;
-    updateQtyDisplay();
-  }));
 
-  // Remove device chip
-  document.querySelectorAll("[data-remove-device]").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation();
-    const id=b.dataset.removeDevice;
-    _modalDevices=_modalDevices.filter(d=>d.id!==id);
-    updateQtyDisplay();
-  }));
-
-  // Forms
-  // RCBO → hide RCD fields
-  const brkTypeEl = document.querySelector('[name="breakerType"]');
-  const rcdEls = document.querySelectorAll('.rcd-field');
-  if (brkTypeEl && rcdEls.length) {
-    const toggleRcd = () => { const rcbo = brkTypeEl.value==="RCBO"; rcdEls.forEach(el=>{ el.style.display=rcbo?"none":""; }); };
-    brkTypeEl.addEventListener("change", toggleRcd); toggleRcd();
-  }
-  // Breaker rating → auto-fill cable CSA
-  const brkRatingEl = document.querySelector('[name="breakerRating"]');
-  const cableCsaEl  = document.querySelector('[name="cableCsa"]');
-  if (brkRatingEl && cableCsaEl) {
-    const autoCable = () => {
-      const r=parseInt(brkRatingEl.value);
-      const csa = r<=10?1.5: r<=20?2.5: r<=32?4: r<=40?6: 10;
-      cableCsaEl.value = csa;
-    };
-    brkRatingEl.addEventListener("change", autoCable);
-  }
-
-  const projectForm = document.getElementById("projectForm");
-  if (projectForm) projectForm.addEventListener("submit", handleProjectForm);
-  const boardForm   = document.getElementById("boardForm");
-  if (boardForm)   boardForm.addEventListener("submit", handleBoardForm);
-  const circuitForm = document.getElementById("circuitForm");
-  if (circuitForm) circuitForm.addEventListener("submit", handleCircuitForm);
-  const deviceForm  = document.getElementById("deviceForm");
-  if (deviceForm)  deviceForm.addEventListener("submit", handleDeviceForm);
-  const deviceEditForm = document.getElementById("deviceEditForm");
-  if (deviceEditForm) deviceEditForm.addEventListener("submit", handleDeviceEditForm);
+  app.addEventListener("submit", (e) => {
+    if (!app.contains(e.target)) return;
+    const id = e.target.id;
+    if (id === "projectForm") handleProjectForm(e);
+    else if (id === "boardForm") handleBoardForm(e);
+    else if (id === "circuitForm") handleCircuitForm(e);
+    else if (id === "deviceForm") handleDeviceForm(e);
+    else if (id === "deviceEditForm") handleDeviceEditForm(e);
+  });
 }
 
 function updateQtyDisplay() {
@@ -1978,12 +2107,6 @@ function updateQtyDisplay() {
     return `<span class="device-chip"><span class="qty">${d.qty}×</span>${escHtml(dev.name)} (${amp}A)<button type="button" data-remove-device="${d.id}" style="margin-left:4px;opacity:0.6;font-size:12px">✕</button></span>`;
   }).join("");
   wrap.innerHTML = chips||`<span style="color:var(--text-3);font-size:12px">No devices added yet</span>`;
-  // Re-bind remove buttons
-  wrap.querySelectorAll("[data-remove-device]").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation();
-    _modalDevices=_modalDevices.filter(d=>d.id!==b.dataset.removeDevice);
-    updateQtyDisplay();
-  }));
 }
 
 function handleAction(e) {
@@ -2223,6 +2346,7 @@ function phaseColor(phase) {
 
 /* ── Boot ────────────────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
+  ensureDelegatedEvents();
   restore();
   readDeepLinkParams();
   state.c9Map = buildC9Map(C9_BUILTIN);

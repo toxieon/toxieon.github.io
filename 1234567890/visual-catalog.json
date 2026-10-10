@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-10",
-  "count": 237,
+  "count": 235,
   "categories": [
     {
       "id": "1234567890/favicon.svg",
@@ -1072,24 +1072,6 @@
       "source": "TipDash (tipbot-dashboard)",
       "category": "TipDash",
       "subcategory": "Logos"
-    },
-    {
-      "id": "assets/tipdash/fonts/geist-latin.woff2",
-      "name": "Geist Latin",
-      "href": "/assets/tipdash/fonts/geist-latin.woff2",
-      "preview": "/assets/tipdash/fonts/geist-latin.woff2",
-      "source": "TipDash (tipbot-dashboard)",
-      "category": "TipDash",
-      "subcategory": "Fonts"
-    },
-    {
-      "id": "assets/tipdash/fonts/instrument-sans-latin.woff2",
-      "name": "Instrument Sans Latin",
-      "href": "/assets/tipdash/fonts/instrument-sans-latin.woff2",
-      "preview": "/assets/tipdash/fonts/instrument-sans-latin.woff2",
-      "source": "TipDash (tipbot-dashboard)",
-      "category": "TipDash",
-      "subcategory": "Fonts"
     },
     {
       "id": "assets/tipdash/fx/behind.svg",

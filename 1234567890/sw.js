@@ -1,6 +1,6 @@
 /* Service worker — Assets showroom + visual library (offline shell). */
 
-const CACHE_VERSION = "assets-1.2.0";
+const CACHE_VERSION = "assets-1.2.1";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -9,8 +9,8 @@ const SHELL_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./visual/index.html",
-  "./visual/visual.css?v=1.2.0",
-  "./visual/visual.js?v=1.2.0",
+  "./visual/visual.css?v=1.2.1",
+  "./visual/visual.js?v=1.2.1",
   "./visual-catalog.json",
   "../assets/suite-icons/apps/assets.svg?v=1.2.0",
   "../shared/nd-core.css",
@@ -37,7 +37,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("assets-") && k !== CACHE_VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

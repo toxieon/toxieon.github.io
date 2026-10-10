@@ -108,7 +108,7 @@ function flatten(src, bg) {
     rgb[j + 1] = Math.round((px[i + 1] * a + bgc * (255 - a)) / 255);
     rgb[j + 2] = Math.round((px[i + 2] * a + bb * (255 - a)) / 255);
   }
-  return { w, h, png: encodeRGB(w, h, rgb) };
+  return { w, h, rgb, png: encodeRGB(w, h, rgb) };
 }
 
 /** Expected outputs: [{file, png, size, app}] */
@@ -120,10 +120,24 @@ function build(root = ROOT) {
       const src = fs.readFileSync(path.join(root, "assets/suite-icons/apps", `${app.icon}-${size}.png`));
       const r = flatten(src, bg);
       if (r.w !== size || r.h !== size) throw new Error(`${app.icon}-${size}.png is ${r.w}x${r.h}`);
-      out.push({ app, size, bg, file: path.join(app.folder, "icons", `icon-${size}.png`), png: r.png });
+      out.push({ app, size, bg, file: path.join(app.folder, "icons", `icon-${size}.png`), png: r.png, rgb: r.rgb });
     }
   }
   return out;
+}
+/* Staleness is judged on decoded PIXELS, not bytes: zlib builds differ between
+ * machines/Node versions (this box, Cursor, GitHub Actions), so the same pixels
+ * can compress to different bytes. A small tolerance absorbs rounding noise; any
+ * real art change (new colour, moved glyph, different icon) is far outside it. */
+const TOLERANCE = { maxChannelDelta: 3, meanAbsDelta: 0.1 };
+/** Compare an icon file's pixels with the expected RGB: { ok, maxDelta, meanDelta }. */
+function pixelDiff(buf, expectedRgb, size, tol = TOLERANCE) {
+  const d = decode(buf);
+  if (d.w !== size || d.h !== size || d.ctype !== 2 || d.px.length !== expectedRgb.length) return { ok: false, maxDelta: 255, meanDelta: 255 };
+  let max = 0, sum = 0;
+  for (let i = 0; i < d.px.length; i++) { const v = Math.abs(d.px[i] - expectedRgb[i]); if (v > max) max = v; sum += v; }
+  const mean = sum / d.px.length;
+  return { ok: max <= tol.maxChannelDelta && mean <= tol.meanAbsDelta, maxDelta: max, meanDelta: mean };
 }
 /** Problems with a written icon (empty array = fine). */
 function inspect(buf, size) {
@@ -142,7 +156,7 @@ if (require.main === module) {
     if (check) {
       const cur = fs.existsSync(dest) ? fs.readFileSync(dest) : null;
       const problems = cur ? inspect(cur, o.size) : ["missing"];
-      if (cur && !cur.equals(o.png)) problems.push("stale: run node scripts/render-app-icons.cjs");
+      if (cur && !problems.length) { const r = pixelDiff(cur, o.rgb, o.size); if (!r.ok) problems.push(`stale (max channel delta ${r.maxDelta}, mean ${r.meanDelta.toFixed(3)}): run node scripts/render-app-icons.cjs`); }
       if (problems.length) { bad++; console.error(o.file + ": " + problems.join("; ")); }
     } else {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -153,4 +167,4 @@ if (require.main === module) {
   if (check) { if (bad) process.exit(1); console.log("app icons: all present, opaque and up to date"); }
 }
 
-module.exports = { APPS, SIZES, build, inspect, decode, background };
+module.exports = { APPS, SIZES, TOLERANCE, build, inspect, decode, background, pixelDiff, encodeRGB };

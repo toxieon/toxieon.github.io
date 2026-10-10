@@ -26,7 +26,12 @@ for (const item of catalog.categories) {
   assert.ok(item.href.startsWith("/"));
   assert.ok(item.name);
   assert.ok(item.source);
-  assert.ok(!/master|mirror|forward|consensus|ops|owner|labs/i.test(item.id), item.id);
+  if (item.id.startsWith("assets/tipdash/")) {
+    const rest = item.id.slice("assets/tipdash/".length);
+    assert.ok(/^(?:bookies|fx|guernseys)\/[^/]+\.svg$|^(?:logo\.svg|favicon\.svg|favicon\.ico|icon-192\.png|icon-512\.png|apple-touch-icon\.png)$/.test(rest), "TipDash item outside the allow-list: " + item.id);
+  }
+  assert.ok(!/\.(woff2?|ttf|otf)$/i.test(item.id) || item.id.includes("KaTeX"), "font outside the permissive set: " + item.id);
+  assert.ok(!item.id.startsWith("mathbuilder/"), item.id);
 }
 
 const richmond = guernseys.find((g) => g.id.includes("richmond.svg"));

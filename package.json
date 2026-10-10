@@ -6,7 +6,7 @@
     "hub:apps": "node hub/build-apps.cjs",
     "hub:check": "node hub/build-apps.cjs --check",
     "test:hub": "node --test hub/build-apps.test.cjs assets/suite-icons.test.cjs",
-    "test": "node --test",
+    "test": "node --test && node --test swb/board-filter.test.cjs",
     "icons:render": "node scripts/render-app-icons.cjs",
     "icons:check": "node scripts/render-app-icons.cjs --check",
     "visual:catalog": "node scripts/build-visual-catalog.cjs",
