@@ -1,6 +1,6 @@
 {
   "_readme": "Config for hub/build-apps.cjs. Every top-level folder with an index.html becomes a hub tile unless listed in exclude or marked hidden. Per-app settings: nd:* meta tags in the folder's index.html (preferred) or <folder>/app.json. 'overrides' keeps the tiles that existed before auto-discovery looking the same; nd:* meta tags and app.json win over it. See hub/README.md.",
-  "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive"],
+  "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive", "mathbuilder"],
   "defaults": { "color": "#94a3b8", "order": 99 },
   "overrides": {
     "planner":    { "name": "Planner",   "icon": "/assets/suite-icons/apps/planner.svg?v=1.2.0",   "color": "#ff5252", "order": 1 },

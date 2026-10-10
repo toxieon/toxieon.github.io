@@ -1,0 +1,13 @@
+# GitHub Pages (Jekyll) config. Added for /mathbuilder/ (Next.js static export):
+# Jekyll skips names starting with "_" unless listed here. Nothing else is set,
+# so all other Jekyll defaults (incl. the areas/*.html permalinks) are unchanged.
+include:
+  - _next
+  - _not-found
+  - __next._tree.txt
+  - __next._full.txt
+  - __next.__PAGE__.txt
+  - __next._not-found.__PAGE__.txt
+  - _buildManifest.js
+  - _clientMiddlewareManifest.js
+  - _ssgManifest.js
