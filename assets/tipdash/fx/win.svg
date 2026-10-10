@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100" aria-hidden="true" role="presentation">
+  <rect class="tbfx-ticket" x="28" y="22" width="104" height="56" rx="6"/>
+  <text class="tbfx-ticket-text" x="80" y="58" text-anchor="middle">WON</text>
+  <circle class="tbfx-win-ring" cx="80" cy="50" r="36"/>
+  <circle class="tbfx-win-ring tbfx-win-ring-2" cx="80" cy="50" r="48"/>
+</svg>

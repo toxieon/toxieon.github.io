@@ -1,0 +1,2139 @@
+{
+  "generatedAt": "2026-10-10",
+  "count": 237,
+  "categories": [
+    {
+      "id": "1234567890/favicon.svg",
+      "name": "Favicon",
+      "href": "/1234567890/favicon.svg",
+      "preview": "/1234567890/favicon.svg",
+      "source": "Assets",
+      "category": "Assets",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "1234567890/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/1234567890/icons/icon-180.png",
+      "preview": "/1234567890/icons/icon-180.png",
+      "source": "Assets",
+      "category": "Assets",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "1234567890/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/1234567890/icons/icon-192.png",
+      "preview": "/1234567890/icons/icon-192.png",
+      "source": "Assets",
+      "category": "Assets",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "1234567890/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/1234567890/icons/icon-512.png",
+      "preview": "/1234567890/icons/icon-512.png",
+      "source": "Assets",
+      "category": "Assets",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-maskable-192.png",
+      "name": "Nd Maskable 192",
+      "href": "/assets/brand/nd-logo/nd-maskable-192.png",
+      "preview": "/assets/brand/nd-logo/nd-maskable-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-maskable-512.png",
+      "name": "Nd Maskable 512",
+      "href": "/assets/brand/nd-logo/nd-maskable-512.png",
+      "preview": "/assets/brand/nd-logo/nd-maskable-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-monogram.svg",
+      "name": "Nd Monogram",
+      "href": "/assets/brand/nd-logo/nd-monogram.svg",
+      "preview": "/assets/brand/nd-logo/nd-monogram.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-tile-180.png",
+      "name": "Nd Tile 180",
+      "href": "/assets/brand/nd-logo/nd-tile-180.png",
+      "preview": "/assets/brand/nd-logo/nd-tile-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-tile-192.png",
+      "name": "Nd Tile 192",
+      "href": "/assets/brand/nd-logo/nd-tile-192.png",
+      "preview": "/assets/brand/nd-logo/nd-tile-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/brand/nd-logo/nd-tile-512.png",
+      "name": "Nd Tile 512",
+      "href": "/assets/brand/nd-logo/nd-tile-512.png",
+      "preview": "/assets/brand/nd-logo/nd-tile-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Brand"
+    },
+    {
+      "id": "assets/studio/sample-site.svg",
+      "name": "Sample Site",
+      "href": "/assets/studio/sample-site.svg",
+      "preview": "/assets/studio/sample-site.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Studio"
+    },
+    {
+      "id": "assets/suite-icons/apps/assets-180.png",
+      "name": "Assets 180",
+      "href": "/assets/suite-icons/apps/assets-180.png",
+      "preview": "/assets/suite-icons/apps/assets-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/assets-192.png",
+      "name": "Assets 192",
+      "href": "/assets/suite-icons/apps/assets-192.png",
+      "preview": "/assets/suite-icons/apps/assets-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/assets-32.png",
+      "name": "Assets 32",
+      "href": "/assets/suite-icons/apps/assets-32.png",
+      "preview": "/assets/suite-icons/apps/assets-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/assets-512.png",
+      "name": "Assets 512",
+      "href": "/assets/suite-icons/apps/assets-512.png",
+      "preview": "/assets/suite-icons/apps/assets-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/assets.svg",
+      "name": "Assets",
+      "href": "/assets/suite-icons/apps/assets.svg",
+      "preview": "/assets/suite-icons/apps/assets.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/checklist-180.png",
+      "name": "Checklist 180",
+      "href": "/assets/suite-icons/apps/checklist-180.png",
+      "preview": "/assets/suite-icons/apps/checklist-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/checklist-192.png",
+      "name": "Checklist 192",
+      "href": "/assets/suite-icons/apps/checklist-192.png",
+      "preview": "/assets/suite-icons/apps/checklist-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/checklist-32.png",
+      "name": "Checklist 32",
+      "href": "/assets/suite-icons/apps/checklist-32.png",
+      "preview": "/assets/suite-icons/apps/checklist-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/checklist-512.png",
+      "name": "Checklist 512",
+      "href": "/assets/suite-icons/apps/checklist-512.png",
+      "preview": "/assets/suite-icons/apps/checklist-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/checklist.svg",
+      "name": "Checklist",
+      "href": "/assets/suite-icons/apps/checklist.svg",
+      "preview": "/assets/suite-icons/apps/checklist.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/company-180.png",
+      "name": "Company 180",
+      "href": "/assets/suite-icons/apps/company-180.png",
+      "preview": "/assets/suite-icons/apps/company-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/company-192.png",
+      "name": "Company 192",
+      "href": "/assets/suite-icons/apps/company-192.png",
+      "preview": "/assets/suite-icons/apps/company-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/company-32.png",
+      "name": "Company 32",
+      "href": "/assets/suite-icons/apps/company-32.png",
+      "preview": "/assets/suite-icons/apps/company-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/company-512.png",
+      "name": "Company 512",
+      "href": "/assets/suite-icons/apps/company-512.png",
+      "preview": "/assets/suite-icons/apps/company-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/company.svg",
+      "name": "Company",
+      "href": "/assets/suite-icons/apps/company.svg",
+      "preview": "/assets/suite-icons/apps/company.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/fitoff-180.png",
+      "name": "Fitoff 180",
+      "href": "/assets/suite-icons/apps/fitoff-180.png",
+      "preview": "/assets/suite-icons/apps/fitoff-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/fitoff-192.png",
+      "name": "Fitoff 192",
+      "href": "/assets/suite-icons/apps/fitoff-192.png",
+      "preview": "/assets/suite-icons/apps/fitoff-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/fitoff-32.png",
+      "name": "Fitoff 32",
+      "href": "/assets/suite-icons/apps/fitoff-32.png",
+      "preview": "/assets/suite-icons/apps/fitoff-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/fitoff-512.png",
+      "name": "Fitoff 512",
+      "href": "/assets/suite-icons/apps/fitoff-512.png",
+      "preview": "/assets/suite-icons/apps/fitoff-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/fitoff.svg",
+      "name": "Fitoff",
+      "href": "/assets/suite-icons/apps/fitoff.svg",
+      "preview": "/assets/suite-icons/apps/fitoff.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/hub-180.png",
+      "name": "Hub 180",
+      "href": "/assets/suite-icons/apps/hub-180.png",
+      "preview": "/assets/suite-icons/apps/hub-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/hub-192.png",
+      "name": "Hub 192",
+      "href": "/assets/suite-icons/apps/hub-192.png",
+      "preview": "/assets/suite-icons/apps/hub-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/hub-32.png",
+      "name": "Hub 32",
+      "href": "/assets/suite-icons/apps/hub-32.png",
+      "preview": "/assets/suite-icons/apps/hub-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/hub-512.png",
+      "name": "Hub 512",
+      "href": "/assets/suite-icons/apps/hub-512.png",
+      "preview": "/assets/suite-icons/apps/hub-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/hub.svg",
+      "name": "Hub",
+      "href": "/assets/suite-icons/apps/hub.svg",
+      "preview": "/assets/suite-icons/apps/hub.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/ico-180.png",
+      "name": "Ico 180",
+      "href": "/assets/suite-icons/apps/ico-180.png",
+      "preview": "/assets/suite-icons/apps/ico-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/ico-192.png",
+      "name": "Ico 192",
+      "href": "/assets/suite-icons/apps/ico-192.png",
+      "preview": "/assets/suite-icons/apps/ico-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/ico-32.png",
+      "name": "Ico 32",
+      "href": "/assets/suite-icons/apps/ico-32.png",
+      "preview": "/assets/suite-icons/apps/ico-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/ico-512.png",
+      "name": "Ico 512",
+      "href": "/assets/suite-icons/apps/ico-512.png",
+      "preview": "/assets/suite-icons/apps/ico-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/ico.svg",
+      "name": "Ico",
+      "href": "/assets/suite-icons/apps/ico.svg",
+      "preview": "/assets/suite-icons/apps/ico.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/planner-180.png",
+      "name": "Planner 180",
+      "href": "/assets/suite-icons/apps/planner-180.png",
+      "preview": "/assets/suite-icons/apps/planner-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/planner-192.png",
+      "name": "Planner 192",
+      "href": "/assets/suite-icons/apps/planner-192.png",
+      "preview": "/assets/suite-icons/apps/planner-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/planner-32.png",
+      "name": "Planner 32",
+      "href": "/assets/suite-icons/apps/planner-32.png",
+      "preview": "/assets/suite-icons/apps/planner-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/planner-512.png",
+      "name": "Planner 512",
+      "href": "/assets/suite-icons/apps/planner-512.png",
+      "preview": "/assets/suite-icons/apps/planner-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/planner.svg",
+      "name": "Planner",
+      "href": "/assets/suite-icons/apps/planner.svg",
+      "preview": "/assets/suite-icons/apps/planner.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/quote-180.png",
+      "name": "Quote 180",
+      "href": "/assets/suite-icons/apps/quote-180.png",
+      "preview": "/assets/suite-icons/apps/quote-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/quote-192.png",
+      "name": "Quote 192",
+      "href": "/assets/suite-icons/apps/quote-192.png",
+      "preview": "/assets/suite-icons/apps/quote-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/quote-32.png",
+      "name": "Quote 32",
+      "href": "/assets/suite-icons/apps/quote-32.png",
+      "preview": "/assets/suite-icons/apps/quote-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/quote-512.png",
+      "name": "Quote 512",
+      "href": "/assets/suite-icons/apps/quote-512.png",
+      "preview": "/assets/suite-icons/apps/quote-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/quote.svg",
+      "name": "Quote",
+      "href": "/assets/suite-icons/apps/quote.svg",
+      "preview": "/assets/suite-icons/apps/quote.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/search-180.png",
+      "name": "Search 180",
+      "href": "/assets/suite-icons/apps/search-180.png",
+      "preview": "/assets/suite-icons/apps/search-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/search-192.png",
+      "name": "Search 192",
+      "href": "/assets/suite-icons/apps/search-192.png",
+      "preview": "/assets/suite-icons/apps/search-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/search-32.png",
+      "name": "Search 32",
+      "href": "/assets/suite-icons/apps/search-32.png",
+      "preview": "/assets/suite-icons/apps/search-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/search-512.png",
+      "name": "Search 512",
+      "href": "/assets/suite-icons/apps/search-512.png",
+      "preview": "/assets/suite-icons/apps/search-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/search.svg",
+      "name": "Search",
+      "href": "/assets/suite-icons/apps/search.svg",
+      "preview": "/assets/suite-icons/apps/search.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/swb-180.png",
+      "name": "Swb 180",
+      "href": "/assets/suite-icons/apps/swb-180.png",
+      "preview": "/assets/suite-icons/apps/swb-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/swb-192.png",
+      "name": "Swb 192",
+      "href": "/assets/suite-icons/apps/swb-192.png",
+      "preview": "/assets/suite-icons/apps/swb-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/swb-32.png",
+      "name": "Swb 32",
+      "href": "/assets/suite-icons/apps/swb-32.png",
+      "preview": "/assets/suite-icons/apps/swb-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/swb-512.png",
+      "name": "Swb 512",
+      "href": "/assets/suite-icons/apps/swb-512.png",
+      "preview": "/assets/suite-icons/apps/swb-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/swb.svg",
+      "name": "Swb",
+      "href": "/assets/suite-icons/apps/swb.svg",
+      "preview": "/assets/suite-icons/apps/swb.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/timesheet-180.png",
+      "name": "Timesheet 180",
+      "href": "/assets/suite-icons/apps/timesheet-180.png",
+      "preview": "/assets/suite-icons/apps/timesheet-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/timesheet-192.png",
+      "name": "Timesheet 192",
+      "href": "/assets/suite-icons/apps/timesheet-192.png",
+      "preview": "/assets/suite-icons/apps/timesheet-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/timesheet-32.png",
+      "name": "Timesheet 32",
+      "href": "/assets/suite-icons/apps/timesheet-32.png",
+      "preview": "/assets/suite-icons/apps/timesheet-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/timesheet-512.png",
+      "name": "Timesheet 512",
+      "href": "/assets/suite-icons/apps/timesheet-512.png",
+      "preview": "/assets/suite-icons/apps/timesheet-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/timesheet.svg",
+      "name": "Timesheet",
+      "href": "/assets/suite-icons/apps/timesheet.svg",
+      "preview": "/assets/suite-icons/apps/timesheet.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/upload-180.png",
+      "name": "Upload 180",
+      "href": "/assets/suite-icons/apps/upload-180.png",
+      "preview": "/assets/suite-icons/apps/upload-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/upload-192.png",
+      "name": "Upload 192",
+      "href": "/assets/suite-icons/apps/upload-192.png",
+      "preview": "/assets/suite-icons/apps/upload-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/upload-32.png",
+      "name": "Upload 32",
+      "href": "/assets/suite-icons/apps/upload-32.png",
+      "preview": "/assets/suite-icons/apps/upload-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/upload-512.png",
+      "name": "Upload 512",
+      "href": "/assets/suite-icons/apps/upload-512.png",
+      "preview": "/assets/suite-icons/apps/upload-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/upload.svg",
+      "name": "Upload",
+      "href": "/assets/suite-icons/apps/upload.svg",
+      "preview": "/assets/suite-icons/apps/upload.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/website-180.png",
+      "name": "Website 180",
+      "href": "/assets/suite-icons/apps/website-180.png",
+      "preview": "/assets/suite-icons/apps/website-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/website-192.png",
+      "name": "Website 192",
+      "href": "/assets/suite-icons/apps/website-192.png",
+      "preview": "/assets/suite-icons/apps/website-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/website-32.png",
+      "name": "Website 32",
+      "href": "/assets/suite-icons/apps/website-32.png",
+      "preview": "/assets/suite-icons/apps/website-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/website-512.png",
+      "name": "Website 512",
+      "href": "/assets/suite-icons/apps/website-512.png",
+      "preview": "/assets/suite-icons/apps/website-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/website.svg",
+      "name": "Website",
+      "href": "/assets/suite-icons/apps/website.svg",
+      "preview": "/assets/suite-icons/apps/website.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/preview.png",
+      "name": "Preview",
+      "href": "/assets/suite-icons/preview.png",
+      "preview": "/assets/suite-icons/preview.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Suite icons"
+    },
+    {
+      "id": "assets/suite-icons/preview.svg",
+      "name": "Preview",
+      "href": "/assets/suite-icons/preview.svg",
+      "preview": "/assets/suite-icons/preview.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Suite icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/arrow.svg",
+      "name": "Arrow",
+      "href": "/assets/suite-icons/ui/arrow.svg",
+      "preview": "/assets/suite-icons/ui/arrow.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/before-after.svg",
+      "name": "Before After",
+      "href": "/assets/suite-icons/ui/before-after.svg",
+      "preview": "/assets/suite-icons/ui/before-after.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/check.svg",
+      "name": "Check",
+      "href": "/assets/suite-icons/ui/check.svg",
+      "preview": "/assets/suite-icons/ui/check.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/circle.svg",
+      "name": "Circle",
+      "href": "/assets/suite-icons/ui/circle.svg",
+      "preview": "/assets/suite-icons/ui/circle.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/close.svg",
+      "name": "Close",
+      "href": "/assets/suite-icons/ui/close.svg",
+      "preview": "/assets/suite-icons/ui/close.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/cloud.svg",
+      "name": "Cloud",
+      "href": "/assets/suite-icons/ui/cloud.svg",
+      "preview": "/assets/suite-icons/ui/cloud.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/download.svg",
+      "name": "Download",
+      "href": "/assets/suite-icons/ui/download.svg",
+      "preview": "/assets/suite-icons/ui/download.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/label.svg",
+      "name": "Label",
+      "href": "/assets/suite-icons/ui/label.svg",
+      "preview": "/assets/suite-icons/ui/label.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/markup.svg",
+      "name": "Markup",
+      "href": "/assets/suite-icons/ui/markup.svg",
+      "preview": "/assets/suite-icons/ui/markup.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/measure.svg",
+      "name": "Measure",
+      "href": "/assets/suite-icons/ui/measure.svg",
+      "preview": "/assets/suite-icons/ui/measure.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/node.svg",
+      "name": "Node",
+      "href": "/assets/suite-icons/ui/node.svg",
+      "preview": "/assets/suite-icons/ui/node.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/offline.svg",
+      "name": "Offline",
+      "href": "/assets/suite-icons/ui/offline.svg",
+      "preview": "/assets/suite-icons/ui/offline.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/pen.svg",
+      "name": "Pen",
+      "href": "/assets/suite-icons/ui/pen.svg",
+      "preview": "/assets/suite-icons/ui/pen.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/photo.svg",
+      "name": "Photo",
+      "href": "/assets/suite-icons/ui/photo.svg",
+      "preview": "/assets/suite-icons/ui/photo.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/pin.svg",
+      "name": "Pin",
+      "href": "/assets/suite-icons/ui/pin.svg",
+      "preview": "/assets/suite-icons/ui/pin.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/qr.svg",
+      "name": "Qr",
+      "href": "/assets/suite-icons/ui/qr.svg",
+      "preview": "/assets/suite-icons/ui/qr.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/rectangle.svg",
+      "name": "Rectangle",
+      "href": "/assets/suite-icons/ui/rectangle.svg",
+      "preview": "/assets/suite-icons/ui/rectangle.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/redo.svg",
+      "name": "Redo",
+      "href": "/assets/suite-icons/ui/redo.svg",
+      "preview": "/assets/suite-icons/ui/redo.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/report.svg",
+      "name": "Report",
+      "href": "/assets/suite-icons/ui/report.svg",
+      "preview": "/assets/suite-icons/ui/report.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/sync-active.svg",
+      "name": "Sync Active",
+      "href": "/assets/suite-icons/ui/sync-active.svg",
+      "preview": "/assets/suite-icons/ui/sync-active.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/sync-error.svg",
+      "name": "Sync Error",
+      "href": "/assets/suite-icons/ui/sync-error.svg",
+      "preview": "/assets/suite-icons/ui/sync-error.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/sync-pending.svg",
+      "name": "Sync Pending",
+      "href": "/assets/suite-icons/ui/sync-pending.svg",
+      "preview": "/assets/suite-icons/ui/sync-pending.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/sync-success.svg",
+      "name": "Sync Success",
+      "href": "/assets/suite-icons/ui/sync-success.svg",
+      "preview": "/assets/suite-icons/ui/sync-success.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/suite-icons/ui/undo.svg",
+      "name": "Undo",
+      "href": "/assets/suite-icons/ui/undo.svg",
+      "preview": "/assets/suite-icons/ui/undo.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "UI icons"
+    },
+    {
+      "id": "assets/tipdash/apple-touch-icon.png",
+      "name": "Apple Touch Icon",
+      "href": "/assets/tipdash/apple-touch-icon.png",
+      "preview": "/assets/tipdash/apple-touch-icon.png",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/tipdash/bookies/bet365.svg",
+      "name": "Bet365",
+      "href": "/assets/tipdash/bookies/bet365.svg",
+      "preview": "/assets/tipdash/bookies/bet365.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/betfair.svg",
+      "name": "Betfair",
+      "href": "/assets/tipdash/bookies/betfair.svg",
+      "preview": "/assets/tipdash/bookies/betfair.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/betr.svg",
+      "name": "Betr",
+      "href": "/assets/tipdash/bookies/betr.svg",
+      "preview": "/assets/tipdash/bookies/betr.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/betright.svg",
+      "name": "Betright",
+      "href": "/assets/tipdash/bookies/betright.svg",
+      "preview": "/assets/tipdash/bookies/betright.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/bluebet.svg",
+      "name": "Bluebet",
+      "href": "/assets/tipdash/bookies/bluebet.svg",
+      "preview": "/assets/tipdash/bookies/bluebet.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/dabble.svg",
+      "name": "Dabble",
+      "href": "/assets/tipdash/bookies/dabble.svg",
+      "preview": "/assets/tipdash/bookies/dabble.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/ladbrokes.svg",
+      "name": "Ladbrokes",
+      "href": "/assets/tipdash/bookies/ladbrokes.svg",
+      "preview": "/assets/tipdash/bookies/ladbrokes.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/neds.svg",
+      "name": "Neds",
+      "href": "/assets/tipdash/bookies/neds.svg",
+      "preview": "/assets/tipdash/bookies/neds.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/picklebet.svg",
+      "name": "Picklebet",
+      "href": "/assets/tipdash/bookies/picklebet.svg",
+      "preview": "/assets/tipdash/bookies/picklebet.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/playup.svg",
+      "name": "Playup",
+      "href": "/assets/tipdash/bookies/playup.svg",
+      "preview": "/assets/tipdash/bookies/playup.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/pointsbet.svg",
+      "name": "Pointsbet",
+      "href": "/assets/tipdash/bookies/pointsbet.svg",
+      "preview": "/assets/tipdash/bookies/pointsbet.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/sportsbet.svg",
+      "name": "Sportsbet",
+      "href": "/assets/tipdash/bookies/sportsbet.svg",
+      "preview": "/assets/tipdash/bookies/sportsbet.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/tab.svg",
+      "name": "Tab",
+      "href": "/assets/tipdash/bookies/tab.svg",
+      "preview": "/assets/tipdash/bookies/tab.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/bookies/unibet.svg",
+      "name": "Unibet",
+      "href": "/assets/tipdash/bookies/unibet.svg",
+      "preview": "/assets/tipdash/bookies/unibet.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Bookmaker logos"
+    },
+    {
+      "id": "assets/tipdash/favicon.ico",
+      "name": "Favicon",
+      "href": "/assets/tipdash/favicon.ico",
+      "preview": "/assets/tipdash/favicon.ico",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Logos"
+    },
+    {
+      "id": "assets/tipdash/favicon.svg",
+      "name": "Favicon",
+      "href": "/assets/tipdash/favicon.svg",
+      "preview": "/assets/tipdash/favicon.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Logos"
+    },
+    {
+      "id": "assets/tipdash/fonts/geist-latin.woff2",
+      "name": "Geist Latin",
+      "href": "/assets/tipdash/fonts/geist-latin.woff2",
+      "preview": "/assets/tipdash/fonts/geist-latin.woff2",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Fonts"
+    },
+    {
+      "id": "assets/tipdash/fonts/instrument-sans-latin.woff2",
+      "name": "Instrument Sans Latin",
+      "href": "/assets/tipdash/fonts/instrument-sans-latin.woff2",
+      "preview": "/assets/tipdash/fonts/instrument-sans-latin.woff2",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Fonts"
+    },
+    {
+      "id": "assets/tipdash/fx/behind.svg",
+      "name": "Behind",
+      "href": "/assets/tipdash/fx/behind.svg",
+      "preview": "/assets/tipdash/fx/behind.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Match FX"
+    },
+    {
+      "id": "assets/tipdash/fx/goal.svg",
+      "name": "Goal",
+      "href": "/assets/tipdash/fx/goal.svg",
+      "preview": "/assets/tipdash/fx/goal.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Match FX"
+    },
+    {
+      "id": "assets/tipdash/fx/win.svg",
+      "name": "Win",
+      "href": "/assets/tipdash/fx/win.svg",
+      "preview": "/assets/tipdash/fx/win.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Match FX"
+    },
+    {
+      "id": "assets/tipdash/guernseys/adelaide.svg",
+      "name": "Adelaide",
+      "href": "/assets/tipdash/guernseys/adelaide.svg",
+      "preview": "/assets/tipdash/guernseys/adelaide.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/brisbane.svg",
+      "name": "Brisbane",
+      "href": "/assets/tipdash/guernseys/brisbane.svg",
+      "preview": "/assets/tipdash/guernseys/brisbane.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/carlton.svg",
+      "name": "Carlton",
+      "href": "/assets/tipdash/guernseys/carlton.svg",
+      "preview": "/assets/tipdash/guernseys/carlton.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/collingwood.svg",
+      "name": "Collingwood",
+      "href": "/assets/tipdash/guernseys/collingwood.svg",
+      "preview": "/assets/tipdash/guernseys/collingwood.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/essendon.svg",
+      "name": "Essendon",
+      "href": "/assets/tipdash/guernseys/essendon.svg",
+      "preview": "/assets/tipdash/guernseys/essendon.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/fremantle.svg",
+      "name": "Fremantle",
+      "href": "/assets/tipdash/guernseys/fremantle.svg",
+      "preview": "/assets/tipdash/guernseys/fremantle.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/geelong.svg",
+      "name": "Geelong",
+      "href": "/assets/tipdash/guernseys/geelong.svg",
+      "preview": "/assets/tipdash/guernseys/geelong.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/goldcoast.svg",
+      "name": "Goldcoast",
+      "href": "/assets/tipdash/guernseys/goldcoast.svg",
+      "preview": "/assets/tipdash/guernseys/goldcoast.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/gws.svg",
+      "name": "Gws",
+      "href": "/assets/tipdash/guernseys/gws.svg",
+      "preview": "/assets/tipdash/guernseys/gws.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/hawthorn.svg",
+      "name": "Hawthorn",
+      "href": "/assets/tipdash/guernseys/hawthorn.svg",
+      "preview": "/assets/tipdash/guernseys/hawthorn.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/melbourne.svg",
+      "name": "Melbourne",
+      "href": "/assets/tipdash/guernseys/melbourne.svg",
+      "preview": "/assets/tipdash/guernseys/melbourne.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/northmelbourne.svg",
+      "name": "Northmelbourne",
+      "href": "/assets/tipdash/guernseys/northmelbourne.svg",
+      "preview": "/assets/tipdash/guernseys/northmelbourne.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/portadelaide.svg",
+      "name": "Portadelaide",
+      "href": "/assets/tipdash/guernseys/portadelaide.svg",
+      "preview": "/assets/tipdash/guernseys/portadelaide.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/richmond.svg",
+      "name": "Richmond",
+      "href": "/assets/tipdash/guernseys/richmond.svg",
+      "preview": "/assets/tipdash/guernseys/richmond.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/stkilda.svg",
+      "name": "Stkilda",
+      "href": "/assets/tipdash/guernseys/stkilda.svg",
+      "preview": "/assets/tipdash/guernseys/stkilda.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/sydney.svg",
+      "name": "Sydney",
+      "href": "/assets/tipdash/guernseys/sydney.svg",
+      "preview": "/assets/tipdash/guernseys/sydney.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/tasmania.svg",
+      "name": "Tasmania",
+      "href": "/assets/tipdash/guernseys/tasmania.svg",
+      "preview": "/assets/tipdash/guernseys/tasmania.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/westcoast.svg",
+      "name": "Westcoast",
+      "href": "/assets/tipdash/guernseys/westcoast.svg",
+      "preview": "/assets/tipdash/guernseys/westcoast.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/guernseys/westernbulldogs.svg",
+      "name": "Westernbulldogs",
+      "href": "/assets/tipdash/guernseys/westernbulldogs.svg",
+      "preview": "/assets/tipdash/guernseys/westernbulldogs.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "AFL guernseys"
+    },
+    {
+      "id": "assets/tipdash/icon-192.png",
+      "name": "Icon 192",
+      "href": "/assets/tipdash/icon-192.png",
+      "preview": "/assets/tipdash/icon-192.png",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/tipdash/icon-512.png",
+      "name": "Icon 512",
+      "href": "/assets/tipdash/icon-512.png",
+      "preview": "/assets/tipdash/icon-512.png",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/tipdash/logo.svg",
+      "name": "Logo",
+      "href": "/assets/tipdash/logo.svg",
+      "preview": "/assets/tipdash/logo.svg",
+      "source": "TipDash (tipbot-dashboard)",
+      "category": "TipDash",
+      "subcategory": "Logos"
+    },
+    {
+      "id": "assets/trade-symbols/access-controller.svg",
+      "name": "Access Controller",
+      "href": "/assets/trade-symbols/access-controller.svg",
+      "preview": "/assets/trade-symbols/access-controller.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/alarm-panel.svg",
+      "name": "Alarm Panel",
+      "href": "/assets/trade-symbols/alarm-panel.svg",
+      "preview": "/assets/trade-symbols/alarm-panel.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/bullet-camera.svg",
+      "name": "Bullet Camera",
+      "href": "/assets/trade-symbols/bullet-camera.svg",
+      "preview": "/assets/trade-symbols/bullet-camera.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/cable-tray.svg",
+      "name": "Cable Tray",
+      "href": "/assets/trade-symbols/cable-tray.svg",
+      "preview": "/assets/trade-symbols/cable-tray.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/card-reader.svg",
+      "name": "Card Reader",
+      "href": "/assets/trade-symbols/card-reader.svg",
+      "preview": "/assets/trade-symbols/card-reader.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/conduit.svg",
+      "name": "Conduit",
+      "href": "/assets/trade-symbols/conduit.svg",
+      "preview": "/assets/trade-symbols/conduit.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/data-double.svg",
+      "name": "Data Double",
+      "href": "/assets/trade-symbols/data-double.svg",
+      "preview": "/assets/trade-symbols/data-double.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/data-single.svg",
+      "name": "Data Single",
+      "href": "/assets/trade-symbols/data-single.svg",
+      "preview": "/assets/trade-symbols/data-single.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/dome-camera.svg",
+      "name": "Dome Camera",
+      "href": "/assets/trade-symbols/dome-camera.svg",
+      "preview": "/assets/trade-symbols/dome-camera.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/door-contact.svg",
+      "name": "Door Contact",
+      "href": "/assets/trade-symbols/door-contact.svg",
+      "preview": "/assets/trade-symbols/door-contact.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/double-gpo.svg",
+      "name": "Double Gpo",
+      "href": "/assets/trade-symbols/double-gpo.svg",
+      "preview": "/assets/trade-symbols/double-gpo.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/earth-point.svg",
+      "name": "Earth Point",
+      "href": "/assets/trade-symbols/earth-point.svg",
+      "preview": "/assets/trade-symbols/earth-point.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/electric-lock.svg",
+      "name": "Electric Lock",
+      "href": "/assets/trade-symbols/electric-lock.svg",
+      "preview": "/assets/trade-symbols/electric-lock.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/exit-button.svg",
+      "name": "Exit Button",
+      "href": "/assets/trade-symbols/exit-button.svg",
+      "preview": "/assets/trade-symbols/exit-button.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/fibre-outlet.svg",
+      "name": "Fibre Outlet",
+      "href": "/assets/trade-symbols/fibre-outlet.svg",
+      "preview": "/assets/trade-symbols/fibre-outlet.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/fibre-splice.svg",
+      "name": "Fibre Splice",
+      "href": "/assets/trade-symbols/fibre-splice.svg",
+      "preview": "/assets/trade-symbols/fibre-splice.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/glass-break.svg",
+      "name": "Glass Break",
+      "href": "/assets/trade-symbols/glass-break.svg",
+      "preview": "/assets/trade-symbols/glass-break.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/intercom.svg",
+      "name": "Intercom",
+      "href": "/assets/trade-symbols/intercom.svg",
+      "preview": "/assets/trade-symbols/intercom.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/isolator.svg",
+      "name": "Isolator",
+      "href": "/assets/trade-symbols/isolator.svg",
+      "preview": "/assets/trade-symbols/isolator.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/junction-box.svg",
+      "name": "Junction Box",
+      "href": "/assets/trade-symbols/junction-box.svg",
+      "preview": "/assets/trade-symbols/junction-box.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/legend.svg",
+      "name": "Legend",
+      "href": "/assets/trade-symbols/legend.svg",
+      "preview": "/assets/trade-symbols/legend.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/light-fitting.svg",
+      "name": "Light Fitting",
+      "href": "/assets/trade-symbols/light-fitting.svg",
+      "preview": "/assets/trade-symbols/light-fitting.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/light-switch.svg",
+      "name": "Light Switch",
+      "href": "/assets/trade-symbols/light-switch.svg",
+      "preview": "/assets/trade-symbols/light-switch.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/main-switchboard.svg",
+      "name": "Main Switchboard",
+      "href": "/assets/trade-symbols/main-switchboard.svg",
+      "preview": "/assets/trade-symbols/main-switchboard.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/monitor.svg",
+      "name": "Monitor",
+      "href": "/assets/trade-symbols/monitor.svg",
+      "preview": "/assets/trade-symbols/monitor.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/network-switch.svg",
+      "name": "Network Switch",
+      "href": "/assets/trade-symbols/network-switch.svg",
+      "preview": "/assets/trade-symbols/network-switch.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/nvr.svg",
+      "name": "Nvr",
+      "href": "/assets/trade-symbols/nvr.svg",
+      "preview": "/assets/trade-symbols/nvr.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/patch-panel.svg",
+      "name": "Patch Panel",
+      "href": "/assets/trade-symbols/patch-panel.svg",
+      "preview": "/assets/trade-symbols/patch-panel.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/pir-detector.svg",
+      "name": "Pir Detector",
+      "href": "/assets/trade-symbols/pir-detector.svg",
+      "preview": "/assets/trade-symbols/pir-detector.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/ptz-camera.svg",
+      "name": "Ptz Camera",
+      "href": "/assets/trade-symbols/ptz-camera.svg",
+      "preview": "/assets/trade-symbols/ptz-camera.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/rack.svg",
+      "name": "Rack",
+      "href": "/assets/trade-symbols/rack.svg",
+      "preview": "/assets/trade-symbols/rack.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/router.svg",
+      "name": "Router",
+      "href": "/assets/trade-symbols/router.svg",
+      "preview": "/assets/trade-symbols/router.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/single-gpo.svg",
+      "name": "Single Gpo",
+      "href": "/assets/trade-symbols/single-gpo.svg",
+      "preview": "/assets/trade-symbols/single-gpo.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/siren.svg",
+      "name": "Siren",
+      "href": "/assets/trade-symbols/siren.svg",
+      "preview": "/assets/trade-symbols/siren.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/smoke-detector.svg",
+      "name": "Smoke Detector",
+      "href": "/assets/trade-symbols/smoke-detector.svg",
+      "preview": "/assets/trade-symbols/smoke-detector.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/sprite.svg",
+      "name": "Sprite",
+      "href": "/assets/trade-symbols/sprite.svg",
+      "preview": "/assets/trade-symbols/sprite.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/sub-board.svg",
+      "name": "Sub Board",
+      "href": "/assets/trade-symbols/sub-board.svg",
+      "preview": "/assets/trade-symbols/sub-board.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "assets/trade-symbols/wireless-ap.svg",
+      "name": "Wireless Ap",
+      "href": "/assets/trade-symbols/wireless-ap.svg",
+      "preview": "/assets/trade-symbols/wireless-ap.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "Trade symbols"
+    },
+    {
+      "id": "basic-electrical-wiring-guidelines.jpg",
+      "name": "Basic Electrical Wiring Guidelines",
+      "href": "/basic-electrical-wiring-guidelines.jpg",
+      "preview": "/basic-electrical-wiring-guidelines.jpg",
+      "source": "Website",
+      "category": "Site",
+      "subcategory": "Root"
+    },
+    {
+      "id": "checklist/favicon.svg",
+      "name": "Favicon",
+      "href": "/checklist/favicon.svg",
+      "preview": "/checklist/favicon.svg",
+      "source": "Checklist",
+      "category": "Checklist",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "checklist/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/checklist/icons/icon-192.png",
+      "preview": "/checklist/icons/icon-192.png",
+      "source": "Checklist",
+      "category": "Checklist",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "checklist/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/checklist/icons/icon-512.png",
+      "preview": "/checklist/icons/icon-512.png",
+      "source": "Checklist",
+      "category": "Checklist",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "company/favicon.svg",
+      "name": "Favicon",
+      "href": "/company/favicon.svg",
+      "preview": "/company/favicon.svg",
+      "source": "Company",
+      "category": "Company",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "company/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/company/icons/icon-180.png",
+      "preview": "/company/icons/icon-180.png",
+      "source": "Company",
+      "category": "Company",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "company/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/company/icons/icon-192.png",
+      "preview": "/company/icons/icon-192.png",
+      "source": "Company",
+      "category": "Company",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "company/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/company/icons/icon-512.png",
+      "preview": "/company/icons/icon-512.png",
+      "source": "Company",
+      "category": "Company",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "favicon.svg",
+      "name": "Favicon",
+      "href": "/favicon.svg",
+      "preview": "/favicon.svg",
+      "source": "Website",
+      "category": "Site",
+      "subcategory": "Root"
+    },
+    {
+      "id": "fitoff/favicon.svg",
+      "name": "Favicon",
+      "href": "/fitoff/favicon.svg",
+      "preview": "/fitoff/favicon.svg",
+      "source": "Fit-off",
+      "category": "Fit-off",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "fitoff/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/fitoff/icons/icon-180.png",
+      "preview": "/fitoff/icons/icon-180.png",
+      "source": "Fit-off",
+      "category": "Fit-off",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "fitoff/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/fitoff/icons/icon-192.png",
+      "preview": "/fitoff/icons/icon-192.png",
+      "source": "Fit-off",
+      "category": "Fit-off",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "fitoff/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/fitoff/icons/icon-512.png",
+      "preview": "/fitoff/icons/icon-512.png",
+      "source": "Fit-off",
+      "category": "Fit-off",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "hub/favicon.svg",
+      "name": "Favicon",
+      "href": "/hub/favicon.svg",
+      "preview": "/hub/favicon.svg",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "hub/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/hub/icons/icon-180.png",
+      "preview": "/hub/icons/icon-180.png",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "hub/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/hub/icons/icon-192.png",
+      "preview": "/hub/icons/icon-192.png",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "hub/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/hub/icons/icon-512.png",
+      "preview": "/hub/icons/icon-512.png",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "hub/icons/maskable-192.png",
+      "name": "Maskable 192",
+      "href": "/hub/icons/maskable-192.png",
+      "preview": "/hub/icons/maskable-192.png",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "hub/icons/maskable-512.png",
+      "name": "Maskable 512",
+      "href": "/hub/icons/maskable-512.png",
+      "preview": "/hub/icons/maskable-512.png",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "ico/favicon.svg",
+      "name": "Favicon",
+      "href": "/ico/favicon.svg",
+      "preview": "/ico/favicon.svg",
+      "source": "ICO",
+      "category": "ICO",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "ico/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/ico/icons/icon-180.png",
+      "preview": "/ico/icons/icon-180.png",
+      "source": "ICO",
+      "category": "ICO",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "ico/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/ico/icons/icon-192.png",
+      "preview": "/ico/icons/icon-192.png",
+      "source": "ICO",
+      "category": "ICO",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "ico/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/ico/icons/icon-512.png",
+      "preview": "/ico/icons/icon-512.png",
+      "source": "ICO",
+      "category": "ICO",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "logo.png",
+      "name": "Logo",
+      "href": "/logo.png",
+      "preview": "/logo.png",
+      "source": "Website",
+      "category": "Site",
+      "subcategory": "Root"
+    },
+    {
+      "id": "planner/assets/floorplan.svg",
+      "name": "Floorplan",
+      "href": "/planner/assets/floorplan.svg",
+      "preview": "/planner/assets/floorplan.svg",
+      "source": "Planner",
+      "category": "Planner",
+      "subcategory": "In-app art"
+    },
+    {
+      "id": "planner/favicon.svg",
+      "name": "Favicon",
+      "href": "/planner/favicon.svg",
+      "preview": "/planner/favicon.svg",
+      "source": "Planner",
+      "category": "Planner",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "planner/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/planner/icons/icon-180.png",
+      "preview": "/planner/icons/icon-180.png",
+      "source": "Planner",
+      "category": "Planner",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "planner/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/planner/icons/icon-192.png",
+      "preview": "/planner/icons/icon-192.png",
+      "source": "Planner",
+      "category": "Planner",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "planner/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/planner/icons/icon-512.png",
+      "preview": "/planner/icons/icon-512.png",
+      "source": "Planner",
+      "category": "Planner",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "quote/favicon.svg",
+      "name": "Favicon",
+      "href": "/quote/favicon.svg",
+      "preview": "/quote/favicon.svg",
+      "source": "Quote",
+      "category": "Quote",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "quote/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/quote/icons/icon-180.png",
+      "preview": "/quote/icons/icon-180.png",
+      "source": "Quote",
+      "category": "Quote",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "quote/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/quote/icons/icon-192.png",
+      "preview": "/quote/icons/icon-192.png",
+      "source": "Quote",
+      "category": "Quote",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "quote/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/quote/icons/icon-512.png",
+      "preview": "/quote/icons/icon-512.png",
+      "source": "Quote",
+      "category": "Quote",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "search/favicon.svg",
+      "name": "Favicon",
+      "href": "/search/favicon.svg",
+      "preview": "/search/favicon.svg",
+      "source": "Search",
+      "category": "Search",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "search/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/search/icons/icon-180.png",
+      "preview": "/search/icons/icon-180.png",
+      "source": "Search",
+      "category": "Search",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "search/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/search/icons/icon-192.png",
+      "preview": "/search/icons/icon-192.png",
+      "source": "Search",
+      "category": "Search",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "search/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/search/icons/icon-512.png",
+      "preview": "/search/icons/icon-512.png",
+      "source": "Search",
+      "category": "Search",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "swb/favicon.svg",
+      "name": "Favicon",
+      "href": "/swb/favicon.svg",
+      "preview": "/swb/favicon.svg",
+      "source": "SWB",
+      "category": "SWB",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "swb/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/swb/icons/icon-180.png",
+      "preview": "/swb/icons/icon-180.png",
+      "source": "SWB",
+      "category": "SWB",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "swb/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/swb/icons/icon-192.png",
+      "preview": "/swb/icons/icon-192.png",
+      "source": "SWB",
+      "category": "SWB",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "swb/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/swb/icons/icon-512.png",
+      "preview": "/swb/icons/icon-512.png",
+      "source": "SWB",
+      "category": "SWB",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "timesheet/assets/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/timesheet/assets/icons/icon-192.png",
+      "preview": "/timesheet/assets/icons/icon-192.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "timesheet/assets/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/timesheet/assets/icons/icon-512.png",
+      "preview": "/timesheet/assets/icons/icon-512.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "timesheet/assets/nd-logo.svg",
+      "name": "Nd Logo",
+      "href": "/timesheet/assets/nd-logo.svg",
+      "preview": "/timesheet/assets/nd-logo.svg",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "In-app art"
+    },
+    {
+      "id": "timesheet/vendor/leaflet/images/layers-2x.png",
+      "name": "Layers 2x",
+      "href": "/timesheet/vendor/leaflet/images/layers-2x.png",
+      "preview": "/timesheet/vendor/leaflet/images/layers-2x.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "Vendor"
+    },
+    {
+      "id": "timesheet/vendor/leaflet/images/layers.png",
+      "name": "Layers",
+      "href": "/timesheet/vendor/leaflet/images/layers.png",
+      "preview": "/timesheet/vendor/leaflet/images/layers.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "Vendor"
+    },
+    {
+      "id": "timesheet/vendor/leaflet/images/marker-icon-2x.png",
+      "name": "Marker Icon 2x",
+      "href": "/timesheet/vendor/leaflet/images/marker-icon-2x.png",
+      "preview": "/timesheet/vendor/leaflet/images/marker-icon-2x.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "Vendor"
+    },
+    {
+      "id": "timesheet/vendor/leaflet/images/marker-icon.png",
+      "name": "Marker Icon",
+      "href": "/timesheet/vendor/leaflet/images/marker-icon.png",
+      "preview": "/timesheet/vendor/leaflet/images/marker-icon.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "Vendor"
+    },
+    {
+      "id": "timesheet/vendor/leaflet/images/marker-shadow.png",
+      "name": "Marker Shadow",
+      "href": "/timesheet/vendor/leaflet/images/marker-shadow.png",
+      "preview": "/timesheet/vendor/leaflet/images/marker-shadow.png",
+      "source": "Timesheet",
+      "category": "Timesheet",
+      "subcategory": "Vendor"
+    },
+    {
+      "id": "upload/favicon.svg",
+      "name": "Favicon",
+      "href": "/upload/favicon.svg",
+      "preview": "/upload/favicon.svg",
+      "source": "Upload",
+      "category": "Upload",
+      "subcategory": "Favicon"
+    },
+    {
+      "id": "upload/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/upload/icons/icon-180.png",
+      "preview": "/upload/icons/icon-180.png",
+      "source": "Upload",
+      "category": "Upload",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "upload/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/upload/icons/icon-192.png",
+      "preview": "/upload/icons/icon-192.png",
+      "source": "Upload",
+      "category": "Upload",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "upload/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/upload/icons/icon-512.png",
+      "preview": "/upload/icons/icon-512.png",
+      "source": "Upload",
+      "category": "Upload",
+      "subcategory": "PWA / home-screen icons"
+    }
+  ]
+}

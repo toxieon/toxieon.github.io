@@ -33,6 +33,7 @@
 <script src="../assets/pixel-cat.js"></script>
 <script src="../assets/dodge-button.js"></script>
 <script src="../ico/ico-canvas.js?v=0.1.6"></script>
+<script src="../shared/nd-pwa.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0f0);
@@ -151,6 +152,7 @@
     <div class="toolbar">
       <span class="count-pill" id="count">— assets</span>
       <a class="btn-link" href="../assets/ASSETS.txt" target="_blank" rel="noopener">View manifest (ASSETS.txt)</a>
+      <a class="btn-link" href="visual/">Visual asset library</a>
     </div>
   </header>
 
@@ -547,7 +549,7 @@ REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</co
 </div>
 
 <script>
-  var APP_VERSION = "1.1.1";   // see 1234567890/VERSIONING.md
+  var APP_VERSION = "1.2.0";   // see 1234567890/VERSIONING.md
   document.getElementById("app-version").textContent = "Assets v" + APP_VERSION;
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
 
