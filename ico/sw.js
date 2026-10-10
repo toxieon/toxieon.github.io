@@ -1,6 +1,6 @@
 /* Service worker — offline app shell for ICO Generator (Neill Data suite). */
 
-const CACHE_VERSION = 'ico-v1';
+const CACHE_VERSION = 'ico-0.1.7';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -9,7 +9,7 @@ const SHELL_ASSETS = [
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./ico-canvas.js?v=0.1.6",
+  "./ico-canvas.js?v=0.1.7",
   "./fonts/DejaVuSans.ttf",
   "./fonts/DejaVuSans-Bold.ttf",
   "../shared/nd-pwa.js"

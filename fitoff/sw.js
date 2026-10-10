@@ -1,6 +1,6 @@
 /* Service worker — offline app shell for Fit-off (Neill Data suite). */
 
-const CACHE_VERSION = 'fitoff-v1';
+const CACHE_VERSION = 'fitoff-0.1.5';
 const SHELL_ASSETS = [
   "./",
   "./index.html",

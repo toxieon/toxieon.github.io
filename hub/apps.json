@@ -7,10 +7,10 @@
     { "id": "quote", "name": "Quote", "path": "/quote/", "icon": "/assets/suite-icons/apps/quote.svg?v=1.2.0", "color": "#31d0ff", "order": 4, "hidden": false, "version": "0.1.6" },
     { "id": "timesheet", "name": "Timesheet", "path": "/timesheet/", "icon": "/timesheet/assets/icons/icon-192.png", "color": "#3ab87a", "order": 5, "hidden": false, "version": "0.4.1" },
     { "id": "swb", "name": "SWB", "path": "/swb/", "icon": "/assets/suite-icons/apps/swb.svg?v=1.2.0", "color": "#f59e0b", "order": 6, "hidden": false },
-    { "id": "fitoff", "name": "Fit-off", "path": "/fitoff/", "icon": "/assets/suite-icons/apps/fitoff.svg?v=1.2.0", "color": "#3ab87a", "order": 7, "hidden": false, "version": "0.1.4" },
+    { "id": "fitoff", "name": "Fit-off", "path": "/fitoff/", "icon": "/assets/suite-icons/apps/fitoff.svg?v=1.2.0", "color": "#3ab87a", "order": 7, "hidden": false, "version": "0.1.5" },
     { "id": "assets", "name": "Assets", "path": "/1234567890/", "icon": "/assets/suite-icons/apps/assets.svg?v=1.2.0", "color": "#6ddba3", "order": 8, "hidden": false, "version": "1.1.1" },
-    { "id": "company", "name": "Company", "path": "/company/", "icon": "/assets/suite-icons/apps/company.svg?v=1.2.0", "color": "#e07b2a", "order": 9, "hidden": false },
-    { "id": "ico", "name": "ICO Generator", "path": "/ico/", "icon": "/ico/favicon.svg", "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.6", "description": "Name + version or picture to a multi-size Windows .ico" },
+    { "id": "company", "name": "Company", "path": "/company/", "icon": "/assets/suite-icons/apps/company.svg?v=1.2.0", "color": "#e07b2a", "order": 9, "hidden": false, "version": "0.1.1" },
+    { "id": "ico", "name": "ICO Generator", "path": "/ico/", "icon": "/ico/favicon.svg", "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.7", "description": "Name + version or picture to a multi-size Windows .ico" },
     { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true }
   ]
 }

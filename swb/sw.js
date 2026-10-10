@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'swb-v8';
+const CACHE_VERSION = 'swb-v9';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -29,7 +29,7 @@ const SHELL_ASSETS = [
   "../shared/nd-core.css",
   "../shared/nd-pwa.js",
   "./swb_engine.js?v=2.0.2",
-  "./app.js?v=2.0.4"
+  "./app.js?v=2.0.5"
 ];
 
 const IS_API_HOST = (url) =>

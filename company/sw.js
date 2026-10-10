@@ -1,6 +1,6 @@
 /* Service worker — offline app shell for Company (Neill Data suite). */
 
-const CACHE_VERSION = 'company-v1';
+const CACHE_VERSION = 'company-0.1.1';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
