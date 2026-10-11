@@ -1,0 +1,17 @@
+{
+  "name": "reel-reader-service",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Backend service for Neill Data Reel Reader.",
+  "main": "src/index.cjs",
+  "scripts": {
+    "start": "node src/index.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/genai": "latest"
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1117" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>ND • Reel Reader</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/suite-icons/apps/hub-180.png" />
+    <meta name="apple-mobile-web-app-title" content="Reel Reader" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="nd:app" content="Reel Reader" />
+    <meta name="nd:color" content="#35d0ba" />
+    <meta name="nd:order" content="12" />
+    <meta
+      name="nd:description"
+      content="Paste a reel link and get a structured prompt with transcript, captions, steps and recipe details."
+    />
+    <link rel="stylesheet" href="../shared/nd-core.css" />
+    <link rel="stylesheet" href="./styles.css?v=0.1.1" />
+    <script src="../shared/nd-ui.js"></script>
+    <script src="./config.js"></script>
+    <script src="../shared/nd-pwa.js" defer></script>
+    <script src="./app.js?v=0.1.1" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="kicker">Neill Data Suite</p>
+        <h1>Reel Reader</h1>
+        <p class="intro">Paste an Instagram, TikTok or YouTube link to generate a paste-ready prompt with transcript, captions and step-by-step actions.</p>
+      </header>
+
+      <section class="card" aria-labelledby="link-heading">
+        <h2 id="link-heading">Video link</h2>
+        <form id="reader-form" novalidate>
+          <label for="video-url">Instagram, TikTok or YouTube URL</label>
+          <input
+            id="video-url"
+            name="url"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="https://www.instagram.com/reel/..."
+            required
+          />
+          <div class="actions">
+            <button id="go-btn" type="submit">Go</button>
+            <span id="progress-text" class="progress" aria-live="polite"></span>
+          </div>
+        </form>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <details class="card settings">
+        <summary>Settings</summary>
+        <div class="settings-body">
+          <label for="api-key">Service API key</label>
+          <input id="api-key" type="password" autocomplete="off" placeholder="Paste key once" />
+          <p class="hint">Saved locally on this device only. Never commit this key to git.</p>
+          <p id="backend-target" class="hint mono"></p>
+        </div>
+      </details>
+
+      <section class="card output" aria-labelledby="output-heading">
+        <div class="output-head">
+          <h2 id="output-heading">Prompt output</h2>
+          <button id="copy-btn" type="button" disabled>Copy full prompt</button>
+        </div>
+        <article>
+          <h3>Transcript</h3>
+          <pre id="transcript-text" class="block empty">Run Reel Reader to see transcript output.</pre>
+        </article>
+        <article>
+          <h3>On-screen text / caption</h3>
+          <pre id="caption-text" class="block empty">Run Reel Reader to see caption output.</pre>
+        </article>
+        <article>
+          <h3>Step-by-step actions</h3>
+          <ol id="steps-list" class="steps"></ol>
+          <p id="steps-empty" class="block empty">Run Reel Reader to see an ordered breakdown.</p>
+        </article>
+        <article>
+          <h3>Recipe details</h3>
+          <pre id="recipe-text" class="block empty">If this video is a recipe, ingredients and method appear here.</pre>
+        </article>
+      </section>
+
+      <footer class="app-footer">Reel Reader v0.1.1</footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+## 0.1.1 · 2026-10-11 · reel-reader-baseline · Initial Reel Reader release: mobile-first UI, service-worker/PWA shell, backend integration settings, transcript/caption/steps/recipe rendering and copy-ready prompt output. Service worker reelreader-0.1.1

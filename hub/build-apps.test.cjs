@@ -10,12 +10,15 @@ test('committed hub/apps.json matches the generator (run: node hub/build-apps.cj
   assert.equal(fs.readFileSync(path.join(__dirname, 'apps.json'), 'utf8'), gen.build());
 });
 
-test('hub keeps its pre-discovery tiles in the same order, plus ICO Generator', () => {
+test('hub keeps its pre-discovery tiles in the same order, plus discovered apps', () => {
   const visible = JSON.parse(gen.build()).apps.filter(a => !a.hidden).map(a => a.id);
-  assert.deepEqual(visible, ['planner', 'upload', 'search', 'quote', 'timesheet', 'swb', 'fitoff', 'assets', 'company', 'ico']);
+  assert.deepEqual(visible, ['planner', 'upload', 'search', 'quote', 'timesheet', 'swb', 'fitoff', 'assets', 'company', 'ico', 'reelreader']);
   const ico = JSON.parse(gen.build()).apps.find(a => a.id === 'ico');
   assert.equal(ico.name, 'ICO Generator');
   assert.equal(ico.version, fs.readFileSync(path.join(__dirname, '../ico/VERSION'), 'utf8').trim());
+  const reelReader = JSON.parse(gen.build()).apps.find(a => a.id === 'reelreader');
+  assert.equal(reelReader.name, 'Reel Reader');
+  assert.equal(reelReader.version, fs.readFileSync(path.join(__dirname, '../reelreader/VERSION'), 'utf8').trim());
 });
 
 test('parsePage reads title, favicon and nd:* meta in any attribute order / quoting', () => {
