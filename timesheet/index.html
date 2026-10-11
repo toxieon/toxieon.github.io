@@ -15,11 +15,12 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.1"></script>
+<script src="ts-time.js?v=0.4.2"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.1"></script>
+<script src="ts-map.js?v=0.4.2"></script>
+<script src="ts-clipboard.js?v=0.4.2"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -530,7 +531,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
         <div class="field"><label>Preferred mail app</label>
           <select id="s-preferredMailApp"><option>Gmail</option><option>Outlook (web)</option><option>Apple / default mail</option><option>Just copy</option></select>
         </div>
-        <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email. Copy timesheet also adds a map of that week's sites when the clipboard can take both; otherwise use Copy map (or Download map).</p>
+        <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email. Use Copy map (or Download map) for the week's site map image.</p>
       </div>
       <div class="card">
         <div class="row-between"><div style="font-weight:500;">Timesheet Live</div><a href="../timesheetlive/" target="_blank" rel="noopener" style="font-size:13px; color:var(--on-accent);">Open ↗</a></div>
@@ -722,7 +723,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.1';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.2';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -2006,10 +2007,10 @@ const TsExport = (() => {
 })();
 window.TsExport = TsExport;
 
-/* ----- WEEK SITE MAP (0.4.1) -----
- * Copy timesheet also builds a PNG of the week's sites. Leaflet draws the
- * on-screen map; the PNG is painted on a canvas (OSM tiles, crossOrigin) so
- * the clipboard image isn't tainted. Text export is unchanged. */
+/* ----- WEEK SITE MAP (0.4.1+) -----
+ * Copy map builds a PNG of the week's sites (Copy timesheet is text only).
+ * Leaflet draws the on-screen map; the PNG is painted on a canvas (OSM tiles,
+ * crossOrigin) so the clipboard image isn't tainted. Text export is unchanged. */
 const TsWeekMap = (() => {
   const REF = 'https://www.neilldata.com/timesheet/';
   const GEO_KEY = 'ts_geocode_cache_v1';
@@ -2170,27 +2171,16 @@ const TsWeekMap = (() => {
   function noMap(m) {
     toast(m && m.pins && m.pins.length ? 'Could not build the map image' : 'No sites to map this week');
   }
-  async function copyWithText(weekStart, text) {
-    const mapP = ensure(weekStart);
-    if (!imageOk()) {
-      const ok = await copyText(text);
-      toast(ok ? 'Timesheet copied' : 'Copy failed — select the preview text manually');
-      mapP.catch(e => console.warn('week map failed', e));
-      return ok;
-    }
-    let both = false;
-    try {
-      await navigator.clipboard.write([new ClipboardItem({
-        'text/plain': Promise.resolve(new Blob([text], { type: 'text/plain' })),
-        'image/png': mapP.then(m => { if (!m || !m.blob) throw new Error('no map'); return m.blob; })
-      })]);
-      both = true;
-    } catch (e) { both = false; }
-    try { await mapP; } catch (e) { console.warn('week map failed', e); }
-    if (both) { toast('Timesheet and map copied'); return true; }
-    const ok = await copyText(text);
-    toast(ok ? 'Timesheet copied' : 'Copy failed — select the preview text manually');
-    return ok;
+  function copyWithText(weekStart, text) {
+    const r = TsClipboard.writeTimesheetText({
+      navigator, ClipboardItem: window.ClipboardItem, document
+    }, text);
+    r.promise.then((ok) => {
+      const success = ok !== false;
+      toast(success ? 'Timesheet copied' : 'Copy failed — select the preview text manually');
+    }).catch(() => toast('Copy failed — select the preview text manually'));
+    ensure(weekStart).catch(e => console.warn('week map failed', e));
+    return r.promise;
   }
   function copyMapOnly(weekStart) {
     const name = mapFilename(weekStart);
@@ -2201,13 +2191,16 @@ const TsWeekMap = (() => {
     };
     const ready = cache.has(dataKey(weekStart)) ? Promise.resolve(cache.get(dataKey(weekStart))) : ensure(weekStart);
     if (!imageOk()) { ready.then(m => deliver(m)).catch(() => toast('Could not build the map')); return; }
+    const blobP = ready.then(m => (m && m.blob) ? m.blob : null);
     try {
-      const item = new ClipboardItem({
-        'image/png': ready.then(m => { if (!m || !m.blob) throw new Error('no map'); return m.blob; })
+      const r = TsClipboard.writeMapImage({
+        navigator, ClipboardItem: window.ClipboardItem, document
+      }, blobP, {
+        onFail: () => {
+          ready.then(m => deliver(m, "Image copy isn't supported — map downloaded")).catch(() => toast('Could not build the map'));
+        }
       });
-      navigator.clipboard.write([item]).then(() => toast('Map copied')).catch(() => {
-        ready.then(m => deliver(m, "Image copy isn't supported — map downloaded")).catch(() => toast('Could not build the map'));
-      });
+      r.promise.then((ok) => { if (ok !== false) toast('Map copied'); });
     } catch (e) {
       ready.then(m => deliver(m, "Image copy isn't supported — map downloaded")).catch(() => toast('Could not build the map'));
     }
