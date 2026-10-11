@@ -1,10 +1,10 @@
-/* ts-map.js — Timesheet week-site map (0.4.1). Pure, no DOM; window.TsMap in
+/* ts-map.js — Timesheet week-site map (0.4.2). Pure, no DOM; window.TsMap in
  * the app, CommonJS in tests (timesheet/ts-map.test.cjs).
  *
  *   weekSites / locateWeek   sites visited in a week, visit counts, skip / geocode
  *   createGeocoder           Nominatim, one request per second, cached
  *   planMap / drawMap        OSM tiles + red visit-count pins fitted to the pins
- *   clipboardSupport         text+png together, or image-only, or neither
+ *   clipboardSupport         image/png clipboard (Copy map), or neither
  *
  * Leaflet (BSD-2-Clause, vendor/leaflet/) draws the on-screen map. The PNG is
  * drawn here onto a canvas from CORS-enabled OSM tiles. Text export is untouched.
