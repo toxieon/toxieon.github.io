@@ -20,5 +20,6 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
+      - run: npm ci --omit=dev --prefix reelreader/server  # Reel Reader backend deps for its tests
       - run: npm test
       - run: npm run icons:check

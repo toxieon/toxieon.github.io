@@ -1,8 +1,8 @@
 # Reel Reader backend (Render)
 
-Small Node service for `POST /api/reel-reader` used by the static app in `/reelreader`.
+Small Node service for `POST /api/reel-reader` and `POST /api/reel-reader/upload` used by the static app in `/reelreader`.
 
-## Endpoint
+## Endpoints
 
 - `POST /api/reel-reader`
 - Header: `x-reel-reader-key: <REEL_READER_KEY>`
@@ -18,12 +18,18 @@ Small Node service for `POST /api/reel-reader` used by the static app in `/reelr
   }
   ```
 
+- `POST /api/reel-reader/upload`
+  - Multipart field `video`, one file, video/* only, max 100 MB (enforced while streaming to disk; 413 `file_too_large` otherwise).
+- Header: `x-reel-reader-key: <REEL_READER_KEY>`
+- Body: `multipart/form-data` with field `video` (streamed to disk; video MIME types only)
+- Same success JSON as the link endpoint
+
 ## Required environment variables
 
 - `GEMINI_API_KEY` – Gemini API key.
 - `REEL_READER_KEY` – shared key required by `x-reel-reader-key`.
 
-Errors come back as `{"error":{"code","message"}}` with a short message (codes: `source_blocked`, `source_private`, `source_unavailable`, `timeout`, `convert_failed`, `model_failed`, `processing_failed`). The raw yt-dlp output is only written to the service log.
+Errors come back as `{"error":{"code","message"}}` with a short message (codes include `source_blocked`, `source_private`, `source_unavailable`, `file_too_large`, `unsupported_type`, `video_too_long`, `timeout`, `convert_failed`, `model_failed`, `processing_failed`). The raw yt-dlp output is only written to the service log.
 
 ## Optional environment variables
 

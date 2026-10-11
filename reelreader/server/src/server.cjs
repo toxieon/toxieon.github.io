@@ -5,9 +5,12 @@ const crypto = require("node:crypto");
 
 // CORS is locked to the production site; not configurable.
 const ALLOWED_ORIGIN = "https://www.neilldata.com";
+// Upload cap: 100 MB (matches maxUploadBytes in reelreader/config.js).
+const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
 const { HttpError } = require("./errors.cjs");
 const { validateBody } = require("./validation.cjs");
-const { runReelReader, DEFAULT_LIMITS } = require("./service.cjs");
+const { runReelReader, runReelReaderUpload, DEFAULT_LIMITS } = require("./service.cjs");
+const { receiveVideoUpload } = require("./multipart-upload.cjs");
 
 function createServer(config = {}) {
   const allowedOrigin = ALLOWED_ORIGIN;
@@ -26,30 +29,47 @@ function createServer(config = {}) {
         return;
       }
 
-      if (req.method !== "POST" || req.url !== "/api/reel-reader") {
+      const pathOnly = String(req.url || "").split("?")[0];
+      if (req.method !== "POST") {
         sendJson(res, 404, { error: { code: "not_found", message: "Endpoint not found." } });
         return;
       }
 
-      const incomingKey = String(req.headers["x-reel-reader-key"] || "").trim();
-      if (!apiKey) throw new HttpError(500, "missing_config", "REEL_READER_KEY is not configured.");
-      if (!keysMatch(incomingKey, apiKey)) throw new HttpError(401, "unauthorized", "Invalid API key.");
+      assertApiKey(req, apiKey);
 
-      const body = await readJsonBody(req, 32 * 1024);
-      const request = validateBody(body);
+      if (pathOnly === "/api/reel-reader/upload") {
+        const uploaded = await receiveVideoUpload(req, Object.assign({}, limits, { maxBytes: Math.min(limits.maxBytes, UPLOAD_MAX_BYTES) }));
+        const result = await withTimeout(
+          runReelReaderUpload(uploaded, {
+            geminiApiKey,
+            model,
+            limits,
+            deps: config.deps
+          }),
+          endpointTimeoutMs
+        );
+        sendJson(res, 200, result);
+        return;
+      }
 
-      const result = await withTimeout(
-        runReelReader(request.url, {
-          geminiApiKey,
-          model,
-          igCookies: config.igCookies || "",
-          limits,
-          deps: config.deps
-        }),
-        endpointTimeoutMs
-      );
+      if (pathOnly === "/api/reel-reader") {
+        const body = await readJsonBody(req, 32 * 1024);
+        const request = validateBody(body);
+        const result = await withTimeout(
+          runReelReader(request.url, {
+            geminiApiKey,
+            model,
+            igCookies: config.igCookies || "",
+            limits,
+            deps: config.deps
+          }),
+          endpointTimeoutMs
+        );
+        sendJson(res, 200, result);
+        return;
+      }
 
-      sendJson(res, 200, result);
+      sendJson(res, 404, { error: { code: "not_found", message: "Endpoint not found." } });
     } catch (error) {
       if (!(error instanceof HttpError)) console.error("[reel-reader] unexpected error: " + ((error && error.stack) || error));
       const status = error instanceof HttpError ? error.status : 500;
@@ -58,6 +78,12 @@ function createServer(config = {}) {
       sendJson(res, status, { error: { code, message } });
     }
   });
+}
+
+function assertApiKey(req, apiKey) {
+  const incomingKey = String(req.headers["x-reel-reader-key"] || "").trim();
+  if (!apiKey) throw new HttpError(500, "missing_config", "REEL_READER_KEY is not configured.");
+  if (!keysMatch(incomingKey, apiKey)) throw new HttpError(401, "unauthorized", "Invalid API key.");
 }
 
 // Constant-time compare: hash both sides to equal-length digests first.
@@ -116,6 +142,7 @@ function withTimeout(promise, timeoutMs) {
 module.exports = {
   createServer,
   keysMatch,
+  UPLOAD_MAX_BYTES,
   ALLOWED_ORIGIN,
   readJsonBody,
   withTimeout

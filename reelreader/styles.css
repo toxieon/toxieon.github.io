@@ -64,6 +64,96 @@ h1 {
   font-size: 1.03rem;
 }
 
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mode-btn {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--rr-border);
+  background: rgba(10, 15, 24, 0.85);
+  color: var(--rr-muted);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.mode-btn.is-active {
+  border-color: var(--rr-brand-strong);
+  color: var(--rr-text);
+  background: rgba(53, 208, 186, 0.12);
+}
+
+.upload-panel {
+  margin-top: 4px;
+}
+
+.file-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 72px;
+  justify-content: center;
+  border: 2px dashed var(--rr-border);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.file-picker-label {
+  font-weight: 700;
+  color: var(--rr-text);
+}
+
+.file-picker-hint {
+  font-size: 0.78rem;
+  color: var(--rr-muted);
+}
+
+.file-meta {
+  margin: 0 0 10px;
+  font-family: var(--nd-mono);
+  font-size: 0.8rem;
+  color: var(--rr-text);
+}
+
+.file-meta.empty {
+  color: var(--rr-muted);
+}
+
+.upload-progress-wrap {
+  margin-bottom: 10px;
+}
+
+.upload-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rr-brand-strong), var(--rr-brand));
+  transition: width 0.15s ease;
+}
+
+.upload-progress-label {
+  margin: 6px 0 0;
+  font-family: var(--nd-mono);
+  font-size: 0.76rem;
+  color: var(--rr-muted);
+}
+
 label {
   display: block;
   font-size: 0.84rem;

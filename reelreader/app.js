@@ -26,11 +26,28 @@
   const stepsEmptyEl = document.getElementById("steps-empty");
   const recipeEl = document.getElementById("recipe-text");
 
+  const modeLinkBtn = document.getElementById("mode-link");
+  const modeUploadBtn = document.getElementById("mode-upload");
+  const panelLink = document.getElementById("panel-link");
+  const panelUpload = document.getElementById("panel-upload");
+  const fileInput = document.getElementById("video-file");
+  const fileMetaEl = document.getElementById("file-meta");
+  const uploadBtn = document.getElementById("upload-btn");
+  const uploadProgressWrap = document.getElementById("upload-progress-wrap");
+  const uploadProgressBar = document.getElementById("upload-progress-bar");
+  const uploadProgressLabel = document.getElementById("upload-progress-label");
+
   let currentPrompt = "";
   let progressTimer = null;
   let progressValue = 6;
+  let activeMode = "link";
+  let selectedFile = null;
+  let uploadXhr = null;
 
-  const backendUrl = String((root.REEL_READER_CONFIG && root.REEL_READER_CONFIG.backendUrl) || "").trim();
+  const cfg = root.REEL_READER_CONFIG || {};
+  const backendUrl = String(cfg.backendUrl || "").trim();
+  const maxUploadBytes = Number(cfg.maxUploadBytes) > 0 ? Number(cfg.maxUploadBytes) : 104857600;
+
   backendTargetEl.textContent = backendUrl
     ? "Backend: " + backendUrl
     : "Backend not configured yet. Ask Brandon to set reelreader/config.js backendUrl.";
@@ -39,6 +56,9 @@
   apiKeyInput.addEventListener("change", function () {
     root.localStorage.setItem(STORAGE_KEY, apiKeyInput.value.trim());
   });
+
+  modeLinkBtn.addEventListener("click", function () { setMode("link"); });
+  modeUploadBtn.addEventListener("click", function () { setMode("upload"); });
 
   copyBtn.addEventListener("click", function () {
     if (!currentPrompt) return;
@@ -49,33 +69,60 @@
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
-    runReader();
+    runLinkReader();
   });
 
-  function runReader() {
+  fileInput.addEventListener("change", function () {
+    selectedFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    renderFileMeta(selectedFile);
+    uploadBtn.disabled = !selectedFile;
+  });
+
+  uploadBtn.addEventListener("click", function () {
+    runUploadReader();
+  });
+
+  function setMode(mode) {
+    activeMode = mode === "upload" ? "upload" : "link";
+    const isLink = activeMode === "link";
+    modeLinkBtn.classList.toggle("is-active", isLink);
+    modeUploadBtn.classList.toggle("is-active", !isLink);
+    modeLinkBtn.setAttribute("aria-selected", isLink ? "true" : "false");
+    modeUploadBtn.setAttribute("aria-selected", isLink ? "false" : "true");
+    panelLink.hidden = !isLink;
+    panelUpload.hidden = isLink;
+    setStatus("", false);
+  }
+
+  function renderFileMeta(file) {
+    if (!file) {
+      fileMetaEl.textContent = "No file selected.";
+      fileMetaEl.classList.add("empty");
+      return;
+    }
+    fileMetaEl.classList.remove("empty");
+    fileMetaEl.textContent = file.name + " · " + formatBytes(file.size);
+    if (file.size > maxUploadBytes) {
+      fileMetaEl.textContent += " (over the " + formatBytes(maxUploadBytes) + " upload limit — trim it or pick a shorter clip)";
+      uploadBtn.disabled = true;
+    }
+  }
+
+  function runLinkReader() {
     const value = urlInput.value.trim();
     const apiKey = apiKeyInput.value.trim();
-
-    if (!backendUrl) {
-      setStatus("Reel Reader backend is not configured yet. Enter backendUrl in reelreader/config.js.", true);
-      return;
-    }
-    if (!apiKey) {
-      setStatus("Enter the service API key in Settings first.", true);
-      apiKeyInput.focus();
-      return;
-    }
+    if (!ensureReady(apiKey)) return;
     if (!isSupportedUrl(value)) {
       setStatus("Paste a valid Instagram, TikTok or YouTube URL.", true);
       return;
     }
 
     root.localStorage.setItem(STORAGE_KEY, apiKey);
-    setLoading(true);
+    setLinkLoading(true);
     clearOutput();
     setStatus("Submitting video for analysis...", false);
 
-    fetch(withApiPath(backendUrl), {
+    fetch(withApiPath(backendUrl, "/api/reel-reader"), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -83,17 +130,7 @@
       },
       body: JSON.stringify({ url: value })
     })
-      .then(function (response) {
-        return response.json().catch(function () { return {}; }).then(function (payload) {
-          if (!response.ok) {
-            const message = payload && payload.error && payload.error.message
-              ? payload.error.message
-              : "Request failed with HTTP " + response.status + ".";
-            throw new Error(message);
-          }
-          return payload;
-        });
-      })
+      .then(parseJsonResponse)
       .then(function (payload) {
         renderResult(payload || {});
         setStatus("Done.", false);
@@ -102,8 +139,99 @@
         setStatus(error.message || "Request failed.", true);
       })
       .finally(function () {
-        setLoading(false);
+        setLinkLoading(false);
       });
+  }
+
+  function runUploadReader() {
+    const apiKey = apiKeyInput.value.trim();
+    if (!ensureReady(apiKey)) return;
+    if (!selectedFile) {
+      setStatus("Choose a video file first.", true);
+      return;
+    }
+    if (selectedFile.size > maxUploadBytes) {
+      setStatus("This video is " + formatBytes(selectedFile.size) + ". The upload limit is " + formatBytes(maxUploadBytes) + ". Trim it or pick a shorter clip.", true);
+      return;
+    }
+
+    root.localStorage.setItem(STORAGE_KEY, apiKey);
+    clearOutput();
+    setUploadBusy(true);
+    setStatus("Uploading video…", false);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("video", selectedFile, selectedFile.name);
+
+    const xhr = new XMLHttpRequest();
+    uploadXhr = xhr;
+    xhr.open("POST", withApiPath(backendUrl, "/api/reel-reader/upload"));
+    xhr.setRequestHeader("x-reel-reader-key", apiKey);
+    xhr.responseType = "json";
+
+    xhr.upload.addEventListener("progress", function (event) {
+      if (!event.lengthComputable) return;
+      const pct = Math.min(100, Math.round((event.loaded / event.total) * 100));
+      setUploadProgress(pct);
+      setStatus(pct < 100 ? "Uploading video… " + pct + "%" : "Analyzing upload…", false);
+    });
+
+    xhr.addEventListener("load", function () {
+      uploadXhr = null;
+      const payload = xhr.response || {};
+      if (xhr.status >= 200 && xhr.status < 300) {
+        renderResult(payload);
+        setUploadProgress(100);
+        setStatus("Done.", false);
+        setUploadBusy(false);
+        return;
+      }
+      const message = payload.error && payload.error.message
+        ? payload.error.message
+        : "Upload failed with HTTP " + xhr.status + ".";
+      setStatus(message, true);
+      setUploadBusy(false);
+    });
+
+    xhr.addEventListener("error", function () {
+      uploadXhr = null;
+      setStatus("Upload failed. Check your connection and try again.", true);
+      setUploadBusy(false);
+    });
+
+    xhr.addEventListener("abort", function () {
+      uploadXhr = null;
+      setStatus("Upload cancelled.", true);
+      setUploadBusy(false);
+    });
+
+    xhr.send(formData);
+  }
+
+  function ensureReady(apiKey) {
+    if (!backendUrl) {
+      setStatus("Reel Reader backend is not configured yet. Enter backendUrl in reelreader/config.js.", true);
+      return false;
+    }
+    if (!apiKey) {
+      setStatus("Enter the service API key in Settings first.", true);
+      apiKeyInput.focus();
+      return false;
+    }
+    return true;
+  }
+
+  function parseJsonResponse(response) {
+    return response.json().catch(function () { return {}; }).then(function (payload) {
+      if (!response.ok) {
+        const message = payload && payload.error && payload.error.message
+          ? payload.error.message
+          : "Request failed with HTTP " + response.status + ".";
+        throw new Error(message);
+      }
+      return payload;
+    });
   }
 
   function renderResult(payload) {
@@ -153,8 +281,9 @@
     recipeEl.classList.remove("empty");
   }
 
-  function setLoading(on) {
+  function setLinkLoading(on) {
     goBtn.disabled = on;
+    uploadBtn.disabled = on || !selectedFile;
     if (on) {
       progressValue = 6;
       progressText.textContent = "Preparing… " + progressValue + "%";
@@ -166,7 +295,27 @@
       if (progressTimer) root.clearInterval(progressTimer);
       progressTimer = null;
       progressText.textContent = "";
+      uploadBtn.disabled = !selectedFile;
     }
+  }
+
+  function setUploadBusy(on) {
+    goBtn.disabled = on;
+    uploadBtn.disabled = on || !selectedFile;
+    fileInput.disabled = on;
+    modeLinkBtn.disabled = on;
+    modeUploadBtn.disabled = on;
+    uploadProgressWrap.hidden = !on;
+    if (!on) {
+      setUploadProgress(0);
+      uploadProgressWrap.hidden = true;
+    }
+  }
+
+  function setUploadProgress(pct) {
+    uploadProgressWrap.hidden = false;
+    uploadProgressBar.style.width = Math.max(0, Math.min(100, pct)) + "%";
+    uploadProgressLabel.textContent = pct < 100 ? "Uploading… " + pct + "%" : "Analyzing…";
   }
 
   function setStatus(message, isError) {
@@ -182,9 +331,9 @@
     setStatus(message, !!isError);
   }
 
-  function withApiPath(base) {
+  function withApiPath(base, suffix) {
     const trimmed = base.replace(/\/+$/, "");
-    return trimmed + "/api/reel-reader";
+    return trimmed + suffix;
   }
 
   function isSupportedUrl(value) {
@@ -200,6 +349,12 @@
   function textValue(value) {
     if (value == null) return "";
     return String(value).trim();
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1) + " MB";
   }
 
   function formatRecipe(recipe) {

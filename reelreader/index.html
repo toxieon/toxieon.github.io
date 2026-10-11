@@ -15,40 +15,65 @@
     <meta name="nd:order" content="12" />
     <meta
       name="nd:description"
-      content="Paste a reel link and get a structured prompt with transcript, captions, steps and recipe details."
+      content="Paste a reel link or upload a video for transcript, captions, steps and recipe details."
     />
     <link rel="stylesheet" href="../shared/nd-core.css" />
-    <link rel="stylesheet" href="./styles.css?v=0.1.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.2.1" />
     <script src="../shared/nd-ui.js"></script>
-    <script src="./config.js?v=0.1.2"></script>
+    <script src="./config.js?v=0.2.1"></script>
     <script src="../shared/nd-pwa.js" defer></script>
-    <script src="./app.js?v=0.1.2" defer></script>
+    <script src="./app.js?v=0.2.1" defer></script>
   </head>
   <body>
     <main class="app-shell">
       <header class="hero">
         <p class="kicker">Neill Data Suite</p>
         <h1>Reel Reader</h1>
-        <p class="intro">Paste an Instagram, TikTok or YouTube link to generate a paste-ready prompt with transcript, captions and step-by-step actions.</p>
+        <p class="intro">Paste a social link or upload a video from your phone to generate a paste-ready prompt with transcript, captions and step-by-step actions.</p>
       </header>
 
-      <section class="card" aria-labelledby="link-heading">
-        <h2 id="link-heading">Video link</h2>
-        <form id="reader-form" novalidate>
-          <label for="video-url">Instagram, TikTok or YouTube URL</label>
-          <input
-            id="video-url"
-            name="url"
-            inputmode="url"
-            autocomplete="off"
-            placeholder="https://www.instagram.com/reel/..."
-            required
-          />
-          <div class="actions">
-            <button id="go-btn" type="submit">Go</button>
-            <span id="progress-text" class="progress" aria-live="polite"></span>
+      <section class="card" aria-labelledby="input-heading">
+        <h2 id="input-heading">Video input</h2>
+        <div class="mode-switch" role="tablist" aria-label="Input mode">
+          <button type="button" class="mode-btn is-active" id="mode-link" role="tab" aria-selected="true" aria-controls="panel-link">Video link</button>
+          <button type="button" class="mode-btn" id="mode-upload" role="tab" aria-selected="false" aria-controls="panel-upload">Upload video</button>
+        </div>
+
+        <div id="panel-link" role="tabpanel" aria-labelledby="mode-link">
+          <form id="reader-form" novalidate>
+            <label for="video-url">Instagram, TikTok or YouTube URL</label>
+            <input
+              id="video-url"
+              name="url"
+              inputmode="url"
+              autocomplete="off"
+              placeholder="https://www.instagram.com/reel/..."
+            />
+            <div class="actions">
+              <button id="go-btn" type="submit">Go</button>
+              <span id="progress-text" class="progress" aria-live="polite"></span>
+            </div>
+          </form>
+        </div>
+
+        <div id="panel-upload" class="upload-panel" role="tabpanel" aria-labelledby="mode-upload" hidden>
+          <label class="file-picker" for="video-file">
+            <span class="file-picker-label">Choose video</span>
+            <span class="file-picker-hint">Opens Photos or Files on iPhone</span>
+          </label>
+          <input id="video-file" type="file" accept="video/*" hidden />
+          <p id="file-meta" class="file-meta empty">No file selected.</p>
+          <div class="upload-progress-wrap" id="upload-progress-wrap" hidden>
+            <div class="upload-progress-track" aria-hidden="true">
+              <div class="upload-progress-bar" id="upload-progress-bar"></div>
+            </div>
+            <p id="upload-progress-label" class="upload-progress-label">Uploading… 0%</p>
           </div>
-        </form>
+          <div class="actions">
+            <button id="upload-btn" type="button" disabled>Go</button>
+          </div>
+        </div>
+
         <p id="status" class="status" role="status" aria-live="polite"></p>
       </section>
 
@@ -86,7 +111,7 @@
         </article>
       </section>
 
-      <footer class="app-footer">Reel Reader v0.1.2</footer>
+      <footer class="app-footer">Reel Reader v0.2.1</footer>
     </main>
   </body>
 </html>
