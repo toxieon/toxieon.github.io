@@ -12,6 +12,6 @@
     { "id": "company", "name": "Company", "path": "/company/", "icon": "/assets/suite-icons/apps/company.svg?v=1.2.0", "color": "#e07b2a", "order": 9, "hidden": false, "version": "0.1.1" },
     { "id": "ico", "name": "ICO Generator", "path": "/ico/", "icon": "/ico/favicon.svg", "color": "#60a5fa", "order": 10, "hidden": false, "version": "0.1.7", "description": "Name + version or picture to a multi-size Windows .ico" },
     { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true },
-    { "id": "reelreader", "name": "Reel Reader", "path": "/reelreader/", "icon": "/reelreader/favicon.svg", "color": "#35d0ba", "order": 12, "hidden": false, "version": "0.1.1", "description": "Paste a reel link and get a structured prompt with transcript, captions, steps and recipe details." }
+    { "id": "reelreader", "name": "Reel Reader", "path": "/reelreader/", "icon": "/reelreader/favicon.svg", "color": "#35d0ba", "order": 12, "hidden": false, "version": "0.1.2", "description": "Paste a reel link and get a structured prompt with transcript, captions, steps and recipe details." }
   ]
 }
