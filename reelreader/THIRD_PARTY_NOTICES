@@ -227,6 +227,28 @@ subprocess (argument array, no shell) only when a download needs converting
 to MP4. Debian's ffmpeg build is licensed under the GPL/LGPL; its licence
 texts ship inside the image at /usr/share/doc/ffmpeg/copyright.
 
+3b) Components bundled inside the yt-dlp release file
+---------------------------------------------------
+The yt-dlp 2026.08.19 release file includes yt-dlp-ejs (Unlicense), the YouTube
+challenge-solver scripts, which in turn bundle meriyah (ISC) and astring (MIT).
+Their licence headers are kept inside the file.
+
+3c) Deno 2.9.5 (MIT) - JavaScript runtime, not redistributed
+------------------------------------------------------------
+Project: https://github.com/denoland/deno
+License: MIT. Copyright 2018-2026 the Deno authors.
+The official release binary (deno-x86_64-unknown-linux-gnu.zip, SHA-256
+checked) is downloaded when the Docker image is built and is not stored in
+this repository. yt-dlp runs it as a separate program to solve YouTube's
+JavaScript challenges. Deno's own third-party notices ship with the Deno
+project.
+
+3d) Not included: curl_cffi / curl-impersonate
+----------------------------------------------
+yt-dlp's browser-impersonation support (curl_cffi 0.16.0, MIT) was reviewed and
+left out: its wheel statically links libidn2 and libunistring, which are
+licensed GPL-2.0+ or LGPL-3.0+. That is outside this project's licence policy.
+
 4) npm dependencies of reelreader/server (from package-lock.json)
 -----------------------------------------------------------------
 @google/genai and every package it pulls in, installed by `npm ci` at image

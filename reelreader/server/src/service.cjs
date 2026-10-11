@@ -1,6 +1,7 @@
 "use strict";
 
 const { HttpError } = require("./errors.cjs");
+const { toFriendlyError } = require("./friendly-errors.cjs");
 const { inspectVideo, downloadVideo, ensureMp4, cleanupTemp } = require("./media-tools.cjs");
 const { buildPrompt } = require("./response-shaper.cjs");
 
@@ -30,7 +31,7 @@ async function runReelReader(url, opts = {}) {
     return buildPrompt(raw || {});
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(502, "processing_failed", "Failed to process the video: " + (error.message || "unknown error"));
+    throw toFriendlyError(error, url, opts.log || console);
   } finally {
     await deps.cleanupTemp(tempDir);
   }
