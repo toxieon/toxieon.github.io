@@ -4,7 +4,6 @@ const { createServer } = require("./server.cjs");
 
 const port = Number(process.env.PORT || 8080);
 const server = createServer({
-  allowedOrigin: process.env.ALLOWED_ORIGIN || "https://www.neilldata.com",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   reelReaderKey: process.env.REEL_READER_KEY || "",
   igCookies: process.env.IG_COOKIES || "",

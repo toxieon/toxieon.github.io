@@ -27,6 +27,9 @@ function normalizeSourceUrl(value) {
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new HttpError(400, "invalid_request", "URL must start with http:// or https://.");
   }
+  if (parsed.username || parsed.password || parsed.port) {
+    throw new HttpError(400, "invalid_request", "URL must not include credentials or a port.");
+  }
   if (!SUPPORTED_HOSTS.has(parsed.hostname.toLowerCase())) {
     throw new HttpError(400, "unsupported_source", "Only Instagram, TikTok, and YouTube URLs are supported.");
   }

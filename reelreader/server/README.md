@@ -26,7 +26,6 @@ Small Node service for `POST /api/reel-reader` used by the static app in `/reelr
 ## Optional environment variables
 
 - `IG_COOKIES` – Netscape cookies file text for a throwaway Instagram account.
-- `ALLOWED_ORIGIN` – defaults to `https://www.neilldata.com`.
 - `GEMINI_MODEL` – defaults to `gemini-2.5-flash`.
 - `REEL_READER_TIMEOUT_MS` – total request timeout (default `180000`).
 - `REEL_READER_COMMAND_TIMEOUT_MS` – per subprocess timeout (default `120000`).

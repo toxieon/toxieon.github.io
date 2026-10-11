@@ -1,12 +1,16 @@
 "use strict";
 
 const http = require("node:http");
+const crypto = require("node:crypto");
+
+// CORS is locked to the production site; not configurable.
+const ALLOWED_ORIGIN = "https://www.neilldata.com";
 const { HttpError } = require("./errors.cjs");
 const { validateBody } = require("./validation.cjs");
 const { runReelReader, DEFAULT_LIMITS } = require("./service.cjs");
 
 function createServer(config = {}) {
-  const allowedOrigin = config.allowedOrigin || "https://www.neilldata.com";
+  const allowedOrigin = ALLOWED_ORIGIN;
   const apiKey = config.reelReaderKey || "";
   const geminiApiKey = config.geminiApiKey || "";
   const model = config.geminiModel || "gemini-2.5-flash";
@@ -29,7 +33,7 @@ function createServer(config = {}) {
 
       const incomingKey = String(req.headers["x-reel-reader-key"] || "").trim();
       if (!apiKey) throw new HttpError(500, "missing_config", "REEL_READER_KEY is not configured.");
-      if (!incomingKey || incomingKey !== apiKey) throw new HttpError(401, "unauthorized", "Invalid API key.");
+      if (!keysMatch(incomingKey, apiKey)) throw new HttpError(401, "unauthorized", "Invalid API key.");
 
       const body = await readJsonBody(req, 32 * 1024);
       const request = validateBody(body);
@@ -53,6 +57,14 @@ function createServer(config = {}) {
       sendJson(res, status, { error: { code, message } });
     }
   });
+}
+
+// Constant-time compare: hash both sides to equal-length digests first.
+function keysMatch(given, expected) {
+  if (!given || !expected) return false;
+  const a = crypto.createHash("sha256").update(given, "utf8").digest();
+  const b = crypto.createHash("sha256").update(expected, "utf8").digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 function setCors(req, res, allowedOrigin) {
@@ -102,6 +114,8 @@ function withTimeout(promise, timeoutMs) {
 
 module.exports = {
   createServer,
+  keysMatch,
+  ALLOWED_ORIGIN,
   readJsonBody,
   withTimeout
 };

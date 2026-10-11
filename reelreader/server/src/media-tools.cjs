@@ -45,7 +45,7 @@ async function inspectVideo(url, limits, timeoutMs, cookieContent) {
       await fs.writeFile(cookiesPath, cookieContent, "utf8");
       args.push("--cookies", cookiesPath);
     }
-    args.push(url);
+    args.push("--", url); // "--": the URL can never be read as an option
     const { stdout } = await runCommand("yt-dlp", args, { timeoutMs });
     let info;
     try {
@@ -82,7 +82,7 @@ async function downloadVideo(url, limits, timeoutMs, cookieContent) {
     await fs.writeFile(cookiesPath, cookieContent, "utf8");
     args.push("--cookies", cookiesPath);
   }
-  args.push(url);
+  args.push("--", url); // "--": the URL can never be read as an option
   const { stdout } = await runCommand("yt-dlp", args, { timeoutMs });
   const filePath = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
   if (!filePath) throw new HttpError(502, "download_failed", "yt-dlp did not return a downloaded file path.");
