@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-10",
-  "count": 235,
+  "generatedAt": "2026-10-11",
+  "count": 236,
   "categories": [
     {
       "id": "1234567890/favicon.svg",
@@ -1936,6 +1936,15 @@
       "source": "Quote",
       "category": "Quote",
       "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "reelreader/favicon.svg",
+      "name": "Favicon",
+      "href": "/reelreader/favicon.svg",
+      "preview": "/reelreader/favicon.svg",
+      "source": "reelreader",
+      "category": "reelreader",
+      "subcategory": "Favicon"
     },
     {
       "id": "search/favicon.svg",

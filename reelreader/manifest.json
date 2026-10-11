@@ -1,0 +1,25 @@
+{
+  "name": "Neill Reel Reader",
+  "short_name": "Reel Reader",
+  "description": "Paste a reel link and receive transcript, captions, steps and recipe details.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "icons": [
+    {
+      "src": "../assets/suite-icons/apps/hub-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/suite-icons/apps/hub-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

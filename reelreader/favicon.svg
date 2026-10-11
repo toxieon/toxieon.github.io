@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Reel Reader placeholder icon">
+  <rect width="64" height="64" rx="14" fill="#101922" />
+  <path d="M20 18h24a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4Z" fill="#1f2e43" stroke="#35d0ba" stroke-width="2" />
+  <circle cx="24" cy="24" r="2.2" fill="#35d0ba" />
+  <circle cx="40" cy="24" r="2.2" fill="#35d0ba" />
+  <circle cx="24" cy="40" r="2.2" fill="#35d0ba" />
+  <circle cx="40" cy="40" r="2.2" fill="#35d0ba" />
+  <path d="m28 28 11 6-11 6Z" fill="#35d0ba" />
+</svg>
