@@ -80,3 +80,21 @@ test("copy timesheet path never performs a second image-only write after text", 
   await map.promise;
   assert.equal(env._writeTextLog.length, 1, "text write count unchanged after map copy");
 });
+
+test("writeText rejected: falls back to execCommand with the same text, never an image", async () => {
+  const copied = [];
+  const ta = { style: {}, select() {}, setSelectionRange() {}, setAttribute() {} };
+  const env = mockEnv({
+    document: {
+      body: { appendChild() {}, removeChild() {} },
+      createElement: () => ta,
+      execCommand: (cmd) => { copied.push([cmd, ta.value]); return true; }
+    }
+  });
+  env.navigator.clipboard.writeText = (t) => { env._writeTextLog.push(t); return Promise.reject(new Error("NotAllowedError")); };
+  const r = C.writeTimesheetText(env, "Week 12 Oct\nMon 7:30-15:30");
+  assert.equal(await r.promise, true);
+  assert.equal(env._writeTextLog.length, 1);
+  assert.deepEqual(copied, [["copy", "Week 12 Oct\nMon 7:30-15:30"]]);
+  assert.equal(env._writeLog.length, 0, "no clipboard.write at all");
+});

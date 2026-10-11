@@ -28,7 +28,11 @@
 
     if (clipboard && typeof clipboard.writeText === "function") {
       writes.writeText = 1;
-      return { writes: writes, promise: clipboard.writeText(text) };
+      var p;
+      try { p = clipboard.writeText(text); } catch (e) { p = Promise.reject(e); }
+      // If the async clipboard refuses (permissions, older WebKit), try the
+      // execCommand fallback once. Still text only, never an image.
+      return { writes: writes, promise: Promise.resolve(p).then(function () { return true; }, function () { return execCopy(doc, text); }) };
     }
 
     var Item = env.ClipboardItem;
@@ -40,23 +44,26 @@
       return { writes: writes, promise: clipboard.write([item]) };
     }
 
-    if (doc && typeof doc.createElement === "function" && typeof doc.execCommand === "function") {
-      try {
-        var ta = doc.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        doc.body.appendChild(ta);
-        ta.select();
-        var ok = doc.execCommand("copy");
-        doc.body.removeChild(ta);
-        return { writes: writes, promise: Promise.resolve(ok) };
-      } catch (e) {
-        return { writes: writes, promise: Promise.resolve(false) };
-      }
-    }
+    return { writes: writes, promise: Promise.resolve(execCopy(doc, text)) };
+  }
 
-    return { writes: writes, promise: Promise.resolve(false) };
+  function execCopy(doc, text) {
+    if (!(doc && typeof doc.createElement === "function" && typeof doc.execCommand === "function")) return false;
+    try {
+      var ta = doc.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      doc.body.appendChild(ta);
+      ta.select();
+      if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+      var ok = doc.execCommand("copy");
+      doc.body.removeChild(ta);
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
   }
 
   /**
