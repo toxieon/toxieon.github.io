@@ -46,7 +46,7 @@
 
   const cfg = root.REEL_READER_CONFIG || {};
   const backendUrl = String(cfg.backendUrl || "").trim();
-  const maxUploadBytes = Number(cfg.maxUploadBytes) > 0 ? Number(cfg.maxUploadBytes) : 125829120;
+  const maxUploadBytes = Number(cfg.maxUploadBytes) > 0 ? Number(cfg.maxUploadBytes) : 104857600;
 
   backendTargetEl.textContent = backendUrl
     ? "Backend: " + backendUrl
@@ -103,7 +103,7 @@
     fileMetaEl.classList.remove("empty");
     fileMetaEl.textContent = file.name + " · " + formatBytes(file.size);
     if (file.size > maxUploadBytes) {
-      fileMetaEl.textContent += " (over limit — choose a shorter clip)";
+      fileMetaEl.textContent += " (over the " + formatBytes(maxUploadBytes) + " upload limit — trim it or pick a shorter clip)";
       uploadBtn.disabled = true;
     }
   }
@@ -151,7 +151,7 @@
       return;
     }
     if (selectedFile.size > maxUploadBytes) {
-      setStatus("Video is too large. Limit is " + formatBytes(maxUploadBytes) + ".", true);
+      setStatus("This video is " + formatBytes(selectedFile.size) + ". The upload limit is " + formatBytes(maxUploadBytes) + ". Trim it or pick a shorter clip.", true);
       return;
     }
 

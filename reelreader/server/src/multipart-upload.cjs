@@ -25,6 +25,8 @@ function receiveVideoUpload(req, limits) {
     async function fail(error) {
       if (settled) return;
       settled = true;
+      // Stop writing to disk; drain (and discard) the rest of the request body.
+      try { req.unpipe(bb); req.resume(); } catch (e) { /* ignore */ }
       if (tempDir) await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       reject(error);
     }
@@ -71,12 +73,12 @@ function receiveVideoUpload(req, limits) {
       const out = fs.createWriteStream(filePath);
 
       fileStream.on("limit", () => {
-        fail(new HttpError(413, "file_too_large", "Video is too large. Limit is " + formatSize(maxBytes) + "."));
+        fail(new HttpError(413, "file_too_large", "Video is too large. The upload limit is " + formatSize(maxBytes) + ". Trim it or pick a shorter clip."));
       });
 
       writePromise = pipeline(fileStream, out).catch((error) => {
         if (error && error.code === "LIMIT_FILE_SIZE") {
-          fail(new HttpError(413, "file_too_large", "Video is too large. Limit is " + formatSize(maxBytes) + "."));
+          fail(new HttpError(413, "file_too_large", "Video is too large. The upload limit is " + formatSize(maxBytes) + ". Trim it or pick a shorter clip."));
         } else {
           fail(error instanceof HttpError ? error : new HttpError(400, "invalid_request", "Upload was interrupted."));
         }
@@ -98,7 +100,7 @@ function receiveVideoUpload(req, limits) {
           throw new HttpError(400, "invalid_request", "Uploaded video file is empty.");
         }
         if (stat.size > maxBytes) {
-          throw new HttpError(413, "file_too_large", "Video is too large. Limit is " + formatSize(maxBytes) + ".");
+          throw new HttpError(413, "file_too_large", "Video is too large. The upload limit is " + formatSize(maxBytes) + ". Trim it or pick a shorter clip.");
         }
         done({ tempDir, filePath, mimeType, size: stat.size });
       } catch (error) {

@@ -5,6 +5,8 @@ const crypto = require("node:crypto");
 
 // CORS is locked to the production site; not configurable.
 const ALLOWED_ORIGIN = "https://www.neilldata.com";
+// Upload cap: 100 MB (matches maxUploadBytes in reelreader/config.js).
+const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
 const { HttpError } = require("./errors.cjs");
 const { validateBody } = require("./validation.cjs");
 const { runReelReader, runReelReaderUpload, DEFAULT_LIMITS } = require("./service.cjs");
@@ -36,7 +38,7 @@ function createServer(config = {}) {
       assertApiKey(req, apiKey);
 
       if (pathOnly === "/api/reel-reader/upload") {
-        const uploaded = await receiveVideoUpload(req, limits);
+        const uploaded = await receiveVideoUpload(req, Object.assign({}, limits, { maxBytes: Math.min(limits.maxBytes, UPLOAD_MAX_BYTES) }));
         const result = await withTimeout(
           runReelReaderUpload(uploaded, {
             geminiApiKey,
@@ -140,6 +142,7 @@ function withTimeout(promise, timeoutMs) {
 module.exports = {
   createServer,
   keysMatch,
+  UPLOAD_MAX_BYTES,
   ALLOWED_ORIGIN,
   readJsonBody,
   withTimeout

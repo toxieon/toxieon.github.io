@@ -27,6 +27,8 @@ async function analyzeVideoFile(filePath, apiKey, model) {
       config: { mimeType: "video/mp4", displayName: path.basename(filePath) }
     });
 
+    upload = await waitForActive(ai, upload);
+
     const response = await ai.models.generateContent({
       model: model || "gemini-2.5-flash",
       contents: [{
@@ -55,4 +57,19 @@ async function analyzeVideoFile(filePath, apiKey, model) {
   }
 }
 
-module.exports = { analyzeVideoFile };
+// Uploaded videos must finish processing (state ACTIVE) before they can be used.
+async function waitForActive(ai, file, timeoutMs = 120000, intervalMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  let current = file;
+  while (current && current.state && String(current.state).toUpperCase() === "PROCESSING") {
+    if (Date.now() > deadline) throw new HttpError(504, "timeout", "The AI step took too long to read the video. Try a shorter clip.");
+    await new Promise((r) => setTimeout(r, intervalMs));
+    current = await ai.files.get({ name: current.name });
+  }
+  if (current && current.state && String(current.state).toUpperCase() === "FAILED") {
+    throw new HttpError(502, "model_failed", "The AI step couldn't read this video. Try another clip.");
+  }
+  return current;
+}
+
+module.exports = { analyzeVideoFile, waitForActive };

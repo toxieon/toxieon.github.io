@@ -54,6 +54,7 @@ async function runReelReaderUpload(uploaded, opts = {}) {
     return buildPrompt(raw || {});
   } catch (error) {
     if (error instanceof HttpError) throw error;
+    (opts.log || console).error("[reel-reader] upload processing error: " + ((error && error.message) || error));
     throw new HttpError(502, "processing_failed", "Couldn't process that video. Try again or use a shorter clip.");
   } finally {
     await deps.cleanupTemp(tempDir);
