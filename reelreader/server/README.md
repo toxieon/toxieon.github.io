@@ -29,12 +29,14 @@ Small Node service for `POST /api/reel-reader` and `POST /api/reel-reader/upload
 - `GEMINI_API_KEY` – Gemini API key.
 - `REEL_READER_KEY` – shared key required by `x-reel-reader-key`.
 
-Errors come back as `{"error":{"code","message"}}` with a short message (codes include `source_blocked`, `source_private`, `source_unavailable`, `file_too_large`, `unsupported_type`, `video_too_long`, `timeout`, `convert_failed`, `model_failed`, `processing_failed`). The raw yt-dlp output is only written to the service log.
+- `GET /api/reel-reader/download/<token>` — one-time stream of the fetched link video (requires `x-reel-reader-key`; token from link-mode JSON `downloadToken`, expires in 10 minutes)
+
+Errors come back as `{"error":{"code","message"}}` with a short message (codes include `source_blocked`, `source_private`, `source_unavailable`, `file_too_large`, `unsupported_type`, `video_too_long`, `model_busy`, `timeout`, `convert_failed`, `model_failed`, `processing_failed`). The raw yt-dlp output is only written to the service log.
 
 ## Optional environment variables
 
 - `IG_COOKIES` – Netscape cookies file text for a throwaway Instagram account.
-- `GEMINI_MODEL` – defaults to `gemini-2.5-flash`.
+- `GEMINI_MODEL` – defaults to `gemini-3.5-flash`.
 - `REEL_READER_TIMEOUT_MS` – total request timeout (default `180000`).
 - `REEL_READER_COMMAND_TIMEOUT_MS` – per subprocess timeout (default `120000`).
 - `REEL_READER_MAX_DURATION_SEC` – max source duration (default `300`).

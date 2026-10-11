@@ -25,11 +25,13 @@ test("runReelReader calls downloader, analyzer and shapes response", async () =>
         steps: ["open pan", "add onions"],
         recipe: { ingredients: [{ item: "onion", quantity: "1" }], method: ["slice", "cook"] }
       }),
+      issueDownloadToken: () => "one-time-token",
       cleanupTemp: async (dir) => { calls.push("cleanup:" + dir); }
     }
   });
 
-  assert.deepEqual(calls, ["inspect", "download", "transcode:/tmp/reel-reader-test/input.webm", "cleanup:/tmp/reel-reader-test"]);
+  assert.deepEqual(calls, ["inspect", "download", "transcode:/tmp/reel-reader-test/input.webm"]);
+  assert.equal(result.downloadToken, "one-time-token");
   assert.equal(result.transcript, "hello world");
   assert.equal(result.caption, "cut onions");
   assert.deepEqual(result.steps, ["open pan", "add onions"]);

@@ -1,13 +1,14 @@
 "use strict";
 
 const { createServer } = require("./server.cjs");
+const { DEFAULT_GEMINI_MODEL } = require("./gemini-config.cjs");
 
 const port = Number(process.env.PORT || 8080);
 const server = createServer({
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   reelReaderKey: process.env.REEL_READER_KEY || "",
   igCookies: process.env.IG_COOKIES || "",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  geminiModel: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
   endpointTimeoutMs: Number(process.env.REEL_READER_TIMEOUT_MS || 180000),
   limits: {
     maxDurationSec: Number(process.env.REEL_READER_MAX_DURATION_SEC || 300),

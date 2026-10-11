@@ -258,15 +258,28 @@ button[disabled] {
 .output-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .output-head button {
   min-height: 36px;
   padding: 0 14px;
   font-size: 0.75rem;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--rr-text);
+  border: 1px solid var(--rr-border);
 }
 
 .output article + article {

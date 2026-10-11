@@ -2,23 +2,27 @@
 
 const http = require("node:http");
 const crypto = require("node:crypto");
+const { createDownloadTokenStore, streamDownloadFile, TOKEN_PATTERN } = require("./download-tokens.cjs");
 
 // CORS is locked to the production site; not configurable.
 const ALLOWED_ORIGIN = "https://www.neilldata.com";
-// Upload cap: 100 MB (matches maxUploadBytes in reelreader/config.js).
-const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
 const { HttpError } = require("./errors.cjs");
 const { validateBody } = require("./validation.cjs");
 const { runReelReader, runReelReaderUpload, DEFAULT_LIMITS } = require("./service.cjs");
 const { receiveVideoUpload } = require("./multipart-upload.cjs");
+const { DEFAULT_GEMINI_MODEL } = require("./gemini-config.cjs");
+
+const DOWNLOAD_PREFIX = "/api/reel-reader/download/";
+const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
 
 function createServer(config = {}) {
   const allowedOrigin = ALLOWED_ORIGIN;
   const apiKey = config.reelReaderKey || "";
   const geminiApiKey = config.geminiApiKey || "";
-  const model = config.geminiModel || "gemini-2.5-flash";
+  const model = config.geminiModel || DEFAULT_GEMINI_MODEL;
   const endpointTimeoutMs = Number(config.endpointTimeoutMs || 180000);
   const limits = Object.assign({}, DEFAULT_LIMITS, config.limits || {});
+  const downloadTokens = config.downloadTokens || createDownloadTokenStore();
 
   return http.createServer(async (req, res) => {
     try {
@@ -30,12 +34,25 @@ function createServer(config = {}) {
       }
 
       const pathOnly = String(req.url || "").split("?")[0];
+
+      if (req.method === "GET" && pathOnly.startsWith(DOWNLOAD_PREFIX)) {
+        assertApiKey(req, apiKey);
+        const token = decodeURIComponent(pathOnly.slice(DOWNLOAD_PREFIX.length));
+        if (!TOKEN_PATTERN.test(token)) {
+          throw new HttpError(404, "download_not_found", "Download link is invalid or expired.");
+        }
+        const entry = downloadTokens.redeem(token);
+        streamDownloadFile(entry, res);
+        return;
+      }
+
       if (req.method !== "POST") {
         sendJson(res, 404, { error: { code: "not_found", message: "Endpoint not found." } });
         return;
       }
 
       assertApiKey(req, apiKey);
+      const geminiDeadlineMs = Date.now() + endpointTimeoutMs;
 
       if (pathOnly === "/api/reel-reader/upload") {
         const uploaded = await receiveVideoUpload(req, Object.assign({}, limits, { maxBytes: Math.min(limits.maxBytes, UPLOAD_MAX_BYTES) }));
@@ -44,6 +61,7 @@ function createServer(config = {}) {
             geminiApiKey,
             model,
             limits,
+            geminiDeadlineMs,
             deps: config.deps
           }),
           endpointTimeoutMs
@@ -61,6 +79,8 @@ function createServer(config = {}) {
             model,
             igCookies: config.igCookies || "",
             limits,
+            geminiDeadlineMs,
+            downloadTokens,
             deps: config.deps
           }),
           endpointTimeoutMs
@@ -75,7 +95,8 @@ function createServer(config = {}) {
       const status = error instanceof HttpError ? error.status : 500;
       const code = error instanceof HttpError ? error.code : "internal_error";
       const message = error instanceof HttpError ? error.message : "Unexpected server error.";
-      sendJson(res, status, { error: { code, message } });
+      if (!res.headersSent) sendJson(res, status, { error: { code, message } });
+      else res.end();
     }
   });
 }
@@ -101,7 +122,7 @@ function setCors(req, res, allowedOrigin) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Headers", "content-type,x-reel-reader-key");
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
 }
 
 function readJsonBody(req, maxBytes) {
@@ -142,8 +163,9 @@ function withTimeout(promise, timeoutMs) {
 module.exports = {
   createServer,
   keysMatch,
-  UPLOAD_MAX_BYTES,
   ALLOWED_ORIGIN,
   readJsonBody,
-  withTimeout
+  withTimeout,
+  DOWNLOAD_PREFIX,
+  UPLOAD_MAX_BYTES
 };
