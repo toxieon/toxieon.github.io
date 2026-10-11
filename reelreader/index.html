@@ -18,11 +18,11 @@
       content="Paste a reel link or upload a video for transcript, captions, steps and recipe details."
     />
     <link rel="stylesheet" href="../shared/nd-core.css" />
-    <link rel="stylesheet" href="./styles.css?v=0.2.1" />
+    <link rel="stylesheet" href="./styles.css?v=0.3.1" />
     <script src="../shared/nd-ui.js"></script>
-    <script src="./config.js?v=0.2.1"></script>
+    <script src="./config.js?v=0.3.1"></script>
     <script src="../shared/nd-pwa.js" defer></script>
-    <script src="./app.js?v=0.2.1" defer></script>
+    <script src="./app.js?v=0.3.1" defer></script>
   </head>
   <body>
     <main class="app-shell">
@@ -90,7 +90,10 @@
       <section class="card output" aria-labelledby="output-heading">
         <div class="output-head">
           <h2 id="output-heading">Prompt output</h2>
-          <button id="copy-btn" type="button" disabled>Copy full prompt</button>
+          <div class="output-actions">
+            <button id="download-btn" type="button" class="secondary" hidden disabled>Download video</button>
+            <button id="copy-btn" type="button" disabled>Copy full prompt</button>
+          </div>
         </div>
         <article>
           <h3>Transcript</h3>
@@ -111,7 +114,7 @@
         </article>
       </section>
 
-      <footer class="app-footer">Reel Reader v0.2.1</footer>
+      <footer class="app-footer">Reel Reader v0.3.1</footer>
     </main>
   </body>
 </html>

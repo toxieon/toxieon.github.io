@@ -20,6 +20,7 @@
   const statusEl = document.getElementById("status");
   const backendTargetEl = document.getElementById("backend-target");
   const copyBtn = document.getElementById("copy-btn");
+  const downloadBtn = document.getElementById("download-btn");
   const transcriptEl = document.getElementById("transcript-text");
   const captionEl = document.getElementById("caption-text");
   const stepsListEl = document.getElementById("steps-list");
@@ -43,6 +44,8 @@
   let activeMode = "link";
   let selectedFile = null;
   let uploadXhr = null;
+  let linkDownloadToken = "";
+  let uploadDownloadFile = null;
 
   const cfg = root.REEL_READER_CONFIG || {};
   const backendUrl = String(cfg.backendUrl || "").trim();
@@ -65,6 +68,16 @@
     copyText(currentPrompt)
       .then(function () { notify("Prompt copied."); })
       .catch(function () { notify("Copy failed. Select and copy manually.", true); });
+  });
+
+  downloadBtn.addEventListener("click", function () {
+    if (activeMode === "upload" && uploadDownloadFile) {
+      saveLocalFile(uploadDownloadFile);
+      return;
+    }
+    if (linkDownloadToken) {
+      downloadFromServer(linkDownloadToken);
+    }
   });
 
   form.addEventListener("submit", function (event) {
@@ -265,11 +278,27 @@
 
     currentPrompt = textValue(payload.prompt) || buildFallbackPrompt(transcript, caption, steps, recipeText);
     copyBtn.disabled = !currentPrompt;
+
+    linkDownloadToken = textValue(payload.downloadToken);
+    if (activeMode === "upload" && selectedFile) {
+      uploadDownloadFile = selectedFile;
+      showDownloadButton(true);
+    } else if (linkDownloadToken) {
+      uploadDownloadFile = null;
+      showDownloadButton(true);
+    } else {
+      uploadDownloadFile = null;
+      linkDownloadToken = "";
+      showDownloadButton(false);
+    }
   }
 
   function clearOutput() {
     currentPrompt = "";
     copyBtn.disabled = true;
+    linkDownloadToken = "";
+    uploadDownloadFile = null;
+    showDownloadButton(false);
     transcriptEl.textContent = "Working...";
     captionEl.textContent = "Working...";
     stepsListEl.innerHTML = "";
@@ -395,6 +424,66 @@
       "Recipe details:",
       recipeText
     ].join("\n");
+  }
+
+  function showDownloadButton(on) {
+    downloadBtn.hidden = !on;
+    downloadBtn.disabled = !on;
+  }
+
+  function saveLocalFile(file) {
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.name || "reel-reader-video.mp4";
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    notify("Video download started.");
+  }
+
+  function downloadFromServer(token) {
+    const apiKey = apiKeyInput.value.trim();
+    if (!ensureReady(apiKey)) return;
+    downloadBtn.disabled = true;
+    setStatus("Preparing video download…", false);
+
+    fetch(withApiPath(backendUrl, "/api/reel-reader/download/" + encodeURIComponent(token)), {
+      method: "GET",
+      headers: { "x-reel-reader-key": apiKey }
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          return response.json().catch(function () { return {}; }).then(function (payload) {
+            const message = payload.error && payload.error.message
+              ? payload.error.message
+              : "Download failed with HTTP " + response.status + ".";
+            throw new Error(message);
+          });
+        }
+        return response.blob();
+      })
+      .then(function (blob) {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "reel-reader-video.mp4";
+        anchor.rel = "noopener";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        linkDownloadToken = "";
+        showDownloadButton(false);
+        setStatus("Video downloaded.", false);
+        notify("Video download started.");
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Download failed.", true);
+        downloadBtn.disabled = false;
+      });
   }
 
   function copyText(text) {
