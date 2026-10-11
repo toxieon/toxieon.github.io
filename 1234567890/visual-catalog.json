@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-11",
-  "count": 236,
+  "count": 244,
   "categories": [
     {
       "id": "1234567890/favicon.svg",
@@ -457,6 +457,51 @@
       "name": "Quote",
       "href": "/assets/suite-icons/apps/quote.svg",
       "preview": "/assets/suite-icons/apps/quote.svg",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/reelreader-180.png",
+      "name": "Reelreader 180",
+      "href": "/assets/suite-icons/apps/reelreader-180.png",
+      "preview": "/assets/suite-icons/apps/reelreader-180.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/reelreader-192.png",
+      "name": "Reelreader 192",
+      "href": "/assets/suite-icons/apps/reelreader-192.png",
+      "preview": "/assets/suite-icons/apps/reelreader-192.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/reelreader-32.png",
+      "name": "Reelreader 32",
+      "href": "/assets/suite-icons/apps/reelreader-32.png",
+      "preview": "/assets/suite-icons/apps/reelreader-32.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/reelreader-512.png",
+      "name": "Reelreader 512",
+      "href": "/assets/suite-icons/apps/reelreader-512.png",
+      "preview": "/assets/suite-icons/apps/reelreader-512.png",
+      "source": "Suite shared /assets",
+      "category": "Suite library",
+      "subcategory": "App icons"
+    },
+    {
+      "id": "assets/suite-icons/apps/reelreader.svg",
+      "name": "Reelreader",
+      "href": "/assets/suite-icons/apps/reelreader.svg",
+      "preview": "/assets/suite-icons/apps/reelreader.svg",
       "source": "Suite shared /assets",
       "category": "Suite library",
       "subcategory": "App icons"
@@ -1945,6 +1990,33 @@
       "source": "reelreader",
       "category": "reelreader",
       "subcategory": "Favicon"
+    },
+    {
+      "id": "reelreader/icons/icon-180.png",
+      "name": "Icon 180",
+      "href": "/reelreader/icons/icon-180.png",
+      "preview": "/reelreader/icons/icon-180.png",
+      "source": "reelreader",
+      "category": "reelreader",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "reelreader/icons/icon-192.png",
+      "name": "Icon 192",
+      "href": "/reelreader/icons/icon-192.png",
+      "preview": "/reelreader/icons/icon-192.png",
+      "source": "reelreader",
+      "category": "reelreader",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "reelreader/icons/icon-512.png",
+      "name": "Icon 512",
+      "href": "/reelreader/icons/icon-512.png",
+      "preview": "/reelreader/icons/icon-512.png",
+      "source": "reelreader",
+      "category": "reelreader",
+      "subcategory": "PWA / home-screen icons"
     },
     {
       "id": "search/favicon.svg",

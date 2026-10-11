@@ -6,9 +6,9 @@ const icons = require('./suite-icons.js');
 
 test('catalog has unique stable app and utility identities and matching exported SVGs', () => {
   const all = icons.list();
-  assert.equal(all.length, 37);
+  assert.equal(all.length, 38);
   assert.equal(new Set(all.map(icon => icon.id)).size, all.length);
-  assert.equal(icons.list({ kind: 'app' }).length, 13);
+  assert.equal(icons.list({ kind: 'app' }).length, 14);
   assert.equal(icons.list({ kind: 'ui' }).length, 24);
   for (const icon of all) {
     assert.match(icon.id, /^(app|ui)-[a-z-]+$/);
