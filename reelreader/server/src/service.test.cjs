@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { runReelReader } = require("./service.cjs");
+const { runReelReader, runReelReaderUpload } = require("./service.cjs");
 const { HttpError } = require("./errors.cjs");
 
 test("runReelReader calls downloader, analyzer and shapes response", async () => {
@@ -35,6 +35,39 @@ test("runReelReader calls downloader, analyzer and shapes response", async () =>
   assert.deepEqual(result.steps, ["open pan", "add onions"]);
   assert.equal(result.recipe.ingredients[0].item, "onion");
   assert.match(result.prompt, /Speech transcript:/);
+});
+
+test("runReelReaderUpload probes, transcodes, analyzes and cleans up", async () => {
+  const calls = [];
+  const result = await runReelReaderUpload({
+    tempDir: "/tmp/reel-upload",
+    filePath: "/tmp/reel-upload/clip.mov",
+    mimeType: "video/quicktime",
+    size: 1024
+  }, {
+    geminiApiKey: "x",
+    deps: {
+      probeUploadedVideo: async () => { calls.push("probe"); },
+      ensureMp4: async (filePath) => {
+        calls.push("transcode:" + filePath);
+        return "/tmp/reel-upload/clip.mp4";
+      },
+      analyzeVideoFile: async (filePath) => {
+        calls.push("analyze:" + filePath);
+        return { transcript: "hi", caption: "text", steps: ["step"], recipe: null };
+      },
+      cleanupTemp: async (dir) => { calls.push("cleanup:" + dir); }
+    }
+  });
+
+  assert.deepEqual(calls, [
+    "probe",
+    "transcode:/tmp/reel-upload/clip.mov",
+    "analyze:/tmp/reel-upload/clip.mp4",
+    "cleanup:/tmp/reel-upload"
+  ]);
+  assert.equal(result.transcript, "hi");
+  assert.equal(result.recipe, null);
 });
 
 test("runReelReader maps unexpected errors to HttpError", async () => {

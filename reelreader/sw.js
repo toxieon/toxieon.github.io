@@ -1,11 +1,11 @@
-const CACHE_VERSION = "reelreader-0.1.2";
+const CACHE_VERSION = "reelreader-0.2.1";
 const CACHE_PREFIX = "reelreader-";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=0.1.2",
-  "./app.js?v=0.1.2",
-  "./config.js?v=0.1.2",
+  "./styles.css?v=0.2.1",
+  "./app.js?v=0.2.1",
+  "./config.js?v=0.2.1",
   "./manifest.json",
   "./favicon.svg",
   "../assets/suite-icons/apps/hub-180.png",

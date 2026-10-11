@@ -20,31 +20,38 @@ const ANALYSIS_INSTRUCTION = [
 async function analyzeVideoFile(filePath, apiKey, model) {
   if (!apiKey) throw new HttpError(500, "missing_config", "GEMINI_API_KEY is not configured.");
   const ai = new GoogleGenAI({ apiKey });
-  const upload = await ai.files.upload({
-    file: filePath,
-    config: { mimeType: "video/mp4", displayName: path.basename(filePath) }
-  });
-
-  const response = await ai.models.generateContent({
-    model: model || "gemini-2.5-flash",
-    contents: [{
-      role: "user",
-      parts: [
-        { text: ANALYSIS_INSTRUCTION },
-        { fileData: { mimeType: upload.mimeType || "video/mp4", fileUri: upload.uri } }
-      ]
-    }],
-    config: {
-      responseMimeType: "application/json"
-    }
-  });
-
-  const text = response && response.text ? String(response.text).trim() : "";
-  if (!text) throw new HttpError(502, "model_failed", "Gemini returned an empty response.");
+  let upload = null;
   try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new HttpError(502, "model_failed", "Gemini returned invalid JSON.");
+    upload = await ai.files.upload({
+      file: filePath,
+      config: { mimeType: "video/mp4", displayName: path.basename(filePath) }
+    });
+
+    const response = await ai.models.generateContent({
+      model: model || "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          { text: ANALYSIS_INSTRUCTION },
+          { fileData: { mimeType: upload.mimeType || "video/mp4", fileUri: upload.uri } }
+        ]
+      }],
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = response && response.text ? String(response.text).trim() : "";
+    if (!text) throw new HttpError(502, "model_failed", "Gemini returned an empty response.");
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      throw new HttpError(502, "model_failed", "Gemini returned invalid JSON.");
+    }
+  } finally {
+    if (upload && upload.name) {
+      await ai.files.delete({ name: upload.name }).catch(() => {});
+    }
   }
 }
 

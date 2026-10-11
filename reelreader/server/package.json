@@ -12,6 +12,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@google/genai": "2.28.0"
+    "@google/genai": "2.28.0",
+    "busboy": "1.6.0"
   }
 }

@@ -110,6 +110,21 @@ async function ensureMp4(inputPath, timeoutMs) {
   return outPath;
 }
 
+async function probeUploadedVideo(filePath, limits, timeoutMs) {
+  const args = [
+    "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    filePath
+  ];
+  const { stdout } = await runCommand("ffprobe", args, { timeoutMs });
+  const duration = Number(String(stdout).trim());
+  if (Number.isFinite(duration) && duration > limits.maxDurationSec) {
+    throw new HttpError(413, "video_too_long", "Video is too long. Limit is " + limits.maxDurationSec + " seconds.");
+  }
+  return { duration: Number.isFinite(duration) ? duration : 0 };
+}
+
 async function cleanupTemp(dirPath) {
   if (!dirPath) return;
   await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
@@ -125,6 +140,7 @@ module.exports = {
   inspectVideo,
   downloadVideo,
   ensureMp4,
+  probeUploadedVideo,
   cleanupTemp,
   formatSize
 };

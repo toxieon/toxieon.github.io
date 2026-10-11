@@ -2,7 +2,7 @@
 
 const { HttpError } = require("./errors.cjs");
 const { toFriendlyError } = require("./friendly-errors.cjs");
-const { inspectVideo, downloadVideo, ensureMp4, cleanupTemp } = require("./media-tools.cjs");
+const { inspectVideo, downloadVideo, ensureMp4, probeUploadedVideo, cleanupTemp } = require("./media-tools.cjs");
 const { buildPrompt } = require("./response-shaper.cjs");
 
 const DEFAULT_LIMITS = {
@@ -37,8 +37,31 @@ async function runReelReader(url, opts = {}) {
   }
 }
 
+async function runReelReaderUpload(uploaded, opts = {}) {
+  const limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
+  const deps = {
+    probeUploadedVideo: (opts.deps && opts.deps.probeUploadedVideo) || probeUploadedVideo,
+    ensureMp4: (opts.deps && opts.deps.ensureMp4) || ensureMp4,
+    analyzeVideoFile: (opts.deps && opts.deps.analyzeVideoFile) || loadGeminiAnalyzer(),
+    cleanupTemp: (opts.deps && opts.deps.cleanupTemp) || cleanupTemp
+  };
+
+  const tempDir = uploaded.tempDir;
+  try {
+    await deps.probeUploadedVideo(uploaded.filePath, limits, limits.commandTimeoutMs);
+    const normalizedPath = await deps.ensureMp4(uploaded.filePath, limits.commandTimeoutMs);
+    const raw = await deps.analyzeVideoFile(normalizedPath, opts.geminiApiKey, opts.model);
+    return buildPrompt(raw || {});
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(502, "processing_failed", "Couldn't process that video. Try again or use a shorter clip.");
+  } finally {
+    await deps.cleanupTemp(tempDir);
+  }
+}
+
 function loadGeminiAnalyzer() {
   return require("./gemini-client.cjs").analyzeVideoFile;
 }
 
-module.exports = { DEFAULT_LIMITS, runReelReader };
+module.exports = { DEFAULT_LIMITS, runReelReader, runReelReaderUpload };
