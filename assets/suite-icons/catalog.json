@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "provenance": "Original geometric SVG artwork created for Neill Data Suite, October 2026. No third-party artwork or icon-font dependency.",
   "pngSizes": [
     32,
@@ -188,6 +188,21 @@
         "folder",
         "version",
         "image"
+      ]
+    },
+    {
+      "id": "app-reelreader",
+      "label": "Reel Reader",
+      "kind": "app",
+      "color": "#f472b6",
+      "file": "assets/suite-icons/apps/reelreader.svg",
+      "recommendation": "Hub tile and reelreader/favicon.svg; a portrait reel frame with a play mark turning into lines of text.",
+      "tags": [
+        "reel",
+        "video",
+        "transcript",
+        "recipe",
+        "text"
       ]
     },
     {

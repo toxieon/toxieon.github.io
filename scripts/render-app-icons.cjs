@@ -30,6 +30,7 @@ const APPS = [
   { folder: "1234567890", icon: "assets", title: "Assets" },
   { folder: "company", icon: "company", title: "Company" },
   { folder: "ico", icon: "ico", title: "ICO" },
+  { folder: "reelreader", icon: "reelreader", title: "Reel Reader" },
   { folder: "hub", icon: "hub", title: "Hub" }
 ];
 

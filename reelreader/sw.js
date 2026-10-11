@@ -1,16 +1,16 @@
-const CACHE_VERSION = "reelreader-0.3.1";
+const CACHE_VERSION = "reelreader-0.3.2";
 const CACHE_PREFIX = "reelreader-";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=0.3.1",
-  "./app.js?v=0.3.1",
-  "./config.js?v=0.3.1",
+  "./styles.css?v=0.3.2",
+  "./app.js?v=0.3.2",
+  "./config.js?v=0.3.2",
   "./manifest.json",
   "./favicon.svg",
-  "../assets/suite-icons/apps/hub-180.png",
-  "../assets/suite-icons/apps/hub-192.png",
-  "../assets/suite-icons/apps/hub-512.png",
+  "./icons/icon-180.png",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
   "../shared/nd-core.css",
   "../shared/nd-ui.js",
   "../shared/nd-pwa.js"

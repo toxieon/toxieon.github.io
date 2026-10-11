@@ -1,6 +1,6 @@
 # Neill Data Suite icon library
 
-37 original geometric SVGs: 13 app identities and 24 interface symbols. These are proposed assets; this library does not replace any live favicon, manifest or app icon automatically.
+38 original geometric SVGs: 14 app identities and 24 interface symbols. These are proposed assets; this library does not replace any live favicon, manifest or app icon automatically.
 
 App tiles share a dark rounded surface and a large functional glyph, using the existing `hub/apps.json` colours. Hub uses the suite teal and Checklist uses its completion green. The glyphs are designed to remain recognisable at 16–32 px. Review `preview.png` or `preview.svg` for the family at 16, 32 and 64 px.
 
@@ -46,6 +46,7 @@ Metadata contains `id`, `label`, `kind` (`app` or `ui`), `color`, `file`, `recom
 | Company | Team | Hub tile (**in use**, 1.2.0); `company/favicon.svg` |
 | Website | Globe | Root public-site favicon |
 | ICO Generator | Stacked navy icon tile with name/version lines | `ico/favicon.svg` and hub tile (**in use**, 1.1.0) |
+| Reel Reader | Portrait reel frame with a play mark turning into text lines (`#f472b6`) | `reelreader/favicon.svg` and hub tile (**in use**, 1.3.0) |
 
 Hub tiles for Planner, Upload, Search, Quote, SWB, Fit-off, Assets and Company point at `/assets/suite-icons/apps/<name>.svg?v=<library version>` through `hub/discover.json` "overrides" (an override `icon` beats the page favicon, so without it the hub shows each app's own `favicon.svg`). Timesheet keeps its own icon; ICO's favicon already is its suite icon. Bump the `?v=` there when the art changes. The apps' own favicons are unchanged.
 
@@ -72,4 +73,4 @@ Then patch-bump each changed app per its VERSIONING.md (service worker caches pr
 
 SVG/catalog generation uses only Node built-ins. PNG generation uses an existing `sharp` installation; optionally set `ND_SHARP_PATH` to its absolute module path. No dependencies are added to this repository. All exported art is defined in `assets/suite-icons.js`; regenerate exports after changes.
 
-Provenance: original artwork created for Neill Data Suite, October 2026 (ICO Generator icon added 2026-10-06, library 1.1.0; Planner, Upload, Search and Quote redrawn 2026-10-06, library 1.2.0). No third-party icon collection, font or copied artwork is included.
+Provenance: original artwork created for Neill Data Suite, October 2026 (ICO Generator icon added 2026-10-06, library 1.1.0; Planner, Upload, Search and Quote redrawn 2026-10-06, library 1.2.0; Reel Reader added 2026-10-11, library 1.3.0). No third-party icon collection, font or copied artwork is included.

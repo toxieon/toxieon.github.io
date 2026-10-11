@@ -1,3 +1,5 @@
+## 1.2.3 · 2026-10-11 · reelreader-icon · Visual library catalogue now includes the Reel Reader suite icon and home-screen PNGs (244 items). Service worker `assets-1.2.3`
+
 ## 1.2.2 · 2026-10-11 · reelreader-catalog · Visual library catalogue now includes the Reel Reader icon. Service worker `assets-1.2.2`
 
 ## 1.2.1 · 2026-10-10 · visual-inventory · Full visual asset library at `/1234567890/visual/`: scans the suite apps for logos, icons, SVGs and illustrations, grouped by app (Hub, Planner, Quote, SWB, …), plus TipDash art (bookmaker marks, match FX, brand icons, AFL guernsey SVGs; allow-listed folders only). Removed internal-only assets. Fonts under the SIL OFL are not included (permissive licences only); see assets/tipdash/NOTICES.txt. Build: `npm run visual:catalog`. Service worker `assets-1.2.1` (cleans up only its own old caches)
