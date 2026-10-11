@@ -51,6 +51,7 @@ function createServer(config = {}) {
 
       sendJson(res, 200, result);
     } catch (error) {
+      if (!(error instanceof HttpError)) console.error("[reel-reader] unexpected error: " + ((error && error.stack) || error));
       const status = error instanceof HttpError ? error.status : 500;
       const code = error instanceof HttpError ? error.code : "internal_error";
       const message = error instanceof HttpError ? error.message : "Unexpected server error.";

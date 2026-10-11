@@ -21,7 +21,20 @@ RUN set -eu; base="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VE
   echo "${YTDLP_SHA256}  /tmp/yt-dlp" | sha256sum -c -; \
   install -m 0755 /tmp/yt-dlp /usr/local/bin/yt-dlp; \
   rm -f /tmp/yt-dlp /tmp/SHA2-256SUMS; \
+  yt-dlp --version
+
+# Deno (MIT): JavaScript runtime yt-dlp needs for YouTube. Pinned to the
+# version yt-dlp 2026.08.19 pins, with the release's published SHA-256.
+ARG DENO_VERSION=v2.9.5
+ARG DENO_SHA256=8b010a3b1a4a0188a67cdb8a7a27348b2a501af78aec7fc74f2ace167368d530
+RUN set -eu; \
+  curl -fsSL -o /tmp/deno.zip "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip"; \
+  echo "${DENO_SHA256}  /tmp/deno.zip" | sha256sum -c -; \
+  python3 -c "import zipfile; zipfile.ZipFile('/tmp/deno.zip').extract('deno', '/usr/local/bin')"; \
+  chmod 0755 /usr/local/bin/deno; \
+  rm -f /tmp/deno.zip; \
   apt-get purge -y --auto-remove curl; \
+  deno --version; \
   yt-dlp --version
 
 COPY package*.json ./
