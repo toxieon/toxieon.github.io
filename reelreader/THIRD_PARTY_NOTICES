@@ -3,9 +3,11 @@ Reel Reader third-party notices
 
 This app includes or invokes the following third-party components.
 
-1) yt-dlp (Unlicense)
----------------------
+1) yt-dlp 2026.08.19 (Unlicense)
+--------------------------------
 Project: https://github.com/yt-dlp/yt-dlp
+Version: 2026.08.19 (official release binary `yt-dlp`, SHA-256 verified;
+downloaded when the Docker image is built, not stored in this repo)
 License: Unlicense
 
 This is free and unencumbered software released into the public domain.
@@ -217,8 +219,8 @@ END OF TERMS AND CONDITIONS
 
 3) ffmpeg (separate program, not redistributed)
 -----------------------------------------------
-The Docker image installs Debian's `ffmpeg` package (and Debian's `yt-dlp`
-package) with apt at image build time. Neither is copied into or
+The Docker image installs Debian's `ffmpeg` package (and `python3`, which
+runs yt-dlp) with apt at image build time. Neither is copied into or
 redistributed from this repository. Reel Reader does not link to any ffmpeg
 library: it calls the `ffmpeg` executable as a separate program through a
 subprocess (argument array, no shell) only when a download needs converting
