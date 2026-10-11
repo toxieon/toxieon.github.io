@@ -55,7 +55,7 @@ function createServer(config = {}) {
       const geminiDeadlineMs = Date.now() + endpointTimeoutMs;
 
       if (pathOnly === "/api/reel-reader/upload") {
-        const uploaded = await receiveVideoUpload(req, limits);
+        const uploaded = await receiveVideoUpload(req, Object.assign({}, limits, { maxBytes: Math.min(limits.maxBytes, UPLOAD_MAX_BYTES) }));
         const result = await withTimeout(
           runReelReaderUpload(uploaded, {
             geminiApiKey,

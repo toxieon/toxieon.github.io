@@ -57,7 +57,18 @@ function createDownloadTokenStore(opts = {}) {
     return entry;
   }
 
-  return { issue, redeem, purgeExpired, _entries: entries };
+  // TTL sweep: files from link mode that are never downloaded are removed
+  // within a minute of their token expiring, even with no further requests.
+  const sweepMs = opts.sweepMs || 60 * 1000;
+  const timer = setInterval(purgeExpired, sweepMs);
+  if (timer.unref) timer.unref();
+
+  function close() {
+    clearInterval(timer);
+    for (const [key, entry] of entries) revokeEntry(key, entry);
+  }
+
+  return { issue, redeem, purgeExpired, close, _entries: entries };
 }
 
 function streamDownloadFile(entry, res) {
@@ -80,6 +91,12 @@ function streamDownloadFile(entry, res) {
     "content-disposition": 'attachment; filename="reel-reader-video.mp4"'
   });
   const stream = fs.createReadStream(resolved);
+  // Single use: the token is already gone, so always remove the file when the
+  // response finishes or the client disconnects part-way.
+  res.on("close", () => {
+    stream.destroy();
+    cleanupTemp(entry.tempDir).catch(() => {});
+  });
   stream.on("error", () => {
     if (!res.headersSent) res.writeHead(500);
     res.end();

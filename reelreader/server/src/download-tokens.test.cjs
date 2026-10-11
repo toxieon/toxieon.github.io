@@ -35,3 +35,20 @@ test("download token rejects path traversal tokens", () => {
     (error) => error instanceof HttpError && error.code === "download_not_found"
   );
 });
+
+test("TTL sweep removes undownloaded files without any further requests", async () => {
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const path = require("node:path");
+  const { createDownloadTokenStore } = require("./download-tokens.cjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "reel-reader-sweep-"));
+  const file = path.join(dir, "v.mp4");
+  fs.writeFileSync(file, "x");
+  const store = createDownloadTokenStore({ ttlMs: 20, sweepMs: 10 });
+  const token = store.issue(file, dir);
+  assert.ok(Buffer.from(token, "base64url").length >= 16, "at least 128 bits");
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(fs.existsSync(dir), false);
+  assert.equal(store._entries.size, 0);
+  store.close();
+});
