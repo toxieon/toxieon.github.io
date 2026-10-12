@@ -80,6 +80,10 @@ if (scrollLog.length < 2 || distinctY.size < 2) {
   server.close();
   process.exit(1);
 }
+if (!meta.record?.pageText?.includes('Question')) {
+  console.error('FAIL: pageText missing Question', meta.record?.pageText?.slice(0, 200));
+  process.exit(1);
+}
 
 const viewerTarget = await browser.waitForTarget(
   (t) => t.type() === 'page' && t.url().includes('viewer/viewer.html'),
@@ -106,6 +110,14 @@ const downloadWorked = await viewerPage.evaluate(() => {
 });
 if (!downloadWorked) {
   console.error('FAIL: download hook / record missing PNG');
+  process.exit(1);
+}
+
+await viewerPage.click('#btn-search');
+await viewerPage.type('#search-input', 'Question');
+const hits = await viewerPage.evaluate(() => document.querySelectorAll('.text-layer .search-hit').length);
+if (hits < 1) {
+  console.error('FAIL: search should highlight Question spans', hits);
   process.exit(1);
 }
 

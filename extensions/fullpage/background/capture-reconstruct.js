@@ -13,9 +13,11 @@ export async function captureTabReconstruct(tabId, options = {}) {
   await onProgress?.(10, 'Expanding lazy content…');
   await callPageTool(tabId, 'prepareForCapture', [{ expandLazy: true }]);
   await onProgress?.(40, 'Inlining styles & images…');
-  const html = await callPageTool(tabId, 'reconstructHtml', [
+  const bundle = await callPageTool(tabId, 'captureTextBundle', [
     { inlineImages: options.inlineImages !== false },
   ]);
+  await callPageTool(tabId, 'restoreScrollPosition', []).catch(() => {});
+  const html = bundle.html;
   const metrics = await callPageTool(tabId, 'getPageMetrics', []);
 
   await onProgress?.(80, 'Building searchable PDF…');
@@ -40,7 +42,10 @@ export async function captureTabReconstruct(tabId, options = {}) {
     metrics,
     html,
     pdfDataUrl,
+    pageText: bundle.pageText,
+    textLayer: bundle.textLayer,
     pageCount: 1,
+    searchable: true,
     pages: [{ title: metrics.title, url: metrics.url, html }],
   };
   if (!options.skipStore) {

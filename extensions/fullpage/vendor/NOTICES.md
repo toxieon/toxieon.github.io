@@ -2,7 +2,12 @@
 
 ## jsPDF 2.5.1
 
-- Source: vendored from `shared/vendor/jspdf/jspdf.umd.min.js` in this repository
-- License: MIT — see `JSPDF-LICENSE.txt`
+- File: `jspdf.umd.min.js`
+- Licence: MIT — `JSPDF-LICENSE.txt`
 
-All other source files in this extension are original work for Neill Full Page Capture.
+## pdf-lib 1.17.1
+
+- File: `pdf-lib.esm.min.js` (and `pdf-lib.min.js` reference build)
+- Licence: MIT — `PDF-LIB-LICENSE.md`
+
+Extension source otherwise original. See `LIBRARIES.md` for rationale.

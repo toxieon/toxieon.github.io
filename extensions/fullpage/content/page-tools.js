@@ -373,6 +373,66 @@
     return '<!DOCTYPE html>\n' + clone.outerHTML;
   }
 
+  function isVisibleTextNode(node) {
+    const parent = node.parentElement;
+    if (!parent) return false;
+    if (parent.closest('script, style, noscript, svg, [hidden], [aria-hidden="true"]')) return false;
+    if (isIgnoredScroller(parent) && parent.closest('[data-region="drawer"]')) return false;
+    const style = getComputedStyle(parent);
+    if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') return false;
+    const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+    return text.length > 0;
+  }
+
+  function extractTextLayer() {
+    window.scrollTo(captureScrollState?.windowX ?? 0, 0);
+    const pageWidth = document.documentElement.scrollWidth;
+    const pageHeight = documentScrollHeight();
+    const items = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!isVisibleTextNode(node)) continue;
+      const raw = node.textContent.replace(/\s+/g, ' ').trim();
+      if (!raw) continue;
+      range.selectNodeContents(node);
+      const rects = range.getClientRects();
+      for (const rect of rects) {
+        if (rect.width < 1 || rect.height < 1) continue;
+        const left = rect.left + window.scrollX;
+        const top = rect.top + window.scrollY;
+        if (top > pageHeight + 4) continue;
+        items.push({
+          text: raw,
+          left: Math.round(left * 10) / 10,
+          top: Math.round(top * 10) / 10,
+          width: Math.round(rect.width * 10) / 10,
+          height: Math.round(rect.height * 10) / 10,
+        });
+      }
+    }
+    const plainText = items.map((i) => i.text).join('\n');
+    return { pageWidth, pageHeight, items, plainText };
+  }
+
+  async function captureTextBundle(options = {}) {
+    window.scrollTo(captureScrollState?.windowX ?? 0, 0);
+    await sleep(80);
+    const textLayer = extractTextLayer();
+    const html = await reconstructHtml({ inlineImages: options.inlineImages !== false });
+    return { html, textLayer, pageText: textLayer.plainText || stripPlainFromHtml(html) };
+  }
+
+  function stripPlainFromHtml(html) {
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      return doc.body?.innerText || '';
+    } catch {
+      return '';
+    }
+  }
+
   function findPaginationLinks(limit = 25) {
     const url = new URL(location.href);
     const scored = [];
@@ -412,6 +472,8 @@
     beforeCaptureSlice,
     restoreScrollPosition,
     reconstructHtml,
+    extractTextLayer,
+    captureTextBundle,
     findPaginationLinks,
   };
 })();

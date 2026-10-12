@@ -300,3 +300,39 @@ button.ghost {
   font-size: 0.8rem;
   margin: 0;
 }
+
+.capture-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.capture-stack img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.text-layer span {
+  position: absolute;
+  color: transparent;
+  user-select: text;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.text-layer span.search-hit {
+  background: rgba(255, 235, 59, 0.55);
+  outline: 1px solid #f9a825;
+}

@@ -1,6 +1,6 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.2.2** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only).
+Version **0.2.3** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only).
 
 ## UX (GoFullPage-style core + our extras)
 
@@ -15,7 +15,7 @@ This folder is **not** linked from the public site or hub.
 
 | Mode | Output |
 |------|--------|
-| **Capture image** | Full-page PNG (scroll + stitch), optional single-page PDF |
+| **Capture image** | Full-page PNG + **searchable text layer** (HTML snapshot + positioned overlay) + PDF with selectable text |
 | **Reconstruct** | Self-contained HTML (inlined CSS where allowed, images as data URIs, scripts removed, form state preserved) + searchable text PDF |
 | **Full scan** | Current tab plus optional tab queue and pagination following; combined HTML with table of contents + PDF |
 
@@ -43,7 +43,9 @@ From the repository root (Git Bash or WSL on Windows):
 bash extensions/fullpage/scripts/build-zip.sh
 ```
 
-The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.1.zip`.
+The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.3.zip`.
+
+Library choices: see `LIBRARIES.md` (pdf-lib MIT for searchable PDFs; jsPDF MIT for HTML exports).
 
 ## Manual test pages
 
@@ -75,7 +77,7 @@ npx puppeteer@23 browsers install chrome
 node extensions/fullpage/scripts/extension-e2e.mjs
 ```
 
-## Known limitations (0.2.1)
+## Known limitations (0.2.3)
 
 - Cross-origin stylesheets blocked by the page may not fully inline; a `<link>` fallback is kept when rules are unreadable.
 - Cross-origin images without CORS may remain external URLs in reconstruct mode.

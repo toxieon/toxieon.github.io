@@ -1,11 +1,13 @@
 import { getCapture, listCaptures, deleteCapture, putCapture } from '../lib/idb.js';
 import { createAnnotator } from './annotate.js';
+import { mountTextLayer } from './text-layer.js';
 
 const params = new URLSearchParams(location.search);
 let currentId = params.get('id');
 let currentRecord = null;
 let searchIndex = '';
 let annotator = null;
+let textLayerController = null;
 let editMode = false;
 
 const els = {
@@ -59,6 +61,7 @@ function safeFilename(title) {
 }
 
 function buildSearchIndex(record) {
+  if (record.pageText) return record.pageText;
   if (record.html) {
     const doc = new DOMParser().parseFromString(record.html, 'text/html');
     return doc.body?.innerText || '';
@@ -70,6 +73,10 @@ function teardownAnnotator() {
   if (annotator) {
     annotator.destroy();
     annotator = null;
+  }
+  if (textLayerController) {
+    textLayerController.destroy();
+    textLayerController = null;
   }
   editMode = false;
   els.editBar.hidden = true;
@@ -91,13 +98,21 @@ function renderPreview(record) {
   els.root.innerHTML = '';
   currentRecord = record;
 
+  const hasSearchText = Boolean(record.pageText || record.html);
+
   if (record.pngDataUrl) {
+    const wrap = document.createElement('div');
+    wrap.className = 'capture-stack';
     const img = document.createElement('img');
     img.src = record.pngDataUrl;
     img.alt = record.title || 'Screenshot';
-    els.root.appendChild(img);
+    wrap.appendChild(img);
+    els.root.appendChild(wrap);
+    if (record.textLayer?.items?.length) {
+      textLayerController = mountTextLayer(wrap, img, record.textLayer, record.metrics);
+    }
     els.btnEdit.disabled = false;
-    els.extrasBar.hidden = true;
+    els.extrasBar.hidden = !hasSearchText;
   } else if (record.html) {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('sandbox', 'allow-same-origin');
@@ -108,36 +123,42 @@ function renderPreview(record) {
   } else {
     els.root.textContent = 'No preview available.';
     els.btnEdit.disabled = true;
+    els.extrasBar.hidden = true;
   }
 
   const when = new Date(record.createdAt).toLocaleString();
-  els.meta.textContent = `${record.type} · ${record.pageCount || 1} page(s) · ${when}`;
+  const searchNote = hasSearchText ? ' · searchable text' : '';
+  els.meta.textContent = `${record.type} · ${record.pageCount || 1} page(s) · ${when}${searchNote}`;
 
   wireDownloads(record);
 }
 
 function highlightSearch(query) {
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
   if (!q) {
     els.searchStatus.textContent = '';
+    textLayerController?.highlight('');
     return;
   }
   const text = searchIndex.toLowerCase();
+  const ql = q.toLowerCase();
   let count = 0;
-  let idx = text.indexOf(q);
+  let idx = text.indexOf(ql);
   while (idx !== -1) {
     count++;
-    idx = text.indexOf(q, idx + q.length);
+    idx = text.indexOf(ql, idx + ql.length);
+  }
+  if (textLayerController) {
+    const overlayHits = textLayerController.highlight(q);
+    if (overlayHits > 0) count = Math.max(count, overlayHits);
   }
   els.searchStatus.textContent = count
-    ? `${count} match(es) in snapshot text`
-    : currentRecord?.pngDataUrl
-      ? 'Search works on HTML/reconstruct captures'
-      : 'No matches in snapshot text';
+    ? `${count} match(es) — use Ctrl+F on the page too`
+    : 'No matches in text layer';
   const iframe = els.root.querySelector('iframe');
   if (iframe?.contentWindow) {
     try {
-      iframe.contentWindow.find(query, false, false, true, false, true, false);
+      iframe.contentWindow.find(q, false, false, true, false, true, false);
     } catch {
       /* sandbox */
     }
@@ -204,11 +225,6 @@ els.backdrop.addEventListener('click', closeHistory);
 els.btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 els.btnSearch.addEventListener('click', () => {
-  if (currentRecord?.pngDataUrl && !currentRecord?.html) {
-    els.extrasBar.hidden = false;
-    els.searchStatus.textContent = 'Search works on HTML/reconstruct captures.';
-    return;
-  }
   els.extrasBar.hidden = false;
   els.search.focus();
   els.search.select();
@@ -236,13 +252,18 @@ els.btnDelete.addEventListener('click', async () => {
 
 els.btnEdit.addEventListener('click', () => {
   if (!currentRecord?.pngDataUrl || editMode) return;
-  const img = els.root.querySelector('img');
+  const img = els.root.querySelector('.capture-stack img, .preview-root img, img');
   if (!img) return;
   editMode = true;
   els.editBar.hidden = false;
+  if (textLayerController) {
+    textLayerController.destroy();
+    textLayerController = null;
+  }
+  const stack = els.root.querySelector('.capture-stack') || els.root;
   const imgClone = img.cloneNode(true);
-  els.root.innerHTML = '';
-  annotator = createAnnotator(els.root, imgClone);
+  stack.innerHTML = '';
+  annotator = createAnnotator(stack, imgClone);
 });
 
 els.editBar.querySelectorAll('[data-tool]').forEach((btn) => {
@@ -269,5 +290,4 @@ else {
   });
 }
 
-// Test hook
 globalThis.__fullpageViewer = { downloadDataUrl, getCurrentRecord: () => currentRecord };

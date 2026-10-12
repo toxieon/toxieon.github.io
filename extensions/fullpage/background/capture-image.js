@@ -70,6 +70,9 @@ export async function captureTabImage(tabId, options = {}) {
     throw new Error('No screenshots captured.');
   }
 
+  await onProgress?.(78, 'Saving searchable text layer…');
+  const textBundle = await callPageTool(tabId, 'captureTextBundle', [{ inlineImages: false }]);
+
   await callPageTool(tabId, 'restoreScrollPosition', []);
   await onProgress?.(85, 'Stitching image…');
 
@@ -84,10 +87,11 @@ export async function captureTabImage(tabId, options = {}) {
   await onProgress?.(92, 'Building PDF…');
   let pdfDataUrl = null;
   try {
-    const pdfResp = await offscreenRequest('imagePdf', {
+    const pdfResp = await offscreenRequest('searchableImagePdf', {
       pngDataUrl,
-      title: metrics.title,
+      textLayer: textBundle.textLayer,
       metrics,
+      title: metrics.title,
     });
     if (pdfResp?.ok) pdfDataUrl = pdfResp.blob;
   } catch {
@@ -103,10 +107,14 @@ export async function captureTabImage(tabId, options = {}) {
     metrics,
     pngDataUrl,
     pdfDataUrl,
+    html: textBundle.html,
+    textLayer: textBundle.textLayer,
+    pageText: textBundle.pageText,
     width,
     height,
     pageCount: 1,
     scrollLog,
+    searchable: true,
   };
   if (!options.skipStore) {
     await putCapture(record);

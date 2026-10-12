@@ -1,3 +1,5 @@
+import { PDFDocument, StandardFonts, rgb } from '../vendor/pdf-lib.esm.min.js';
+
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
@@ -10,6 +12,14 @@ function loadImage(dataUrl) {
   });
 }
 
+function dataUrlToBytes(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 async function stitchSlices(payload) {
   const { slices, metrics, overlapCss } = payload;
   const dpr = metrics.devicePixelRatio || 1;
@@ -20,7 +30,6 @@ async function stitchSlices(payload) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, pageWidth, pageHeight);
 
-  const sliceCssHeight = metrics.viewportHeight;
   const overlapDpr = Math.round((overlapCss || 0) * dpr);
 
   for (let i = 0; i < slices.length; i++) {
@@ -28,9 +37,7 @@ async function stitchSlices(payload) {
     const img = await loadImage(dataUrl);
     const destY = Math.round(scrollY * dpr);
     let srcY = 0;
-    if (i > 0 && overlapDpr > 0) {
-      srcY = overlapDpr;
-    }
+    if (i > 0 && overlapDpr > 0) srcY = overlapDpr;
     const srcH = img.height - srcY;
     const destH = Math.min(srcH, pageHeight - destY);
     if (destH <= 0) continue;
@@ -80,23 +87,44 @@ async function htmlToSearchablePdf(html, title, meta = {}) {
     pdf.setFontSize(9);
     pdf.text(meta.url, margin, pdf.internal.pageSize.getHeight() - margin);
   }
-  const blob = pdf.output('blob');
-  return blob;
+  return pdf.output('blob');
 }
 
-async function imageToPdf(pngDataUrl, title, metrics) {
-  const { jsPDF } = globalThis.jspdf;
-  const img = await loadImage(pngDataUrl);
+async function searchableImagePdf(pngDataUrl, textLayer, metrics, title) {
+  const pngBytes = dataUrlToBytes(pngDataUrl);
+  const pdfDoc = await PDFDocument.create();
+  const embedded = await pdfDoc.embedPng(pngBytes);
   const pxToPt = 72 / 96;
-  const wPt = img.width * pxToPt;
-  const hPt = img.height * pxToPt;
-  const orientation = wPt > hPt ? 'l' : 'p';
-  const pdf = new jsPDF({ orientation, unit: 'pt', format: [wPt, hPt] });
-  pdf.addImage(pngDataUrl, 'PNG', 0, 0, wPt, hPt);
-  if (title) {
-    pdf.setProperties({ title });
+  const cssW = textLayer?.pageWidth || metrics.width;
+  const cssH = textLayer?.pageHeight || metrics.height;
+  const wPt = cssW * pxToPt;
+  const hPt = cssH * pxToPt;
+  const page = pdfDoc.addPage([wPt, hPt]);
+  page.drawImage(embedded, { x: 0, y: 0, width: wPt, height: hPt });
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const scale = wPt / cssW;
+  for (const item of textLayer?.items || []) {
+    const text = String(item.text || '').trim();
+    if (!text) continue;
+    const fontSize = Math.max(5, item.height * scale * 0.85);
+    const x = item.left * scale;
+    const y = hPt - (item.top + item.height) * scale;
+    try {
+      page.drawText(text.slice(0, 500), {
+        x,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(1, 1, 1),
+        opacity: 0.02,
+      });
+    } catch {
+      /* skip unencodable glyphs */
+    }
   }
-  return pdf.output('blob');
+  if (title) pdfDoc.setTitle(title);
+  const bytes = await pdfDoc.save();
+  return new Blob([bytes], { type: 'application/pdf' });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -108,8 +136,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: true, result });
         break;
       }
-      case 'imagePdf': {
-        const blob = await imageToPdf(message.pngDataUrl, message.title, message.metrics);
+      case 'searchableImagePdf': {
+        const blob = await searchableImagePdf(
+          message.pngDataUrl,
+          message.textLayer,
+          message.metrics,
+          message.title
+        );
         sendResponse({ ok: true, blob: await blobToDataUrl(blob) });
         break;
       }
