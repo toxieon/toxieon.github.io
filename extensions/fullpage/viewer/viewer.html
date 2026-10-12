@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Full Page Capture — Viewer</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">◫</span>
+        <h1>Full Page Capture</h1>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-png" class="secondary" hidden>Download PNG</button>
+        <button type="button" id="btn-pdf" class="secondary" hidden>Download PDF</button>
+        <button type="button" id="btn-html" class="secondary" hidden>Download HTML</button>
+        <button type="button" id="btn-delete" class="danger ghost">Delete</button>
+      </div>
+    </header>
+    <aside class="sidebar">
+      <label class="search">
+        <span>Search capture</span>
+        <input type="search" id="search-input" placeholder="Find text…" autocomplete="off" />
+      </label>
+      <p id="search-status" class="muted"></p>
+      <h2>Recent captures</h2>
+      <ul id="history-list" class="history"></ul>
+    </aside>
+    <main class="preview">
+      <div id="meta" class="meta muted"></div>
+      <div id="preview-root" class="preview-root"></div>
+    </main>
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>

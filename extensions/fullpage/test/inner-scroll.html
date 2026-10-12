@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Inner scroll test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; }
+    .panel {
+      height: 320px; overflow: auto; border: 2px solid #333; padding: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Inner scroll container</h1>
+  <div class="panel" id="panel"></div>
+  <script>
+    const panel = document.getElementById('panel');
+    for (let i = 1; i <= 40; i++) {
+      const p = document.createElement('p');
+      p.textContent = 'Row ' + i + ': ' + 'content '.repeat(30);
+      panel.appendChild(p);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1117;
+  --panel: #171a22;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --accent: #5b9fd4;
+  --danger: #e57373;
+  --border: #2a2f3a;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'top top'
+    'side main';
+}
+
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.brand {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.brand h1 {
+  font-size: 1rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.logo {
+  font-size: 1.25rem;
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: #222733;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+button.secondary {
+  background: #1e3a52;
+  border-color: #2d5f87;
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.sidebar {
+  grid-area: side;
+  border-right: 1px solid var(--border);
+  padding: 1rem;
+  overflow: auto;
+}
+
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.search input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0c0e13;
+  color: var(--text);
+}
+
+.history {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.history li {
+  margin-bottom: 0.35rem;
+}
+
+.history button {
+  width: 100%;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.history .active {
+  outline: 2px solid var(--accent);
+}
+
+.preview {
+  grid-area: main;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.meta {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.preview-root iframe,
+.preview-root img {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.preview-root iframe {
+  width: 100%;
+  min-height: 70vh;
+}
+
+mark.hit {
+  background: #ffe082;
+  color: #111;
+}
