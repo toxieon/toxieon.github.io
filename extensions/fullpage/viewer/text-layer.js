@@ -1,6 +1,45 @@
 /**
  * Renders invisible selectable text over a captured PNG for search / Ctrl+F.
  */
+
+/** Fit glyph box to CSS pixel rect (used for layout + tests). */
+export function fitTextToRect(span, boxWidth, boxHeight) {
+  const text = span.textContent || '';
+  if (!text || boxWidth < 2 || boxHeight < 2) {
+    span.style.fontSize = '1px';
+    span.style.letterSpacing = '0px';
+    return;
+  }
+
+  const maxFont = Math.max(4, boxHeight * 0.92);
+  let fontSize = maxFont;
+  span.style.letterSpacing = '0px';
+  span.style.fontSize = `${fontSize}px`;
+
+  const measure = () => span.getBoundingClientRect().width;
+
+  while (measure() > boxWidth + 0.5 && fontSize > 4) {
+    fontSize -= 0.5;
+    span.style.fontSize = `${fontSize}px`;
+  }
+
+  const chars = text.length;
+  if (chars > 1) {
+    let spacing = 0;
+    let w = measure();
+    if (w < boxWidth - 0.5) {
+      spacing = (boxWidth - w) / (chars - 1);
+      span.style.letterSpacing = `${spacing}px`;
+      w = measure();
+    }
+    while (w > boxWidth + 0.5 && spacing > -1.5) {
+      spacing -= 0.25;
+      span.style.letterSpacing = `${spacing}px`;
+      w = measure();
+    }
+  }
+}
+
 export function mountTextLayer(wrap, img, textLayer, metrics) {
   const layer = document.createElement('div');
   layer.className = 'text-layer';
@@ -26,7 +65,7 @@ export function mountTextLayer(wrap, img, textLayer, metrics) {
       span.style.top = `${top}px`;
       span.style.width = `${width}px`;
       span.style.height = `${height}px`;
-      span.style.fontSize = `${Math.max(8, height * 0.92)}px`;
+      fitTextToRect(span, width, height);
     });
   }
 

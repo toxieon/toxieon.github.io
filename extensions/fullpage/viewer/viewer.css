@@ -324,7 +324,11 @@ button.ghost {
 
 .text-layer span {
   position: absolute;
-  color: transparent;
+  box-sizing: border-box;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background: transparent !important;
+  text-shadow: none;
   user-select: text;
   cursor: text;
   white-space: nowrap;
@@ -332,7 +336,15 @@ button.ghost {
   line-height: 1;
 }
 
+.text-layer span::selection {
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important;
+  background: rgba(26, 115, 232, 0.35);
+}
+
 .text-layer span.search-hit {
-  background: rgba(255, 235, 59, 0.55);
-  outline: 1px solid #f9a825;
+  background: rgba(255, 214, 0, 0.28) !important;
+  outline: 1px solid rgba(249, 168, 37, 0.45);
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
 }

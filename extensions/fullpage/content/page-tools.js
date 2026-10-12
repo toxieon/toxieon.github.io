@@ -384,18 +384,43 @@
     return text.length > 0;
   }
 
+  function textForClientRect(node, rect) {
+    if (!node?.textContent || typeof document.caretRangeFromPoint !== 'function') {
+      return (node?.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    const y = rect.top + rect.height / 2;
+    const xStart = Math.min(rect.right - 2, rect.left + 2);
+    const xEnd = Math.max(rect.left + 2, rect.right - 2);
+    const startCaret = document.caretRangeFromPoint(xStart, y);
+    const endCaret = document.caretRangeFromPoint(xEnd, y);
+    if (!startCaret || !endCaret) {
+      return (node.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    const slice = document.createRange();
+    try {
+      slice.setStart(startCaret.startContainer, startCaret.startOffset);
+      slice.setEnd(endCaret.endContainer, endCaret.endOffset);
+      if (!node.contains(slice.commonAncestorContainer)) {
+        return (node.textContent || '').replace(/\s+/g, ' ').trim();
+      }
+      const piece = slice.toString().replace(/\s+/g, ' ').trim();
+      return piece || (node.textContent || '').replace(/\s+/g, ' ').trim();
+    } catch {
+      return (node.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+  }
+
   function extractTextLayer() {
     window.scrollTo(captureScrollState?.windowX ?? 0, 0);
     const pageWidth = document.documentElement.scrollWidth;
     const pageHeight = documentScrollHeight();
     const items = [];
+    const seen = new Set();
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const range = document.createRange();
     let node;
     while ((node = walker.nextNode())) {
       if (!isVisibleTextNode(node)) continue;
-      const raw = node.textContent.replace(/\s+/g, ' ').trim();
-      if (!raw) continue;
       range.selectNodeContents(node);
       const rects = range.getClientRects();
       for (const rect of rects) {
@@ -403,8 +428,13 @@
         const left = rect.left + window.scrollX;
         const top = rect.top + window.scrollY;
         if (top > pageHeight + 4) continue;
+        const text = textForClientRect(node, rect);
+        if (!text) continue;
+        const key = `${Math.round(left)}:${Math.round(top)}:${text}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         items.push({
-          text: raw,
+          text,
           left: Math.round(left * 10) / 10,
           top: Math.round(top * 10) / 10,
           width: Math.round(rect.width * 10) / 10,

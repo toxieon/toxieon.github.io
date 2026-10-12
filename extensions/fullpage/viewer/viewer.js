@@ -9,6 +9,8 @@ let searchIndex = '';
 let annotator = null;
 let textLayerController = null;
 let editMode = false;
+/** @type {'html' | 'image'} */
+let previewMode = 'html';
 
 const els = {
   meta: document.getElementById('meta'),
@@ -25,6 +27,8 @@ const els = {
   btnSettings: document.getElementById('btn-settings'),
   btnSearch: document.getElementById('btn-search'),
   btnReconstruct: document.getElementById('btn-reconstruct'),
+  btnViewScreenshot: document.getElementById('btn-view-screenshot'),
+  btnViewPage: document.getElementById('btn-view-page'),
   editBar: document.getElementById('edit-bar'),
   extrasBar: document.getElementById('extras-bar'),
   drawer: document.getElementById('history-drawer'),
@@ -93,42 +97,77 @@ function wireDownloads(record) {
   els.btnHtml.onclick = () => downloadBlob(record.html, `${name}.html`, 'text/html');
 }
 
+function defaultPreviewMode(record) {
+  if (record.html) return 'html';
+  if (record.pngDataUrl) return 'image';
+  return 'html';
+}
+
+function updateViewToggleButtons(record) {
+  const hasHtml = Boolean(record.html);
+  const hasImage = Boolean(record.pngDataUrl);
+  const dual = hasHtml && hasImage;
+  els.btnViewScreenshot.hidden = !dual || previewMode === 'image';
+  els.btnViewPage.hidden = !dual || previewMode === 'html';
+}
+
+function mountHtmlPreview(record) {
+  const iframe = document.createElement('iframe');
+  iframe.className = 'html-snapshot';
+  iframe.setAttribute('sandbox', 'allow-same-origin');
+  iframe.srcdoc = record.html;
+  els.root.appendChild(iframe);
+  els.btnEdit.disabled = true;
+}
+
+function mountImagePreview(record) {
+  const wrap = document.createElement('div');
+  wrap.className = 'capture-stack';
+  const img = document.createElement('img');
+  img.src = record.pngDataUrl;
+  img.alt = record.title || 'Screenshot';
+  wrap.appendChild(img);
+  els.root.appendChild(wrap);
+  if (record.textLayer?.items?.length) {
+    textLayerController = mountTextLayer(wrap, img, record.textLayer, record.metrics);
+  }
+  els.btnEdit.disabled = false;
+}
+
 function renderPreview(record) {
   teardownAnnotator();
   els.root.innerHTML = '';
   currentRecord = record;
 
   const hasSearchText = Boolean(record.pageText || record.html);
+  const hasHtml = Boolean(record.html);
+  const hasImage = Boolean(record.pngDataUrl);
+  if (previewMode === 'image' && !hasImage) previewMode = 'html';
+  if (previewMode === 'html' && !hasHtml && hasImage) previewMode = 'image';
 
-  if (record.pngDataUrl) {
-    const wrap = document.createElement('div');
-    wrap.className = 'capture-stack';
-    const img = document.createElement('img');
-    img.src = record.pngDataUrl;
-    img.alt = record.title || 'Screenshot';
-    wrap.appendChild(img);
-    els.root.appendChild(wrap);
-    if (record.textLayer?.items?.length) {
-      textLayerController = mountTextLayer(wrap, img, record.textLayer, record.metrics);
-    }
-    els.btnEdit.disabled = false;
+  if (previewMode === 'html' && hasHtml) {
+    mountHtmlPreview(record);
     els.extrasBar.hidden = !hasSearchText;
-  } else if (record.html) {
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('sandbox', 'allow-same-origin');
-    iframe.srcdoc = record.html;
-    els.root.appendChild(iframe);
-    els.btnEdit.disabled = true;
-    els.extrasBar.hidden = false;
+  } else if (hasImage) {
+    previewMode = 'image';
+    mountImagePreview(record);
+    els.extrasBar.hidden = !hasSearchText;
+  } else if (hasHtml) {
+    previewMode = 'html';
+    mountHtmlPreview(record);
+    els.extrasBar.hidden = !hasSearchText;
   } else {
     els.root.textContent = 'No preview available.';
     els.btnEdit.disabled = true;
     els.extrasBar.hidden = true;
   }
 
+  updateViewToggleButtons(record);
+
   const when = new Date(record.createdAt).toLocaleString();
+  const viewNote = previewMode === 'html' && record.html ? ' · page snapshot' : '';
   const searchNote = hasSearchText ? ' · searchable text' : '';
-  els.meta.textContent = `${record.type} · ${record.pageCount || 1} page(s) · ${when}${searchNote}`;
+  els.meta.textContent = `${record.type} · ${record.pageCount || 1} page(s) · ${when}${viewNote}${searchNote}`;
 
   wireDownloads(record);
 }
@@ -152,9 +191,11 @@ function highlightSearch(query) {
     const overlayHits = textLayerController.highlight(q);
     if (overlayHits > 0) count = Math.max(count, overlayHits);
   }
-  els.searchStatus.textContent = count
-    ? `${count} match(es) — use Ctrl+F on the page too`
-    : 'No matches in text layer';
+  const hint =
+    previewMode === 'html' && els.root.querySelector('iframe')
+      ? ' — use Ctrl+F in the page snapshot'
+      : ' — use Ctrl+F on the screenshot overlay';
+  els.searchStatus.textContent = count ? `${count} match(es)${hint}` : 'No matches in text layer';
   const iframe = els.root.querySelector('iframe');
   if (iframe?.contentWindow) {
     try {
@@ -174,6 +215,7 @@ async function loadRecord(id) {
   }
   currentId = id;
   searchIndex = buildSearchIndex(record);
+  previewMode = defaultPreviewMode(record);
   renderPreview(record);
   highlightSearch(els.search.value);
   history.replaceState(null, '', `?id=${encodeURIComponent(id)}`);
@@ -228,6 +270,20 @@ els.btnSearch.addEventListener('click', () => {
   els.extrasBar.hidden = false;
   els.search.focus();
   els.search.select();
+});
+
+els.btnViewScreenshot?.addEventListener('click', () => {
+  if (!currentRecord?.pngDataUrl) return;
+  previewMode = 'image';
+  renderPreview(currentRecord);
+  highlightSearch(els.search.value);
+});
+
+els.btnViewPage?.addEventListener('click', () => {
+  if (!currentRecord?.html) return;
+  previewMode = 'html';
+  renderPreview(currentRecord);
+  highlightSearch(els.search.value);
 });
 
 els.btnReconstruct.addEventListener('click', async () => {

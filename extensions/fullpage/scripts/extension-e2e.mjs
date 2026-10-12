@@ -108,9 +108,33 @@ const viewerTarget = await browser.waitForTarget(
 );
 const viewerPage = await viewerTarget.page();
 await viewerPage.waitForFunction(
+  () => document.querySelector('.preview-root iframe.html-snapshot')?.srcdoc?.includes('Question'),
+  { timeout: 60000 }
+);
+
+await viewerPage.click('#btn-view-screenshot');
+await viewerPage.waitForFunction(
   () => document.querySelector('.preview-root img')?.naturalHeight > 400,
   { timeout: 60000 }
 );
+
+const layerStyle = await viewerPage.evaluate(() => {
+  const span = document.querySelector('.text-layer span');
+  if (!span) return { ok: false, reason: 'no text-layer span' };
+  const cs = getComputedStyle(span);
+  const transparent =
+    cs.color === 'rgba(0, 0, 0, 0)' ||
+    cs.color === 'transparent' ||
+    cs.webkitTextFillColor === 'rgba(0, 0, 0, 0)' ||
+    cs.webkitTextFillColor === 'transparent';
+  const bgClear =
+    cs.backgroundColor === 'rgba(0, 0, 0, 0)' || cs.backgroundColor === 'transparent';
+  return { ok: transparent && bgClear, color: cs.color, fill: cs.webkitTextFillColor, bg: cs.backgroundColor };
+});
+if (!layerStyle.ok) {
+  console.error('FAIL: text layer must be invisible by default', layerStyle);
+  process.exit(1);
+}
 
 const imgHeight = await viewerPage.evaluate(
   () => document.querySelector('.preview-root img')?.naturalHeight || 0

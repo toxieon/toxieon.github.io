@@ -1,6 +1,6 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.2.4** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
+Version **0.2.5** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
 
 ## UX (GoFullPage-style core + our extras)
 
@@ -62,7 +62,7 @@ From the repository root (Git Bash or WSL on Windows):
 bash extensions/fullpage/scripts/build-zip.sh
 ```
 
-The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.4.zip`.
+The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.5.zip`.
 
 Library choices: `LIBRARIES.md` · legal: `THIRD_PARTY_NOTICES.md`.
 
@@ -96,7 +96,7 @@ npx puppeteer@23 browsers install chrome
 node extensions/fullpage/scripts/extension-e2e.mjs
 ```
 
-## Known limitations (0.2.4)
+## Known limitations (0.2.5)
 
 - Cross-origin stylesheets blocked by the page may not fully inline; a `<link>` fallback is kept when rules are unreadable.
 - Cross-origin images without CORS may remain external URLs in reconstruct mode.

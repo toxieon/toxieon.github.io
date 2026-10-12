@@ -1,6 +1,6 @@
 # Reliability report (Brandon) — permissive-only vs SingleFile
 
-**Version:** 0.2.4  
+**Version:** 0.2.5  
 **Priority:** It must **work** on real sites (e.g. Moodle quiz review on energyspace).  
 **This release:** permissive licences only (MIT pdf-lib + jsPDF). **No SingleFile (AGPL).**
 
@@ -54,7 +54,7 @@ Use **SingleFile / single-file-core (AGPL-3.0)** only if:
 
 ## Recommended workflow on energyspace (this build)
 
-1. Reload extension **0.2.4** on Windows Chrome.
+1. Reload extension **0.2.5** on Windows Chrome.
 2. On quiz review tab, **click toolbar icon** (allow optional site access if prompted for some flows).
 3. Wait for progress popup → viewer opens.
 4. **Search** box: type `tuesday` (case-insensitive) — should match status lines in `pageText`.
@@ -62,7 +62,9 @@ Use **SingleFile / single-file-core (AGPL-3.0)** only if:
 6. **Download PDF** — try selecting “Tuesday” in Acrobat/Chrome PDF viewer.
 7. If layout is wrong but text matters: **Download HTML** and open locally; use browser Find there.
 
-If stitch still repeats headers on production Moodle after 0.2.4, report URL + “one page at a time” setting — that’s a **scroll target** bug, not a licence issue.
+If stitch still repeats headers on production Moodle after 0.2.5, report URL + “one page at a time” setting — that’s a **scroll target** bug, not a licence issue.
+
+**Viewer (0.2.5):** opens the **HTML page snapshot** by default (native Ctrl+F). Use **Screenshot** in the toolbar for the stitched PNG + invisible text overlay (export/annotate).
 
 ---
 

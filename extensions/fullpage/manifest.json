@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Neill Full Page Capture",
   "short_name": "FullPage",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Full-page screenshots with searchable text, HTML snapshots, and multi-page scans. Data stays on your device.",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "offscreen"],
   "optional_host_permissions": ["<all_urls>"],
