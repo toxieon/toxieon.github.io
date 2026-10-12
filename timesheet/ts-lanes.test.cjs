@@ -100,19 +100,46 @@ test("rule skips: the rule itself is kept intact and round-trips via the sheet c
   r.active = false; assert.equal(T.staticDaysFor([r], week).length, 0, "inactive still wins");
 });
 
+const EXPORT_JOBS = [
+  { job_id: "jf", job_name: "Frankston", lat: -38.142, lng: 145.122 },
+  { job_id: "jw", job_name: "Wheelers Hill", lat: -37.898, lng: 145.182 },
+  { job_id: "jm", job_name: "Mornington", lat: -38.217, lng: 145.039 },
+];
 const S = (id, date, onR, offR, hrs, extra) => Object.assign({ session_id: id, date, job_id: "", job_name: "Job " + id, address_confirmed: "", time_on: onR, time_off: offR, time_on_rounded: onR, time_off_rounded: offR, break_minutes: 0, total_hours: hrs, overtime_hours: 0, job_type: "employer" }, extra || {});
-const seed = (tplPatch) => ({ version: 1, jobs: [], payPeriods: [], currentSession: null, lastClosedSession: null,
-  settings: { use24hr: true, firstDayOfWeek: "Monday", employerName: "Neill Data & Security", payslip: { employee: "Neill, Brandon" } },
+const seed = (tplPatch) => ({
+  version: 1, jobs: EXPORT_JOBS, payPeriods: [], currentSession: null, lastClosedSession: null,
+  settings: { use24hr: true, firstDayOfWeek: "Monday", employerName: "Neill Data & Security", payslip: { employee: "Neill, Brandon" }, fuelLPer100km: 8.5, fuelPricePerLitre: 1.90, includeCommute: false },
   staticDays: [Object.assign({ id: "tpl1", name: "School pickup", type: "School Day", days: ["Thursday"], clock_on: "15:00", clock_off: "15:30", location: "", active: true }, tplPatch || {})],
-  sessions: [S("Frankston", "2026-10-08", "10:30", "15:30", 5, { job_name: "Frankston" }), S("WH", "2026-10-08", "14:30", "15:30", 1, { job_name: "Wheelers Hill" }), S("M", "2026-10-08", "15:30", "15:30", 0, { job_name: "Mornington" })] });
+  sessions: [
+    S("Frankston", "2026-10-08", "10:30", "15:30", 5, { job_id: "jf", job_name: "Frankston" }),
+    S("WH", "2026-10-08", "14:30", "15:30", 1, { job_id: "jw", job_name: "Wheelers Hill" }),
+    S("M", "2026-10-08", "15:30", "15:30", 0, { job_id: "jm", job_name: "Mornington" }),
+  ],
+});
 
-// Captured from 0.2.1 (main 40e75c0) BEFORE any 0.3.1 change: the export must stay byte-identical.
-const GOLDEN_PREVIEW = "TIMESHEET — Brandon Neill\nWeek: Mon 5 Oct – Sun 11 Oct 2026\nEmployer: Neill Data & Security\n────────────────────────────\n\nTHU 8 OCT\n  10:30–15:30  ·  Frankston  ·  5 hrs\n  14:30–15:30  ·  Wheelers Hill  ·  1 hr\n  15:30–15:30  ·  Mornington  ·  0 hrs\n  15:00–15:30  ·  School pickup (School Day)  ·  0.5 hrs\n  Day total: 6.5 hrs\n\n────────────────────────────\nWEEKLY SUMMARY — HOURS BY SITE\n\n  Frankston — 5 hrs\n  Wheelers Hill — 1 hr\n  School pickup (School Day) — 0.5 hrs\n  Mornington — 0 hrs\n────────────────────────────\nTOTAL: 6.5 hrs  ·  1 day";
+/** Prime the History travel cache (Copy timesheet reads cached legs synchronously). */
+function primeExportTravelCache(app) {
+  const iso = "2026-10-08";
+  const sessions = app.getState().sessions.filter((s) => s.date === iso);
+  const mkLeg = (from, to, km) => ({ from: { name: from }, to: { name: to }, km, skipped: false, method: "haversine", commute: null });
+  const legs = [mkLeg("Frankston", "Wheelers Hill", 27.6), mkLeg("Wheelers Hill", "Mornington", 37.6)];
+  const eff = 8.5;
+  const price = 1.9;
+  const totalKm = 65.2;
+  const cost = totalKm * (eff / 100) * price;
+  app.TsTravel.rememberDayTravel(iso, sessions, app.getState(), {
+    legs, totalKm, cost, eff, price, usableCount: 2, needsHome: false, includeCommute: false,
+  });
+}
+
+// 0.4.3 — weekly copy adds per-leg km/cost (from cached History travel) + weekly travel total.
+const GOLDEN_PREVIEW = "TIMESHEET — Brandon Neill\nWeek: Mon 5 Oct – Sun 11 Oct 2026\nEmployer: Neill Data & Security\n────────────────────────────\n\nTHU 8 OCT\n  10:30–15:30  ·  Frankston  ·  5 hrs\n  14:30–15:30  ·  Wheelers Hill  ·  1 hr\n  15:30–15:30  ·  Mornington  ·  0 hrs\n  15:00–15:30  ·  School pickup (School Day)  ·  0.5 hrs\n  Travel\n    Frankston → Wheelers Hill  ·  27.6 km  ·  $4.46\n    Wheelers Hill → Mornington  ·  37.6 km  ·  $6.07\n  Day travel total: 65.2 km  ·  $10.53\n  Day total: 6.5 hrs\n\n────────────────────────────\nWEEKLY SUMMARY — HOURS BY SITE\n\n  Frankston — 5 hrs\n  Wheelers Hill — 1 hr\n  School pickup (School Day) — 0.5 hrs\n  Mornington — 0 hrs\n────────────────────────────\nWEEKLY TRAVEL COST\n\n  65.2 km  ·  $10.53\n────────────────────────────\nTOTAL: 6.5 hrs  ·  1 day";
 const GOLDEN_SUBJECT = "Timesheet — Brandon Neill — w/c Mon 5 Oct 2026";
-const GOLDEN_BODY = "Hi there,\n\nPlease find my timesheet for the week of Mon 5 Oct – Sun 11 Oct 2026 below.\n\nTIMESHEET — Brandon Neill\nWeek: Mon 5 Oct – Sun 11 Oct 2026\nEmployer: Neill Data & Security\n────────────────────────────\n\nTHU 8 OCT\n  10:30–15:30  ·  Frankston  ·  5 hrs\n  14:30–15:30  ·  Wheelers Hill  ·  1 hr\n  15:30–15:30  ·  Mornington  ·  0 hrs\n  15:00–15:30  ·  School pickup (School Day)  ·  0.5 hrs\n  Day total: 6.5 hrs\n\n────────────────────────────\nWEEKLY SUMMARY — HOURS BY SITE\n\n  Frankston — 5 hrs\n  Wheelers Hill — 1 hr\n  School pickup (School Day) — 0.5 hrs\n  Mornington — 0 hrs\n────────────────────────────\nTOTAL: 6.5 hrs  ·  1 day\n\nThanks,\nBrandon Neill";
+const GOLDEN_BODY = "Hi there,\n\nPlease find my timesheet for the week of Mon 5 Oct – Sun 11 Oct 2026 below.\n\nTIMESHEET — Brandon Neill\nWeek: Mon 5 Oct – Sun 11 Oct 2026\nEmployer: Neill Data & Security\n────────────────────────────\n\nTHU 8 OCT\n  10:30–15:30  ·  Frankston  ·  5 hrs\n  14:30–15:30  ·  Wheelers Hill  ·  1 hr\n  15:30–15:30  ·  Mornington  ·  0 hrs\n  15:00–15:30  ·  School pickup (School Day)  ·  0.5 hrs\n  Travel\n    Frankston → Wheelers Hill  ·  27.6 km  ·  $4.46\n    Wheelers Hill → Mornington  ·  37.6 km  ·  $6.07\n  Day travel total: 65.2 km  ·  $10.53\n  Day total: 6.5 hrs\n\n────────────────────────────\nWEEKLY SUMMARY — HOURS BY SITE\n\n  Frankston — 5 hrs\n  Wheelers Hill — 1 hr\n  School pickup (School Day) — 0.5 hrs\n  Mornington — 0 hrs\n────────────────────────────\nWEEKLY TRAVEL COST\n\n  65.2 km  ·  $10.53\n────────────────────────────\nTOTAL: 6.5 hrs  ·  1 day\n\nThanks,\nBrandon Neill";
 
 test("text export output is unchanged for a sample day (Thu 8 Oct 2026)", () => {
   const app = loadApp(seed());
+  primeExportTravelCache(app);
   const wk = new Date(2026, 9, 8, 12);
   assert.equal(app.TsExport.formatWeekPreview(wk), GOLDEN_PREVIEW);
   const t = app.TsExport.buildTimesheetText(wk);
@@ -123,6 +150,50 @@ test("text export output is unchanged for a sample day (Thu 8 Oct 2026)", () => 
 test("text export: a skipped rule date just drops that rule's line (format unchanged)", () => {
   const app = loadApp(seed({ skipDates: ["2026-10-08"], skipRanges: [] }));
   const out = app.TsExport.formatWeekPreview(new Date(2026, 9, 8, 12));
-  const expected = GOLDEN_PREVIEW.split("\n").filter((l) => !l.includes("School pickup")).join("\n").replace(/6\.5 hrs/g, "6 hrs");
+  const travelBlock = /  Travel\n(?:    .+\n)+  Day travel total: .+\n/;
+  const expected = GOLDEN_PREVIEW.split("\n").filter((l) => !l.includes("School pickup")).join("\n")
+    .replace(/6\.5 hrs/g, "6 hrs")
+    .replace(travelBlock, "  Travel: km/cost omitted (distances unavailable for this day).\n")
+    .replace("────────────────────────────\nWEEKLY TRAVEL COST\n\n  65.2 km  ·  $10.53\n", "");
   assert.equal(out, expected);
+});
+
+test("text export: without cached travel, shifts still export with an omission note", () => {
+  const app = loadApp(seed());
+  const out = app.TsExport.formatWeekPreview(new Date(2026, 9, 8, 12));
+  assert.ok(out.includes("Travel: km/cost omitted"));
+  assert.ok(!out.includes("WEEKLY TRAVEL COST"));
+});
+
+test("0.4.3 background travel: every day of the week is computed and cached without expanding, Distance Matrix not repeated", async () => {
+  const app = loadApp(seed());
+  // Two working days, two legs each.
+  const st = app.getState();
+  st.sessions.push(
+    S("F2", "2026-10-06", "07:30", "11:00", 3.5, { job_id: "jf", job_name: "Frankston" }),
+    S("M2", "2026-10-06", "11:30", "15:30", 4, { job_id: "jm", job_name: "Mornington" })
+  );
+  let dmCalls = 0;
+  app.window.google = { maps: {
+    Geocoder: function () {},
+    TravelMode: { DRIVING: "DRIVING" }, UnitSystem: { METRIC: 0 },
+    DistanceMatrixService: function () { this.getDistanceMatrix = (req, cb) => {
+      dmCalls++;
+      const rows = req.origins.map((o, i) => ({ elements: req.destinations.map((d, j) => ({ status: "OK", distance: { value: i === j ? 30000 + 1000 * i : 0 } })) }));
+      cb({ rows }, "OK");
+    }; }
+  } };
+  const week = new Date(2026, 9, 8, 12);
+  const before = app.TsExport.formatWeekPreview(week);
+  assert.ok(before.includes("Travel: km/cost omitted"), "nothing cached yet");
+  const sessions = st.sessions.filter((s) => s.date >= "2026-10-05" && s.date <= "2026-10-11");
+  const n = await app.TsTravel.prefetchWeek(sessions, st, { gapMs: 0 });
+  assert.equal(n, 2, "both days computed in the background");
+  const out = app.TsExport.formatWeekPreview(week);
+  assert.ok(!out.includes("omitted"), out);
+  assert.equal((out.match(/Day travel total:/g) || []).length, 2);
+  assert.match(out, /WEEKLY TRAVEL COST\n\n  \d+(\.\d)? km  ·  \$\d+\.\d\d/);
+  const calls = dmCalls;
+  assert.equal(await app.TsTravel.prefetchWeek(sessions, st, { gapMs: 0 }), 0, "cached days are skipped");
+  assert.equal(dmCalls, calls, "no repeat Distance Matrix requests");
 });

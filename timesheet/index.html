@@ -15,12 +15,12 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.2"></script>
+<script src="ts-time.js?v=0.4.3"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.2"></script>
-<script src="ts-clipboard.js?v=0.4.2"></script>
+<script src="ts-map.js?v=0.4.3"></script>
+<script src="ts-clipboard.js?v=0.4.3"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -723,7 +723,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.2';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.3';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1925,8 +1925,14 @@ const TsExport = (() => {
     return { start, range: fmtRange(start), name: exporterName(st), employer: cleanName(st.settings.employerName, ''), days, sites: siteList, totals, dayCount: days.length };
   }
   function formatWeekPreview(weekStart) {
+    const st = getState();
     const m = buildWeekModel(weekStart);
+    const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const weekSessions = sessionsForWeek(start);
     const lines = [];
+    let weekTravelCost = 0;
+    let weekTravelKm = 0;
+    let anyTravelData = false;
     lines.push(m.name ? `TIMESHEET — ${m.name}` : 'TIMESHEET');
     lines.push(`Week: ${m.range}`);
     if (m.employer) lines.push(`Employer: ${m.employer}`);
@@ -1936,6 +1942,21 @@ const TsExport = (() => {
       lines.push('');
       lines.push(d.label);
       d.rows.forEach(r => lines.push(`  ${r.on}–${r.off}  ·  ${r.name}  ·  ${fmtHrs(r.hours)}`));
+      const daySessions = window.TsTravel ? TsTravel.sortDaySessions(weekSessions.filter(s => s.date === d.iso)) : [];
+      if (daySessions.length && window.TsTravel) {
+        const cached = TsTravel.getDayTravelCache(d.iso, daySessions, st);
+        if (cached) {
+          const ex = TsTravel.travelExportLines(cached);
+          ex.lines.forEach(l => lines.push(l));
+          if (ex.hasData) {
+            anyTravelData = true;
+            weekTravelCost += ex.cost;
+            weekTravelKm += ex.km;
+          }
+        } else {
+          lines.push('  Travel: km/cost omitted (distances unavailable for this day).');
+        }
+      }
       const extras = [];
       if (d.breakMin > 0) extras.push(`break ${d.breakMin} min`);
       if (d.ot > 0) extras.push(`OT ${fmtHrs(d.ot)}`);
@@ -1946,6 +1967,12 @@ const TsExport = (() => {
     lines.push('WEEKLY SUMMARY — HOURS BY SITE');
     lines.push('');
     m.sites.forEach(s => lines.push(`  ${s.name} — ${fmtHrs(s.hours)}${s.dayCount > 1 ? ` (${s.dayCount} days)` : ''}`));
+    if (anyTravelData && window.TsTravel) {
+      lines.push(RULE);
+      lines.push('WEEKLY TRAVEL COST');
+      lines.push('');
+      lines.push(`  ${TsTravel.fmtKm(weekTravelKm)}  ·  ${TsTravel.fmtMoney(weekTravelCost)}`);
+    }
     lines.push(RULE);
     lines.push(`TOTAL: ${fmtHrs(m.totals.total)}  ·  ${m.dayCount} day${m.dayCount === 1 ? '' : 's'}${m.totals.ot > 0 ? `  ·  OT ${fmtHrs(m.totals.ot)}` : ''}`);
     return lines.join('\n');
@@ -2475,6 +2502,116 @@ window.Views = {};
 
 /* ----- TRAVEL + FUEL (History day expand) ----- */
 const TsTravel = (() => {
+  /** Cached async day-travel results (History expand). Copy timesheet reads this synchronously. */
+  const dayTravelCache = new Map();
+  function travelFingerprint(daySessions, st) {
+    const jobs = st.jobs || [];
+    const jobBits = (daySessions || []).map(s => {
+      const j = jobs.find(x => x.job_id === s.job_id);
+      return [s.session_id, s.job_id, s.lat_on, s.lng_on, s.time_on_rounded || s.time_on, j && j.lat, j && j.lng];
+    });
+    const sett = st.settings || {};
+    return JSON.stringify({
+      includeCommute: !!sett.includeCommute,
+      fuelLPer100km: sett.fuelLPer100km,
+      fuelPricePerLitre: sett.fuelPricePerLitre,
+      homeLat: sett.homeLat,
+      homeLng: sett.homeLng,
+      jobBits
+    });
+  }
+  function rememberDayTravel(iso, daySessions, st, travel) {
+    if (!iso || !travel) return;
+    dayTravelCache.set(iso, { fingerprint: travelFingerprint(daySessions, st), travel });
+  }
+  function getDayTravelCache(iso, daySessions, st) {
+    if (!iso) return null;
+    const hit = dayTravelCache.get(iso);
+    if (!hit) return null;
+    if (hit.fingerprint !== travelFingerprint(daySessions, st)) return null;
+    return hit.travel;
+  }
+  /** One ordering for a day's sessions everywhere (History panel, prefetch, export) so cache fingerprints match. */
+  function sortDaySessions(sessions) {
+    return (sessions || []).slice().sort((a, b) => (a.time_on_rounded || a.time_on || '99:99').localeCompare(b.time_on_rounded || b.time_on || '99:99'));
+  }
+  /* Background travel for the visible week (0.4.3). Computes every day that
+   * isn't cached yet, one day at a time with a gap between days, so Copy
+   * timesheet can read finished legs synchronously without the user expanding
+   * each day. A newer week (or re-render) supersedes older queued work. */
+  const failedDays = new Map(); // iso -> fingerprint that failed (don't retry the same input)
+  let prefetchGen = 0;
+  const inflight = new Map();
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  function dayFailed(iso, daySessions, st) {
+    return failedDays.get(iso) === travelFingerprint(daySessions, st);
+  }
+  function prefetchWeek(weekSessions, st, opts) {
+    opts = opts || {};
+    const gapMs = opts.gapMs != null ? opts.gapMs : 1200;
+    const gen = ++prefetchGen;
+    const byDay = new Map();
+    (weekSessions || []).forEach(s => { if (s && s.date) { if (!byDay.has(s.date)) byDay.set(s.date, []); byDay.get(s.date).push(s); } });
+    const todo = [...byDay.keys()].sort().filter(iso => {
+      const ds = sortDaySessions(byDay.get(iso));
+      return !getDayTravelCache(iso, ds, st) && !dayFailed(iso, ds, st);
+    });
+    return (async () => {
+      let done = 0;
+      for (let i = 0; i < todo.length; i++) {
+        if (gen !== prefetchGen) return done; // superseded by a newer week / render
+        if (i > 0 && gapMs) await sleep(gapMs);
+        if (gen !== prefetchGen) return done;
+        const iso = todo[i];
+        const ds = sortDaySessions(byDay.get(iso));
+        if (getDayTravelCache(iso, ds, st)) continue;
+        const fp = iso + '|' + travelFingerprint(ds, st);
+        try {
+          // A day already being computed (e.g. by an earlier render) is awaited, not re-requested.
+          if (!inflight.has(fp)) inflight.set(fp, computeDayTravel(ds, st).finally(() => inflight.delete(fp)));
+          await inflight.get(fp);
+          done++;
+          if (opts.onDay) opts.onDay(iso);
+        } catch (e) {
+          failedDays.set(iso, travelFingerprint(ds, st));
+          console.warn('travel prefetch failed', iso, e);
+        }
+      }
+      return done;
+    })();
+  }
+  function legFuelCost(leg, eff, price) {
+    if (!leg || leg.skipped || leg.km == null || !Number.isFinite(leg.km)) return null;
+    if (!Number.isFinite(eff) || eff <= 0) return null;
+    const litres = leg.km * (eff / 100);
+    if (!Number.isFinite(price) || price < 0) return null;
+    return litres * price;
+  }
+  function legLabelText(leg) {
+    if (leg.label) return leg.label;
+    return `${leg.from.name} → ${leg.to.name}`;
+  }
+  /** Plain-text travel block for weekly export (matches History day fuel maths). */
+  function travelExportLines(travel) {
+    if (!travel) return { lines: [], cost: 0, km: 0, hasData: false };
+    const { legs, totalKm, cost, eff, price, usableCount, needsHome, includeCommute } = travel;
+    if (!legs || !legs.length) return { lines: [], cost: 0, km: 0, hasData: false };
+    const lines = ['  Travel'];
+    legs.forEach(leg => {
+      const label = legLabelText(leg);
+      if (leg.skipped) lines.push(`    ${label}  ·  no coords`);
+      else {
+        const c = legFuelCost(leg, eff, price);
+        lines.push(`    ${label}  ·  ${fmtKm(leg.km)}  ·  ${c != null ? fmtMoney(c) : '—'}`);
+      }
+    });
+    if (usableCount > 0) {
+      lines.push(`  Day travel total: ${fmtKm(totalKm)}  ·  ${fmtMoney(cost)}`);
+      return { lines, cost: Number.isFinite(cost) ? cost : 0, km: totalKm, hasData: true };
+    }
+    if (needsHome && includeCommute) lines.push('  Commute km pending home coordinates in Settings.');
+    return { lines, cost: 0, km: 0, hasData: false };
+  }
   function distFn() {
     if (window.NDJobLocator && typeof NDJobLocator.distanceMetres === 'function') return NDJobLocator.distanceMetres;
     return distanceMetres;
@@ -2547,9 +2684,18 @@ const TsTravel = (() => {
     });
     return legs;
   }
+  // Road km per leg, cached by rounded coordinates so History expands, the
+  // background week prefetch and re-renders never ask Distance Matrix twice.
+  const roadKmCache = new Map();
+  const legKey = (l) => [l.from.lat, l.from.lng, l.to.lat, l.to.lng].map(v => Number(v).toFixed(5)).join(',');
   function roadDistanceMatrix(legs) {
+    legs.forEach(l => {
+      if (l.skipped) return;
+      const hit = roadKmCache.get(legKey(l));
+      if (hit != null) { l.km = hit; l.method = 'road'; }
+    });
     return new Promise((resolve) => {
-      const pending = legs.filter(l => !l.skipped);
+      const pending = legs.filter(l => !l.skipped && l.method !== 'road');
       if (!pending.length) { resolve(legs); return; }
       if (!(window.google && google.maps && google.maps.DistanceMatrixService)) {
         fillHaversine(legs); resolve(legs); return;
@@ -2571,13 +2717,14 @@ const TsTravel = (() => {
           if (el && el.status === 'OK' && el.distance && Number.isFinite(el.distance.value)) {
             leg.km = el.distance.value / 1000;
             leg.method = 'road';
+            roadKmCache.set(legKey(leg), leg.km);
             anyRoad = true;
           } else {
             leg.km = haversineKm(leg.from, leg.to);
             leg.method = 'haversine';
           }
         });
-        if (!anyRoad) fillHaversine(legs);
+        if (!anyRoad) legs.forEach(l => { if (!l.skipped && l.method !== 'road') { l.km = haversineKm(l.from, l.to); l.method = 'haversine'; } });
         resolve(legs);
       });
     });
@@ -2613,7 +2760,8 @@ const TsTravel = (() => {
     }
     const methodLabel = { road: 'road (Distance Matrix)', haversine: 'straight-line (Haversine)' };
     try {
-      if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs();
+      // Don't let a Maps script that never loads stall travel (falls back to Haversine).
+      if (window.TsGeo && TsGeo.loadMapsJs) await Promise.race([TsGeo.loadMapsJs().catch(() => {}), new Promise(r => setTimeout(r, 8000))]);
       legs = await roadDistanceMatrix(legs);
     } catch (e) {
       console.warn('TsTravel road distance failed, using Haversine', e);
@@ -2629,11 +2777,14 @@ const TsTravel = (() => {
     const mapStops = [];
     if (includeCommute && home.geocoded) mapStops.push(home);
     stops.forEach(s => mapStops.push(s));
-    return {
+    const result = {
       stops, geocoded, legs, totalKm, litres, cost, eff, price,
       includeCommute, needsHome, home, mapStops, usableCount: usable.length,
       methodSummary: methods.map(m => methodLabel[m] || m).join(' + ') || 'n/a'
     };
+    const iso = daySessions.length && daySessions[0].date;
+    if (iso) rememberDayTravel(iso, daySessions, st, result);
+    return result;
   }
   function fmtKm(km) {
     if (km == null || !Number.isFinite(km)) return '—';
@@ -2736,7 +2887,10 @@ const TsTravel = (() => {
     }
     return `<div class="day-travel" data-day-travel="${iso}">${body}</div>`;
   }
-  return { computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop };
+  return {
+    computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop,
+    getDayTravelCache, travelExportLines, rememberDayTravel, prefetchWeek, sortDaySessions
+  };
 })();
 window.TsTravel = TsTravel;
 
@@ -2923,6 +3077,9 @@ window.TsLocPicker = TsLocPicker;
     $('wk-today').style.display = isCurrentWeek ? 'none' : 'inline-flex';
     renderPeriodSummary(st);
     if ($('export-panel').open) renderExportPreview();
+    // Compute travel for every day of this week in the background (cached,
+    // throttled) so Copy timesheet has km/cost without expanding each day.
+    if (window.TsTravel) TsTravel.prefetchWeek(sessions, st, { onDay: () => { if ($('export-panel').open) renderExportPreview(); } });
     const daysHtml = []; let daysWithData = 0;
     for (let i = 0; i < 7; i++) {
       const day = addDays(weekCursor, i); const iso = isoDate(day);
@@ -2973,8 +3130,7 @@ window.TsLocPicker = TsLocPicker;
     });
     // Hydrate travel panels for currently expanded days (async distance + map).
     function hydrateDayTravel(iso, card) {
-      const daySessions = sessionsForWeek(weekCursor).filter(s => s.date === iso)
-        .sort((a, b) => (a.time_on || '99:99').localeCompare(b.time_on || '99:99'));
+      const daySessions = TsTravel.sortDaySessions(sessionsForWeek(weekCursor).filter(s => s.date === iso));
       if (!daySessions.length) return;
       const panel = card.querySelector('[data-day-travel]');
       if (!panel) return;
