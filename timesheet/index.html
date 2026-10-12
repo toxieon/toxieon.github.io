@@ -15,12 +15,12 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.2"></script>
+<script src="ts-time.js?v=0.4.3"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.2"></script>
-<script src="ts-clipboard.js?v=0.4.2"></script>
+<script src="ts-map.js?v=0.4.3"></script>
+<script src="ts-clipboard.js?v=0.4.3"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
@@ -723,7 +723,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.2';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.3';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1925,8 +1925,14 @@ const TsExport = (() => {
     return { start, range: fmtRange(start), name: exporterName(st), employer: cleanName(st.settings.employerName, ''), days, sites: siteList, totals, dayCount: days.length };
   }
   function formatWeekPreview(weekStart) {
+    const st = getState();
     const m = buildWeekModel(weekStart);
+    const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
+    const weekSessions = sessionsForWeek(start);
     const lines = [];
+    let weekTravelCost = 0;
+    let weekTravelKm = 0;
+    let anyTravelData = false;
     lines.push(m.name ? `TIMESHEET — ${m.name}` : 'TIMESHEET');
     lines.push(`Week: ${m.range}`);
     if (m.employer) lines.push(`Employer: ${m.employer}`);
@@ -1936,6 +1942,22 @@ const TsExport = (() => {
       lines.push('');
       lines.push(d.label);
       d.rows.forEach(r => lines.push(`  ${r.on}–${r.off}  ·  ${r.name}  ·  ${fmtHrs(r.hours)}`));
+      const daySessions = weekSessions.filter(s => s.date === d.iso)
+        .sort((a, b) => (a.time_on_rounded || a.time_on || '99:99').localeCompare(b.time_on_rounded || b.time_on || '99:99'));
+      if (daySessions.length && window.TsTravel) {
+        const cached = TsTravel.getDayTravelCache(d.iso, daySessions, st);
+        if (cached) {
+          const ex = TsTravel.travelExportLines(cached);
+          ex.lines.forEach(l => lines.push(l));
+          if (ex.hasData) {
+            anyTravelData = true;
+            weekTravelCost += ex.cost;
+            weekTravelKm += ex.km;
+          }
+        } else {
+          lines.push('  Travel: km/cost omitted (expand day in History to load distances).');
+        }
+      }
       const extras = [];
       if (d.breakMin > 0) extras.push(`break ${d.breakMin} min`);
       if (d.ot > 0) extras.push(`OT ${fmtHrs(d.ot)}`);
@@ -1946,6 +1968,12 @@ const TsExport = (() => {
     lines.push('WEEKLY SUMMARY — HOURS BY SITE');
     lines.push('');
     m.sites.forEach(s => lines.push(`  ${s.name} — ${fmtHrs(s.hours)}${s.dayCount > 1 ? ` (${s.dayCount} days)` : ''}`));
+    if (anyTravelData && window.TsTravel) {
+      lines.push(RULE);
+      lines.push('WEEKLY TRAVEL COST');
+      lines.push('');
+      lines.push(`  ${TsTravel.fmtKm(weekTravelKm)}  ·  ${TsTravel.fmtMoney(weekTravelCost)}`);
+    }
     lines.push(RULE);
     lines.push(`TOTAL: ${fmtHrs(m.totals.total)}  ·  ${m.dayCount} day${m.dayCount === 1 ? '' : 's'}${m.totals.ot > 0 ? `  ·  OT ${fmtHrs(m.totals.ot)}` : ''}`);
     return lines.join('\n');
@@ -2475,6 +2503,67 @@ window.Views = {};
 
 /* ----- TRAVEL + FUEL (History day expand) ----- */
 const TsTravel = (() => {
+  /** Cached async day-travel results (History expand). Copy timesheet reads this synchronously. */
+  const dayTravelCache = new Map();
+  function travelFingerprint(daySessions, st) {
+    const jobs = st.jobs || [];
+    const jobBits = (daySessions || []).map(s => {
+      const j = jobs.find(x => x.job_id === s.job_id);
+      return [s.session_id, s.job_id, s.lat_on, s.lng_on, s.time_on_rounded || s.time_on, j && j.lat, j && j.lng];
+    });
+    const sett = st.settings || {};
+    return JSON.stringify({
+      includeCommute: !!sett.includeCommute,
+      fuelLPer100km: sett.fuelLPer100km,
+      fuelPricePerLitre: sett.fuelPricePerLitre,
+      homeLat: sett.homeLat,
+      homeLng: sett.homeLng,
+      jobBits
+    });
+  }
+  function rememberDayTravel(iso, daySessions, st, travel) {
+    if (!iso || !travel) return;
+    dayTravelCache.set(iso, { fingerprint: travelFingerprint(daySessions, st), travel });
+  }
+  function getDayTravelCache(iso, daySessions, st) {
+    if (!iso) return null;
+    const hit = dayTravelCache.get(iso);
+    if (!hit) return null;
+    if (hit.fingerprint !== travelFingerprint(daySessions, st)) return null;
+    return hit.travel;
+  }
+  function legFuelCost(leg, eff, price) {
+    if (!leg || leg.skipped || leg.km == null || !Number.isFinite(leg.km)) return null;
+    if (!Number.isFinite(eff) || eff <= 0) return null;
+    const litres = leg.km * (eff / 100);
+    if (!Number.isFinite(price) || price < 0) return null;
+    return litres * price;
+  }
+  function legLabelText(leg) {
+    if (leg.label) return leg.label;
+    return `${leg.from.name} → ${leg.to.name}`;
+  }
+  /** Plain-text travel block for weekly export (matches History day fuel maths). */
+  function travelExportLines(travel) {
+    if (!travel) return { lines: [], cost: 0, km: 0, hasData: false };
+    const { legs, totalKm, cost, eff, price, usableCount, needsHome, includeCommute } = travel;
+    if (!legs || !legs.length) return { lines: [], cost: 0, km: 0, hasData: false };
+    const lines = ['  Travel'];
+    legs.forEach(leg => {
+      const label = legLabelText(leg);
+      if (leg.skipped) lines.push(`    ${label}  ·  no coords`);
+      else {
+        const c = legFuelCost(leg, eff, price);
+        lines.push(`    ${label}  ·  ${fmtKm(leg.km)}  ·  ${c != null ? fmtMoney(c) : '—'}`);
+      }
+    });
+    if (usableCount > 0) {
+      lines.push(`  Day travel total: ${fmtKm(totalKm)}  ·  ${fmtMoney(cost)}`);
+      return { lines, cost: Number.isFinite(cost) ? cost : 0, km: totalKm, hasData: true };
+    }
+    if (needsHome && includeCommute) lines.push('  Commute km pending home coordinates in Settings.');
+    return { lines, cost: 0, km: 0, hasData: false };
+  }
   function distFn() {
     if (window.NDJobLocator && typeof NDJobLocator.distanceMetres === 'function') return NDJobLocator.distanceMetres;
     return distanceMetres;
@@ -2613,7 +2702,7 @@ const TsTravel = (() => {
     }
     const methodLabel = { road: 'road (Distance Matrix)', haversine: 'straight-line (Haversine)' };
     try {
-      if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs();
+      if (window.TsGeo && TsGeo.loadMapsJs) await TsGeo.loadMapsJs().catch(() => {});
       legs = await roadDistanceMatrix(legs);
     } catch (e) {
       console.warn('TsTravel road distance failed, using Haversine', e);
@@ -2629,11 +2718,14 @@ const TsTravel = (() => {
     const mapStops = [];
     if (includeCommute && home.geocoded) mapStops.push(home);
     stops.forEach(s => mapStops.push(s));
-    return {
+    const result = {
       stops, geocoded, legs, totalKm, litres, cost, eff, price,
       includeCommute, needsHome, home, mapStops, usableCount: usable.length,
       methodSummary: methods.map(m => methodLabel[m] || m).join(' + ') || 'n/a'
     };
+    const iso = daySessions.length && daySessions[0].date;
+    if (iso) rememberDayTravel(iso, daySessions, st, result);
+    return result;
   }
   function fmtKm(km) {
     if (km == null || !Number.isFinite(km)) return '—';
@@ -2736,7 +2828,10 @@ const TsTravel = (() => {
     }
     return `<div class="day-travel" data-day-travel="${iso}">${body}</div>`;
   }
-  return { computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop };
+  return {
+    computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop,
+    getDayTravelCache, travelExportLines, rememberDayTravel
+  };
 })();
 window.TsTravel = TsTravel;
 
