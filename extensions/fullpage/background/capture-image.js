@@ -15,19 +15,15 @@ function uuid() {
 
 let lastCaptureVisibleTabAt = 0;
 
-async function waitForPaint(tabId, y) {
-  await callPageTool(tabId, 'scrollToY', [y]);
-  await new Promise((r) => setTimeout(r, SCROLL_SETTLE_MS));
-}
-
-async function captureVisiblePng(windowId) {
+async function captureVisiblePng(windowId, tabId, sliceIndex) {
+  await callPageTool(tabId, 'beforeCaptureSlice', [sliceIndex]).catch(() => {});
   const now = Date.now();
   const wait = CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS - (now - lastCaptureVisibleTabAt);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   let dataUrl;
   try {
     dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
-  } catch (capErr) {
+  } catch {
     await new Promise((r) => setTimeout(r, CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS));
     dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
   }
@@ -41,19 +37,37 @@ export async function captureTabImage(tabId, options = {}) {
   const tab = await chrome.tabs.get(tabId);
   await onProgress?.(5, 'Preparing page…');
   const metrics = await callPageTool(tabId, 'prepareForCapture', [
-    { expandLazy: true, settleMs: SCROLL_SETTLE_MS, lazyMs: LAZY_LOAD_EXTRA_MS },
+    {
+      expandLazy: options.expandLazy !== false,
+      settleMs: SCROLL_SETTLE_MS,
+      lazyMs: LAZY_LOAD_EXTRA_MS,
+    },
   ]);
   const plan = await callPageTool(tabId, 'buildScrollPlan', [metrics, options.overlapPx ?? 80]);
   const slices = [];
+  const scrollLog = [];
   const total = plan.positions.length;
 
   for (let i = 0; i < plan.positions.length; i++) {
     const scrollY = plan.positions[i];
     const pct = 10 + Math.round((i / total) * 70);
     await onProgress?.(pct, `Screenshot ${i + 1} of ${total}`);
-    await waitForPaint(tabId, scrollY);
-    const dataUrl = await captureVisiblePng(tab.windowId);
-    slices.push({ scrollY, dataUrl });
+
+    const verify = await callPageTool(tabId, 'scrollToCaptureY', [scrollY, i]);
+    scrollLog.push(verify);
+    if (verify.duplicate) {
+      if (i === 0) {
+        throw new Error('Page did not scroll for capture. Try scrolling the main content manually first.');
+      }
+      break;
+    }
+    await new Promise((r) => setTimeout(r, SCROLL_SETTLE_MS));
+    const dataUrl = await captureVisiblePng(tab.windowId, tabId, i);
+    slices.push({ scrollY: verify.actualY, dataUrl });
+  }
+
+  if (slices.length < 1) {
+    throw new Error('No screenshots captured.');
   }
 
   await callPageTool(tabId, 'restoreScrollPosition', []);
@@ -92,6 +106,7 @@ export async function captureTabImage(tabId, options = {}) {
     width,
     height,
     pageCount: 1,
+    scrollLog,
   };
   if (!options.skipStore) {
     await putCapture(record);

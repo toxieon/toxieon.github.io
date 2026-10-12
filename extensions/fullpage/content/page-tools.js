@@ -1,132 +1,108 @@
 /**
- * Injected into the page (isolated world). Handles metrics, scrolling, HTML reconstruction.
- * Original implementation for Neill Full Page Capture.
+ * Injected into the page (isolated world). Metrics, scrolling, HTML reconstruction.
  */
-
 (function () {
   if (globalThis.__NeillFullPageTools) return;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  const IGNORED_SCROLLER_SELECTORS = [
+    '[data-region="drawer"]',
+    '.drawer',
+    '[data-region="fixed-drawer"]',
+    '#theme_boost-drawers-courseindex',
+    '.drawercontent',
+    '.courseindex',
+    '[data-blockregion="side-pre"]',
+    '[data-blockregion="side-post"]',
+    '.block_column',
+    '.quizreviewsummary + .block',
+  ].join(',');
+
+  function isIgnoredScroller(el) {
+    if (!el) return true;
+    try {
+      if (el.closest(IGNORED_SCROLLER_SELECTORS)) return true;
+      const id = (el.id || '').toLowerCase();
+      const cls = (el.className || '').toString().toLowerCase();
+      if (id.includes('drawer') || id.includes('courseindex')) return true;
+      if (cls.includes('drawer') && !cls.includes('drawer-open')) return true;
+      if (el.getAttribute('data-region') === 'drawer') return true;
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   function getDevicePixelRatio() {
     return window.devicePixelRatio || 1;
   }
 
+  function documentScrollHeight() {
+    const doc = document.documentElement;
+    const body = document.body;
+    return Math.max(
+      doc.scrollHeight,
+      body ? body.scrollHeight : 0,
+      doc.clientHeight,
+      window.innerHeight
+    );
+  }
+
   function isScrollable(el) {
-    if (!el || el === document.documentElement || el === document.body) return false;
+    if (!el || el === document.documentElement) return false;
+    if (isIgnoredScroller(el)) return false;
     const style = getComputedStyle(el);
     const oy = style.overflowY;
     if (oy !== 'auto' && oy !== 'scroll' && oy !== 'overlay') return false;
     return el.scrollHeight > el.clientHeight + 4;
   }
 
-  function findInnerScrollContainers() {
-    const candidates = document.querySelectorAll('main, [role="main"], .content, #content, .region-main, article, section, div');
-    const out = [];
-    for (const el of candidates) {
-      if (isScrollable(el) && el.clientHeight > 120) {
-        out.push({
-          selector: cssPath(el),
-          scrollHeight: el.scrollHeight,
-          clientHeight: el.clientHeight,
-          scrollWidth: el.scrollWidth,
-          clientWidth: el.clientWidth,
-        });
-      }
-    }
-    out.sort((a, b) => b.scrollHeight - a.scrollHeight);
-    return out.slice(0, 8);
-  }
-
-  function cssPath(el) {
-    if (!el || el.nodeType !== 1) return '';
-    if (el.id) return `#${CSS.escape(el.id)}`;
-    const parts = [];
-    let node = el;
-    while (node && node.nodeType === 1 && node !== document.documentElement) {
-      let part = node.nodeName.toLowerCase();
-      if (node.classList && node.classList.length) {
-        const cls = [...node.classList].slice(0, 2).map((c) => `.${CSS.escape(c)}`).join('');
-        part += cls;
-      }
-      const parent = node.parentElement;
-      if (parent) {
-        const siblings = [...parent.children].filter((c) => c.nodeName === node.nodeName);
-        if (siblings.length > 1) {
-          const idx = siblings.indexOf(node) + 1;
-          part += `:nth-of-type(${idx})`;
-        }
-      }
-      parts.unshift(part);
-      if (node.id) break;
-      node = node.parentElement;
-    }
-    return parts.join(' > ');
-  }
-
-  function collectStickyMeta() {
-    const fixed = [];
-    const all = document.querySelectorAll('body *');
-    for (const el of all) {
-      const style = getComputedStyle(el);
-      if (style.position === 'fixed' || style.position === 'sticky') {
-        const rect = el.getBoundingClientRect();
-        if (rect.height < 4 || rect.width < 4) continue;
-        fixed.push({
-          top: Math.round(rect.top),
-          height: Math.round(rect.height),
-          position: style.position,
-        });
-      }
-    }
-    const headerOverlap = fixed
-      .filter((f) => f.top <= 2)
-      .reduce((max, f) => Math.max(max, f.height), 0);
-    return { headerOverlap, fixedCount: fixed.length };
-  }
-
   let captureScrollState = null;
+  let fixedHiddenForCapture = false;
 
   function pickPrimaryScroller() {
-    const docH = document.documentElement.scrollHeight;
-    const inner = findInnerScrollContainers();
-    for (const info of inner) {
-      const el = document.querySelector(info.selector);
-      if (!el) continue;
-      if (info.scrollHeight > docH * 1.08 && info.scrollHeight > info.clientHeight + 80) {
-        return { mode: 'element', selector: info.selector, el };
-      }
+    const docH = documentScrollHeight();
+    if (docH > window.innerHeight + 60) {
+      return { mode: 'window', selector: null, el: null };
     }
-    const moodleMain = document.querySelector('#region-main, .region-main, [role="main"]');
-    if (moodleMain && isScrollable(moodleMain) && moodleMain.scrollHeight > window.innerHeight + 80) {
-      return { mode: 'element', selector: cssPath(moodleMain), el: moodleMain };
+    const moodleSelectors = ['#page', '#page-wrapper', '#region-main', '#page-content', 'main[role="main"]'];
+    for (const sel of moodleSelectors) {
+      const el = document.querySelector(sel);
+      if (!el || isIgnoredScroller(el)) continue;
+      if (isScrollable(el) && el.scrollHeight > window.innerHeight + 60) {
+        return { mode: 'element', selector: sel, el };
+      }
     }
     return { mode: 'window', selector: null, el: null };
   }
 
+  function collectStickyMeta() {
+    const fixed = [];
+    for (const el of document.querySelectorAll('body *')) {
+      if (isIgnoredScroller(el)) continue;
+      const style = getComputedStyle(el);
+      if (style.position !== 'fixed' && style.position !== 'sticky') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.height < 4 || rect.width < 4) continue;
+      fixed.push({ top: Math.round(rect.top), height: Math.round(rect.height) });
+    }
+    const headerOverlap = fixed.filter((f) => f.top <= 2).reduce((max, f) => Math.max(max, f.height), 0);
+    return { headerOverlap, fixedCount: fixed.length };
+  }
+
   function getPageMetrics() {
-    const doc = document.documentElement;
-    const body = document.body;
     const scroller = pickPrimaryScroller();
-    let width = Math.max(
-      doc.scrollWidth,
-      body ? body.scrollWidth : 0,
-      doc.clientWidth,
-      window.innerWidth
-    );
-    let height = Math.max(
-      doc.scrollHeight,
-      body ? body.scrollHeight : 0,
-      doc.clientHeight,
-      window.innerHeight
-    );
+    let width = Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0, window.innerWidth);
+    let height = documentScrollHeight();
     let viewportHeight = window.innerHeight;
+
     if (scroller.mode === 'element' && scroller.el) {
       height = Math.max(height, scroller.el.scrollHeight);
       width = Math.max(width, scroller.el.scrollWidth, scroller.el.clientWidth);
-      viewportHeight = Math.min(window.innerHeight, scroller.el.clientHeight || window.innerHeight);
+      viewportHeight = window.innerHeight;
     }
-    const sticky = collectStickyMeta();
+
     return {
       width,
       height,
@@ -137,41 +113,65 @@
       scrollY: window.scrollY,
       scrollMode: scroller.mode,
       scrollSelector: scroller.selector,
-      sticky,
-      innerScrolls: findInnerScrollContainers(),
+      sticky: collectStickyMeta(),
       title: document.title,
       url: location.href,
     };
   }
 
+  function readScrollMetrics() {
+    const main =
+      document.querySelector('#region-main, #page-content, [role="main"]') || document.body;
+    const sample = (main?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    let y = window.scrollY;
+    if (captureScrollState?.mode === 'element' && captureScrollState.element) {
+      y = captureScrollState.element.scrollTop;
+    }
+    return { y: Math.round(y), sample };
+  }
+
+  function hideExtensionUi() {
+    document.getElementById('neill-fullpage-progress-root')?.remove();
+    document.querySelectorAll('[data-neill-fullpage]').forEach((n) => {
+      n.style.setProperty('display', 'none', 'important');
+    });
+  }
+
+  function maskFixedAndSticky() {
+    if (fixedHiddenForCapture) return;
+    fixedHiddenForCapture = true;
+    for (const el of document.querySelectorAll('body *')) {
+      if (isIgnoredScroller(el)) continue;
+      const style = getComputedStyle(el);
+      if (style.position !== 'fixed' && style.position !== 'sticky') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 4 && rect.height < 4) continue;
+      if (!el.dataset.fullpageVis) el.dataset.fullpageVis = el.style.visibility || '';
+      el.style.setProperty('visibility', 'hidden', 'important');
+    }
+  }
+
+  function unmaskFixedAndSticky() {
+    if (!fixedHiddenForCapture) return;
+    fixedHiddenForCapture = false;
+    document.querySelectorAll('[data-fullpage-vis]').forEach((el) => {
+      el.style.visibility = el.dataset.fullpageVis || '';
+      delete el.dataset.fullpageVis;
+    });
+  }
+
   async function expandLazyContent(options = {}) {
-    const maxSteps = options.maxScrollSteps ?? 80;
     const step = Math.max(200, Math.floor(window.innerHeight * 0.85));
-    const originalY = window.scrollY;
-    const originalX = window.scrollX;
-    let y = 0;
-    const maxY = document.documentElement.scrollHeight;
-    for (let i = 0; i < maxSteps && y < maxY; i++) {
+    const ox = window.scrollX;
+    const oy = window.scrollY;
+    const maxY = documentScrollHeight();
+    for (let y = 0, i = 0; i < 35 && y < maxY; i++) {
       window.scrollTo(0, y);
       await sleep(options.settleMs ?? 120);
       y += step;
     }
-    window.scrollTo(originalX, originalY);
+    window.scrollTo(ox, oy);
     await sleep(options.settleMs ?? 120);
-
-    const inner = findInnerScrollContainers();
-    for (const info of inner.slice(0, 3)) {
-      const el = document.querySelector(info.selector);
-      if (!el) continue;
-      const orig = el.scrollTop;
-      let iy = 0;
-      for (let i = 0; i < 40 && iy < el.scrollHeight; i++) {
-        el.scrollTop = iy;
-        await sleep(80);
-        iy += Math.max(150, Math.floor(el.clientHeight * 0.8));
-      }
-      el.scrollTop = orig;
-    }
     await sleep(options.lazyMs ?? 200);
     return getPageMetrics();
   }
@@ -179,34 +179,66 @@
   async function prepareForCapture(options = {}) {
     document.documentElement.style.scrollBehavior = 'auto';
     if (document.body) document.body.style.scrollBehavior = 'auto';
+    unmaskFixedAndSticky();
+    hideExtensionUi();
+
+    const scroller = pickPrimaryScroller();
     captureScrollState = {
+      mode: scroller.mode,
       windowX: window.scrollX,
       windowY: window.scrollY,
       element: null,
       elementTop: 0,
+      lastY: -1,
+      lastSample: '',
     };
-    const metrics = options.expandLazy ? await expandLazyContent(options) : getPageMetrics();
-    if (metrics.scrollMode === 'element' && metrics.scrollSelector) {
-      const el = document.querySelector(metrics.scrollSelector);
-      if (el) {
-        captureScrollState.element = el;
-        captureScrollState.elementTop = el.scrollTop;
-        window.scrollTo(0, 0);
-      }
+
+    if (scroller.mode === 'element' && scroller.el) {
+      captureScrollState.element = scroller.el;
+      captureScrollState.elementTop = scroller.el.scrollTop;
     }
-    return getPageMetrics();
+
+    return options.expandLazy ? expandLazyContent(options) : getPageMetrics();
   }
 
   function scrollToY(y) {
-    if (captureScrollState?.element) {
+    hideExtensionUi();
+    if (captureScrollState?.mode === 'element' && captureScrollState.element) {
       captureScrollState.element.scrollTop = y;
       window.scrollTo(captureScrollState.windowX, 0);
-      return;
+    } else {
+      window.scrollTo(captureScrollState?.windowX ?? window.scrollX, y);
     }
-    window.scrollTo(captureScrollState?.windowX ?? window.scrollX, y);
+  }
+
+  function scrollToCaptureY(y, sliceIndex = 0) {
+    if (sliceIndex > 0) maskFixedAndSticky();
+    hideExtensionUi();
+    const before = readScrollMetrics();
+    scrollToY(y);
+    const after = readScrollMetrics();
+    const moved = Math.abs(after.y - before.y) > 3 || after.sample !== before.sample;
+    const duplicate = sliceIndex > 0 && !moved;
+    captureScrollState.lastY = after.y;
+    captureScrollState.lastSample = after.sample;
+    return {
+      requestedY: y,
+      actualY: after.y,
+      moved,
+      duplicate,
+      sample: after.sample.slice(0, 80),
+    };
+  }
+
+  function beforeCaptureSlice(sliceIndex) {
+    hideExtensionUi();
+    if (sliceIndex > 0) maskFixedAndSticky();
+    return readScrollMetrics();
   }
 
   function restoreScrollPosition() {
+    unmaskFixedAndSticky();
+    hideExtensionUi();
     if (captureScrollState?.element) {
       captureScrollState.element.scrollTop = captureScrollState.elementTop;
     }
@@ -244,15 +276,14 @@
 
   async function imageToDataUrl(img) {
     try {
-      if (img.src && img.src.startsWith('data:')) return img.src;
+      if (img.src?.startsWith('data:')) return img.src;
       const canvas = document.createElement('canvas');
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       if (!w || !h) return img.currentSrc || img.src || '';
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+      canvas.getContext('2d').drawImage(img, 0, 0);
       return canvas.toDataURL('image/png');
     } catch {
       return img.currentSrc || img.src || '';
@@ -265,9 +296,7 @@
       if (type === 'checkbox' || type === 'radio') {
         if (input.checked) input.setAttribute('checked', 'checked');
         else input.removeAttribute('checked');
-      } else if (type !== 'file') {
-        input.setAttribute('value', input.value);
-      }
+      } else if (type !== 'file') input.setAttribute('value', input.value);
     });
     root.querySelectorAll('textarea').forEach((ta) => {
       ta.textContent = ta.value;
@@ -284,8 +313,7 @@
     let head = clone.querySelector('head');
     if (!head) {
       head = document.createElement('head');
-      const html = clone.nodeName === 'HTML' ? clone : clone.querySelector('html') || clone;
-      html.insertBefore(head, html.firstChild);
+      (clone.querySelector('html') || clone).insertBefore(head, clone.firstChild);
     }
     return head;
   }
@@ -297,12 +325,8 @@
     const chunks = [];
     for (const sheet of document.styleSheets) {
       try {
-        const rules = sheet.cssRules;
-        if (!rules) continue;
         const parts = [];
-        for (const rule of rules) {
-          parts.push(rule.cssText);
-        }
+        for (const rule of sheet.cssRules) parts.push(rule.cssText);
         if (parts.length) chunks.push(parts.join('\n'));
       } catch {
         if (sheet.href) {
@@ -321,18 +345,13 @@
   }
 
   async function inlineImages(clone, baseUrl) {
-    const imgs = clone.querySelectorAll('img');
-    for (const img of imgs) {
-      const live = document.querySelector(`img[src="${img.getAttribute('src')}"]`);
+    for (const img of clone.querySelectorAll('img')) {
       const src = img.getAttribute('src') || '';
       if (!src || src.startsWith('data:')) continue;
+      const live = document.querySelector(`img[src="${CSS.escape(src)}"]`);
       try {
-        const abs = new URL(src, baseUrl).href;
-        const res = await fetch(abs, { credentials: 'include', mode: 'cors' });
-        if (res.ok) {
-          const blob = await res.blob();
-          img.setAttribute('src', await blobToDataUrl(blob));
-        }
+        const res = await fetch(new URL(src, baseUrl).href, { credentials: 'include' });
+        if (res.ok) img.setAttribute('src', await blobToDataUrl(await res.blob()));
       } catch {
         if (live) {
           const data = await imageToDataUrl(live);
@@ -346,64 +365,42 @@
     const baseUrl = location.href;
     const clone = document.documentElement.cloneNode(true);
     clone.querySelectorAll('script, noscript').forEach((n) => n.remove());
-    clone.querySelectorAll('iframe, video, audio').forEach((n) => {
-      const placeholder = document.createElement('div');
-      placeholder.textContent = `[${n.nodeName.toLowerCase()} omitted]`;
-      n.replaceWith(placeholder);
-    });
     serializeFormState(clone);
     await inlineStyles(clone, baseUrl);
-    if (options.inlineImages !== false) {
-      await inlineImages(clone, baseUrl);
-    }
+    if (options.inlineImages !== false) await inlineImages(clone, baseUrl);
     const head = ensureHead(clone);
-    const meta = document.createElement('meta');
-    meta.setAttribute('charset', 'utf-8');
-    meta.setAttribute('data-fullpage-captured', new Date().toISOString());
-    head.prepend(meta);
-    const base = document.createElement('base');
-    base.href = baseUrl;
-    head.prepend(base);
-    const doctype = '<!DOCTYPE html>\n';
-    return doctype + clone.outerHTML;
+    head.prepend(Object.assign(document.createElement('meta'), { charset: 'utf-8' }));
+    return '<!DOCTYPE html>\n' + clone.outerHTML;
   }
 
   function findPaginationLinks(limit = 25) {
     const url = new URL(location.href);
-    const links = [...document.querySelectorAll('a[href]')];
     const scored = [];
-    const nextWords = /^(next|continue|older|newer|›|»|→)/i;
-    for (const a of links) {
-      const text = (a.textContent || '').trim();
-      const rel = (a.getAttribute('rel') || '').toLowerCase();
+    for (const a of document.querySelectorAll('a[href]')) {
       const href = a.href;
       if (!href || href.startsWith('javascript:')) continue;
       let score = 0;
-      if (rel === 'next') score += 50;
-      if (nextWords.test(text)) score += 40;
-      if (/page=\d+|[?&]p=\d+|\/page\/\d+/i.test(href)) score += 25;
-      if (a.classList.contains('next') || a.getAttribute('aria-label')?.toLowerCase().includes('next')) {
-        score += 30;
-      }
+      if ((a.getAttribute('rel') || '').toLowerCase() === 'next') score += 50;
+      if (/^(next|continue|›|»)/i.test((a.textContent || '').trim())) score += 40;
+      if (/page=\d+/i.test(href)) score += 25;
       try {
-        const target = new URL(href);
-        if (target.origin === url.origin) score += 10;
+        if (new URL(href).origin === url.origin) score += 10;
       } catch {
         continue;
       }
-      if (score > 0) scored.push({ href, text, score });
+      if (score > 0) scored.push({ href, score });
     }
     scored.sort((a, b) => b.score - a.score);
     const seen = new Set([location.href.split('#')[0]]);
-    const chain = [];
+    const out = [];
     for (const item of scored) {
       const key = item.href.split('#')[0];
       if (seen.has(key)) continue;
       seen.add(key);
-      chain.push(item);
-      if (chain.length >= limit) break;
+      out.push(item.href);
+      if (out.length >= limit) break;
     }
-    return chain.map((x) => x.href);
+    return out;
   }
 
   globalThis.__NeillFullPageTools = {
@@ -411,9 +408,10 @@
     prepareForCapture,
     buildScrollPlan,
     scrollToY,
+    scrollToCaptureY,
+    beforeCaptureSlice,
     restoreScrollPosition,
     reconstructHtml,
     findPaginationLinks,
-    expandLazyContent,
   };
 })();

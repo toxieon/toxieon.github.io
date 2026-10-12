@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Topic 1.1 Learning Activity — Attempt review | energyspace (test)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    .navbar.fixed-top {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: #0f6cbf; color: #fff; display: flex; align-items: center; padding: 0 1rem; z-index: 1030;
+    }
+    #page { margin-top: 56px; min-height: calc(100vh - 56px); }
+    #page-wrapper { display: flex; max-width: 1400px; margin: 0 auto; }
+    [data-region="drawer"] {
+      position: fixed; top: 56px; left: 0; width: 280px; height: calc(100vh - 56px);
+      overflow: auto; background: #f8f9fa; border-right: 1px solid #dee2e6; z-index: 1020;
+    }
+    .drawercontent { padding: 0.75rem; }
+    .courseindex a { display: block; padding: 0.35rem 0; color: #0f6cbf; }
+    #region-main {
+      flex: 1; margin-left: 280px; margin-right: 260px; padding: 1.25rem 1.5rem 3rem;
+    }
+    [data-blockregion="side-post"] {
+      position: fixed; top: 56px; right: 0; width: 240px; height: calc(100vh - 56px);
+      overflow: auto; background: #fff; border-left: 1px solid #dee2e6; padding: 1rem;
+    }
+    .quizreviewsummary { border: 1px solid #dee2e6; padding: 1rem; margin-bottom: 1rem; background: #f8f9fa; }
+    .que { border: 1px solid #ced4da; margin-bottom: 1.5rem; padding: 1rem; }
+    .que h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <nav class="navbar fixed-top">energyspace — Topic 1.1 Learning Activity</nav>
+  <div id="page">
+    <div id="page-wrapper">
+      <div data-region="drawer" id="theme_boost-drawers-courseindex">
+        <div class="drawercontent courseindex" id="drawer-scroll-trap">
+          <strong>Course index</strong>
+          <!-- tall drawer scroll (must NOT be captured scroller) -->
+        </div>
+      </div>
+      <section id="region-main" role="main">
+        <h1>Topic 1.1 Learning Activity</h1>
+        <div class="quizreviewsummary">
+          <table>
+            <tr><th>Status</th><td>Finished</td></tr>
+            <tr><th>Grade</th><td>4.00 out of 6.00</td></tr>
+          </table>
+        </div>
+        <div id="questions"></div>
+      </section>
+      <aside data-blockregion="side-post" class="block_column">
+        <h4>Quiz navigation</h4>
+        <p>1 2 3 4</p>
+      </aside>
+    </div>
+  </div>
+  <script>
+    const drawer = document.getElementById('drawer-scroll-trap');
+    for (let i = 1; i <= 60; i++) {
+      const a = document.createElement('a');
+      a.href = '#';
+      a.textContent = 'Section ' + i + ' — long course index label '.repeat(3);
+      drawer.appendChild(a);
+    }
+    const main = document.getElementById('questions');
+    for (let q = 1; q <= 6; q++) {
+      const d = document.createElement('div');
+      d.className = 'que';
+      d.innerHTML = '<h3>Question ' + q + '</h3><p>' + 'Answer feedback and text '.repeat(50) + '</p><p data-qid="' + q + '">Marker Q' + q + '</p>';
+      main.appendChild(d);
+    }
+  </script>
+</body>
+</html>

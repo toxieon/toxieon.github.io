@@ -13,7 +13,14 @@ export async function ensureOffscreen() {
   });
 }
 
-export async function offscreenRequest(action, data = {}) {
+export async function offscreenRequest(action, data = {}, timeoutMs = 90000) {
   await ensureOffscreen();
-  return chrome.runtime.sendMessage({ target: 'offscreen', action, ...data });
+  const message = { target: 'offscreen', action, ...data };
+  const response = await Promise.race([
+    chrome.runtime.sendMessage(message),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Offscreen action "${action}" timed out`)), timeoutMs)
+    ),
+  ]);
+  return response;
 }

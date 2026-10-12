@@ -5,7 +5,7 @@ const DEFAULTS = {
   fullScanPageLimit: 25,
   followPagination: true,
   historyLimit: 40,
-  showProgressOverlay: true,
+  showProgressOverlay: false,
 };
 
 export async function getSettings() {

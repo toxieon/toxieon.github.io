@@ -1,7 +1,7 @@
 import { captureTabImage } from './capture-image.js';
 import { captureTabReconstruct } from './capture-reconstruct.js';
 import { captureFullScan } from './capture-fullscan.js';
-import { listCaptures } from '../lib/idb.js';
+import { listCaptures, getCapture } from '../lib/idb.js';
 import { getSettings } from '../lib/settings.js';
 import {
   createProgressReporter,
@@ -171,6 +171,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.target === 'offscreen') return false;
   if (message.type === 'FULLPAGE_CAPTURE') {
     runCapture(message.kind, message.options || {})
       .then((result) => sendResponse(result))
@@ -189,6 +190,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === 'FULLPAGE_GET_SETTINGS') {
     getSettings().then((s) => sendResponse({ ok: true, settings: s }));
+    return true;
+  }
+  if (message.type === 'FULLPAGE_GET_CAPTURE') {
+    getCapture(message.id)
+      .then((record) => sendResponse({ ok: Boolean(record), record }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
   return false;

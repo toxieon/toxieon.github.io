@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="0.2.1"
+VERSION="0.2.2"
 OUT_DIR="$ROOT/dist"
 ARCHIVE="$OUT_DIR/fullpage-capture-${VERSION}.zip"
 

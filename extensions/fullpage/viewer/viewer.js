@@ -16,7 +16,7 @@ const els = {
   searchStatus: document.getElementById('search-status'),
   btnEdit: document.getElementById('btn-edit'),
   btnPdf: document.getElementById('btn-pdf'),
-  btnDownload: document.getElementById('btn-download'),
+  btnDownloadPng: document.getElementById('btn-download-png'),
   btnHtml: document.getElementById('btn-html'),
   btnDelete: document.getElementById('btn-delete'),
   btnHistory: document.getElementById('btn-history'),
@@ -28,13 +28,18 @@ const els = {
   drawer: document.getElementById('history-drawer'),
   backdrop: document.getElementById('drawer-backdrop'),
   btnCloseHistory: document.getElementById('btn-close-history'),
+  btnUndo: document.getElementById('btn-undo'),
+  btnSaveEdit: document.getElementById('btn-save-edit'),
+  btnCancelEdit: document.getElementById('btn-cancel-edit'),
 };
 
 function downloadDataUrl(dataUrl, filename) {
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
 }
 
 function downloadBlob(text, filename, mime) {
@@ -43,7 +48,9 @@ function downloadBlob(text, filename, mime) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
@@ -68,9 +75,21 @@ function teardownAnnotator() {
   els.editBar.hidden = true;
 }
 
+function wireDownloads(record) {
+  const name = safeFilename(record.title);
+  els.btnDownloadPng.hidden = !record.pngDataUrl;
+  els.btnPdf.hidden = !record.pdfDataUrl;
+  els.btnHtml.hidden = !record.html;
+
+  els.btnDownloadPng.onclick = () => downloadDataUrl(record.pngDataUrl, `${name}.png`);
+  els.btnPdf.onclick = () => downloadDataUrl(record.pdfDataUrl, `${name}.pdf`);
+  els.btnHtml.onclick = () => downloadBlob(record.html, `${name}.html`, 'text/html');
+}
+
 function renderPreview(record) {
   teardownAnnotator();
   els.root.innerHTML = '';
+  currentRecord = record;
 
   if (record.pngDataUrl) {
     const img = document.createElement('img');
@@ -78,6 +97,7 @@ function renderPreview(record) {
     img.alt = record.title || 'Screenshot';
     els.root.appendChild(img);
     els.btnEdit.disabled = false;
+    els.extrasBar.hidden = true;
   } else if (record.html) {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('sandbox', 'allow-same-origin');
@@ -93,17 +113,7 @@ function renderPreview(record) {
   const when = new Date(record.createdAt).toLocaleString();
   els.meta.textContent = `${record.type} · ${record.pageCount || 1} page(s) · ${when}`;
 
-  els.btnPdf.hidden = !record.pdfDataUrl;
-  els.btnDownload.hidden = !record.pngDataUrl && !record.html;
-  els.btnHtml.hidden = !record.html;
-  els.extrasBar.hidden = !record.html;
-
-  els.btnPdf.onclick = () => downloadDataUrl(record.pdfDataUrl, `${safeFilename(record.title)}.pdf`);
-  els.btnDownload.onclick = () => {
-    if (record.pngDataUrl) downloadDataUrl(record.pngDataUrl, `${safeFilename(record.title)}.png`);
-    else if (record.html) downloadBlob(record.html, `${safeFilename(record.title)}.html`, 'text/html');
-  };
-  els.btnHtml.onclick = () => downloadBlob(record.html, `${safeFilename(record.title)}.html`, 'text/html');
+  wireDownloads(record);
 }
 
 function highlightSearch(query) {
@@ -121,7 +131,9 @@ function highlightSearch(query) {
   }
   els.searchStatus.textContent = count
     ? `${count} match(es) in snapshot text`
-    : 'No matches in snapshot text';
+    : currentRecord?.pngDataUrl
+      ? 'Search works on HTML/reconstruct captures'
+      : 'No matches in snapshot text';
   const iframe = els.root.querySelector('iframe');
   if (iframe?.contentWindow) {
     try {
@@ -140,7 +152,6 @@ async function loadRecord(id) {
     return;
   }
   currentId = id;
-  currentRecord = record;
   searchIndex = buildSearchIndex(record);
   renderPreview(record);
   highlightSearch(els.search.value);
@@ -178,30 +189,33 @@ function closeHistory() {
   els.backdrop.hidden = true;
 }
 
-els.search.addEventListener('input', () => highlightSearch(els.search.value));
+function setAnnotateTool(tool) {
+  if (!annotator) return;
+  annotator.setTool(tool);
+  els.editBar.querySelectorAll('[data-tool]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.tool === tool);
+  });
+}
+
+els.search?.addEventListener('input', () => highlightSearch(els.search.value));
 els.btnHistory.addEventListener('click', openHistory);
 els.btnCloseHistory.addEventListener('click', closeHistory);
 els.backdrop.addEventListener('click', closeHistory);
 els.btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 els.btnSearch.addEventListener('click', () => {
+  if (currentRecord?.pngDataUrl && !currentRecord?.html) {
+    els.extrasBar.hidden = false;
+    els.searchStatus.textContent = 'Search works on HTML/reconstruct captures.';
+    return;
+  }
   els.extrasBar.hidden = false;
   els.search.focus();
   els.search.select();
 });
 
 els.btnReconstruct.addEventListener('click', async () => {
-  if (!currentRecord?.url) {
-    alert('No source URL for this capture.');
-    return;
-  }
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
-  const resp = await chrome.runtime.sendMessage({
-    type: 'FULLPAGE_CAPTURE',
-    kind: 'reconstruct',
-    options: { tabId: tab.id },
-  });
+  const resp = await chrome.runtime.sendMessage({ type: 'FULLPAGE_CAPTURE', kind: 'reconstruct' });
   if (!resp?.ok) alert(resp?.error || 'Reconstruct failed');
 });
 
@@ -231,22 +245,15 @@ els.btnEdit.addEventListener('click', () => {
   annotator = createAnnotator(els.root, imgClone);
 });
 
-els.editBar.addEventListener('click', (ev) => {
-  const tool = ev.target.closest('[data-tool]')?.dataset.tool;
-  if (tool && annotator) {
-    annotator.setTool(tool);
-    els.editBar.querySelectorAll('[data-tool]').forEach((b) => b.classList.remove('active'));
-    ev.target.closest('[data-tool]').classList.add('active');
-  }
+els.editBar.querySelectorAll('[data-tool]').forEach((btn) => {
+  btn.addEventListener('click', () => setAnnotateTool(btn.dataset.tool));
 });
 
-document.getElementById('btn-undo').addEventListener('click', () => annotator?.undo());
-
-document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+els.btnUndo.addEventListener('click', () => annotator?.undo());
+els.btnCancelEdit.addEventListener('click', () => {
   if (currentRecord) renderPreview(currentRecord);
 });
-
-document.getElementById('btn-save-edit').addEventListener('click', async () => {
+els.btnSaveEdit.addEventListener('click', async () => {
   if (!annotator || !currentRecord) return;
   const pngDataUrl = await annotator.exportPng();
   currentRecord.pngDataUrl = pngDataUrl;
@@ -261,3 +268,6 @@ else {
     if (items[0]) loadRecord(items[0].id);
   });
 }
+
+// Test hook
+globalThis.__fullpageViewer = { downloadDataUrl, getCurrentRecord: () => currentRecord };
