@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#101922" />
+<title>Gate Codes</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="stylesheet" href="../shared/nd-core.css" />
+<script src="../shared/nd-backend.js"></script>
+<script src="../shared/nd-config.js"></script>
+<script src="../shared/nd-auth.js"></script>
+<script src="../shared/nd-gate-codes.js?v=0.1.2"></script>
+<script src="../shared/nd-site-match.js?v=0.1.2"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root { --bg:#0d0d0d; --surface:#1a1a1a; --border:#2a2a2a; --text:#f0f0f0; --muted:#888; --accent:#6ddba3; }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;min-height:100vh}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.muted{color:var(--muted);font-size:13px}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+h1{font-size:18px;margin:0}
+.btn{border:0;border-radius:999px;padding:10px 16px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.1);color:var(--text)}
+.btn-primary{background:var(--accent);color:#06140d}
+main{padding:16px;max-width:480px;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin:12px 0}
+.code{font-size:36px;letter-spacing:.25em;text-align:center;margin:8px 0}
+#pin-screen,#edit-modal,#settings-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+#pin-screen[hidden],#edit-modal[hidden],#settings-modal[hidden]{display:none!important}
+.pin-card,.modal-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;width:min(360px,100%)}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:#111;color:var(--text);font-size:16px;margin:8px 0}
+.editor-row{display:flex;justify-content:space-between;width:100%;padding:12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);text-align:left}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);padding:10px 16px;border-radius:999px;opacity:0;transition:.2s}
+#toast.show{opacity:1}
+#auth-chip{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Gate Codes</h1>
+  <div>
+    <span id="auth-chip" hidden></span>
+    <button type="button" class="btn" id="btn-signin">Sign in</button>
+    <button type="button" class="btn" id="btn-settings">Settings</button>
+  </div>
+</header>
+
+<div id="pin-screen" hidden>
+  <div class="pin-card">
+    <h2>Company PIN</h2>
+    <p class="muted">Enter the view PIN once per device.</p>
+    <input id="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" />
+    <p id="pin-err" class="muted"></p>
+    <button type="button" class="btn btn-primary" id="pin-submit" style="width:100%">Continue</button>
+  </div>
+</div>
+
+<div id="app-main">
+  <main>
+    <p id="setup-hint" class="muted" hidden></p>
+    <div id="proximity-card" class="card" hidden>
+      <p class="muted" id="prox-title">Site</p>
+      <p class="code mono" id="prox-code">0000</p>
+      <p class="muted">Shown only when you are at the site.</p>
+      <button type="button" class="btn" id="prox-edit">Edit</button>
+    </div>
+    <p class="muted">Move within about 150 m of a job site to see its gate code. No site list is shown here unless you are a signed-in editor.</p>
+
+    <section id="editor-panel" hidden>
+      <h2>All sites (editor)</h2>
+      <input id="editor-search" type="search" placeholder="Search sites" />
+      <div id="editor-list"></div>
+      <button type="button" class="btn btn-primary" id="btn-save-here" style="width:100%;margin-top:12px">Save code at my location</button>
+    </section>
+    <p class="muted mono" id="ver"></p>
+  </main>
+</div>
+
+<div id="edit-modal" hidden>
+  <div class="modal-card">
+    <h3>Edit gate code</h3>
+    <input type="hidden" id="edit-site-id" />
+    <input type="hidden" id="edit-lat" />
+    <input type="hidden" id="edit-lng" />
+    <label class="muted">Site name</label>
+    <input id="edit-site-name" />
+    <label class="muted">4-digit code</label>
+    <input id="edit-code" inputmode="numeric" pattern="[0-9]*" maxlength="4" />
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button type="button" class="btn" id="edit-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="edit-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-modal" hidden>
+  <div class="modal-card">
+    <h3>Settings</h3>
+    <p class="muted">Owner: set or change the company view PIN.</p>
+    <input id="owner-pin" inputmode="numeric" placeholder="New PIN" />
+    <button type="button" class="btn btn-primary" id="pin-set" style="width:100%">Update PIN</button>
+    <div id="owner-editors" hidden>
+      <h3 style="margin-top:16px">Editors</h3>
+      <div id="editors-list"></div>
+      <input id="editor-email" type="email" placeholder="Add editor email" autocomplete="off" />
+      <button type="button" class="btn" id="editor-add" style="width:100%">Add editor</button>
+    </div>
+    <button type="button" class="btn" id="settings-close" style="width:100%;margin-top:8px">Close</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js?v=0.1.2"></script>
+</body>
+</html>

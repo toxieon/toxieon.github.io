@@ -1,4 +1,4 @@
-/* Hub v0.7.2 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.7.3 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -21,6 +21,7 @@ async function loadHub() {
     const r = await fetch("./apps.json", { cache: "no-cache" });
     const payload = await r.json();
     apps = (payload.apps || []).filter((a) => !a.hidden).sort((a, b) => (a.order || 99) - (b.order || 99));
+    await injectOwnerGateCodesTile();
     statusEl.textContent = "Neill Data suite";
   } catch (e) {
     statusEl.textContent = "Could not load apps.json";
@@ -104,6 +105,25 @@ document.addEventListener("visibilitychange", () => {
   if (Date.now() - lastLoad > 60000) loadHub(); else renderRecents();
 });
 if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("controllerchange", () => loadHub());
+
+async function injectOwnerGateCodesTile() {
+  if (!window.NDAuth || !window.NDGateCodes) return;
+  // Only for a device that has signed in to the suite before: no silent GIS calls for everyone else.
+  if (!(NDAuth.hasPriorSession && NDAuth.hasPriorSession())) return;
+  try {
+    const cfg = window.NDConfig && NDConfig.forApp("timesheet");
+    NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
+    if (!NDAuth.isSignedIn()) await NDAuth.ensureToken().catch(() => {});
+    const profile = NDAuth.getProfile();
+    if (!profile || String(profile.email).toLowerCase() !== "brandon.j.neill@gmail.com") return;
+    const link = await NDGateCodes.ownerAppLink();
+    if (!link || !link.ok || !link.app) return;
+    if (apps.some((a) => a.id === link.app.id)) return;
+    apps.push(Object.assign({ hidden: false }, link.app));
+    apps.sort((a, b) => (a.order || 99) - (b.order || 99));
+  } catch (e) { /* path only from backend */ }
+}
+
 loadHub();
 
 /* §1.6 suite-wide water-fill sync tube (shared). The hub is a launcher with no

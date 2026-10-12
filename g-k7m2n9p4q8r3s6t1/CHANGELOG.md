@@ -1,0 +1,2 @@
+## 0.1.2 · 2026-10-12 · hardening · Cinna's icon (favicon, apple-touch, manifest). Shows a clear 'not set up yet' state until the backend has Gate Codes. Owner-only editor management in Settings. Editor list is never stored on the device. Service worker gatecodes-0.1.2.
+## 0.1.1 · 2026-10-12 · hidden-proximity · Secret-path Gate Codes app: view-only users see a code only within ~150 m (server-side nearest match); company PIN default on; editors signed in with Google get full searchable list and edit anywhere. Service worker gatecodes-0.1.1.

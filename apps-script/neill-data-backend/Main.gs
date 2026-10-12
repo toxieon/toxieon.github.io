@@ -34,6 +34,7 @@ function route_(body) {
     case 'tsl_get':    return tslGet_(body);
     case 'tsl_logout': return tslLogout_(body);
   }
+  if (typeof isGcAction_ === 'function' && isGcAction_(action)) return routeGc_(body);
   if (!QUOTE_ACTIONS[action]) return { error: 'unknown action: ' + action };
   const ctx = authQuote_(body);
   if (ctx.denied) return ctx.denied;

@@ -37,6 +37,7 @@ function setup() {
   const snap = SpreadsheetApp.openById(TIMESHEET_SHEET_ID).getSheetByName(SNAPSHOT_TAB);
   out.push('Timesheet snapshot tab ' + (snap ? 'found' : 'not written yet — open the Timesheet app signed in as Brandon once'));
   out.push(statusText_());
+  if (typeof gcSetup_ === 'function') out.push(gcSetup_());
   tslLog_('setup', 'setup');
   console.log(out.join('\n'));
   return out.join('\n');
