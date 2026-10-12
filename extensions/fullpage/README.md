@@ -26,6 +26,8 @@ No `unlimitedStorage`, no broad host access at install, no context menus, no net
 
 Permissive only (MIT): **pdf-lib**, **jsPDF**. See **`THIRD_PARTY_NOTICES.md`**. No AGPL/GPL (e.g. SingleFile is not used).
 
+**Reliability vs SingleFile:** see **`REPORT-BRANDON.md`** (permissive-only is enough for search; SingleFile only if offline HTML must look pixel-perfect — private AGPL OK).
+
 This folder is **not** linked from the public site or hub.
 
 ## Features

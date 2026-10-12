@@ -421,7 +421,10 @@
     await sleep(80);
     const textLayer = extractTextLayer();
     const html = await reconstructHtml({ inlineImages: options.inlineImages !== false });
-    return { html, textLayer, pageText: textLayer.plainText || stripPlainFromHtml(html) };
+    const htmlText = stripPlainFromHtml(html);
+    // Search index: prefer full DOM innerText from snapshot (more complete than rect walk alone).
+    const pageText = htmlText.length >= (textLayer.plainText?.length || 0) ? htmlText : textLayer.plainText;
+    return { html, textLayer, pageText: pageText || htmlText || textLayer.plainText };
   }
 
   function stripPlainFromHtml(html) {
