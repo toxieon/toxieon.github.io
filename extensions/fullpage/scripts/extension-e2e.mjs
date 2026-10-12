@@ -120,6 +120,16 @@ if (scrollLog.length < 2 || distinctY.size < 2) {
   server.close();
   process.exit(1);
 }
+
+const drawerFlags = scrollLog.map((s) => s.drawerVisible);
+if (!drawerFlags[0]) {
+  console.error('FAIL: course drawer should be visible in slice 1', drawerFlags);
+  process.exit(1);
+}
+if (drawerFlags.slice(1).some(Boolean)) {
+  console.error('FAIL: fixed drawer/nav must be hidden after slice 1', drawerFlags);
+  process.exit(1);
+}
 if (!meta.record?.pageText?.includes('Question')) {
   console.error('FAIL: pageText missing Question', meta.record?.pageText?.slice(0, 200));
   process.exit(1);

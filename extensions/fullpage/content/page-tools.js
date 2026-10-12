@@ -60,6 +60,21 @@
 
   let captureScrollState = null;
   let fixedHiddenForCapture = false;
+  /** @type {Set<Element>} */
+  let pinnedViewportElements = new Set();
+
+  const CHROME_MASK_SELECTORS = [
+    '[data-region="drawer"]',
+    '[data-region="fixed-drawer"]',
+    '#theme_boost-drawers-courseindex',
+    '[data-blockregion]',
+    '.block_column',
+    'nav.navbar.fixed-top',
+    '.navbar.fixed-top',
+    '.sticky-top',
+    '#page-header',
+    '.fixed-top',
+  ].join(',');
 
   function pickPrimaryScroller() {
     const docH = documentScrollHeight();
@@ -137,26 +152,91 @@
     });
   }
 
-  function maskFixedAndSticky() {
-    if (fixedHiddenForCapture) return;
-    fixedHiddenForCapture = true;
+  function hideElementForCapture(el) {
+    if (!el || el.dataset.fullpageCapHidden === '1') return;
+    el.dataset.fullpageCapHidden = '1';
+    if (el.dataset.fullpageVis === undefined) el.dataset.fullpageVis = el.style.visibility || '';
+    el.style.setProperty('visibility', 'hidden', 'important');
+  }
+
+  function snapshotVisibleViewportElements() {
+    const map = new Map();
     for (const el of document.querySelectorAll('body *')) {
-      if (isIgnoredScroller(el)) continue;
+      if (el.matches('script, style, noscript, svg, path')) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 48 || rect.height < 48) continue;
+      if (rect.bottom < 8 || rect.top > window.innerHeight - 8) continue;
+      if (rect.right < 8 || rect.left > window.innerWidth - 8) continue;
+      map.set(el, {
+        top: Math.round(rect.top),
+        left: Math.round(rect.left),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height),
+      });
+    }
+    return map;
+  }
+
+  function rectsStayPinned(a, b) {
+    return (
+      Math.abs(a.top - b.top) <= 2 &&
+      Math.abs(a.left - b.left) <= 2 &&
+      Math.abs(a.w - b.w) <= 4 &&
+      Math.abs(a.h - b.h) <= 4
+    );
+  }
+
+  async function detectPinnedViewportElements() {
+    const pinned = new Set();
+    const y0 = captureScrollState?.windowY ?? window.scrollY;
+    scrollToY(0);
+    await sleep(120);
+    const atTop = snapshotVisibleViewportElements();
+    const step = Math.max(280, Math.floor(window.innerHeight * 0.55));
+    const maxY = Math.max(0, documentScrollHeight() - window.innerHeight);
+    scrollToY(Math.min(step, maxY));
+    await sleep(120);
+    const scrolled = snapshotVisibleViewportElements();
+    for (const [el, r0] of atTop) {
+      const r1 = scrolled.get(el);
+      if (r1 && rectsStayPinned(r0, r1)) pinned.add(el);
+    }
+    document.querySelectorAll(CHROME_MASK_SELECTORS).forEach((el) => pinned.add(el));
+    scrollToY(0);
+    await sleep(80);
+    window.scrollTo(captureScrollState?.windowX ?? 0, y0);
+    return pinned;
+  }
+
+  function isDrawerVisibleInViewport() {
+    const drawer = document.querySelector('[data-region="drawer"], [data-region="fixed-drawer"]');
+    if (!drawer) return false;
+    const style = getComputedStyle(drawer);
+    if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') return false;
+    const rect = drawer.getBoundingClientRect();
+    return rect.width > 24 && rect.height > 24 && rect.bottom > 0 && rect.top < window.innerHeight;
+  }
+
+  function maskFixedAndSticky() {
+    if (!fixedHiddenForCapture) fixedHiddenForCapture = true;
+    document.querySelectorAll(CHROME_MASK_SELECTORS).forEach(hideElementForCapture);
+    for (const el of pinnedViewportElements) hideElementForCapture(el);
+    for (const el of document.querySelectorAll('body *')) {
       const style = getComputedStyle(el);
       if (style.position !== 'fixed' && style.position !== 'sticky') continue;
       const rect = el.getBoundingClientRect();
       if (rect.width < 4 && rect.height < 4) continue;
-      if (!el.dataset.fullpageVis) el.dataset.fullpageVis = el.style.visibility || '';
-      el.style.setProperty('visibility', 'hidden', 'important');
+      hideElementForCapture(el);
     }
   }
 
   function unmaskFixedAndSticky() {
-    if (!fixedHiddenForCapture) return;
     fixedHiddenForCapture = false;
+    pinnedViewportElements = new Set();
     document.querySelectorAll('[data-fullpage-vis]').forEach((el) => {
       el.style.visibility = el.dataset.fullpageVis || '';
       delete el.dataset.fullpageVis;
+      delete el.dataset.fullpageCapHidden;
     });
   }
 
@@ -198,7 +278,9 @@
       captureScrollState.elementTop = scroller.el.scrollTop;
     }
 
-    return options.expandLazy ? expandLazyContent(options) : getPageMetrics();
+    const metrics = options.expandLazy ? await expandLazyContent(options) : getPageMetrics();
+    pinnedViewportElements = await detectPinnedViewportElements();
+    return metrics;
   }
 
   function scrollToY(y) {
@@ -227,13 +309,14 @@
       moved,
       duplicate,
       sample: after.sample.slice(0, 80),
+      drawerVisible: isDrawerVisibleInViewport(),
     };
   }
 
   function beforeCaptureSlice(sliceIndex) {
     hideExtensionUi();
     if (sliceIndex > 0) maskFixedAndSticky();
-    return readScrollMetrics();
+    return { ...readScrollMetrics(), drawerVisible: isDrawerVisibleInViewport() };
   }
 
   function restoreScrollPosition() {

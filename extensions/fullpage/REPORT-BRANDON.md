@@ -20,7 +20,7 @@
 
 | Goal | How | Moodle quiz review |
 |------|-----|-------------------|
-| **Full-page picture** | Scroll + `captureVisibleTab` + stitch | Fixed in 0.2.2+ (window scroll, ignore drawers; hide overlay before shots) |
+| **Full-page picture** | Scroll + `captureVisibleTab` + stitch | 0.2.5: slice 1 keeps Moodle chrome; later slices hide fixed/sticky/pinned drawers & quiz nav (GoFullPage-style) |
 | **Search “Tuesday” etc.** | Every image capture also stores `html` + `pageText` + positioned `textLayer` | **Search box** uses `pageText` (from reconstructed DOM text). **Ctrl+F** works on the transparent text overlay on the PNG. |
 | **Offline HTML** | `reconstructHtml` — clone DOM, inline CSS/fonts/images (cookie `fetch` + canvas fallback), FA unicode fallbacks | Question images from `pluginfile.php` should embed as **data:** URIs at capture time |
 | **Searchable PDF** | pdf-lib (MIT): PNG + low-opacity positioned text from `textLayer` | Text is **selectable** in PDF readers; position match to pixels is **approximate** |
