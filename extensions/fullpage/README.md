@@ -96,9 +96,19 @@ npx puppeteer@23 browsers install chrome
 node extensions/fullpage/scripts/extension-e2e.mjs
 ```
 
+## Region capture, redact, clipboard (0.3.1)
+
+- **Capture selected area:** extension menu or **Alt+Shift+A** — drag a box (scroll + “Extend while scrolling” to grow downward). Saves image + searchable HTML; adds to an active multipage session when multipage mode is on.
+- **Redact / blur:** Edit mode → **Redact** or **Blur** boxes; saved to PNG and stripped from PDF/HTML search text.
+- **Copy PNG:** **Copy** in the viewer; optional **copy after capture** in settings (pastes into Discord, etc.).
+
+```bash
+node extensions/fullpage/scripts/extension-e2e-features.mjs
+```
+
 ## Multipage mode (0.3.0)
 
-Right-click the toolbar icon → **Start multipage mode**. A floating edge widget stays available while you browse; **camera** captures each page (image + inlined HTML), **Undo** removes the last scan, **Finish** opens the project editor. Export/import **`.nfp`** project files, download combined HTML (TOC), PDF, or PNG. Sessions persist in IndexedDB.
+Right-click the toolbar icon → **Start multipage mode**. A floating edge widget stays available while you browse; **camera** captures each page (image + inlined HTML), **Undo** removes the last scan, **Finish** opens the project editor. Export/import **`.nfp`** project files, download combined HTML (TOC), PDF, or PNG, or **Export separately (zip)** to get one PNG/PDF/HTML file per included scan (filenames use order + page title). Sessions persist in IndexedDB.
 
 ```bash
 node extensions/fullpage/scripts/extension-e2e-multipage.mjs

@@ -62,9 +62,39 @@ export async function combinePngsVertical(pngDataUrls, offscreenRequest) {
   return { mode: 'single', pngDataUrl: resp.result.pngDataUrl };
 }
 
+export function pageExportFileName(index, title, ext) {
+  const base = sanitize(title || `page-${index + 1}`);
+  return `${String(index + 1).padStart(2, '0')}-${base}.${ext}`;
+}
+
+export function buildPageHtml(page, index) {
+  const pageTitle = escapeHtml(page.title || `Page ${index + 1}`);
+  const docTitle = pageTitle;
+  const bodyMatch = page.html?.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const inner = bodyMatch
+    ? bodyMatch[1]
+    : page.html || `<p>${escapeHtml(page.pageText || '')}</p>`;
+  const url = escapeHtml(page.url || '');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${docTitle}</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 0; padding: 1.5rem 2rem 3rem; max-width: 1100px; }
+.nfp-meta { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+</style>
+</head>
+<body>
+<header><h1>${pageTitle}</h1><p class="nfp-meta">${url}</p></header>
+${inner}
+</body>
+</html>`;
+}
+
 export function pngDataUrlsToZip(pngDataUrls, titles) {
   const files = pngDataUrls.map((url, i) => ({
-    name: `${String(i + 1).padStart(2, '0')}-${sanitize(titles[i] || `page-${i + 1}`)}.png`,
+    name: pageExportFileName(i, titles[i], 'png'),
     bytes: dataUrlToBytes(url),
   }));
   return storeOnlyZip(files);
@@ -74,7 +104,7 @@ function sanitize(name) {
   return name.replace(/[^\w\-]+/g, '_').slice(0, 40);
 }
 
-function dataUrlToBytes(dataUrl) {
+export function dataUrlToBytes(dataUrl) {
   const base64 = dataUrl.split(',')[1];
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);

@@ -44,6 +44,32 @@ button.ghost {
   background: transparent;
 }
 
+.separate-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.separate-export select {
+  font: inherit;
+  font-size: 0.9rem;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem;
+  background: #fff;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .meta {
   color: #5f6368;
   font-size: 0.9rem;

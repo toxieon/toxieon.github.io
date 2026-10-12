@@ -23,7 +23,7 @@ import {
   onTabReadyForWidget,
 } from './multipage.js';
 import { getMultipageProject, putMultipageProject } from '../lib/idb-multipage.js';
-import { exportProjectPng, exportProjectPdf } from './multipage-export.js';
+import { exportProjectPng, exportProjectPdf, exportProjectSeparate } from './multipage-export.js';
 import { projectToNfpPayload } from '../lib/nfp-format.js';
 import {
   createProgressReporter,
@@ -394,6 +394,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === 'MULTIPAGE_EXPORT_PDF') {
     exportProjectPdf(message.projectId)
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_EXPORT_SEPARATE') {
+    exportProjectSeparate(message.projectId, message.format)
       .then((r) => sendResponse(r))
       .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
     return true;

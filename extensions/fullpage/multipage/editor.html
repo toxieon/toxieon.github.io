@@ -15,6 +15,15 @@
         <button type="button" id="btn-dl-html">Download HTML</button>
         <button type="button" id="btn-dl-pdf">Download PDF</button>
         <button type="button" id="btn-dl-png">Download PNG</button>
+        <label class="separate-export">
+          <span class="sr-only">Per-page format</span>
+          <select id="separate-format" aria-label="Per-page export format">
+            <option value="png">PNG</option>
+            <option value="pdf">PDF</option>
+            <option value="html">HTML</option>
+          </select>
+          <button type="button" id="btn-dl-separate">Export separately (zip)</button>
+        </label>
       </div>
     </header>
     <p id="meta" class="meta"></p>

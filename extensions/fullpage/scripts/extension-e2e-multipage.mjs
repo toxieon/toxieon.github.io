@@ -158,7 +158,35 @@ if (!importTest.ok) {
   process.exit(1);
 }
 
-console.log('OK multipage e2e — pages after undo: 1, import id:', importTest.id);
+const separateExport = await harness.evaluate(async (projectId) => {
+  const png = await chrome.runtime.sendMessage({
+    type: 'MULTIPAGE_EXPORT_SEPARATE',
+    projectId,
+    format: 'png',
+  });
+  const html = await chrome.runtime.sendMessage({
+    type: 'MULTIPAGE_EXPORT_SEPARATE',
+    projectId,
+    format: 'html',
+  });
+  return {
+    ok: png?.ok && html?.ok && png.zip?.startsWith('data:') && html.zip?.startsWith('data:'),
+    pngLen: png.zip?.length || 0,
+    htmlLen: html.zip?.length || 0,
+  };
+}, importTest.id);
+
+if (!separateExport.ok) {
+  console.error('FAIL: export separately', separateExport);
+  process.exit(1);
+}
+
+console.log(
+  'OK multipage e2e — pages after undo: 1, import id:',
+  importTest.id,
+  'separate zip bytes ~',
+  separateExport.pngLen
+);
 
 await browser.close();
 server.close();

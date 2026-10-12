@@ -188,5 +188,23 @@ document.getElementById('btn-dl-pdf').addEventListener('click', async () => {
   downloadBlob(await (await fetch(resp.pdfDataUrl)).blob(), `${safeName(project.title)}.pdf`);
 });
 
+document.getElementById('btn-dl-separate').addEventListener('click', async () => {
+  const format = document.getElementById('separate-format').value;
+  const resp = await chrome.runtime.sendMessage({
+    type: 'MULTIPAGE_EXPORT_SEPARATE',
+    projectId: project.id,
+    format,
+  });
+  if (!resp?.ok) {
+    alert(resp?.error || 'Export failed');
+    return;
+  }
+  if (!resp.zip) {
+    alert('Export failed');
+    return;
+  }
+  downloadBlob(await (await fetch(resp.zip)).blob(), `${safeName(project.title)}-pages.zip`);
+});
+
 if (projectId) loadProject();
 else els.meta.textContent = 'Open from Finish in multipage mode or import a .nfp file.';
