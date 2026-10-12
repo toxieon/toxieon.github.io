@@ -1,7 +1,7 @@
 /* Gate Codes — proximity for viewers; editor list when signed in + allowlisted. */
 (function () {
   "use strict";
-  const APP_VERSION = "0.1.2";
+  const APP_VERSION = "0.1.3";
   const $ = (id) => document.getElementById(id);
 
   let editorMode = false;
@@ -259,7 +259,8 @@
   async function init() {
     bindUi();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
-    await bootAuth();
+    // Setup/PIN state first: a slow or blocked Google sign-in must never hide it.
+    bootAuth().catch(() => {});
     await ensurePinGate();
     if (notSetUp) return;
     pollLocation();
