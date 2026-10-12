@@ -274,20 +274,307 @@
     });
   }
 
+  function resolveUrl(href, baseUrl) {
+    if (!href || href.startsWith('data:') || href.startsWith('blob:')) return href || '';
+    try {
+      return new URL(href, baseUrl).href;
+    } catch {
+      return href;
+    }
+  }
+
+  function pickSrcsetUrl(srcset, baseUrl) {
+    if (!srcset) return '';
+    const parts = srcset
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!parts.length) return '';
+    const scored = parts.map((part) => {
+      const bits = part.split(/\s+/);
+      const url = bits[0];
+      const w = bits[1]?.endsWith('w') ? parseInt(bits[1], 10) : 0;
+      const x = bits[1]?.endsWith('x') ? parseFloat(bits[1]) : 0;
+      return { url, score: w || x * 1000 || 1 };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return resolveUrl(scored[0].url, baseUrl);
+  }
+
+  function effectiveImageUrl(img) {
+    if (!img) return '';
+    if (img.currentSrc && !img.currentSrc.startsWith('data:')) return img.currentSrc;
+    for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-url']) {
+      const v = img.getAttribute(attr);
+      if (v && !v.startsWith('data:')) return v;
+    }
+    const srcset = img.getAttribute('srcset');
+    if (srcset) return pickSrcsetUrl(srcset, location.href);
+    return img.src || '';
+  }
+
+  function promoteLazyImage(img) {
+    for (const attr of ['data-src', 'data-original', 'data-lazy-src', 'data-url']) {
+      const v = img.getAttribute(attr);
+      if (!v) continue;
+      const src = img.getAttribute('src') || '';
+      if (!src || src.includes('placeholder') || src.startsWith('data:image/svg')) {
+        img.setAttribute('src', v);
+      }
+      break;
+    }
+    img.loading = 'eager';
+  }
+
+  async function ensureImagesLoaded() {
+    const imgs = [...document.images];
+    for (const img of imgs) {
+      promoteLazyImage(img);
+      try {
+        img.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      } catch {
+        /* */
+      }
+      if (img.complete && img.naturalWidth > 0) continue;
+      await new Promise((resolve) => {
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+        setTimeout(done, 5000);
+      });
+    }
+    await sleep(120);
+  }
+
   async function imageToDataUrl(img) {
     try {
       if (img.src?.startsWith('data:')) return img.src;
       const canvas = document.createElement('canvas');
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
-      if (!w || !h) return img.currentSrc || img.src || '';
+      if (!w || !h) return '';
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0);
       return canvas.toDataURL('image/png');
     } catch {
-      return img.currentSrc || img.src || '';
+      return '';
     }
+  }
+
+  async function fetchAsDataUrl(url, baseUrl, cache) {
+    const abs = resolveUrl(url, baseUrl);
+    if (!abs) return '';
+    if (abs.startsWith('data:')) return abs;
+    if (cache.has(abs)) return cache.get(abs);
+    try {
+      const res = await fetch(abs, { credentials: 'include', cache: 'force-cache' });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const data = await blobToDataUrl(blob);
+      cache.set(abs, data);
+      return data;
+    } catch {
+      return '';
+    }
+  }
+
+  async function resourceToDataUrl(url, baseUrl, cache, liveImg) {
+    const fromFetch = await fetchAsDataUrl(url, baseUrl, cache);
+    if (fromFetch?.startsWith('data:')) return fromFetch;
+    if (liveImg) {
+      const fromCanvas = await imageToDataUrl(liveImg);
+      if (fromCanvas?.startsWith('data:')) {
+        const abs = resolveUrl(url, baseUrl);
+        cache.set(abs, fromCanvas);
+        return fromCanvas;
+      }
+    }
+    return '';
+  }
+
+  function pairedElementWalk(liveEl, cloneEl, callback) {
+    if (!liveEl || !cloneEl) return;
+    callback(liveEl, cloneEl);
+    let li = 0;
+    let ci = 0;
+    while (li < liveEl.children.length && ci < cloneEl.children.length) {
+      const l = liveEl.children[li];
+      const c = cloneEl.children[ci];
+      if (/^(SCRIPT|NOSCRIPT)$/i.test(l.tagName)) {
+        li++;
+        continue;
+      }
+      if (/^(SCRIPT|NOSCRIPT)$/i.test(c.tagName)) {
+        ci++;
+        continue;
+      }
+      if (l.tagName === c.tagName) {
+        pairedElementWalk(l, c, callback);
+        li++;
+        ci++;
+      } else {
+        li++;
+      }
+    }
+  }
+
+  async function inlineImagePair(cloneImg, liveImg, baseUrl, cache) {
+    const urls = [];
+    if (liveImg) {
+      urls.push(effectiveImageUrl(liveImg));
+      urls.push(liveImg.currentSrc);
+    }
+    urls.push(cloneImg.getAttribute('src'));
+    for (const a of ['data-src', 'data-original', 'data-lazy-src', 'data-url']) {
+      urls.push(cloneImg.getAttribute(a));
+      if (liveImg) urls.push(liveImg.getAttribute(a));
+    }
+    const srcset = cloneImg.getAttribute('srcset') || liveImg?.getAttribute('srcset');
+    if (srcset) urls.push(pickSrcsetUrl(srcset, baseUrl));
+
+    let dataUrl = '';
+    for (const raw of urls) {
+      if (!raw) continue;
+      if (raw.startsWith('data:')) {
+        dataUrl = raw;
+        break;
+      }
+      dataUrl = await resourceToDataUrl(raw, baseUrl, cache, liveImg);
+      if (dataUrl?.startsWith('data:')) break;
+    }
+    if (!dataUrl?.startsWith('data:') && liveImg) {
+      dataUrl = await imageToDataUrl(liveImg);
+    }
+    if (dataUrl?.startsWith('data:')) {
+      cloneImg.setAttribute('src', dataUrl);
+      cloneImg.removeAttribute('srcset');
+      cloneImg.removeAttribute('data-src');
+      cloneImg.removeAttribute('data-lazy-src');
+      cloneImg.removeAttribute('data-original');
+      cloneImg.removeAttribute('data-url');
+    }
+  }
+
+  async function inlineImages(clone, baseUrl, cache) {
+    const liveImgs = document.querySelectorAll('img');
+    const cloneImgs = clone.querySelectorAll('img');
+    for (let i = 0; i < cloneImgs.length; i++) {
+      await inlineImagePair(cloneImgs[i], liveImgs[i] || null, baseUrl, cache);
+    }
+    const livePics = document.querySelectorAll('picture');
+    const clonePics = clone.querySelectorAll('picture');
+    for (let i = 0; i < clonePics.length; i++) {
+      const clonePic = clonePics[i];
+      const livePic = livePics[i];
+      const cloneImg = clonePic.querySelector('img');
+      const liveImg = livePic?.querySelector('img');
+      if (cloneImg) await inlineImagePair(cloneImg, liveImg || null, baseUrl, cache);
+      clonePic.querySelectorAll('source').forEach((s) => s.remove());
+    }
+    for (const obj of clone.querySelectorAll('object[type*="svg"], embed[src*=".svg"]')) {
+      const src = obj.getAttribute('data') || obj.getAttribute('src');
+      if (!src) continue;
+      const data = await fetchAsDataUrl(src, baseUrl, cache);
+      if (data?.startsWith('data:')) {
+        if (obj.tagName === 'OBJECT') obj.setAttribute('data', data);
+        else obj.setAttribute('src', data);
+      }
+    }
+  }
+
+  async function inlineBackgroundImages(clone, baseUrl, cache) {
+    const pairs = [];
+    pairedElementWalk(document.documentElement, clone, (liveEl, cloneEl) => {
+      pairs.push([liveEl, cloneEl]);
+    });
+    for (const [liveEl, cloneEl] of pairs) {
+      const bg = getComputedStyle(liveEl).backgroundImage;
+      if (!bg || bg === 'none' || !bg.includes('url(')) continue;
+      let next = bg;
+      for (const [, raw] of bg.matchAll(/url\(["']?([^"')]+)["']?\)/gi)) {
+        if (raw.startsWith('data:')) continue;
+        const data = await resourceToDataUrl(raw, baseUrl, cache, null);
+        if (data) next = next.split(raw).join(data);
+      }
+      if (next !== bg) cloneEl.style.backgroundImage = next;
+    }
+  }
+
+  async function inlineUrlsInStyles(clone, baseUrl, cache) {
+    for (const style of clone.querySelectorAll('style')) {
+      if (!style.textContent?.includes('url(')) continue;
+      let css = style.textContent;
+      for (const [, raw] of css.matchAll(/url\(["']?([^"')]+)["']?\)/gi)) {
+        if (raw.startsWith('data:')) continue;
+        const data = await fetchAsDataUrl(raw, baseUrl, cache);
+        if (data) css = css.split(raw).join(data);
+      }
+      style.textContent = css;
+    }
+    for (const link of clone.querySelectorAll('link[rel="stylesheet"][href]')) {
+      const href = link.getAttribute('href');
+      if (!href) continue;
+      const cssText = await fetch(link.href, { credentials: 'include' })
+        .then((r) => (r.ok ? r.text() : ''))
+        .catch(() => '');
+      if (!cssText) continue;
+      let css = cssText;
+      for (const [, raw] of css.matchAll(/url\(["']?([^"')]+)["']?\)/gi)) {
+        if (raw.startsWith('data:')) continue;
+        const data = await fetchAsDataUrl(raw, link.href, cache);
+        if (data) css = css.split(raw).join(data);
+      }
+      const style = document.createElement('style');
+      style.setAttribute('data-fullpage', 'linked-css');
+      style.textContent = css;
+      link.replaceWith(style);
+    }
+  }
+
+  const FA_ICON_FALLBACK_RULES = {
+    'fa-check': '"✓"',
+    'fa-check-circle': '"✓"',
+    'fa-check-square': '"✓"',
+    'fa-times': '"✗"',
+    'fa-times-circle': '"✗"',
+    'fa-circle': '"●"',
+    'fa-circle-o': '"○"',
+    'fa-dot-circle-o': '"◉"',
+    'fa-warning': '"⚠"',
+    'fa-exclamation-triangle': '"⚠"',
+    'fa-info': '"ℹ"',
+    'fa-info-circle': '"ℹ"',
+    'fa-arrow-right': '"→"',
+    'fa-arrow-left': '"←"',
+  };
+
+  function injectIconFontFallbacks(clone) {
+    const root = clone.querySelector('html') || clone;
+    root.setAttribute('data-fullpage-fa-fallback', '1');
+    const rules = Object.entries(FA_ICON_FALLBACK_RULES).map(
+      ([cls, content]) =>
+        `[class~="${cls}"]::before, .${cls}::before { content: ${content} !important; font-family: system-ui, "Segoe UI Symbol", sans-serif !important; font-weight: normal !important; }`
+    );
+    const style = document.createElement('style');
+    style.setAttribute('data-fullpage', 'fa-fallback');
+    style.textContent = `${rules.join('\n')}\n.icon::before { font-family: system-ui, "Segoe UI Symbol", sans-serif !important; }`;
+    ensureHead(clone).appendChild(style);
+    clone.querySelectorAll('i[class*="fa-"], span[class*="fa-"]').forEach((el) => {
+      const faClass = [...el.classList].find((c) => FA_ICON_FALLBACK_RULES[c]);
+      if (!faClass) return;
+      const glyph = FA_ICON_FALLBACK_RULES[faClass].replace(/^"|"$/g, '');
+      if (!el.textContent.trim()) el.textContent = glyph;
+      el.style.fontFamily = 'system-ui, "Segoe UI Symbol", sans-serif';
+    });
+  }
+
+  async function inlineAllAssets(clone, baseUrl) {
+    const cache = new Map();
+    await inlineImages(clone, baseUrl, cache);
+    await inlineBackgroundImages(clone, baseUrl, cache);
+    await inlineUrlsInStyles(clone, baseUrl, cache);
+    injectIconFontFallbacks(clone);
   }
 
   function serializeFormState(root) {
@@ -344,30 +631,13 @@
     clone.querySelectorAll('link[rel="stylesheet"]').forEach((l) => l.remove());
   }
 
-  async function inlineImages(clone, baseUrl) {
-    for (const img of clone.querySelectorAll('img')) {
-      const src = img.getAttribute('src') || '';
-      if (!src || src.startsWith('data:')) continue;
-      const live = document.querySelector(`img[src="${CSS.escape(src)}"]`);
-      try {
-        const res = await fetch(new URL(src, baseUrl).href, { credentials: 'include' });
-        if (res.ok) img.setAttribute('src', await blobToDataUrl(await res.blob()));
-      } catch {
-        if (live) {
-          const data = await imageToDataUrl(live);
-          if (data) img.setAttribute('src', data);
-        }
-      }
-    }
-  }
-
   async function reconstructHtml(options = {}) {
     const baseUrl = location.href;
     const clone = document.documentElement.cloneNode(true);
     clone.querySelectorAll('script, noscript').forEach((n) => n.remove());
     serializeFormState(clone);
     await inlineStyles(clone, baseUrl);
-    if (options.inlineImages !== false) await inlineImages(clone, baseUrl);
+    if (options.inlineImages !== false) await inlineAllAssets(clone, baseUrl);
     const head = ensureHead(clone);
     head.prepend(Object.assign(document.createElement('meta'), { charset: 'utf-8' }));
     return '<!DOCTYPE html>\n' + clone.outerHTML;
@@ -449,6 +719,7 @@
   async function captureTextBundle(options = {}) {
     window.scrollTo(captureScrollState?.windowX ?? 0, 0);
     await sleep(80);
+    if (options.inlineImages !== false) await ensureImagesLoaded();
     const textLayer = extractTextLayer();
     const html = await reconstructHtml({ inlineImages: options.inlineImages !== false });
     const htmlText = stripPlainFromHtml(html);

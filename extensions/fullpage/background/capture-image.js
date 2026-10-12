@@ -71,7 +71,7 @@ export async function captureTabImage(tabId, options = {}) {
   }
 
   await onProgress?.(78, 'Saving searchable text layer…');
-  const textBundle = await callPageTool(tabId, 'captureTextBundle', [{ inlineImages: false }]);
+  const textBundle = await callPageTool(tabId, 'captureTextBundle', [{ inlineImages: true }]);
 
   await callPageTool(tabId, 'restoreScrollPosition', []);
   await onProgress?.(85, 'Stitching image…');

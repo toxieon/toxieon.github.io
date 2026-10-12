@@ -26,19 +26,42 @@ function restoreManifest() {
 useTestHostPermissions();
 
 const testFile = 'moodle-boost.html';
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64'
+);
 
 function serveTest(port) {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
-      const base = path.basename((req.url || '/').split('?')[0]);
-      const file = path.join(root, 'test', base === '/' ? testFile : base);
+      const url = new URL(req.url || '/', `http://127.0.0.1:${port}`);
+      const pathname = url.pathname;
+
+      if (pathname.includes('pluginfile.php')) {
+        const cookie = req.headers.cookie || '';
+        if (!cookie.includes('moodletest=1')) {
+          res.writeHead(403, { 'Content-Type': 'text/plain' });
+          res.end('forbidden');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+        res.end(TINY_PNG);
+        return;
+      }
+
+      const base = path.basename(pathname);
+      const file = path.join(root, 'test', !base || base === '/' ? testFile : base);
       const testDir = path.join(root, 'test');
       if (!file.startsWith(testDir) || !fs.existsSync(file)) {
         res.writeHead(404);
         res.end();
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+      if (base === 'protected-image.html') {
+        headers['Set-Cookie'] = 'moodletest=1; Path=/; SameSite=Lax';
+      }
+      res.writeHead(200, headers);
       res.end(fs.readFileSync(file));
     });
     server.listen(port, '127.0.0.1', () => resolve(server));
@@ -167,13 +190,40 @@ await viewerPage.waitForSelector('#edit-bar:not([hidden])');
 await viewerPage.click('#tool-pen');
 await viewerPage.click('#btn-cancel-edit');
 
+await page.goto(`http://127.0.0.1:${PORT}/protected-image.html`, { waitUntil: 'networkidle0' });
+const prot = await harness.evaluate(async (origin) => {
+  const [tab] = await chrome.tabs.query({ url: `${origin}*` });
+  if (!tab?.id) throw new Error('Protected test tab not found');
+  return chrome.runtime.sendMessage({
+    type: 'FULLPAGE_CAPTURE',
+    kind: 'reconstruct',
+    options: { tabId: tab.id },
+  });
+}, `http://127.0.0.1:${PORT}/`);
+
+if (!prot?.ok) {
+  console.error('FAIL: protected reconstruct capture', prot?.error);
+  process.exit(1);
+}
+
+const protMeta = await harness.evaluate((id) =>
+  chrome.runtime.sendMessage({ type: 'FULLPAGE_GET_CAPTURE', id })
+, prot.id);
+
+const html = protMeta.record?.html || '';
+if (!/data:image\/[a-z+]+;base64,/i.test(html)) {
+  console.error('FAIL: saved HTML should inline auth-protected image as data URI', html.slice(0, 400));
+  process.exit(1);
+}
+
 console.log(
   'OK moodle-boost e2e — slices:',
   scrollLog.length,
   'distinct Y:',
   distinctY.size,
   'img height:',
-  imgHeight
+  imgHeight,
+  'protected data-uri: yes'
 );
 
 await browser.close();

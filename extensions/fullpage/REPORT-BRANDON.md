@@ -22,7 +22,7 @@
 |------|-----|-------------------|
 | **Full-page picture** | Scroll + `captureVisibleTab` + stitch | Fixed in 0.2.2+ (window scroll, ignore drawers; hide overlay before shots) |
 | **Search “Tuesday” etc.** | Every image capture also stores `html` + `pageText` + positioned `textLayer` | **Search box** uses `pageText` (from reconstructed DOM text). **Ctrl+F** works on the transparent text overlay on the PNG. |
-| **Offline HTML** | `reconstructHtml` — clone DOM, inline readable CSS, strip scripts, keep form/radio state | Text and structure good; **styling may be simplified** if CSS is cross-origin or blocked |
+| **Offline HTML** | `reconstructHtml` — clone DOM, inline CSS/fonts/images (cookie `fetch` + canvas fallback), FA unicode fallbacks | Question images from `pluginfile.php` should embed as **data:** URIs at capture time |
 | **Searchable PDF** | pdf-lib (MIT): PNG + low-opacity positioned text from `textLayer` | Text is **selectable** in PDF readers; position match to pixels is **approximate** |
 | **Multi-page quiz** | Full scan + optional host permission | Heuristic pagination; set a page limit |
 
