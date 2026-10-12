@@ -1,23 +1,22 @@
-# Third-party libraries (Neill Full Page Capture)
+# Libraries and dependencies
 
-## In use (vendored)
+Chrome Web Store build: **permissive licences only** (MIT/BSD/Apache/ISC). No AGPL/GPL.
 
-| Library | Licence | Role | Why |
-|---------|---------|------|-----|
-| **pdf-lib** 1.17.1 | MIT | `vendor/pdf-lib.esm.min.js` | Searchable PDFs: full-page PNG + invisible positioned text (DOM text layer). |
-| **jsPDF** 2.5.1 | MIT | `vendor/jspdf.umd.min.js` | Reconstruct / HTML-only PDFs (flowing text export). |
+## Vendored (included in package)
 
-## Surveyed, not vendored
+| Library | Version | Licence | File |
+|---------|---------|---------|------|
+| pdf-lib | 1.17.1 | MIT | `vendor/pdf-lib.esm.min.js` |
+| jsPDF | 2.5.1 | MIT | `vendor/jspdf.umd.min.js` |
 
-| Project | Licence | Notes |
-|---------|---------|-------|
-| **SingleFile** / single-file-core | AGPL-3.0 | Best-in-class saved HTML; our `reconstructHtml` covers internal offline search without AGPL payload. Brandon: OK to adopt later if HTML fidelity must match SingleFile exactly. |
-| **html2canvas**, **html-to-image**, **modern-screenshot** | MIT | DOM→canvas rasterization; we use Chrome `captureVisibleTab` for pixel accuracy on complex LMS CSS. |
-| **GoFullPage** (closed) | — | Behaviour reference only; no code used. |
-| **Nimbus / Fireshot** (closed) | — | Same. |
+Legal text: **`THIRD_PARTY_NOTICES.md`** and `vendor/*-LICENSE*`.
 
-## Original code
+## Not used (store policy)
 
-Scroll planning, Moodle drawer exclusion, slice de-duplication, text-layer extraction (DOM `Range` + `getClientRects`), viewer overlay, and stitching are implemented in this extension.
+- **SingleFile / single-file-core** (AGPL) — not bundled; HTML reconstruct is original.
+- **html2canvas**, **html-to-image**, **modern-screenshot** (MIT) — not needed; capture uses `chrome.tabs.captureVisibleTab`.
+- Closed-source extensions — behaviour reference only; no code copied.
 
-See `vendor/NOTICES.md` for licence file paths.
+## Original implementation
+
+Scroll/stitch, Moodle scroller detection, text-layer extraction, viewer overlay, IndexedDB history, and reconstruct HTML are implemented in this repository.

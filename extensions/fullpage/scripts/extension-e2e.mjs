@@ -8,6 +8,23 @@ import { fileURLToPath } from 'url';
 import puppeteer from 'puppeteer';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const manifestPath = path.join(root, 'manifest.json');
+const manifestOriginal = fs.readFileSync(manifestPath, 'utf8');
+
+/** Automation only: load extension with host access (store build uses optional_host_permissions). */
+function useTestHostPermissions() {
+  const m = JSON.parse(manifestOriginal);
+  m.host_permissions = ['<all_urls>'];
+  delete m.optional_host_permissions;
+  fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2));
+}
+
+function restoreManifest() {
+  fs.writeFileSync(manifestPath, manifestOriginal);
+}
+
+useTestHostPermissions();
+
 const testFile = 'moodle-boost.html';
 
 function serveTest(port) {
@@ -50,7 +67,6 @@ const extensionId = new URL(swTarget.url()).host;
 await page.bringToFront();
 const harness = await browser.newPage();
 await harness.goto(`chrome-extension://${extensionId}/popup/popup.html`);
-
 const result = await harness.evaluate(async (url) => {
   const [tab] = await chrome.tabs.query({ url: `${url}*` });
   if (!tab?.id) throw new Error('Test tab not found');
@@ -65,6 +81,7 @@ if (!result?.ok) {
   console.error('Capture failed:', result?.error);
   await browser.close();
   server.close();
+  restoreManifest();
   process.exit(1);
 }
 
@@ -137,4 +154,5 @@ console.log(
 
 await browser.close();
 server.close();
+restoreManifest();
 process.exit(0);

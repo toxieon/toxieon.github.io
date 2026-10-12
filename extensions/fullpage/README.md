@@ -1,13 +1,30 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.2.3** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only).
+Version **0.2.4** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
 
 ## UX (GoFullPage-style core + our extras)
 
-- **One-click toolbar** — click the extension icon to start capture (default: full-page image). GoFullPage-style **progress popup** with segmented bar (plus optional in-page overlay).
-- **Result tab** — preview on a gray stage with toolbar: **Edit** (annotate PNG), **PDF**, **Download**, **History**, **Delete**, **Settings**.
-- **Right-click toolbar icon** — Reconstruct, Full scan, more options popup, history, settings.
-- **Extras** — searchable HTML reconstruct, multi-page full scan, and text search in the viewer for HTML captures.
+- **One-click toolbar** — click the extension icon to start capture (default: full-page image). GoFullPage-style **progress popup** with segmented bar.
+- **Result tab** — preview on a gray stage with toolbar: **Edit**, **Download PNG**, **PDF**, **Search**, **Reconstruct**, **History**, **Settings**.
+- **Keyboard shortcuts** and **capture menu** (`popup/popup.html` — pin via options) for Reconstruct and Full scan.
+- **Extras** — searchable text on every image capture (HTML + text overlay + selectable PDF).
+
+## Permissions (Chrome Web Store–friendly)
+
+| Permission | Why |
+|------------|-----|
+| `activeTab` | Capture the page you are viewing when you click the icon or use a shortcut. |
+| `scripting` | Inject capture helpers into that tab. |
+| `storage` | Settings and local capture history (IndexedDB). |
+| `tabs` | Open the result viewer tab and read the active tab id. |
+| `offscreen` | Stitch screenshots and build PDFs locally. |
+| **Optional** `<all_urls>` | Requested when needed for multi-page full scan or reliable injection; not required at install time. |
+
+No `unlimitedStorage`, no broad host access at install, no context menus, no network calls, no ads.
+
+## Third-party licences
+
+Permissive only (MIT): **pdf-lib**, **jsPDF**. See **`THIRD_PARTY_NOTICES.md`**. No AGPL/GPL (e.g. SingleFile is not used).
 
 This folder is **not** linked from the public site or hub.
 
@@ -43,9 +60,9 @@ From the repository root (Git Bash or WSL on Windows):
 bash extensions/fullpage/scripts/build-zip.sh
 ```
 
-The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.3.zip`.
+The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.4.zip`.
 
-Library choices: see `LIBRARIES.md` (pdf-lib MIT for searchable PDFs; jsPDF MIT for HTML exports).
+Library choices: `LIBRARIES.md` · legal: `THIRD_PARTY_NOTICES.md`.
 
 ## Manual test pages
 
@@ -77,7 +94,7 @@ npx puppeteer@23 browsers install chrome
 node extensions/fullpage/scripts/extension-e2e.mjs
 ```
 
-## Known limitations (0.2.3)
+## Known limitations (0.2.4)
 
 - Cross-origin stylesheets blocked by the page may not fully inline; a `<link>` fallback is kept when rules are unreadable.
 - Cross-origin images without CORS may remain external URLs in reconstruct mode.

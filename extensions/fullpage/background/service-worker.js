@@ -3,6 +3,7 @@ import { captureTabReconstruct } from './capture-reconstruct.js';
 import { captureFullScan } from './capture-fullscan.js';
 import { listCaptures, getCapture } from '../lib/idb.js';
 import { getSettings } from '../lib/settings.js';
+import { ensureOptionalHostAccess } from '../lib/permissions.js';
 import {
   createProgressReporter,
   progressHide,
@@ -10,7 +11,6 @@ import {
   openProgressWindow,
   showCaptureError,
 } from './progress.js';
-import { registerContextMenusSafe, menuIdToKind, MENU } from './context-menus.js';
 
 const BUSY_KEY = 'captureBusy';
 
@@ -20,7 +20,6 @@ const PROGRESS_TITLES = {
   fullscan: 'Running full scan…',
 };
 
-// Recover from a crashed capture leaving the session stuck busy.
 chrome.storage.session.set({ [BUSY_KEY]: false }).catch(() => {});
 
 async function setBusy(busy) {
@@ -45,19 +44,9 @@ function openOptions() {
   chrome.runtime.openOptionsPage();
 }
 
-function openPopupWindow() {
-  chrome.windows.create({
-    url: chrome.runtime.getURL('popup/popup.html'),
-    type: 'popup',
-    width: 360,
-    height: 520,
-  });
-}
-
 async function resolveCaptureTab(options = {}) {
   if (options.tabId) {
-    const tab = await chrome.tabs.get(options.tabId);
-    return tab;
+    return chrome.tabs.get(options.tabId);
   }
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id) throw new Error('No active tab found. Focus the page you want to capture.');
@@ -77,6 +66,16 @@ function assertCapturableTab(tab) {
   }
 }
 
+async function ensureCapturePermissions(kind) {
+  if (kind !== 'fullscan') return;
+  const ok = await ensureOptionalHostAccess();
+  if (!ok) {
+    throw new Error(
+      'Full scan needs permission to access pages on this site. Allow when Chrome prompts, then try again.'
+    );
+  }
+}
+
 async function runCapture(kind, options = {}) {
   if (await isBusy()) {
     await showCaptureError('A capture is already running. Wait for it to finish or reload the extension.');
@@ -86,6 +85,8 @@ async function runCapture(kind, options = {}) {
   const tab = await resolveCaptureTab(options);
   assertCapturableTab(tab);
   const tabId = tab.id;
+
+  await ensureCapturePermissions(kind);
 
   await setBusy(true);
   await openProgressWindow();
@@ -141,33 +142,11 @@ async function runCapture(kind, options = {}) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  registerContextMenusSafe();
-});
-
-registerContextMenusSafe();
-
 chrome.action.onClicked.addListener((tab) => {
   const tabId = tab?.id;
   getSettings()
-    .then((settings) => {
-      const kind = settings.toolbarCaptureMode || 'image';
-      return runCapture(kind, tabId ? { tabId } : {});
-    })
+    .then((settings) => runCapture(settings.toolbarCaptureMode || 'image', tabId ? { tabId } : {}))
     .catch((err) => console.error('Full Page Capture:', err));
-});
-
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const kind = menuIdToKind(info.menuItemId);
-  if (kind) {
-    runCapture(kind, tab?.id ? { tabId: tab.id } : {}).catch((err) =>
-      console.error('Full Page Capture:', err)
-    );
-    return;
-  }
-  if (info.menuItemId === MENU.history) openHistory();
-  if (info.menuItemId === MENU.options) openOptions();
-  if (info.menuItemId === MENU.popup) openPopupWindow();
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -176,6 +155,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     runCapture(message.kind, message.options || {})
       .then((result) => sendResponse(result))
       .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'FULLPAGE_OPEN_VIEWER') {
+    if (message.id) openViewer(message.id);
+    else openHistory();
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (message.type === 'FULLPAGE_OPEN_OPTIONS') {
+    openOptions();
+    sendResponse({ ok: true });
     return true;
   }
   if (message.type === 'FULLPAGE_LIST') {
@@ -208,7 +198,5 @@ chrome.commands.onCommand.addListener((command) => {
     'capture-fullscan': 'fullscan',
   };
   const kind = map[command];
-  if (kind) {
-    runCapture(kind).catch((err) => console.error('Full Page Capture:', err));
-  }
+  if (kind) runCapture(kind).catch((err) => console.error('Full Page Capture:', err));
 });
