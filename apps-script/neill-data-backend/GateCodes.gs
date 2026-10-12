@@ -7,6 +7,12 @@ const GC_VIEW_TTL_MS = 7 * 24 * 3600 * 1000;
 const PROP_GC_PIN_HASH = 'GC_PIN_HASH';
 const PROP_GC_PIN_ENABLED = 'GC_PIN_ENABLED';
 const PROP_GC_APP_SLUG = 'GC_APP_SLUG';
+const PROP_GC_CLIENT_ID = 'GC_CLIENT_ID';
+// Suite GIS OAuth client (public value; same as shared/nd-config.js). Override with GC_CLIENT_ID.
+const GC_DEFAULT_CLIENT_ID = '418369916603-u3pqd7ngq7nuvd032dagjc5apq8ogg2e.apps.googleusercontent.com';
+const GC_ISSUERS = { 'accounts.google.com': true, 'https://accounts.google.com': true };
+const GC_PIN_ITER = 300;
+const GC_NEARBY_MAX_PER_MIN = 60;
 
 const GC_ACTIONS = {
   gc_pin_status: gcPinStatus_,
@@ -159,14 +165,25 @@ function gcRequireViewSession_(body) {
   if (!s) return { ok: false, error: 'pin_required' };
   return null;
 }
+/** Salted + peppered, iterated HMAC-SHA256: "gc1$<salt>$<hex>". */
+function gcHashPin_(pin, salt, pepper) {
+  let h = String(salt) + ':' + String(pin);
+  for (let i = 0; i < GC_PIN_ITER; i++) h = hmacHex_(h, 'gcpin:' + String(pepper || '') + ':' + salt);
+  return 'gc1$' + salt + '$' + h;
+}
+function gcNewPinHash_(pin) { return gcHashPin_(pin, randomHex_(32), pepper_()); }
+function gcPinMatches_(stored, pin) {
+  const parts = String(stored || '').split('$');
+  if (parts.length !== 3 || parts[0] !== 'gc1' || !parts[1]) return false;
+  return safeEq_(stored, gcHashPin_(pin, parts[1], pepper_()));
+}
 function gcPinVerify_(body) {
   const pin = String(body.pin == null ? '' : body.pin).trim();
-  if (!/^\d{4,12}$/.test(pin)) return { ok: false, error: 'invalid pin' };
   const stored = PropertiesService.getScriptProperties().getProperty(PROP_GC_PIN_HASH);
   if (!stored) return { ok: false, error: 'pin_not_configured' };
-  const pepper = pepper_();
-  const v2 = credFromCode_(pin, pepper);
-  const settled = settleLogin_('gc_pin', '', credMatch_(stored, sha256Hex_(pin), v2) ? 'ok' : 'fail');
+  // Malformed input still counts as a failed attempt (rate limit applies to every try).
+  const good = /^\d{4,12}$/.test(pin) && gcPinMatches_(stored, pin);
+  const settled = settleLogin_('gc_pin', '', good ? 'ok' : 'fail');
   if (settled) return settled;
   const session = newSession_('gc_view', 'viewer', GC_VIEW_TTL_MS);
   return { ok: true, viewSession: session, ttlMs: GC_VIEW_TTL_MS };
@@ -184,7 +201,7 @@ function gcPinSet_(body) {
   const pin = String(body.pin == null ? '' : body.pin).trim();
   if (pin) {
     if (!/^\d{4,12}$/.test(pin)) return { ok: false, error: 'pin must be 4–12 digits' };
-    PropertiesService.getScriptProperties().setProperty(PROP_GC_PIN_HASH, credFromCode_(pin, pepper_()));
+    PropertiesService.getScriptProperties().setProperty(PROP_GC_PIN_HASH, gcNewPinHash_(pin));
     PropertiesService.getScriptProperties().setProperty(PROP_GC_PIN_ENABLED, 'true');
   }
   return { ok: true, pinRequired: gcPinEnabled_(), pinConfigured: gcPinConfigured_() };
@@ -192,31 +209,45 @@ function gcPinSet_(body) {
 
 /* ── Google auth (editors) ────────────────────────────────────────── */
 
-function gcVerifyAccessToken_(token) {
-  token = String(token || '').trim();
-  if (!token) return null;
-  const r = UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: { Authorization: 'Bearer ' + token },
-    muteHttpExceptions: true
-  });
-  if (r.getResponseCode() !== 200) return null;
-  let p;
-  try { p = JSON.parse(r.getContentText()); } catch (e) { return null; }
-  if (!p.email || !p.email_verified) return null;
-  return { email: String(p.email).toLowerCase(), sub: p.sub, name: p.name || '' };
+function gcClientId_() {
+  return PropertiesService.getScriptProperties().getProperty(PROP_GC_CLIENT_ID) || GC_DEFAULT_CLIENT_ID;
+}
+/** Google tokeninfo via POST (token never goes in a URL). Any failure → null (anonymous). */
+function gcTokenInfo_(field, token) {
+  try {
+    const payload = {}; payload[field] = token;
+    const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo', { method: 'post', payload: payload, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return null;
+    return JSON.parse(r.getContentText());
+  } catch (e) { return null; }
+}
+/** Pure check of a tokeninfo payload. kind: 'id' | 'access'. */
+function gcCheckTokenClaims_(p, kind, clientId, nowSec) {
+  if (!p || typeof p !== 'object') return null;
+  const exp = parseInt(p.exp, 10);
+  if (!Number.isFinite(exp) || exp <= nowSec) return null;
+  if (String(p.email_verified) !== 'true' || !p.email) return null;
+  if (kind === 'id') {
+    if (p.aud !== clientId) return null;
+    if (!GC_ISSUERS[String(p.iss || '')]) return null;
+  } else if (p.aud !== clientId && p.azp !== clientId) {
+    return null; // a token minted for some other app is never accepted
+  }
+  return { email: String(p.email).toLowerCase(), sub: String(p.sub || ''), name: p.name || '' };
 }
 function gcVerifyIdToken_(idToken) {
   idToken = String(idToken || '').trim();
   if (!idToken) return null;
-  const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
-  if (r.getResponseCode() !== 200) return null;
-  let p;
-  try { p = JSON.parse(r.getContentText()); } catch (e) { return null; }
-  if (!p.email || String(p.email_verified) !== 'true') return null;
-  return { email: String(p.email).toLowerCase(), sub: p.sub, name: p.name || '' };
+  return gcCheckTokenClaims_(gcTokenInfo_('id_token', idToken), 'id', gcClientId_(), Math.floor(Date.now() / 1000));
 }
+function gcVerifyAccessToken_(token) {
+  token = String(token || '').trim();
+  if (!token) return null;
+  return gcCheckTokenClaims_(gcTokenInfo_('access_token', token), 'access', gcClientId_(), Math.floor(Date.now() / 1000));
+}
+/** Verified identity, or null. Invalid / expired / foreign tokens are anonymous. */
 function gcAuthProfile_(body) {
-  return gcVerifyAccessToken_(body.accessToken) || gcVerifyIdToken_(body.idToken || body.googleIdToken);
+  return gcVerifyIdToken_(body.idToken || body.googleIdToken) || gcVerifyAccessToken_(body.accessToken);
 }
 function gcIsEditorEmail_(email) {
   email = String(email || '').toLowerCase();
@@ -247,12 +278,24 @@ function gcAuthOwner_(body) {
 function gcNearby_(body) {
   const pinGate = gcRequireViewSession_(body);
   if (pinGate) return pinGate;
+  if (!gcNearbyAllowed_()) return { ok: false, error: 'busy — try again shortly' };
   const lat = parseFloat(body.lat);
   const lng = parseFloat(body.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, error: 'lat/lng required' };
   const sites = gcReadSites_();
   const hit = gcNearestSiteWithin_(sites, lat, lng, GC_RADIUS_M);
   return { ok: true, site: hit ? gcPublicSite_(hit.site) : null };
+}
+
+/** Global cap on proximity lookups so the site list can't be scraped by sweeping coordinates. */
+function gcNearbyAllowed_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const key = 'gc_nearby_' + Math.floor(Date.now() / 60000);
+    const n = parseInt(cache.get(key) || '0', 10) + 1;
+    cache.put(key, String(n), 120);
+    return n <= GC_NEARBY_MAX_PER_MIN;
+  } catch (e) { return true; }
 }
 
 function gcList_(body) {
@@ -334,9 +377,11 @@ function gcUpsert_(body) {
   return { ok: true, row: gcPublicSite_(row) };
 }
 
+/** Editors learn only that they are editors; the editor list itself is owner-only. */
 function gcEditorsList_(body) {
   const editor = gcAuthEditor_(body);
   if (!editor) return { ok: false, error: 'forbidden' };
+  if (editor.email !== GC_OWNER_EMAIL) return { ok: true, isEditor: true, isOwner: false };
   const sh = gcEditorsSheet_();
   const values = sh.getDataRange().getValues();
   const editors = [];
@@ -345,7 +390,7 @@ function gcEditorsList_(body) {
     if (!em) continue;
     editors.push({ email: em, role: String(values[i][1] || 'editor') });
   }
-  return { ok: true, owner: GC_OWNER_EMAIL, editors: editors, isOwner: editor.email === GC_OWNER_EMAIL };
+  return { ok: true, isEditor: true, isOwner: true, owner: GC_OWNER_EMAIL, editors: editors };
 }
 
 function gcEditorsAdd_(body) {
@@ -379,12 +424,11 @@ function gcEditorsRemove_(body) {
 }
 
 function gcOwnerAppLink_(body) {
-  const profile = gcAuthProfile_(body);
-  if (!profile || profile.email !== GC_OWNER_EMAIL) return { ok: false, error: 'forbidden' };
-  const slug = PropertiesService.getScriptProperties().getProperty(PROP_GC_APP_SLUG);
-  if (!slug) return { ok: false, error: 'not_configured' };
+  if (!gcAuthOwner_(body)) return { ok: false, error: 'forbidden' };
+  const slug = String(PropertiesService.getScriptProperties().getProperty(PROP_GC_APP_SLUG) || '').trim();
+  if (!/^[a-z0-9-]{8,64}$/.test(slug)) return { ok: false, error: 'not_configured' };
   return {
     ok: true,
-    app: { id: 'gatecodes', name: 'Gate Codes', path: '/' + slug + '/', icon: '/favicon.svg', color: '#6ddba3', order: 50 }
+    app: { id: 'gatecodes', name: 'Gate Codes', path: '/' + slug + '/', icon: '/' + slug + '/favicon.svg', color: '#a3e635', order: 50 }
   };
 }

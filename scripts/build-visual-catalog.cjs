@@ -61,6 +61,8 @@ function shouldSkip(rel) {
   for (const p of parts) {
     if (SKIP_DIRS.has(p)) return true;
   }
+  // Private apps (top-level folder with a .nd-private marker) never enter the public catalogue.
+  if (parts.length > 1 && fs.existsSync(path.join(ROOT, parts[0], ".nd-private"))) return true;
   if (norm.startsWith("assets/tipdash/")) return !tipdashAllowed(norm.slice("assets/tipdash/".length));
   return false;
 }

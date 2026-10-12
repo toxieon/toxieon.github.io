@@ -1,4 +1,4 @@
-/* Hub v0.7.2 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.7.3 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -108,6 +108,8 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("cont
 
 async function injectOwnerGateCodesTile() {
   if (!window.NDAuth || !window.NDGateCodes) return;
+  // Only for a device that has signed in to the suite before: no silent GIS calls for everyone else.
+  if (!(NDAuth.hasPriorSession && NDAuth.hasPriorSession())) return;
   try {
     const cfg = window.NDConfig && NDConfig.forApp("timesheet");
     NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });

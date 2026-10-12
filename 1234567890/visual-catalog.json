@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-12",
-  "count": 248,
+  "generatedAt": "2026-10-11",
+  "count": 244,
   "categories": [
     {
       "id": "1234567890/favicon.svg",
@@ -1800,42 +1800,6 @@
       "preview": "/fitoff/icons/icon-512.png",
       "source": "Fit-off",
       "category": "Fit-off",
-      "subcategory": "PWA / home-screen icons"
-    },
-    {
-      "id": "g-k7m2n9p4q8r3s6t1/favicon.svg",
-      "name": "Favicon",
-      "href": "/g-k7m2n9p4q8r3s6t1/favicon.svg",
-      "preview": "/g-k7m2n9p4q8r3s6t1/favicon.svg",
-      "source": "g-k7m2n9p4q8r3s6t1",
-      "category": "g-k7m2n9p4q8r3s6t1",
-      "subcategory": "Favicon"
-    },
-    {
-      "id": "g-k7m2n9p4q8r3s6t1/icons/icon-180.png",
-      "name": "Icon 180",
-      "href": "/g-k7m2n9p4q8r3s6t1/icons/icon-180.png",
-      "preview": "/g-k7m2n9p4q8r3s6t1/icons/icon-180.png",
-      "source": "g-k7m2n9p4q8r3s6t1",
-      "category": "g-k7m2n9p4q8r3s6t1",
-      "subcategory": "PWA / home-screen icons"
-    },
-    {
-      "id": "g-k7m2n9p4q8r3s6t1/icons/icon-192.png",
-      "name": "Icon 192",
-      "href": "/g-k7m2n9p4q8r3s6t1/icons/icon-192.png",
-      "preview": "/g-k7m2n9p4q8r3s6t1/icons/icon-192.png",
-      "source": "g-k7m2n9p4q8r3s6t1",
-      "category": "g-k7m2n9p4q8r3s6t1",
-      "subcategory": "PWA / home-screen icons"
-    },
-    {
-      "id": "g-k7m2n9p4q8r3s6t1/icons/icon-512.png",
-      "name": "Icon 512",
-      "href": "/g-k7m2n9p4q8r3s6t1/icons/icon-512.png",
-      "preview": "/g-k7m2n9p4q8r3s6t1/icons/icon-512.png",
-      "source": "g-k7m2n9p4q8r3s6t1",
-      "category": "g-k7m2n9p4q8r3s6t1",
       "subcategory": "PWA / home-screen icons"
     },
     {

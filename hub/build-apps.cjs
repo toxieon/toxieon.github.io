@@ -4,7 +4,8 @@
  *   node hub/build-apps.cjs          write hub/apps.json
  *   node hub/build-apps.cjs --check  exit 1 if hub/apps.json is out of date (used by tests / CI)
  *
- * A top-level folder with an index.html becomes a tile unless it's in discover.json "exclude"
+ * A top-level folder with an index.html becomes a tile unless it's in discover.json "exclude",
+ * contains a .nd-private marker file (private apps: kept out of every public list),
  * or marked hidden. Values, lowest to highest priority:
  *   1. defaults: <title> (minus "ND • " prefixes), the page's <link rel="icon">, folder/favicon.svg
  *      or the suite icon, the suite icon colour, folder name as id, version from folder/VERSION
@@ -124,6 +125,7 @@ function discover(root = ROOT, config = readConfig(root)) {
     if (!ent.isDirectory() || ent.name.startsWith(".") || ent.name.startsWith("_") || ent.name === "node_modules") continue;
     if (exclude.has(ent.name)) continue;
     if (!fs.existsSync(path.join(root, ent.name, "index.html"))) continue;
+    if (fs.existsSync(path.join(root, ent.name, ".nd-private"))) continue; // private app: never listed
     apps.push(discoverFolder(root, ent.name, config, suite));
   }
   for (const extra of config.extra || []) apps.push({ ...extra });

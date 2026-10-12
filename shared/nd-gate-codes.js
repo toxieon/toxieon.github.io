@@ -3,7 +3,8 @@
   "use strict";
 
   var VIEW_KEY = "gc_view_session_v1";
-  var EDITOR_CACHE_KEY = "gc_editor_list_v1";
+  // Older builds persisted the editor list; remove any copy left on the device.
+  try { if (typeof localStorage !== "undefined") localStorage.removeItem("gc_editor_list_v1"); } catch (e) {}
 
   function endpoint() {
     return (root.ND_BACKEND && root.ND_BACKEND.endpoint) || "";
@@ -99,18 +100,11 @@
     /** Editors only — invalid/expired token → forbidden (treat as anonymous). */
     async listEditor() {
       if (!backendReady()) return { ok: false, error: "not_configured" };
-      var data = await call("gc_list", authFields(), { skipViewSession: true });
-      if (data && data.codes) {
-        try { localStorage.setItem(EDITOR_CACHE_KEY, JSON.stringify({ ts: Date.now(), codes: data.codes })); } catch (e) {}
-      }
-      return data;
+      // The full list is held in memory only; nothing with codes is written to storage.
+      return call("gc_list", authFields(), { skipViewSession: true });
     },
-    readEditorCache() {
-      try {
-        var o = JSON.parse(localStorage.getItem(EDITOR_CACHE_KEY) || "null");
-        return o && o.codes ? o.codes : [];
-      } catch (e) { return []; }
-    },
+    /** Kept for callers; the list is never persisted, so this is always empty. */
+    readEditorCache() { return []; },
     async upsert(row) {
       var err = validateCode(row && row.code);
       if (err) throw new Error(err);
@@ -141,14 +135,9 @@
       if (!backendReady()) return { ok: false, error: "not_configured" };
       return call("gc_owner_app_link", authFields(), { skipViewSession: true });
     },
-    isEditorMeta(meta, profile) {
-      if (!profile || !profile.email || !meta || !meta.ok) return false;
-      var email = String(profile.email).toLowerCase();
-      if (meta.owner && String(meta.owner).toLowerCase() === email) return true;
-      return !!(meta.editors && meta.editors.some(function (e) {
-        return String(e.email || e).toLowerCase() === email;
-      }));
-    }
+    /** The server decides; profile is ignored (kept for signature compatibility). */
+    isEditorMeta(meta) { return !!(meta && meta.ok && meta.isEditor); },
+    isOwnerMeta(meta) { return !!(meta && meta.ok && meta.isOwner); }
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

@@ -5,7 +5,7 @@
  *  nearestJob, NEAR_RADIUS_MULT, and the tiered "known / near" classification
  *  used by TsGeo.resolveClockOnTarget before quote / geocode fallbacks.
  *
- *  Browser: window.NDSiteMatch (and NDJobLocator alias for travel-map code).
+ *  Browser: window.NDSiteMatch (does not touch assets/job-locator.js / NDJobLocator).
  *  Node:    require('./nd-site-match.js')
  * ========================================================================= */
 (function (root) {
@@ -72,16 +72,4 @@
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.NDSiteMatch = API;
-  root.NDJobLocator = {
-    distanceMetres: distanceMetres,
-    nearest: function (jobs, lat, lng) { return nearestJob(jobs, lat, lng); },
-    match: function (jobs, lat, lng, opts) {
-      opts = opts || {};
-      var c = classifyNearJob(jobs, lat, lng, opts.defaultRadius || 200);
-      if (c.type === "known") return { tier: "here", job: c.job, dist: c.dist };
-      if (c.type === "near") return { tier: "near", job: c.job, dist: c.dist };
-      return { tier: "none", job: null, dist: c.dist };
-    },
-    resolveOrCreate: function () { return null; }
-  };
 })(typeof window !== "undefined" ? window : globalThis);

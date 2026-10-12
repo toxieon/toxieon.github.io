@@ -1,7 +1,7 @@
 /* Gate Codes — proximity for viewers; editor list when signed in + allowlisted. */
 (function () {
   "use strict";
-  const APP_VERSION = "0.1.1";
+  const APP_VERSION = "0.1.2";
   const $ = (id) => document.getElementById(id);
 
   let editorMode = false;
@@ -24,17 +24,45 @@
 
   async function refreshEditorFlag() {
     editorMode = false;
+    editorCodes = [];
+    $("editor-list").replaceChildren();
     $("editor-panel").hidden = true;
+    renderOwnerEditors(null);
     if (!window.NDAuth || !NDAuth.isSignedIn()) return;
     try {
       const meta = await NDGateCodes.editorsMeta();
       const profile = NDAuth.getProfile();
       editorMode = NDGateCodes.isEditorMeta(meta, profile);
       $("editor-panel").hidden = !editorMode;
+      renderOwnerEditors(meta);
       if (editorMode) await loadEditorList();
     } catch (e) {
       editorMode = false;
     }
+  }
+
+  function renderOwnerEditors(meta) {
+    const box = $("owner-editors");
+    const list = $("editors-list");
+    list.replaceChildren();
+    if (!NDGateCodes.isOwnerMeta(meta)) { box.hidden = true; return; }
+    box.hidden = false;
+    (meta.editors || []).forEach((e) => {
+      const row = document.createElement("div");
+      row.className = "editor-row";
+      const name = document.createElement("span");
+      name.textContent = e.email + (e.role === "owner" ? " (owner)" : "");
+      row.appendChild(name);
+      if (e.role !== "owner") {
+        const rm = document.createElement("button");
+        rm.type = "button"; rm.className = "btn"; rm.textContent = "Remove";
+        rm.addEventListener("click", async () => {
+          try { await NDGateCodes.editorsRemove(e.email); toast("Removed"); await refreshEditorFlag(); } catch (err) { toast(err.message); }
+        });
+        row.appendChild(rm);
+      }
+      list.appendChild(row);
+    });
   }
 
   function renderProximity(site) {
@@ -89,17 +117,25 @@
     $("app-main").hidden = false;
   }
 
+  let notSetUp = false;
+  function showNotSetUp() {
+    notSetUp = true;
+    hidePin();
+    $("setup-hint").hidden = false;
+    $("setup-hint").textContent = "Gate Codes isn't set up yet. The owner needs to finish the backend setup.";
+  }
   async function ensurePinGate() {
-    if (!NDGateCodes.backendReady()) {
-      $("setup-hint").hidden = false;
-      $("setup-hint").textContent = "Backend not connected yet — set shared/nd-backend.js endpoint after deploying GateCodes.gs.";
-      return;
-    }
-    const st = await NDGateCodes.pinStatus();
+    if (!NDGateCodes.backendReady()) { showNotSetUp(); return; }
+    let st;
+    try { st = await NDGateCodes.pinStatus(); } catch (e) { showNotSetUp(); return; }
+    if (!st || !st.ok) { showNotSetUp(); return; }
     if (!st.pinRequired) { hidePin(); return; }
     if (!st.pinConfigured) {
       $("setup-hint").hidden = false;
-      $("setup-hint").textContent = "Owner: sign in and set the company view PIN in Settings.";
+      $("setup-hint").textContent = "Gate Codes isn't set up yet. Owner: sign in and set the company view PIN in Settings.";
+      hidePin();
+      notSetUp = true;
+      return;
     }
     if (NDGateCodes.hasViewSession()) { hidePin(); return; }
     showPin();
@@ -111,7 +147,7 @@
       const data = await NDGateCodes.listEditor();
       editorCodes = data.codes || [];
     } catch (e) {
-      editorCodes = NDGateCodes.readEditorCache();
+      editorCodes = [];
       toast("Could not refresh list — " + (e.message || "sign in as editor"));
     }
     const list = $("editor-list");
@@ -212,6 +248,11 @@
         toast("PIN updated");
       } catch (e) { toast(e.message); }
     });
+    $("editor-add").addEventListener("click", async () => {
+      const email = $("editor-email").value.trim();
+      if (!email) return;
+      try { await NDGateCodes.editorsAdd(email); $("editor-email").value = ""; toast("Editor added"); await refreshEditorFlag(); } catch (e) { toast(e.message); }
+    });
     $("ver").textContent = "v" + APP_VERSION;
   }
 
@@ -220,6 +261,7 @@
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
     await bootAuth();
     await ensurePinGate();
+    if (notSetUp) return;
     pollLocation();
     startWatch();
   }
