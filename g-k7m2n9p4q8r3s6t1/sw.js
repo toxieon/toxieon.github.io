@@ -1,15 +1,15 @@
-const CACHE_VERSION = 'gatecodes-0.1.2';
+const CACHE_VERSION = 'gatecodes-0.1.3';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
   "../shared/nd-config.js",
   "../shared/nd-auth.js",
-  "../shared/nd-gate-codes.js?v=0.1.2",
-  "../shared/nd-site-match.js?v=0.1.2",
+  "../shared/nd-gate-codes.js?v=0.1.3",
+  "../shared/nd-site-match.js?v=0.1.3",
   "../shared/nd-core.css",
   "../shared/nd-ui.js",
   "./index.html",
-  "./app.js?v=0.1.2",
+  "./app.js?v=0.1.3",
   "./manifest.json",
   "./favicon.svg",
   "./icons/icon-32.png",
