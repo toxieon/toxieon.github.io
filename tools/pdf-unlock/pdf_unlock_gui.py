@@ -18,6 +18,8 @@ from core import (  # noqa: E402
     ProgressUpdate,
     build_phases,
     default_output_path,
+    estimate_brute_search,
+    format_duration,
     format_eta,
     run_attack,
     state_path_for,
@@ -30,7 +32,7 @@ class PdfUnlockApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("pdf-unlock")
-        self.minsize(520, 480)
+        self.minsize(560, 620)
         self._stop_event = threading.Event()
         self._worker: threading.Thread | None = None
 
@@ -40,71 +42,109 @@ class PdfUnlockApp(tk.Tk):
 
         ttk.Label(
             frm,
-            text="Recover passwords on PDFs you own only. Strong random passwords may be impossible to recover.",
-            wraplength=480,
+            text=(
+                "For PDFs you own only. Password-manager random strings require brute force; "
+                "long mixed passwords can take years on one PC."
+            ),
+            wraplength=520,
         ).grid(row=0, column=0, columnspan=3, sticky="w", **pad)
 
         ttk.Label(frm, text="PDF file").grid(row=1, column=0, sticky="w", **pad)
         self.pdf_var = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.pdf_var, width=48).grid(row=1, column=1, sticky="ew", **pad)
+        ttk.Entry(frm, textvariable=self.pdf_var, width=50).grid(row=1, column=1, sticky="ew", **pad)
         ttk.Button(frm, text="Browse…", command=self._browse_pdf).grid(row=1, column=2, **pad)
 
-        ttk.Label(frm, text="Hints (one per line)").grid(row=2, column=0, sticky="nw", **pad)
-        self.hints_text = tk.Text(frm, height=4, width=40)
-        self.hints_text.grid(row=2, column=1, columnspan=2, sticky="ew", **pad)
+        brute = ttk.LabelFrame(frm, text="Brute force (default)", padding=8)
+        brute.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
+        self.brute_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            brute,
+            text="Run ordered brute force (a, b, … Z, 0, … aa, ab, …)",
+            variable=self.brute_var,
+            command=self._refresh_estimate,
+        ).grid(row=0, column=0, columnspan=4, sticky="w")
 
-        ttk.Label(frm, text="Wordlist").grid(row=3, column=0, sticky="w", **pad)
-        self.wordlist_var = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.wordlist_var, width=48).grid(row=3, column=1, sticky="ew", **pad)
-        ttk.Button(frm, text="Browse…", command=self._browse_wordlist).grid(row=3, column=2, **pad)
+        charset_frm = ttk.Frame(brute)
+        charset_frm.grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
+        self.lower_var = tk.BooleanVar(value=True)
+        self.upper_var = tk.BooleanVar(value=True)
+        self.digits_var = tk.BooleanVar(value=True)
+        self.symbols_var = tk.BooleanVar(value=False)
+        for col, (text, var) in enumerate(
+            [
+                ("a–z", self.lower_var),
+                ("A–Z", self.upper_var),
+                ("0–9", self.digits_var),
+                ("symbols", self.symbols_var),
+            ]
+        ):
+            ttk.Checkbutton(charset_frm, text=text, variable=var, command=self._refresh_estimate).grid(
+                row=0, column=col, padx=6, sticky="w"
+            )
 
-        opts = ttk.LabelFrame(frm, text="Attack options", padding=8)
-        opts.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
+        ttk.Label(brute, text="Length min → max").grid(row=2, column=0, sticky="w")
+        len_frm = ttk.Frame(brute)
+        len_frm.grid(row=2, column=1, sticky="w")
+        self.min_len_var = tk.StringVar(value="1")
+        self.max_len_var = tk.StringVar(value="8")
+        ttk.Spinbox(len_frm, from_=1, to=16, textvariable=self.min_len_var, width=4, command=self._refresh_estimate).pack(
+            side=tk.LEFT
+        )
+        ttk.Label(len_frm, text=" → ").pack(side=tk.LEFT)
+        ttk.Spinbox(len_frm, from_=1, to=16, textvariable=self.max_len_var, width=4, command=self._refresh_estimate).pack(
+            side=tk.LEFT
+        )
+        self.min_len_var.trace_add("write", lambda *_: self._refresh_estimate())
+        self.max_len_var.trace_add("write", lambda *_: self._refresh_estimate())
 
-        self.common_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(opts, text="Try empty / common passwords first", variable=self.common_var).grid(
+        self.estimate_var = tk.StringVar(value="Select a PDF to estimate search size and time.")
+        ttk.Label(brute, textvariable=self.estimate_var, wraplength=500).grid(
+            row=3, column=0, columnspan=4, sticky="w", pady=6
+        )
+
+        secondary = ttk.LabelFrame(frm, text="Optional (dictionary / hints — usually not for random passwords)", padding=8)
+        secondary.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+
+        self.common_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(secondary, text="Try empty / common passwords first", variable=self.common_var).grid(
             row=0, column=0, columnspan=2, sticky="w"
         )
 
-        ttk.Label(opts, text="Digits max (0 = off)").grid(row=1, column=0, sticky="w")
-        self.digits_var = tk.StringVar(value="0")
-        ttk.Spinbox(opts, from_=0, to=12, textvariable=self.digits_var, width=6).grid(row=1, column=1, sticky="w")
+        ttk.Label(secondary, text="Hints (one per line)").grid(row=1, column=0, sticky="nw")
+        self.hints_text = tk.Text(secondary, height=3, width=36)
+        self.hints_text.grid(row=1, column=1, sticky="ew")
 
-        self.brute_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(opts, text="Charset brute (lowercase+digits default)", variable=self.brute_var).grid(
-            row=2, column=0, columnspan=2, sticky="w"
-        )
+        ttk.Label(secondary, text="Wordlist").grid(row=2, column=0, sticky="w")
+        self.wordlist_var = tk.StringVar()
+        ttk.Entry(secondary, textvariable=self.wordlist_var, width=36).grid(row=2, column=1, sticky="ew")
+        ttk.Button(secondary, text="Browse…", command=self._browse_wordlist).grid(row=2, column=2)
 
-        ttk.Label(opts, text="Charset").grid(row=3, column=0, sticky="w")
-        self.charset_var = tk.StringVar()
-        ttk.Entry(opts, textvariable=self.charset_var, width=36).grid(row=3, column=1, sticky="ew")
+        ttk.Label(secondary, text="Digits only (0=off)").grid(row=3, column=0, sticky="w")
+        self.digits_only_var = tk.StringVar(value="0")
+        ttk.Spinbox(secondary, from_=0, to=12, textvariable=self.digits_only_var, width=6).grid(row=3, column=1, sticky="w")
 
-        ttk.Label(opts, text="Min / max length").grid(row=4, column=0, sticky="w")
-        len_frm = ttk.Frame(opts)
-        len_frm.grid(row=4, column=1, sticky="w")
-        self.min_len_var = tk.StringVar(value="1")
-        self.max_len_var = tk.StringVar(value="5")
-        ttk.Spinbox(len_frm, from_=1, to=12, textvariable=self.min_len_var, width=4).pack(side=tk.LEFT)
-        ttk.Label(len_frm, text=" – ").pack(side=tk.LEFT)
-        ttk.Spinbox(len_frm, from_=1, to=12, textvariable=self.max_len_var, width=4).pack(side=tk.LEFT)
-
-        prog = ttk.LabelFrame(frm, text="Progress", padding=8)
-        prog.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
+        prog = ttk.LabelFrame(frm, text="Progress (resume supported)", padding=8)
+        prog.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
         self.phase_var = tk.StringVar(value="Idle")
         self.stats_var = tk.StringVar(value="—")
-        self.last_var = tk.StringVar(value="—")
         ttk.Label(prog, textvariable=self.phase_var).pack(anchor="w")
         ttk.Label(prog, textvariable=self.stats_var).pack(anchor="w")
-        ttk.Label(prog, textvariable=self.last_var).pack(anchor="w")
+        ttk.Label(prog, text="Last password tried:").pack(anchor="w", pady=(8, 0))
+        self.last_display = tk.StringVar(value="—")
+        ttk.Label(prog, textvariable=self.last_display, font=("Consolas", 14), anchor="w").pack(
+            fill=tk.X, pady=4
+        )
 
         btn_frm = ttk.Frame(frm)
-        btn_frm.grid(row=6, column=0, columnspan=3, **pad)
+        btn_frm.grid(row=5, column=0, columnspan=3, **pad)
         self.start_btn = ttk.Button(btn_frm, text="Start", command=self._start)
         self.start_btn.pack(side=tk.LEFT, padx=4)
         self.stop_btn = ttk.Button(btn_frm, text="Stop", command=self._stop, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn_frm, text="Refresh estimate", command=self._refresh_estimate).pack(side=tk.LEFT, padx=4)
 
         frm.columnconfigure(1, weight=1)
+        self.pdf_var.trace_add("write", lambda *_: self._refresh_estimate())
 
     def _browse_pdf(self) -> None:
         path = filedialog.askopenfilename(
@@ -127,39 +167,93 @@ class PdfUnlockApp(tk.Tk):
             messagebox.showerror("pdf-unlock", f"Wordlist not found:\n{wordlist}")
             return None
 
-        digits_raw = self.digits_var.get().strip() or "0"
-        try:
-            digits_n = int(digits_raw)
-        except ValueError:
-            messagebox.showerror("pdf-unlock", "Digits max must be a number.")
-            return None
-        digits = digits_n if digits_n > 0 else None
-        if digits is not None and digits > 6:
-            if not messagebox.askyesno(
-                "pdf-unlock",
-                f"Digits max {digits} may take a very long time. Continue?",
-            ):
-                return None
-
-        charset = self.charset_var.get().strip() or None
-        brute = self.brute_var.get() or bool(charset)
         try:
             min_l = int(self.min_len_var.get())
             max_l = int(self.max_len_var.get())
+            digits_only = int(self.digits_only_var.get() or "0")
         except ValueError:
-            messagebox.showerror("pdf-unlock", "Min/max length must be numbers.")
+            messagebox.showerror("pdf-unlock", "Length and digits fields must be numbers.")
+            return None
+        if min_l > max_l:
+            messagebox.showerror("pdf-unlock", "Min length cannot exceed max length.")
+            return None
+
+        brute = self.brute_var.get()
+        if not brute and not self.common_var.get() and not hints and not wordlist and digits_only <= 0:
+            messagebox.showerror("pdf-unlock", "Enable brute force or at least one optional mode.")
+            return None
+        if brute and not (
+            self.lower_var.get() or self.upper_var.get() or self.digits_var.get() or self.symbols_var.get()
+        ):
+            messagebox.showerror("pdf-unlock", "Select at least one character set for brute force.")
             return None
 
         return AttackOptions(
+            brute_force=brute,
+            use_lower=self.lower_var.get(),
+            use_upper=self.upper_var.get(),
+            use_digits=self.digits_var.get(),
+            use_symbols=self.symbols_var.get(),
+            min_length=min_l,
+            max_length=max_l,
             run_common=self.common_var.get(),
             hints=hints,
             wordlist=wordlist,
-            digits=digits,
-            charset=charset,
-            brute=brute,
-            min_length=min_l,
-            max_length=max_l,
+            digits_only=digits_only if digits_only > 0 else None,
         )
+
+    def _refresh_estimate(self) -> None:
+        pdf = self.pdf_var.get().strip()
+        if not self.brute_var.get():
+            self.estimate_var.set("Brute force off — optional modes only (no full ETA).")
+            return
+        if not pdf or not Path(pdf).is_file():
+            self.estimate_var.set("Select a PDF to estimate brute-force size and time.")
+            return
+        try:
+            qpdf_exe = require_qpdf()
+        except QpdfNotFoundError as exc:
+            self.estimate_var.set(str(exc))
+            return
+        try:
+            opts = AttackOptions(
+                brute_force=True,
+                use_lower=self.lower_var.get(),
+                use_upper=self.upper_var.get(),
+                use_digits=self.digits_var.get(),
+                use_symbols=self.symbols_var.get(),
+                min_length=int(self.min_len_var.get()),
+                max_length=int(self.max_len_var.get()),
+            )
+        except ValueError:
+            return
+        est = estimate_brute_search(opts, Path(pdf), qpdf_exe, benchmark=False)
+        self.estimate_var.set(
+            f"~{est.total_candidates:,} candidates  |  charset size {est.charset_size}  |  "
+            f"rough ETA at ~{est.passwords_per_sec:,.0f} pwd/s: {format_duration(est.eta_seconds)} "
+            f"(benchmark on Start for a tighter estimate)"
+        )
+
+    def _confirm_start(self, options: AttackOptions, pdf_path: Path, qpdf_exe: str) -> bool:
+        if not options.brute_force:
+            return True
+        est = estimate_brute_search(options, pdf_path, qpdf_exe, benchmark=True)
+        msg = (
+            f"Brute force: lengths {est.min_length}–{est.max_length}, "
+            f"{est.charset_size} characters\n"
+            f"Candidates: {est.total_candidates:,}\n"
+            f"Measured ~{est.passwords_per_sec:,.0f} passwords/sec on this PDF\n"
+            f"Estimated time if the password is in range: {format_duration(est.eta_seconds)}\n\n"
+        )
+        if est.max_length >= 8 and est.charset_size >= 62:
+            msg += (
+                "8+ character mixed case + digits (and especially with symbols) is often "
+                "years on one PC. Password-manager random strings may never finish.\n\n"
+            )
+        if est.eta_seconds > 86400 * 30:
+            msg += "This search is likely impractical on one machine.\n\n"
+        msg += "Start anyway? (You can Stop anytime; progress is saved for resume.)"
+        return messagebox.askyesno("pdf-unlock — confirm brute force", msg)
 
     def _start(self) -> None:
         pdf = self.pdf_var.get().strip()
@@ -169,9 +263,10 @@ class PdfUnlockApp(tk.Tk):
         options = self._collect_options()
         if options is None:
             return
-        phases = build_phases(options)
-        if not phases:
-            messagebox.showerror("pdf-unlock", "Enable at least one attack option.")
+        try:
+            phases = build_phases(options)
+        except ValueError as exc:
+            messagebox.showerror("pdf-unlock", str(exc))
             return
         try:
             qpdf_exe = require_qpdf()
@@ -179,20 +274,21 @@ class PdfUnlockApp(tk.Tk):
             messagebox.showerror("pdf-unlock", str(exc))
             return
 
+        pdf_path = Path(pdf).resolve()
+        if not self._confirm_start(options, pdf_path, qpdf_exe):
+            return
+
         self._stop_event.clear()
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.phase_var.set("Starting…")
+        self.last_display.set("")
 
-        pdf_path = Path(pdf).resolve()
         out_path = default_output_path(pdf_path)
 
         def work() -> None:
             def on_progress(u: ProgressUpdate) -> None:
-                self.after(
-                    0,
-                    lambda: self._update_progress(u),
-                )
+                self.after(0, lambda u=u: self._update_progress(u))
 
             password = run_attack(
                 pdf_path,
@@ -217,7 +313,7 @@ class PdfUnlockApp(tk.Tk):
         self.stats_var.set(
             f"Tried: {u.tried:,}  |  {u.rate:.1f} pwd/s  |  {format_eta(u.eta_seconds)}"
         )
-        self.last_var.set(f"Last: {u.last_password!r}")
+        self.last_display.set(u.last_password)
 
     def _stop(self) -> None:
         self._stop_event.set()
@@ -238,7 +334,7 @@ class PdfUnlockApp(tk.Tk):
                 messagebox.showinfo("pdf-unlock", "Stopped. Progress saved; run again to resume.")
             else:
                 self.phase_var.set("Not found")
-                messagebox.showwarning("pdf-unlock", "Password not found with these options.")
+                messagebox.showwarning("pdf-unlock", "Password not found within the selected search space.")
             return
         try:
             unlock_pdf(pdf_path, password, out_path, qpdf_exe)

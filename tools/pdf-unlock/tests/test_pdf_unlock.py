@@ -77,7 +77,7 @@ class PdfUnlockSelfTest(unittest.TestCase):
                     sys.executable,
                     str(CLI),
                     str(locked),
-                    "--no-common",
+                    "--no-brute",
                     "--wordlist",
                     str(wordlist),
                     "--no-resume",

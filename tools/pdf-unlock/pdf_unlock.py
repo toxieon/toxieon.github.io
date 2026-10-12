@@ -16,8 +16,9 @@ from core import (  # noqa: E402
     AttackOptions,
     ProgressUpdate,
     build_phases,
-    count_charset,
     default_output_path,
+    estimate_brute_search,
+    format_duration,
     format_eta,
     run_attack,
     state_path_for,
@@ -28,55 +29,61 @@ from qpdf_util import QpdfNotFoundError, require_qpdf  # noqa: E402
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Recover open passwords for PDFs you own (local CLI).",
+        description="Recover open passwords for PDFs you own (default: ordered brute force).",
     )
     p.add_argument("pdf", type=Path, help="Path to password-protected PDF")
+    p.add_argument("--no-brute", action="store_true", help="Disable default brute-force search")
+    p.add_argument("--no-lower", action="store_true", help="Exclude a-z from brute charset")
+    p.add_argument("--no-upper", action="store_true", help="Exclude A-Z from brute charset")
+    p.add_argument("--no-digit-chars", action="store_true", help="Exclude 0-9 from brute charset")
+    p.add_argument("--symbols", action="store_true", help="Include symbol charset in brute force")
+    p.add_argument("--charset", type=str, help="Custom brute charset (overrides checkboxes)")
+    p.add_argument("--min-length", type=int, default=1, help="Brute min length (default 1)")
+    p.add_argument("--max-length", type=int, default=8, help="Brute max length (default 8)")
     p.add_argument(
         "--hint",
         action="append",
         default=[],
         metavar="WORD",
-        help="Hint word(s); expands with case, leet, years 1990-2026, digits 0-999, !@#",
+        help="Optional: hint word(s) with mutations (secondary to brute)",
     )
-    p.add_argument("--wordlist", type=Path, help="Text file, one password per line")
+    p.add_argument("--wordlist", type=Path, help="Optional: wordlist file (one password per line)")
     p.add_argument(
         "--digits",
         type=int,
         nargs="?",
         const=6,
-        help="Brute numeric passwords 1..N digits (default N=6 if flag has no value)",
+        help="Optional: numeric-only brute 1..N digits",
     )
-    p.add_argument(
-        "--charset",
-        type=str,
-        help="Character set for length brute (with --min-length / --max-length)",
-    )
-    p.add_argument(
-        "--brute",
-        action="store_true",
-        help="Charset brute: lowercase+digits, lengths 1-5 unless overridden",
-    )
-    p.add_argument("--min-length", type=int, default=1, help="Min brute length (default 1)")
-    p.add_argument("--max-length", type=int, default=5, help="Max brute length (default 5)")
-    p.add_argument("--no-common", action="store_true", help="Skip empty/common password phase")
+    p.add_argument("--common", action="store_true", help="Optional: try empty/common passwords first")
     p.add_argument("-j", "--jobs", type=int, default=0, help="Worker processes (default: CPU count)")
     p.add_argument("--batch-size", type=int, default=64, help="Passwords per worker batch")
     p.add_argument("--no-resume", action="store_true", help="Ignore saved state and start fresh")
     p.add_argument("--clear-state", action="store_true", help="Delete state file before run")
     p.add_argument("-o", "--output", type=Path, help="Unlocked PDF (default: <stem>-unlocked.pdf)")
+    p.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for very large brute-force searches",
+    )
     return p.parse_args(argv)
 
 
 def args_to_options(args: argparse.Namespace) -> AttackOptions:
     return AttackOptions(
-        run_common=not args.no_common,
-        hints=list(args.hint),
-        wordlist=args.wordlist,
-        digits=args.digits,
-        charset=args.charset,
-        brute=args.brute,
+        brute_force=not args.no_brute,
+        use_lower=not args.no_lower,
+        use_upper=not args.no_upper,
+        use_digits=not args.no_digit_chars,
+        use_symbols=args.symbols,
+        custom_charset=args.charset,
         min_length=args.min_length,
         max_length=args.max_length,
+        run_common=args.common,
+        hints=list(args.hint),
+        wordlist=args.wordlist,
+        digits_only=args.digits,
     )
 
 
@@ -94,30 +101,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
 
     options = args_to_options(args)
-    if options.brute or options.charset:
-        total = count_charset(
-            options.charset or "abcdefghijklmnopqrstuvwxyz0123456789",
-            options.min_length,
-            options.max_length,
-        )
-        print(f"Charset search size: {total:,} candidates", file=sys.stderr)
-
-    if options.digits is not None and options.digits > 6:
-        total = sum(10**i for i in range(1, options.digits + 1))
-        print(
-            f"Warning: --digits {options.digits} tries up to {total:,} candidates; "
-            "this may take a long time.",
-            file=sys.stderr,
-        )
-
-    phases = build_phases(options)
-    if not phases:
-        print(
-            "No attack phases selected. Omit --no-common or add --hint / --wordlist / "
-            "--digits / --brute.",
-            file=sys.stderr,
-        )
+    try:
+        phases = build_phases(options)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
         return 1
+    if not phases:
+        print("No attack phases selected.", file=sys.stderr)
+        return 1
+
+    if options.brute_force and not args.yes:
+        est = estimate_brute_search(options, pdf_path, qpdf_exe, benchmark=True)
+        print(
+            f"Brute force: {est.total_candidates:,} candidates, "
+            f"charset {est.charset_size}, lengths {est.min_length}-{est.max_length}",
+            file=sys.stderr,
+        )
+        print(
+            f"~{est.passwords_per_sec:,.0f} pwd/s on this file → "
+            f"ETA {format_duration(est.eta_seconds)} if password is in range",
+            file=sys.stderr,
+        )
+        if est.max_length >= 8 and est.charset_size >= 62:
+            print(
+                "Warning: 8+ char mixed case+digits often takes years on one PC; "
+                "password-manager random strings may be impractical.",
+                file=sys.stderr,
+            )
+        if est.eta_seconds > 86400 * 7 and not args.yes:
+            print("Refusing huge search without -y / --yes.", file=sys.stderr)
+            return 1
 
     workers = args.jobs or os.cpu_count() or 4
     state_file = state_path_for(pdf_path)
@@ -125,7 +138,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"PDF: {pdf_path}")
     print(f"qpdf: {qpdf_exe}")
     print(f"Workers: {workers}  Batch size: {args.batch_size}")
-    print("For your own files only. Long or random passwords may be impractical to recover.")
+    print("Own files only. Stop anytime; resume uses the .unlock-state.json file.")
 
     def on_progress(update: ProgressUpdate) -> None:
         line = (

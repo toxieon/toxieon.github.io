@@ -1,112 +1,74 @@
 # pdf-unlock
 
-Local tool to recover **open (user) passwords** on PDFs you own when you forgot the password. It is not linked from the public site hub.
+Local tool to recover **open (user) passwords** on PDFs you own. Not linked from the public site hub.
 
-Password checks use the **[qpdf](https://github.com/qpdf/qpdf)** command-line tool (`qpdf --password=… --decrypt …`). Python handles orchestration, word generation, multiprocessing, resume state, CLI, and a small **tkinter** GUI.
+Password checks use **[qpdf](https://github.com/qpdf/qpdf)** (`qpdf --password=… --decrypt …`). Python orchestrates multiprocessing, resume state, CLI, and a **tkinter** GUI.
 
-**Honest expectations:** Long, random, or unique passwords may be impossible to recover in practical time. Use this only for your own files—short PINs, common passwords, or words you almost remember.
+**Default attack:** ordered **brute force** by increasing length — `a`, `b`, … `z`, `A`, … `Z`, `0`–`9`, optional symbols, then `aa`, `ab`, … (for password-manager style random strings). Dictionary, hints, and common passwords are **optional** secondary modes.
+
+**Honest expectations:** 8+ character mixed case + digits (and symbols) is often **years** on one PC. Truly random passwords may never finish. Use only on files you own.
 
 ## Requirements
 
-- **Python 3.10+** (tkinter included with most official installers)
-- **qpdf** on your `PATH`
+- **Python 3.10+** (tkinter on most installers)
+- **qpdf** on `PATH`
 
-### Install qpdf
-
-| Platform | Command |
+| Platform | Install |
 |----------|---------|
-| **Windows** | `winget install qpdf.qpdf` (or a [release build](https://github.com/qpdf/qpdf/releases)) |
-| **Linux (Debian/Ubuntu)** | `sudo apt install qpdf` |
-| **macOS** | `brew install qpdf` |
+| Windows | `winget install qpdf.qpdf` |
+| Linux | `sudo apt install qpdf` |
+| macOS | `brew install qpdf` |
 
-Optional: set `QPDF_PATH` to the full path of the `qpdf` executable if it is not on `PATH`.
+Optional: `QPDF_PATH` → full path to `qpdf`. No pip packages required.
 
-No pip packages are required (`requirements.txt` is documentation only).
+## Windows
 
-## Windows quick start
+1. Install Python + qpdf.
+2. `setup.bat` — verifies both (no heavy downloads).
+3. **GUI:** `unlock-gui.bat` (brute force on by default; confirm dialog shows ETA).
+4. **CLI:** `unlock.bat "file.pdf"` (large searches need `-y`).
 
-1. Install Python and qpdf (see above).
-2. Run `setup.bat` — verifies both are available (does not download heavy dependencies).
-3. **GUI:** double-click `unlock-gui.bat`
-4. **CLI:** drag a PDF onto `unlock.bat`, or:
-
-```bat
-unlock.bat "C:\path\to\locked.pdf" --hint YourWord
-```
-
-## macOS / Linux
-
-```bash
-cd tools/pdf-unlock
-python3 pdf_unlock.py /path/to/locked.pdf
-python3 pdf_unlock_gui.py   # desktop GUI
-```
-
-## CLI usage
+## CLI
 
 ```text
 python pdf_unlock.py <locked.pdf> [options]
 ```
 
-### Default pipeline
-
-With no extra flags, tries an **empty password** and a small **common password** list.
-
-### Attack modes
+**Defaults:** brute `a–z` + `A–Z` + `0–9`, lengths **1–8**. Prints benchmarked ETA; refuses week-scale+ searches unless `-y`.
 
 | Option | Description |
 |--------|-------------|
-| `--hint WORD` | Repeatable. Mutates: case, leet, years `1990`–`2026`, digits `0`–`999`, `!@#`. |
-| `--wordlist FILE` | One candidate per line. |
-| `--digits [N]` | Numeric strings length 1..`N` (default `N=6` if flag has no value). Warns if `N>6`. |
-| `--brute` | Charset brute: lowercase+digits, lengths 1–5 (override with `--min-length` / `--max-length`). |
-| `--charset STRING` | Custom charset + length bounds (implies charset brute). |
-| `--no-common` | Skip empty/common phase. |
+| `--no-brute` | Disable brute force |
+| `--no-lower` / `--no-upper` / `--no-digit-chars` | Trim charset |
+| `--symbols` | Add `!@#$…` to charset |
+| `--min-length` / `--max-length` | Length range (defaults 1 / 8) |
+| `--charset STRING` | Custom ordered charset |
+| `--common` | Optional: empty/common list first |
+| `--hint WORD` | Optional: mutated hints |
+| `--wordlist FILE` | Optional: dictionary |
+| `--digits [N]` | Optional: numeric-only 1..N |
+| `-y` | Confirm huge brute-force search |
 
-### Performance and resume
-
-- Uses all CPU cores (`-j N` to limit).
-- Live stats: passwords/sec, ETA (when search size is known), last candidate.
-- Resume file: `<file>.pdf.unlock-state.json` beside the PDF. `--no-resume` or `--clear-state` to reset.
-
-### Output
-
-On success, prints the password and writes `<stem>-unlocked.pdf` (or `-o path.pdf`) via `qpdf --decrypt`.
+Resume: `<file>.pdf.unlock-state.json`. Stop anytime; run again to continue.
 
 ## GUI
 
-`pdf_unlock_gui.py` (or `unlock-gui.bat` on Windows):
+`pdf_unlock_gui.py` / `unlock-gui.bat`:
 
-- Pick PDF, hints, wordlist, digits max, charset / min / max length
-- **Start** / **Stop** (stop keeps resume state)
-- Progress: tried/sec, ETA, last password
-- Success dialog with password and path to the unlocked file
-
-## Examples
-
-```bash
-python pdf_unlock.py report.pdf
-python pdf_unlock.py report.pdf --hint Neill --digits 4
-python pdf_unlock.py report.pdf --wordlist passwords.txt
-```
+- **Brute force** on by default with **a–z / A–Z / 0–9 / symbols** checkboxes and min→max length
+- Live **last password tried** (large monospace), passwords/sec, ETA
+- **Start** runs a quick benchmark and asks you to confirm if the search is large
+- Optional collapsible dictionary/hints/common (off by default)
+- **Stop** saves resume state
 
 ## Self-test
-
-Requires `qpdf` on PATH:
 
 ```bash
 python3 -m unittest tests/test_pdf_unlock.py -v
 ```
 
-Creates a disposable encrypted fixture in a temp directory (no secrets in the repo).
-
-## Distribution zip
-
-```bash
-chmod +x build-zip.sh
-./build-zip.sh
-```
+(requires `qpdf`; creates encrypted fixture in temp)
 
 ## Legal
 
-Use **only** on PDFs you own or may access. MIT licensed — see [LICENSE](LICENSE).
+Own files only. MIT — see [LICENSE](LICENSE).

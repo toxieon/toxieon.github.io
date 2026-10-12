@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import itertools
 import json
-import os
+import string
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Sequence
 
-from qpdf_util import decrypt_pdf
+from qpdf_util import decrypt_pdf, test_password
 from worker import try_batch
 
 COMMON_PASSWORDS: tuple[str, ...] = (
@@ -35,20 +35,31 @@ COMMON_PASSWORDS: tuple[str, ...] = (
     "secret",
 )
 
-DEFAULT_CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789"
+# Ordered for brute force: a-z, A-Z, 0-9, then symbols.
+SYMBOL_CHARSET = "!@#$%^&*()-_=+[]{}|;:,.<>?~`"
+
 STATE_VERSION = 1
+
+# Conservative guess before benchmark (password manager PDFs vary).
+FALLBACK_PASSWORDS_PER_SEC = 150.0
 
 
 @dataclass
 class AttackOptions:
-    run_common: bool = True
+    """Default: full brute force over increasing length (password-manager style)."""
+
+    brute_force: bool = True
+    use_lower: bool = True
+    use_upper: bool = True
+    use_digits: bool = True
+    use_symbols: bool = False
+    custom_charset: Optional[str] = None
+    min_length: int = 1
+    max_length: int = 8
+    run_common: bool = False
     hints: list[str] = field(default_factory=list)
     wordlist: Optional[Path] = None
-    digits: Optional[int] = None
-    charset: Optional[str] = None
-    brute: bool = False
-    min_length: int = 1
-    max_length: int = 5
+    digits_only: Optional[int] = None
 
 
 @dataclass
@@ -60,12 +71,43 @@ class ProgressUpdate:
     phase: str
 
 
+@dataclass
+class SearchEstimate:
+    total_candidates: int
+    passwords_per_sec: float
+    eta_seconds: float
+    charset_size: int
+    min_length: int
+    max_length: int
+
+
 ProgressCallback = Callable[[ProgressUpdate], None]
 ShouldStopCallback = Callable[[], bool]
 
 
 def state_path_for(pdf: Path) -> Path:
     return pdf.with_suffix(pdf.suffix + ".unlock-state.json")
+
+
+def compose_charset(
+    use_lower: bool = True,
+    use_upper: bool = True,
+    use_digits: bool = True,
+    use_symbols: bool = False,
+    custom: Optional[str] = None,
+) -> str:
+    if custom:
+        return custom
+    parts: list[str] = []
+    if use_lower:
+        parts.append(string.ascii_lowercase)
+    if use_upper:
+        parts.append(string.ascii_uppercase)
+    if use_digits:
+        parts.append(string.digits)
+    if use_symbols:
+        parts.append(SYMBOL_CHARSET)
+    return "".join(parts)
 
 
 def leet_variants(word: str) -> Iterator[str]:
@@ -129,6 +171,7 @@ def digit_passwords(max_digits: int) -> Iterator[str]:
 
 
 def charset_passwords(charset: str, min_len: int, max_len: int) -> Iterator[str]:
+    """Lexicographic product: a, b, … z, A, … (charset order defines climb)."""
     for length in range(min_len, max_len + 1):
         for combo in itertools.product(charset, repeat=length):
             yield "".join(combo)
@@ -151,7 +194,78 @@ def skip_iterator(it: Iterator[str], skip: int) -> Iterator[str]:
 
 def count_charset(charset: str, min_len: int, max_len: int) -> int:
     n = len(charset)
+    if n == 0:
+        return 0
     return sum(n**length for length in range(min_len, max_len + 1))
+
+
+def brute_charset_for_options(options: AttackOptions) -> str:
+    return compose_charset(
+        options.use_lower,
+        options.use_upper,
+        options.use_digits,
+        options.use_symbols,
+        options.custom_charset,
+    )
+
+
+def benchmark_password_rate(
+    pdf_path: Path,
+    qpdf_exe: str,
+    duration_sec: float = 0.75,
+) -> float:
+    """Measure wrong-password attempts/sec on this PDF (single-threaded)."""
+    charset = string.ascii_lowercase
+    deadline = time.monotonic() + duration_sec
+    attempts = 0
+    length = 1
+    idx = 0
+    while time.monotonic() < deadline:
+        pwd = charset[idx % len(charset)] * length
+        idx += 1
+        if idx % len(charset) == 0:
+            length = min(length + 1, 4)
+        test_password(pdf_path, pwd, qpdf_exe=qpdf_exe)
+        attempts += 1
+    elapsed = duration_sec if duration_sec > 0 else 1.0
+    rate = attempts / elapsed
+    cpus = max(1, __import__("os").cpu_count() or 1)
+    return max(rate * cpus * 0.85, 1.0)
+
+
+def estimate_brute_search(
+    options: AttackOptions,
+    pdf_path: Path,
+    qpdf_exe: str,
+    benchmark: bool = True,
+) -> SearchEstimate:
+    charset = brute_charset_for_options(options)
+    total = count_charset(charset, options.min_length, options.max_length)
+    if benchmark and pdf_path.is_file():
+        rate = benchmark_password_rate(pdf_path, qpdf_exe)
+    else:
+        rate = FALLBACK_PASSWORDS_PER_SEC * max(1, __import__("os").cpu_count() or 1)
+    eta = total / rate if rate > 0 else float("inf")
+    return SearchEstimate(
+        total_candidates=total,
+        passwords_per_sec=rate,
+        eta_seconds=eta,
+        charset_size=len(charset),
+        min_length=options.min_length,
+        max_length=options.max_length,
+    )
+
+
+def format_duration(seconds: float) -> str:
+    if seconds == float("inf") or seconds < 0:
+        return "unknown"
+    if seconds < 120:
+        return f"{seconds:.0f} seconds"
+    if seconds < 86400:
+        return f"{seconds / 3600:.1f} hours" if seconds >= 7200 else f"{seconds / 60:.1f} minutes"
+    if seconds < 86400 * 365:
+        return f"{seconds / 86400:.1f} days"
+    return f"{seconds / (86400 * 365):.1f} years"
 
 
 @dataclass
@@ -190,7 +304,9 @@ def format_eta(seconds: Optional[float]) -> str:
         return f"ETA: {seconds:.0f}s"
     if seconds < 7200:
         return f"ETA: {seconds / 60:.1f}m"
-    return f"ETA: {seconds / 3600:.1f}h"
+    if seconds < 86400 * 7:
+        return f"ETA: {seconds / 3600:.1f}h"
+    return f"ETA: {format_duration(seconds)}"
 
 
 def build_phases(options: AttackOptions) -> list[Phase]:
@@ -213,19 +329,20 @@ def build_phases(options: AttackOptions) -> list[Phase]:
 
         phases.append(Phase("wordlist", wl_iter))
 
-    if options.digits is not None:
-        n = options.digits
+    if options.digits_only is not None:
+        n = options.digits_only
         total = sum(10**i for i in range(1, n + 1))
         phases.append(Phase(f"digits-1-{n}", lambda: digit_passwords(n), total=total))
 
-    run_charset = bool(options.brute or options.charset is not None)
-    if run_charset:
-        charset = options.charset or DEFAULT_CHARSET
+    if options.brute_force:
+        charset = brute_charset_for_options(options)
+        if not charset:
+            raise ValueError("Brute force enabled but charset is empty (select at least one set).")
         min_l, max_l = options.min_length, options.max_length
         total = count_charset(charset, min_l, max_l)
         phases.append(
             Phase(
-                f"charset-{min_l}-{max_l}",
+                f"brute-{min_l}-{max_l}",
                 lambda c=charset, a=min_l, b=max_l: charset_passwords(c, a, b),
                 total=total,
             )
