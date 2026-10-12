@@ -68,3 +68,15 @@ test("existing polygon edges contribute to the wall mask", () => {
   const merged = A.detectRoomsFromRgba(data, w, h, { minAreaRatio: 0.02, existingPolygons: [poly] }).rooms.length;
   assert.ok(merged >= alone);
 });
+
+test("0.21.1: OCR is lazy (not in index.html or SW), pinned with SRI, and the icon stub has no UI", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
+  const html = read("index.html"), sw = read("sw.js"), app = read("app.js");
+  assert.doesNotMatch(html, /tesseract/i);
+  assert.doesNotMatch(sw, /tesseract|jsdelivr/i);
+  assert.match(app, /PLANNER_TESSERACT_SRI = "sha384-/);
+  assert.match(app, /tesseract\.js-core@5\.1\.1/);
+  assert.doesNotMatch(app, /detectPlanIcons/);
+  assert.match(sw, /k\.startsWith\('planner-'\)/);
+});

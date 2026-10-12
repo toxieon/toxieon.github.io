@@ -1,6 +1,6 @@
 /* Original floor-plan room auto-detection for Neill Planner.
  * Plan coordinates are percentages (0–100), matching manual room draw.
- * Apache-2.0-compatible; no proprietary CadCraft code. */
+ * Written from scratch for this app (Otsu threshold, wall mask, flood fill, RDP simplify); no third-party code. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;

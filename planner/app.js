@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.20.7";
+const APP_VERSION = "0.21.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -23,7 +23,15 @@ const DRIVE_PDF_MAX_BLOB_BYTES = 18 * 1024 * 1024;
 const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
 const DRIVE_PDF_HTML2CANVAS_SRC = "../shared/vendor/html2canvas-pro/html2canvas-pro.min.js"; // html2canvas-pro 2.5.0, MIT
 const DRIVE_PDF_JSPDF_SRC = "../shared/vendor/jspdf/jspdf.umd.min.js"; // jsPDF 2.5.1, MIT
-const PLANNER_TESSERACT_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; // Apache-2.0, lazy-loaded (see vendor/tesseract/LICENSE.txt)
+// Tesseract.js OCR — Apache-2.0, loaded only when Auto rooms runs with OCR on (see vendor/tesseract/LICENSE.txt).
+const PLANNER_TESSERACT_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+const PLANNER_TESSERACT_SRI = "sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F";
+const PLANNER_TESSERACT_PATHS = {
+  workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+  corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+  langPath: "https://tessdata.projectnaptha.com/4.0.0"
+};
+const PLANNER_OCR_TIMEOUT_MS = 90000;
 let _drivePdfBusy = false;
 let _downloadPdf = null;
 
@@ -676,11 +684,19 @@ async function loadPlanImageData(floor) {
 }
 
 async function runPlanOcr(dataUrl, meta) {
-  if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC);
-  if (!window.Tesseract) throw new Error("OCR library unavailable");
-  const worker = await Tesseract.createWorker("eng", 1, { logger: () => {} });
-  const { data } = await worker.recognize(dataUrl);
-  await worker.terminate();
+  if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("offline");
+  let worker = null;
+  const work = (async () => {
+    if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC, PLANNER_TESSERACT_SRI);
+    if (!window.Tesseract) throw new Error("OCR library unavailable");
+    worker = await Tesseract.createWorker("eng", 1, Object.assign({ logger: () => {} }, PLANNER_TESSERACT_PATHS));
+    return (await worker.recognize(dataUrl)).data;
+  })();
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("OCR timed out")), PLANNER_OCR_TIMEOUT_MS); });
+  let data;
+  try { data = await Promise.race([work, timeout]); }
+  finally { clearTimeout(timer); if (worker) worker.terminate().catch(() => {}); else work.then(() => worker && worker.terminate()).catch(() => {}); }
   const sw = meta.sourceWidth || meta.width;
   const sh = meta.sourceHeight || meta.height;
   return (data.words || []).map((w) => {
@@ -721,16 +737,14 @@ async function startAutoRooms() {
         ocrNote = named ? `OCR applied ${named} label(s). Check spelling before saving.` : "OCR did not find reliable room numbers — edit names below.";
       } catch (e) {
         console.warn("Plan OCR", e);
-        ocrNote = "OCR skipped (network or library). Edit names manually.";
+        ocrNote = e && e.message === "offline" ? "OCR needs a connection — edit names below." : "OCR skipped (network or library). Edit names manually.";
       }
     }
-    const icons = NDPlannerRoomAuto.detectPlanIcons();
     state.modal = {
       mode: "auto-rooms",
       loading: false,
       candidates,
       ocrNote,
-      icons,
       floorId: floor.id,
       meta: detected.meta,
       useOcr: state.modal.useOcr !== false
@@ -768,14 +782,12 @@ function renderAutoRoomsModal() {
       <input type="text" class="auto-room-name" data-auto-room-name="${i}" value="${escapeHtml(c.name || "")}" placeholder="Room name" aria-label="Room ${i + 1} name" />
       <span class="auto-room-area" title="Relative size on plan">${Math.round(c.areaPlan || 0)}</span>
     </div>`).join("");
-  const iconNote = m.icons?.message ? `<p class="summary-hint">${escapeHtml(m.icons.message)}</p>` : "";
   return `<div class="modal-backdrop" data-action="auto-rooms-cancel"></div><form class="modal auto-rooms-modal" id="autoRoomsForm" role="dialog">
     <div class="modal-header"><div><h3>Auto rooms preview</h3><p>${escapeHtml(currentFloor()?.name || "")} · ${count} selected · ${escapeHtml(m.ocrNote || "")}</p></div><button type="button" class="icon-button" data-action="auto-rooms-cancel">${icon("close")}</button></div>
     <div class="modal-body auto-rooms-body">
       <p class="summary-hint">Review detected outlines on the plan. Uncheck false positives, fix names, then Add rooms. Accuracy varies with scan quality, open doors and furniture.</p>
       <label class="ps-toggle"><input type="checkbox" name="useOcr" ${m.useOcr !== false ? "checked" : ""} data-auto-rooms-ocr><span>Read room numbers from plan (OCR, first run downloads ~2&nbsp;MB)</span></label>
       ${rows || `<div class="empty-state">No rooms detected on this plan.</div>`}
-      ${iconNote}
     </div>
     <div class="modal-actions"><button type="button" class="ghost-button" data-action="auto-rooms-cancel">Cancel</button><button type="submit" class="primary-button" ${count ? "" : "disabled"}>${icon("check")}Add ${count || ""} room${count === 1 ? "" : "s"}</button></div>
   </form>`;
@@ -6236,7 +6248,7 @@ async function uploadPhotosToNode(nodeId, files, options = {}) {
  * Browser Print remains the full-fidelity path; Drive PDF caps photos/pages.
  * ======================================================================= */
 
-function loadScriptOnce(src) {
+function loadScriptOnce(src, integrity) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[data-np-cdn="${src}"]`);
     if (existing) {
@@ -6248,6 +6260,7 @@ function loadScriptOnce(src) {
     const s = document.createElement("script");
     s.src = src;
     s.async = true;
+    if (integrity) { s.integrity = integrity; s.crossOrigin = "anonymous"; }
     s.dataset.npCdn = src;
     s.onload = () => { s.dataset.loaded = "1"; resolve(); };
     s.onerror = () => { s.remove(); reject(new Error("Failed to load " + src + ". Check your connection and retry.")); };
