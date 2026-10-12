@@ -1,0 +1,4 @@
+Tesseract.js (lazy-loaded from jsDelivr when Auto rooms OCR runs)
+https://github.com/naptha/tesseract.js — Apache License 2.0
+
+English language data is fetched by the library on first use (also Apache-2.0 via tessdata).

@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.20.6";
+const APP_VERSION = "0.20.7";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -23,6 +23,7 @@ const DRIVE_PDF_MAX_BLOB_BYTES = 18 * 1024 * 1024;
 const DRIVE_PDF_EXPORTS_FOLDER = "Exports";
 const DRIVE_PDF_HTML2CANVAS_SRC = "../shared/vendor/html2canvas-pro/html2canvas-pro.min.js"; // html2canvas-pro 2.5.0, MIT
 const DRIVE_PDF_JSPDF_SRC = "../shared/vendor/jspdf/jspdf.umd.min.js"; // jsPDF 2.5.1, MIT
+const PLANNER_TESSERACT_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; // Apache-2.0, lazy-loaded (see vendor/tesseract/LICENSE.txt)
 let _drivePdfBusy = false;
 let _downloadPdf = null;
 
@@ -642,6 +643,213 @@ function openRoomExport() {
     loadPdf: async () => { if (!window.jspdf?.jsPDF) await loadScriptOnce(DRIVE_PDF_JSPDF_SRC); if (!window.jspdf?.jsPDF) throw new Error("PDF library unavailable"); return window.jspdf.jsPDF; }
   });
 }
+
+async function floorPlanImageForAnalysis(floor) {
+  if (state.floorPlans[floor.id]?.startsWith("data:image/")) return state.floorPlans[floor.id];
+  try {
+    const pdf = await planPdfSource(floor);
+    if (pdf) return await pdfFirstPageToPng(pdf);
+  } catch (e) { console.warn("Auto rooms plan PDF", e); }
+  for (const id of [floor.planDriveFileId, floor.planPngFileId].filter(Boolean)) {
+    try {
+      const source = await fetchDriveFileAsDataUrl(id);
+      if (source?.startsWith("data:application/pdf")) return await pdfFirstPageToPng(source);
+      if (source?.startsWith("data:image/")) return source;
+    } catch (e) { console.warn("Auto rooms Drive fetch", e); }
+  }
+  throw new Error("Plan image unavailable");
+}
+
+async function loadPlanImageData(floor) {
+  const src = await floorPlanImageForAnalysis(floor);
+  const img = new Image();
+  await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = src; });
+  const width = img.naturalWidth || img.width;
+  const height = img.naturalHeight || img.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  return { data: imageData.data, width, height, dataUrl: src };
+}
+
+async function runPlanOcr(dataUrl, meta) {
+  if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC);
+  if (!window.Tesseract) throw new Error("OCR library unavailable");
+  const worker = await Tesseract.createWorker("eng", 1, { logger: () => {} });
+  const { data } = await worker.recognize(dataUrl);
+  await worker.terminate();
+  const sw = meta.sourceWidth || meta.width;
+  const sh = meta.sourceHeight || meta.height;
+  return (data.words || []).map((w) => {
+    const b = w.bbox || {};
+    return {
+      text: w.text,
+      x: ((b.x0 + b.x1) / 2 / sw) * 100,
+      y: ((b.y0 + b.y1) / 2 / sh) * 100,
+      confidence: w.confidence
+    };
+  }).filter((w) => w.text && Number.isFinite(w.x) && (w.confidence ?? 0) >= 35);
+}
+
+async function startAutoRooms() {
+  const floor = currentFloor();
+  const proj = project();
+  if (!floor || !proj) return;
+  if (!window.NDPlannerRoomAuto) { toast("Auto rooms module missing"); return; }
+  if (!(state.floorPlans[floor.id] || floor.planDriveFileId)) { toast("Upload a plan first"); return; }
+  if (state.roomDraw?.mode) clearRoomDraw();
+  state.modal = { mode: "auto-rooms", loading: true, candidates: [], useOcr: true, floorId: floor.id };
+  render();
+  try {
+    const { data, width, height, dataUrl } = await loadPlanImageData(floor);
+    const existing = floorRooms(floor.id).map((r) => parseRoomShape(r.shape)?.pts).filter(Boolean);
+    const detected = NDPlannerRoomAuto.detectRoomsFromRgba(data, width, height, { existingPolygons: existing });
+    let candidates = detected.rooms.map((r, i) => ({
+      ...r,
+      name: r.name || NDPlannerRoomAuto.defaultRoomName(i),
+      selected: true
+    }));
+    let ocrNote = "OCR off.";
+    if (state.modal.useOcr !== false) {
+      try {
+        const words = await runPlanOcr(dataUrl, detected.meta);
+        candidates = NDPlannerRoomAuto.assignOcrLabels(candidates, words);
+        const named = candidates.filter((c) => c.name && !/^Room \d+$/i.test(c.name)).length;
+        ocrNote = named ? `OCR applied ${named} label(s). Check spelling before saving.` : "OCR did not find reliable room numbers — edit names below.";
+      } catch (e) {
+        console.warn("Plan OCR", e);
+        ocrNote = "OCR skipped (network or library). Edit names manually.";
+      }
+    }
+    const icons = NDPlannerRoomAuto.detectPlanIcons();
+    state.modal = {
+      mode: "auto-rooms",
+      loading: false,
+      candidates,
+      ocrNote,
+      icons,
+      floorId: floor.id,
+      meta: detected.meta,
+      useOcr: state.modal.useOcr !== false
+    };
+    if (!candidates.length) toast("No closed rooms detected — try a clearer scan or draw rooms manually.");
+    render();
+  } catch (e) {
+    console.warn("Auto rooms", e);
+    state.modal = null;
+    render();
+    toast("Could not analyse this plan. Reload the plan or upload PNG/PDF.");
+  }
+}
+
+function renderAutoRoomPreview(candidates) {
+  const polys = (candidates || []).filter((c) => c.selected !== false).map((c) => {
+    const pts = (c.points || []).map(([x, y]) => `${x},${y}`).join(" ");
+    const cx = c.centroid?.[0] ?? 50;
+    const cy = c.centroid?.[1] ?? 50;
+    return `<g class="room-poly is-auto-preview"><polygon points="${pts}"></polygon><text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(c.name || "?")}</text></g>`;
+  }).join("");
+  if (!polys) return "";
+  return `<svg class="room-overlay room-overlay--auto-preview" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${polys}</svg>`;
+}
+
+function renderAutoRoomsModal() {
+  const m = state.modal;
+  if (m.loading) {
+    return `<div class="modal-backdrop"></div><div class="modal auto-rooms-modal" role="dialog" aria-busy="true"><div class="modal-header"><div><h3>Auto rooms</h3><p>Analysing floor plan…</p></div></div><div class="modal-body">${renderLoadingOverlay("Detecting walls and spaces")}</div></div>`;
+  }
+  const count = (m.candidates || []).filter((c) => c.selected !== false).length;
+  const rows = (m.candidates || []).map((c, i) => `
+    <div class="auto-room-row">
+      <label class="auto-room-check"><input type="checkbox" data-auto-room-idx="${i}" ${c.selected !== false ? "checked" : ""}><span>Include</span></label>
+      <input type="text" class="auto-room-name" data-auto-room-name="${i}" value="${escapeHtml(c.name || "")}" placeholder="Room name" aria-label="Room ${i + 1} name" />
+      <span class="auto-room-area" title="Relative size on plan">${Math.round(c.areaPlan || 0)}</span>
+    </div>`).join("");
+  const iconNote = m.icons?.message ? `<p class="summary-hint">${escapeHtml(m.icons.message)}</p>` : "";
+  return `<div class="modal-backdrop" data-action="auto-rooms-cancel"></div><form class="modal auto-rooms-modal" id="autoRoomsForm" role="dialog">
+    <div class="modal-header"><div><h3>Auto rooms preview</h3><p>${escapeHtml(currentFloor()?.name || "")} · ${count} selected · ${escapeHtml(m.ocrNote || "")}</p></div><button type="button" class="icon-button" data-action="auto-rooms-cancel">${icon("close")}</button></div>
+    <div class="modal-body auto-rooms-body">
+      <p class="summary-hint">Review detected outlines on the plan. Uncheck false positives, fix names, then Add rooms. Accuracy varies with scan quality, open doors and furniture.</p>
+      <label class="ps-toggle"><input type="checkbox" name="useOcr" ${m.useOcr !== false ? "checked" : ""} data-auto-rooms-ocr><span>Read room numbers from plan (OCR, first run downloads ~2&nbsp;MB)</span></label>
+      ${rows || `<div class="empty-state">No rooms detected on this plan.</div>`}
+      ${iconNote}
+    </div>
+    <div class="modal-actions"><button type="button" class="ghost-button" data-action="auto-rooms-cancel">Cancel</button><button type="submit" class="primary-button" ${count ? "" : "disabled"}>${icon("check")}Add ${count || ""} room${count === 1 ? "" : "s"}</button></div>
+  </form>`;
+}
+
+function syncAutoRoomsModalFromDom() {
+  const m = state.modal;
+  if (!m || m.mode !== "auto-rooms" || !m.candidates) return;
+  m.candidates.forEach((c, i) => {
+    const chk = document.querySelector(`[data-auto-room-idx="${i}"]`);
+    const name = document.querySelector(`[data-auto-room-name="${i}"]`);
+    if (chk) c.selected = chk.checked;
+    if (name) c.name = name.value.trim();
+  });
+  const ocr = document.querySelector("[data-auto-rooms-ocr]");
+  if (ocr) m.useOcr = ocr.checked;
+}
+
+function commitAutoRooms(event) {
+  event?.preventDefault();
+  const m = state.modal;
+  if (!m || m.mode !== "auto-rooms") return;
+  syncAutoRoomsModalFromDom();
+  const floor = currentFloor();
+  const proj = project();
+  if (!floor || !proj) return;
+  const picked = (m.candidates || []).filter((c) => c.selected !== false && c.points?.length >= 3);
+  if (!picked.length) { toast("Select at least one detected room"); return; }
+  const createdRooms = [];
+  const createdPins = [];
+  let order = floorRooms(floor.id).reduce((mx, r) => Math.max(mx, r.order || 0), -1) + 1;
+  const author = state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local";
+  picked.forEach((c, idx) => {
+    const name = (c.name || NDPlannerRoomAuto.defaultRoomName(idx)).trim() || NDPlannerRoomAuto.defaultRoomName(idx);
+    const room = {
+      id: uid("room"), projectId: proj.id, floorId: floor.id, name, order: order++,
+      shape: { type: "poly", pts: c.points.map((p) => [...p]) },
+      createdAt: nowStamp(), updatedAt: nowStamp()
+    };
+    state.rooms.push(room);
+    createdRooms.push(room);
+    const [x, y] = c.centroid || [50, 50];
+    const pin = {
+      id: uid("node"), projectId: proj.id, floorId: floor.id, type: "title",
+      category: "", lineItem: "", customTitle: name, status: "Complete",
+      roomId: room.id, linkedRoomId: room.id, assignedTo: "", tags: [], description: "",
+      position: { x: Number(x), y: Number(y) }, size: 1,
+      createdBy: author, createdAt: nowStamp(), updatedAt: nowStamp(), imageRefs: [], comments: []
+    };
+    state.nodes.push(pin);
+    createdPins.push(pin);
+    reassignRoomNodes(room);
+  });
+  if (proj && !proj.showRooms) proj.showRooms = true;
+  state.modal = null;
+  persist();
+  render();
+  toast(`Added ${createdRooms.length} room(s) from plan`);
+  const roomIds = createdRooms.map((r) => r.id);
+  const pinIds = createdPins.map((n) => n.id);
+  undoableDelete(`Added ${createdRooms.length} auto-detected room(s)`, {
+    undo: () => {
+      state.rooms = state.rooms.filter((r) => !roomIds.includes(r.id));
+      state.nodes = state.nodes.filter((n) => !pinIds.includes(n.id));
+      createdRooms.forEach((room) => {
+        state.nodes.forEach((n) => { if (n.roomId === room.id) n.roomId = null; });
+      });
+    },
+    commit: () => {
+      createdRooms.forEach((room) => logAudit("Room Created", { projectId: room.projectId, floorId: room.floorId, details: `${room.name} (auto-detect)` }));
+    }
+  });
+}
+
 function finishRoomDraw() {
   const draw = state.roomDraw || {};
   let pts = (draw.points || []).map((p) => [...p]);
@@ -2992,7 +3200,7 @@ function renderMapView() {
           <button class="room-chip ${state.selectedRoomId === "all" ? "is-active" : ""}" data-room="all">All rooms <span>${allFloorNodes.length}</span></button>
           ${rooms.map((r) => `<button class="room-chip ${state.selectedRoomId === r.id ? "is-active" : ""}" data-room="${r.id}">${escapeHtml(r.name)} <span>${state.nodes.filter((n) => n.roomId === r.id).length}</span>${parseRoomShape(r.shape) ? '<span class="room-chip-shape" title="Has plan shape">◇</span>' : ""}</button>`).join("")}
           <button class="room-chip room-chip--add" data-action="new-room">${icon("plus")}Room</button>
-          ${hasPlan ? `<button class="room-chip ${state.roomDraw?.mode === "poly" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-poly" title="Draw polygon room">${icon("edit")}Draw</button><button class="room-chip ${state.roomDraw?.mode === "rect" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-rect" title="Draw rectangle room">${icon("plus")}Rect</button>` : ""}
+          ${hasPlan ? `<button class="room-chip" data-action="auto-rooms" title="Detect rooms from plan walls">${icon("layers")}Auto rooms</button><button class="room-chip ${state.roomDraw?.mode === "poly" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-poly" title="Draw polygon room">${icon("edit")}Draw</button><button class="room-chip ${state.roomDraw?.mode === "rect" && !state.roomDraw?.roomId ? "is-active" : ""}" data-action="draw-room-rect" title="Draw rectangle room">${icon("plus")}Rect</button>` : ""}
           ${state.selectedRoomId !== "all" ? `<button class="room-chip" data-action="rename-room">${icon("edit")}Rename</button>${hasPlan ? `<button class="room-chip" data-action="edit-room-shape" title="Edit room shape on plan">${icon("layers")}Edit shape</button>` : ""}<button class="room-chip room-chip--danger" data-action="delete-room">${icon("trash")}Delete</button>` : ""}
         </div>` : ""}
         <div class="map-toolbar">
@@ -3011,7 +3219,7 @@ function renderMapView() {
         <div class="canvas-shell">
           <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""} ${osdFloorReady(floor) ? "is-osd" : ""}" id="canvasViewport">
             <div class="plan-stage ${osdFloorReady(floor) ? "is-osd" : ""}" id="planStage" style="--plan-ar:${planAspect}">
-              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
+              ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.modal?.mode === "auto-rooms" && state.modal.candidates?.length ? renderAutoRoomPreview(state.modal.candidates) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
@@ -3138,6 +3346,8 @@ function renderPlanSettings(floor) {
     <label class="ps-toggle"><input type="checkbox" data-plan-set="grid" ${floor.planGrid ? "checked" : ""}><span>Grid overlay</span></label>
     <label class="ps-toggle"><input type="checkbox" data-plan-set="lock" ${state.ui.planLocked ? "checked" : ""}><span>Lock plan — place / move nodes without panning</span></label>
     <h3 class="section-title">Rooms</h3>
+    <button type="button" class="ghost-button" data-action="auto-rooms" style="width:100%;justify-content:center;margin-bottom:10px">${icon("layers")}Auto rooms</button>
+    <p class="summary-hint" style="margin-top:0">Detect closed spaces from the plan image (and any drawn room walls). Preview before saving; undo after commit.</p>
     <label class="ps-toggle"><input type="checkbox" data-room-pref="titles" ${state.ui.roomTitlesVisible !== false ? "checked" : ""}><span>Show room titles (off keeps the pins)</span></label>
     <label class="ps-toggle"><input type="checkbox" data-room-pref="snap" ${state.ui.roomSnap !== false ? "checked" : ""}><span>Snap to nearby room walls</span></label>
     <div class="ps-field"><label for="room-opacity-master">All room opacity <span class="ps-val">${Math.round((state.ui.roomOpacity ?? 1) * 100)}%</span></label><input id="room-opacity-master" type="range" min="0" max="100" step="1" value="${Math.round((state.ui.roomOpacity ?? 1) * 100)}" data-room-pref="opacity"></div>
@@ -3772,6 +3982,7 @@ function renderModal() {
   if (m.mode === "portal-create") return renderPortalCreateModal();
   if (m.mode === "add-floor" || m.mode === "rename-floor") return renderFloorModal();
   if (m.mode === "new-room" || m.mode === "rename-room") return renderRoomModal();
+  if (m.mode === "auto-rooms") return renderAutoRoomsModal();
   if (m.mode === "bulk-photo-picker") return renderBulkPhotoPickerModal();
   if (m.mode === "help") return renderHelpModal();
   if (m.mode === "camera") return renderPlannerCamera();
@@ -4250,6 +4461,14 @@ function bindEvents() {
   const portalForm = document.getElementById("portalForm"); if (portalForm) portalForm.addEventListener("submit", handlePortalForm);
   const floorForm = document.getElementById("floorForm"); if (floorForm) floorForm.addEventListener("submit", handleFloorForm);
   const roomForm = document.getElementById("roomForm"); if (roomForm) roomForm.addEventListener("submit", handleRoomForm);
+  const autoRoomsForm = document.getElementById("autoRoomsForm");
+  if (autoRoomsForm) {
+    autoRoomsForm.addEventListener("submit", commitAutoRooms);
+    autoRoomsForm.querySelectorAll("[data-auto-room-idx],[data-auto-room-name],[data-auto-rooms-ocr]").forEach((el) => {
+      el.addEventListener("change", () => { syncAutoRoomsModalFromDom(); render(); });
+      el.addEventListener("input", () => { syncAutoRoomsModalFromDom(); });
+    });
+  }
   bindCanvasEvents();
   bindMarkerDrag();
 }
@@ -4416,6 +4635,8 @@ function handleAction(event) {
     case "new-room": state.modal = { mode: "new-room" }; return render();
     case "rename-room": if (state.selectedRoomId === "all") return; state.modal = { mode: "rename-room", roomId: state.selectedRoomId }; return render();
     case "delete-room": return deleteSelectedRoom();
+    case "auto-rooms": return startAutoRooms();
+    case "auto-rooms-cancel": state.modal = null; return render();
     case "draw-room-poly": return startRoomDraw("poly");
     case "draw-room-rect": return startRoomDraw("rect");
     case "edit-room-shape": if (state.selectedRoomId === "all") return; return startRoomDraw("poly", state.selectedRoomId);
