@@ -85,30 +85,58 @@
     return { headerOverlap, fixedCount: fixed.length };
   }
 
+  let captureScrollState = null;
+
+  function pickPrimaryScroller() {
+    const docH = document.documentElement.scrollHeight;
+    const inner = findInnerScrollContainers();
+    for (const info of inner) {
+      const el = document.querySelector(info.selector);
+      if (!el) continue;
+      if (info.scrollHeight > docH * 1.08 && info.scrollHeight > info.clientHeight + 80) {
+        return { mode: 'element', selector: info.selector, el };
+      }
+    }
+    const moodleMain = document.querySelector('#region-main, .region-main, [role="main"]');
+    if (moodleMain && isScrollable(moodleMain) && moodleMain.scrollHeight > window.innerHeight + 80) {
+      return { mode: 'element', selector: cssPath(moodleMain), el: moodleMain };
+    }
+    return { mode: 'window', selector: null, el: null };
+  }
+
   function getPageMetrics() {
     const doc = document.documentElement;
     const body = document.body;
-    const width = Math.max(
+    const scroller = pickPrimaryScroller();
+    let width = Math.max(
       doc.scrollWidth,
       body ? body.scrollWidth : 0,
       doc.clientWidth,
       window.innerWidth
     );
-    const height = Math.max(
+    let height = Math.max(
       doc.scrollHeight,
       body ? body.scrollHeight : 0,
       doc.clientHeight,
       window.innerHeight
     );
+    let viewportHeight = window.innerHeight;
+    if (scroller.mode === 'element' && scroller.el) {
+      height = Math.max(height, scroller.el.scrollHeight);
+      width = Math.max(width, scroller.el.scrollWidth, scroller.el.clientWidth);
+      viewportHeight = Math.min(window.innerHeight, scroller.el.clientHeight || window.innerHeight);
+    }
     const sticky = collectStickyMeta();
     return {
       width,
       height,
       viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
+      viewportHeight,
       devicePixelRatio: getDevicePixelRatio(),
       scrollX: window.scrollX,
       scrollY: window.scrollY,
+      scrollMode: scroller.mode,
+      scrollSelector: scroller.selector,
       sticky,
       innerScrolls: findInnerScrollContainers(),
       title: document.title,
@@ -151,14 +179,39 @@
   async function prepareForCapture(options = {}) {
     document.documentElement.style.scrollBehavior = 'auto';
     if (document.body) document.body.style.scrollBehavior = 'auto';
-    if (options.expandLazy) {
-      return expandLazyContent(options);
+    captureScrollState = {
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      element: null,
+      elementTop: 0,
+    };
+    const metrics = options.expandLazy ? await expandLazyContent(options) : getPageMetrics();
+    if (metrics.scrollMode === 'element' && metrics.scrollSelector) {
+      const el = document.querySelector(metrics.scrollSelector);
+      if (el) {
+        captureScrollState.element = el;
+        captureScrollState.elementTop = el.scrollTop;
+        window.scrollTo(0, 0);
+      }
     }
     return getPageMetrics();
   }
 
   function scrollToY(y) {
-    window.scrollTo(0, y);
+    if (captureScrollState?.element) {
+      captureScrollState.element.scrollTop = y;
+      window.scrollTo(captureScrollState.windowX, 0);
+      return;
+    }
+    window.scrollTo(captureScrollState?.windowX ?? window.scrollX, y);
+  }
+
+  function restoreScrollPosition() {
+    if (captureScrollState?.element) {
+      captureScrollState.element.scrollTop = captureScrollState.elementTop;
+    }
+    window.scrollTo(captureScrollState?.windowX ?? 0, captureScrollState?.windowY ?? 0);
+    captureScrollState = null;
   }
 
   function buildScrollPlan(metrics, overlapPx = 80) {
@@ -358,6 +411,7 @@
     prepareForCapture,
     buildScrollPlan,
     scrollToY,
+    restoreScrollPosition,
     reconstructHtml,
     findPaginationLinks,
     expandLazyContent,

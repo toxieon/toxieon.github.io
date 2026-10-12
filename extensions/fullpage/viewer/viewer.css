@@ -76,6 +76,11 @@ body {
   color: var(--danger);
 }
 
+.tool.primary-tool:not(:disabled) {
+  background: #f1f3f4;
+  color: #202124;
+}
+
 .tool .label {
   display: none;
 }

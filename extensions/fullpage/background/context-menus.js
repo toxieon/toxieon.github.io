@@ -37,6 +37,14 @@ export function registerContextMenus() {
   });
 }
 
+export function registerContextMenusSafe() {
+  try {
+    registerContextMenus();
+  } catch (err) {
+    console.warn('Context menu registration:', err);
+  }
+}
+
 export function menuIdToKind(id) {
   if (id === MENU.reconstruct) return 'reconstruct';
   if (id === MENU.fullscan) return 'fullscan';

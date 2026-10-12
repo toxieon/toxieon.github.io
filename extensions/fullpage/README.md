@@ -1,10 +1,10 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.2.0** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only).
+Version **0.2.1** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only).
 
 ## UX (GoFullPage-style core + our extras)
 
-- **One-click toolbar** — click the extension icon to start capture (default: full-page image). In-page **progress bar** while scrolling/stitching.
+- **One-click toolbar** — click the extension icon to start capture (default: full-page image). GoFullPage-style **progress popup** with segmented bar (plus optional in-page overlay).
 - **Result tab** — preview on a gray stage with toolbar: **Edit** (annotate PNG), **PDF**, **Download**, **History**, **Delete**, **Settings**.
 - **Right-click toolbar icon** — Reconstruct, Full scan, more options popup, history, settings.
 - **Extras** — searchable HTML reconstruct, multi-page full scan, and text search in the viewer for HTML captures.
@@ -43,7 +43,7 @@ From the repository root (Git Bash or WSL on Windows):
 bash extensions/fullpage/scripts/build-zip.sh
 ```
 
-The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.0.zip`.
+The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.1.zip`.
 
 ## Manual test pages
 
@@ -68,7 +68,14 @@ Then visit `http://localhost:4173/long-page.html` and run captures from the popu
 - `offscreen/` — canvas stitch + PDF generation (jsPDF, MIT)
 - `viewer/` — preview, search, downloads, local history
 
-## Known limitations (0.2.0)
+Optional extension E2E (Puppeteer + unpacked extension):
+
+```bash
+npx puppeteer@23 browsers install chrome
+node extensions/fullpage/scripts/extension-e2e.mjs
+```
+
+## Known limitations (0.2.1)
 
 - Cross-origin stylesheets blocked by the page may not fully inline; a `<link>` fallback is kept when rules are unreadable.
 - Cross-origin images without CORS may remain external URLs in reconstruct mode.

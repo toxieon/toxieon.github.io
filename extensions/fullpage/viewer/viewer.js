@@ -21,6 +21,8 @@ const els = {
   btnDelete: document.getElementById('btn-delete'),
   btnHistory: document.getElementById('btn-history'),
   btnSettings: document.getElementById('btn-settings'),
+  btnSearch: document.getElementById('btn-search'),
+  btnReconstruct: document.getElementById('btn-reconstruct'),
   editBar: document.getElementById('edit-bar'),
   extrasBar: document.getElementById('extras-bar'),
   drawer: document.getElementById('history-drawer'),
@@ -181,6 +183,27 @@ els.btnHistory.addEventListener('click', openHistory);
 els.btnCloseHistory.addEventListener('click', closeHistory);
 els.backdrop.addEventListener('click', closeHistory);
 els.btnSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+els.btnSearch.addEventListener('click', () => {
+  els.extrasBar.hidden = false;
+  els.search.focus();
+  els.search.select();
+});
+
+els.btnReconstruct.addEventListener('click', async () => {
+  if (!currentRecord?.url) {
+    alert('No source URL for this capture.');
+    return;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  const resp = await chrome.runtime.sendMessage({
+    type: 'FULLPAGE_CAPTURE',
+    kind: 'reconstruct',
+    options: { tabId: tab.id },
+  });
+  if (!resp?.ok) alert(resp?.error || 'Reconstruct failed');
+});
 
 els.btnDelete.addEventListener('click', async () => {
   if (!currentId) return;

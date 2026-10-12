@@ -13,8 +13,14 @@
         <span class="brand-name">Full Page Capture</span>
       </div>
       <nav class="toolbar" aria-label="Capture actions">
-        <button type="button" id="btn-edit" class="tool" title="Edit / annotate" disabled>
+        <button type="button" id="btn-edit" class="tool primary-tool" title="Edit / annotate" disabled>
           <span class="icon" aria-hidden="true">✎</span><span class="label">Edit</span>
+        </button>
+        <button type="button" id="btn-search" class="tool" title="Search snapshot">
+          <span class="icon" aria-hidden="true">⌕</span><span class="label">Search</span>
+        </button>
+        <button type="button" id="btn-reconstruct" class="tool" title="Re-run reconstruct on source URL">
+          <span class="icon" aria-hidden="true">⎘</span><span class="label">Reconstruct</span>
         </button>
         <button type="button" id="btn-pdf" class="tool" title="Download PDF" hidden>
           <span class="icon" aria-hidden="true">PDF</span>

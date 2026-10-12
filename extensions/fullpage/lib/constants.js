@@ -10,5 +10,7 @@ export const CAPTURE_TYPES = {
 
 export const DEFAULT_SCAN_LIMIT = 25;
 export const SCROLL_SETTLE_MS = 120;
+/** Chrome limits captureVisibleTab (~2/sec); stay under quota. */
+export const CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS = 550;
 export const LAZY_LOAD_EXTRA_MS = 200;
 export const STITCH_OVERLAP_PX = 2;

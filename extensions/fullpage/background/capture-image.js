@@ -1,4 +1,9 @@
-import { LAZY_LOAD_EXTRA_MS, SCROLL_SETTLE_MS, CAPTURE_TYPES } from '../lib/constants.js';
+import {
+  LAZY_LOAD_EXTRA_MS,
+  SCROLL_SETTLE_MS,
+  CAPTURE_TYPES,
+  CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS,
+} from '../lib/constants.js';
 import { putCapture, trimHistory } from '../lib/idb.js';
 import { getSettings } from '../lib/settings.js';
 import { callPageTool } from './inject.js';
@@ -8,9 +13,27 @@ function uuid() {
   return crypto.randomUUID();
 }
 
+let lastCaptureVisibleTabAt = 0;
+
 async function waitForPaint(tabId, y) {
   await callPageTool(tabId, 'scrollToY', [y]);
   await new Promise((r) => setTimeout(r, SCROLL_SETTLE_MS));
+}
+
+async function captureVisiblePng(windowId) {
+  const now = Date.now();
+  const wait = CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS - (now - lastCaptureVisibleTabAt);
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  let dataUrl;
+  try {
+    dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  } catch (capErr) {
+    await new Promise((r) => setTimeout(r, CAPTURE_VISIBLE_TAB_MIN_INTERVAL_MS));
+    dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  }
+  lastCaptureVisibleTabAt = Date.now();
+  if (!dataUrl) throw new Error('Screenshot failed (captureVisibleTab returned empty).');
+  return dataUrl;
 }
 
 export async function captureTabImage(tabId, options = {}) {
@@ -29,11 +52,11 @@ export async function captureTabImage(tabId, options = {}) {
     const pct = 10 + Math.round((i / total) * 70);
     await onProgress?.(pct, `Screenshot ${i + 1} of ${total}`);
     await waitForPaint(tabId, scrollY);
-    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+    const dataUrl = await captureVisiblePng(tab.windowId);
     slices.push({ scrollY, dataUrl });
   }
 
-  await callPageTool(tabId, 'scrollToY', [metrics.scrollY]);
+  await callPageTool(tabId, 'restoreScrollPosition', []);
   await onProgress?.(85, 'Stitching image…');
 
   const stitchResp = await offscreenRequest('stitch', {
