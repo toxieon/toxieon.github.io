@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Neill Full Page Capture",
   "short_name": "FullPage",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Full-page screenshots with searchable text, HTML snapshots, multipage sessions, and scans. Data stays on your device.",
   "permissions": [
     "activeTab",
@@ -10,7 +10,8 @@
     "storage",
     "tabs",
     "offscreen",
-    "contextMenus"
+    "contextMenus",
+    "clipboardWrite"
   ],
   "background": {
     "service_worker": "background/service-worker.js",
@@ -54,6 +55,14 @@
         "mac": "Alt+Shift+F"
       },
       "description": "Full scan (multi-page)"
+    },
+    "capture-region": {
+      "suggested_key": {
+        "default": "Alt+Shift+A",
+        "windows": "Alt+Shift+A",
+        "mac": "Alt+Shift+A"
+      },
+      "description": "Capture selected area"
     }
   },
   "host_permissions": [

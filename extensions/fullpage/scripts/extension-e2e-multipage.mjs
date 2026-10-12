@@ -125,6 +125,13 @@ const reorderHide = await editorPage.evaluate(async () => {
   const load = await chrome.runtime.sendMessage({ type: 'MULTIPAGE_LOAD', id });
   const project = load.project;
   if (project.pages.length < 1) return { ok: false, reason: 'no pages' };
+  if (project.pages.length > 1) {
+    const [a, b] = project.pages;
+    project.pages = [b, a];
+    project.pages.forEach((p, i) => {
+      p.order = i;
+    });
+  }
   project.pages[0].hidden = true;
   project.pages[0].title = 'Renamed scan';
   const save = await chrome.runtime.sendMessage({ type: 'MULTIPAGE_SAVE', project });

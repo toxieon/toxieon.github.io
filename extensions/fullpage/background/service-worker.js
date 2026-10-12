@@ -1,4 +1,11 @@
 import { captureTabImage } from './capture-image.js';
+import { captureTabRegion } from './capture-region.js';
+import {
+  waitForRegionSelection,
+  completeRegionSelection,
+  cancelRegionSelection,
+} from './region-picker.js';
+import { copyPngOnTab } from './copy-to-tab.js';
 import { captureTabReconstruct } from './capture-reconstruct.js';
 import { captureFullScan } from './capture-fullscan.js';
 import { listCaptures, getCapture } from '../lib/idb.js';
@@ -8,6 +15,7 @@ import {
   startMultipageSession,
   getActiveProject,
   capturePageToSession,
+  captureRegionToSession,
   undoLastPage,
   finishMultipageSession,
   endMultipageSession,
@@ -31,6 +39,7 @@ const PROGRESS_TITLES = {
   image: 'Screen capture in progress…',
   reconstruct: 'Reconstructing searchable HTML…',
   fullscan: 'Running full scan…',
+  region: 'Capturing selected region…',
 };
 
 chrome.storage.session.set({ [BUSY_KEY]: false }).catch(() => {});
@@ -42,12 +51,20 @@ chrome.runtime.onInstalled.addListener(() => {
       title: 'Start multipage mode',
       contexts: ['action'],
     });
+    chrome.contextMenus.create({
+      id: 'capture-region',
+      title: 'Capture selected area',
+      contexts: ['action', 'page'],
+    });
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info) => {
+chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'multipage-start') {
     startMultipageSession().catch((err) => console.error('Multipage:', err));
+  }
+  if (info.menuItemId === 'capture-region' && tab?.id) {
+    runRegionCapture({ tabId: tab.id }).catch((err) => console.error('Region:', err));
   }
 });
 
@@ -111,6 +128,56 @@ async function ensureCapturePermissions(kind) {
   }
 }
 
+async function runRegionCapture(options = {}) {
+  if (await isBusy()) {
+    await showCaptureError('A capture is already running.');
+    throw new Error('busy');
+  }
+  const tab = await resolveCaptureTab(options);
+  assertCapturableTab(tab);
+  const tabId = tab.id;
+  await setBusy(true);
+  const settings = await getSettings();
+  let failed = false;
+  try {
+    let region = options.region;
+    if (!region) {
+      region = await waitForRegionSelection(tabId);
+    }
+    const mp = await getActiveProject();
+    let record;
+    if (mp?.status === 'active') {
+      await captureRegionToSession(tabId, region);
+      record = { id: mp.id, multipage: true };
+    } else {
+      await openProgressWindow();
+      const report = createProgressReporter(tabId, PROGRESS_TITLES.region);
+      record = await captureTabRegion(tabId, region, {
+        overlapPx: settings.overlapPx,
+        expandLazy: false,
+        onProgress: report,
+      });
+      await progressHide(tabId);
+      if (settings.copyToClipboardAfterCapture && record.pngDataUrl) {
+        await copyPngOnTab(tabId, record.pngDataUrl).catch(() => {});
+      }
+      if (settings.openViewerAfterCapture && record.id) openViewer(record.id);
+    }
+    return { ok: true, id: record.id, multipage: Boolean(record.multipage) };
+  } catch (err) {
+    failed = true;
+    cancelRegionSelection();
+    const message = err?.message || String(err);
+    if (message !== 'Region selection cancelled') {
+      await showCaptureError(message, 'Region capture failed');
+    }
+    throw err;
+  } finally {
+    await setBusy(false);
+    if (!failed) await progressHide(tabId);
+  }
+}
+
 async function runCapture(kind, options = {}) {
   if (await isBusy()) {
     await showCaptureError('A capture is already running. Wait for it to finish or reload the extension.');
@@ -153,8 +220,14 @@ async function runCapture(kind, options = {}) {
       case 'fullscan':
         record = await captureFullScan(tabId, captureOptions);
         break;
+      case 'region':
+        record = await captureTabRegion(tabId, options.region, captureOptions);
+        break;
       default:
         throw new Error(`Unknown capture kind: ${kind}`);
+    }
+    if (settings.copyToClipboardAfterCapture && record.pngDataUrl) {
+      await copyPngOnTab(tabId, record.pngDataUrl).catch(() => {});
     }
     if (settings.openViewerAfterCapture) {
       openViewer(record.id);
@@ -186,6 +259,36 @@ chrome.action.onClicked.addListener((tab) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.target === 'offscreen') return false;
+  if (message.type === 'REGION_SELECT_DONE') {
+    completeRegionSelection(message.region);
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (message.type === 'REGION_SELECT_CANCEL') {
+    cancelRegionSelection();
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (message.type === 'FULLPAGE_REGION_CAPTURE') {
+    runRegionCapture(message.options || {})
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'FULLPAGE_BUILD_PDF') {
+    import('./offscreen-manager.js')
+      .then(({ offscreenRequest }) =>
+        offscreenRequest('searchableImagePdf', {
+          pngDataUrl: message.record.pngDataUrl,
+          textLayer: message.record.textLayer,
+          metrics: message.record.metrics,
+          title: message.record.title,
+        })
+      )
+      .then((resp) => sendResponse({ ok: Boolean(resp?.ok), pdfDataUrl: resp?.blob }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
   if (message.type === 'FULLPAGE_CAPTURE') {
     runCapture(message.kind, message.options || {})
       .then((result) => sendResponse(result))
@@ -312,7 +415,12 @@ chrome.commands.onCommand.addListener((command) => {
     'capture-image': 'image',
     'capture-reconstruct': 'reconstruct',
     'capture-fullscan': 'fullscan',
+    'capture-region': 'region',
   };
   const kind = map[command];
+  if (command === 'capture-region') {
+    runRegionCapture().catch((err) => console.error('Full Page Capture:', err));
+    return;
+  }
   if (kind) runCapture(kind).catch((err) => console.error('Full Page Capture:', err));
 });

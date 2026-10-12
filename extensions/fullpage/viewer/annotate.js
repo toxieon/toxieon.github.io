@@ -1,5 +1,5 @@
 /**
- * Simple screenshot annotation (pen, highlight, arrow, text).
+ * Screenshot annotation (pen, highlight, arrow, text, redact).
  */
 export function createAnnotator(container, imageEl, onSave) {
   const wrap = document.createElement('div');
@@ -15,6 +15,7 @@ export function createAnnotator(container, imageEl, onSave) {
   let strokes = [];
   let current = null;
   let scale = 1;
+  let rectStart = null;
 
   function resize() {
     const rect = imageEl.getBoundingClientRect();
@@ -36,6 +37,18 @@ export function createAnnotator(container, imageEl, onSave) {
   function drawStroke(context, stroke, invScale) {
     const sc = invScale;
     context.save();
+    if (stroke.tool === 'redact-black') {
+      context.fillStyle = '#000';
+      context.fillRect(stroke.x * sc, stroke.y * sc, stroke.w * sc, stroke.h * sc);
+      context.restore();
+      return;
+    }
+    if (stroke.tool === 'redact-blur') {
+      context.fillStyle = 'rgba(0,0,0,0.35)';
+      context.fillRect(stroke.x * sc, stroke.y * sc, stroke.w * sc, stroke.h * sc);
+      context.restore();
+      return;
+    }
     if (stroke.tool === 'highlight') {
       context.globalAlpha = 0.35;
       context.strokeStyle = '#ffeb3b';
@@ -91,6 +104,10 @@ export function createAnnotator(container, imageEl, onSave) {
     return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
   }
 
+  function isRectTool() {
+    return tool === 'redact-black' || tool === 'redact-blur';
+  }
+
   canvas.addEventListener('pointerdown', (ev) => {
     if (tool === 'text') {
       const p = pos(ev);
@@ -101,12 +118,27 @@ export function createAnnotator(container, imageEl, onSave) {
       }
       return;
     }
+    if (isRectTool()) {
+      rectStart = pos(ev);
+      current = { tool, x: rectStart.x, y: rectStart.y, w: 0, h: 0 };
+      canvas.setPointerCapture(ev.pointerId);
+      return;
+    }
     drawing = true;
     current = { tool, points: [pos(ev)] };
     canvas.setPointerCapture(ev.pointerId);
   });
 
   canvas.addEventListener('pointermove', (ev) => {
+    if (isRectTool() && current && rectStart) {
+      const p = pos(ev);
+      current.x = Math.min(rectStart.x, p.x);
+      current.y = Math.min(rectStart.y, p.y);
+      current.w = Math.abs(p.x - rectStart.x);
+      current.h = Math.abs(p.y - rectStart.y);
+      redraw();
+      return;
+    }
     if (!drawing || !current) return;
     if (tool === 'arrow') {
       current.points = [current.points[0], pos(ev)];
@@ -117,6 +149,13 @@ export function createAnnotator(container, imageEl, onSave) {
   });
 
   canvas.addEventListener('pointerup', () => {
+    if (isRectTool() && current) {
+      if (current.w > 4 && current.h > 4) strokes.push(current);
+      current = null;
+      rectStart = null;
+      redraw();
+      return;
+    }
     if (!drawing || !current) return;
     drawing = false;
     strokes.push(current);
@@ -127,6 +166,24 @@ export function createAnnotator(container, imageEl, onSave) {
   imageEl.addEventListener('load', resize);
   window.addEventListener('resize', resize);
   if (imageEl.complete) resize();
+
+  function applyRedactToContext(octx, stroke) {
+    const x = stroke.x * scale;
+    const y = stroke.y * scale;
+    const w = stroke.w * scale;
+    const h = stroke.h * scale;
+    if (stroke.tool === 'redact-blur') {
+      octx.save();
+      octx.filter = 'blur(12px)';
+      octx.drawImage(imageEl, x, y, w, h, x, y, w, h);
+      octx.restore();
+      octx.fillStyle = 'rgba(0,0,0,0.15)';
+      octx.fillRect(x, y, w, h);
+    } else {
+      octx.fillStyle = '#000';
+      octx.fillRect(x, y, w, h);
+    }
+  }
 
   return {
     setTool(t) {
@@ -140,13 +197,27 @@ export function createAnnotator(container, imageEl, onSave) {
       strokes = [];
       redraw();
     },
+    getRedactions() {
+      return strokes
+        .filter((s) => s.tool === 'redact-black' || s.tool === 'redact-blur')
+        .map((s) => ({
+          x: s.x * scale,
+          y: s.y * scale,
+          width: s.w * scale,
+          height: s.h * scale,
+          mode: s.tool === 'redact-blur' ? 'blur' : 'black',
+        }));
+    },
     async exportPng() {
       const out = document.createElement('canvas');
       out.width = imageEl.naturalWidth;
       out.height = imageEl.naturalHeight;
       const octx = out.getContext('2d');
       octx.drawImage(imageEl, 0, 0);
-      for (const s of strokes) drawStroke(octx, s, scale);
+      for (const s of strokes) {
+        if (s.tool === 'redact-black' || s.tool === 'redact-blur') applyRedactToContext(octx, s);
+        else drawStroke(octx, s, scale);
+      }
       return out.toDataURL('image/png');
     },
     destroy() {

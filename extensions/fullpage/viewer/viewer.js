@@ -1,6 +1,8 @@
 import { getCapture, listCaptures, deleteCapture, putCapture } from '../lib/idb.js';
 import { createAnnotator } from './annotate.js';
 import { mountTextLayer } from './text-layer.js';
+import { copyPngDataUrlToClipboard } from '../lib/clipboard-png.js';
+import { withRedactions } from '../lib/record-export.js';
 
 const params = new URLSearchParams(location.search);
 let currentId = params.get('id');
@@ -20,6 +22,7 @@ const els = {
   searchStatus: document.getElementById('search-status'),
   btnEdit: document.getElementById('btn-edit'),
   btnPdf: document.getElementById('btn-pdf'),
+  btnCopyPng: document.getElementById('btn-copy-png'),
   btnDownloadPng: document.getElementById('btn-download-png'),
   btnHtml: document.getElementById('btn-html'),
   btnDelete: document.getElementById('btn-delete'),
@@ -88,13 +91,27 @@ function teardownAnnotator() {
 
 function wireDownloads(record) {
   const name = safeFilename(record.title);
+  const exp = withRedactions(record);
   els.btnDownloadPng.hidden = !record.pngDataUrl;
-  els.btnPdf.hidden = !record.pdfDataUrl;
+  els.btnCopyPng.hidden = !record.pngDataUrl;
+  els.btnPdf.hidden = !record.pngDataUrl;
   els.btnHtml.hidden = !record.html;
 
-  els.btnDownloadPng.onclick = () => downloadDataUrl(record.pngDataUrl, `${name}.png`);
-  els.btnPdf.onclick = () => downloadDataUrl(record.pdfDataUrl, `${name}.pdf`);
-  els.btnHtml.onclick = () => downloadBlob(record.html, `${name}.html`, 'text/html');
+  els.btnDownloadPng.onclick = () => downloadDataUrl(exp.pngDataUrl, `${name}.png`);
+  els.btnCopyPng.onclick = async () => {
+    try {
+      await copyPngDataUrlToClipboard(exp.pngDataUrl);
+      els.searchStatus.textContent = 'PNG copied to clipboard';
+    } catch (err) {
+      els.searchStatus.textContent = err.message || 'Copy failed';
+    }
+  };
+  els.btnPdf.onclick = async () => {
+    const resp = await chrome.runtime.sendMessage({ type: 'FULLPAGE_BUILD_PDF', record: exp });
+    if (resp?.pdfDataUrl) downloadDataUrl(resp.pdfDataUrl, `${name}.pdf`);
+    else alert(resp?.error || 'PDF export failed');
+  };
+  els.btnHtml.onclick = () => downloadBlob(exp.html, `${name}.html`, 'text/html');
 }
 
 function defaultPreviewMode(record) {
@@ -334,6 +351,13 @@ els.btnSaveEdit.addEventListener('click', async () => {
   if (!annotator || !currentRecord) return;
   const pngDataUrl = await annotator.exportPng();
   currentRecord.pngDataUrl = pngDataUrl;
+  const reds = annotator.getRedactions();
+  if (reds.length) currentRecord.redactions = [...(currentRecord.redactions || []), ...reds];
+  const exp = withRedactions(currentRecord);
+  currentRecord.pageText = exp.pageText;
+  currentRecord.textLayer = exp.textLayer;
+  currentRecord.html = exp.html;
+  currentRecord.pdfDataUrl = null;
   await putCapture(currentRecord);
   renderPreview(currentRecord);
 });
@@ -346,4 +370,13 @@ else {
   });
 }
 
-globalThis.__fullpageViewer = { downloadDataUrl, getCurrentRecord: () => currentRecord };
+globalThis.__fullpageViewer = {
+  downloadDataUrl,
+  getCurrentRecord: () => currentRecord,
+  copyPngToClipboard: () => copyPngDataUrlToClipboard(withRedactions(currentRecord).pngDataUrl),
+  applyTestRedaction: (rect) => {
+    if (!currentRecord) return;
+    currentRecord.redactions = [...(currentRecord.redactions || []), rect];
+    return withRedactions(currentRecord).pageText;
+  },
+};

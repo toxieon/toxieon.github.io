@@ -1,6 +1,6 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.3.0** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, **multipage sessions**, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
+Version **0.3.1** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, **multipage sessions**, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
 
 ## UX (GoFullPage-style core + our extras)
 

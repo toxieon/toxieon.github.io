@@ -43,7 +43,11 @@ export async function captureTabImage(tabId, options = {}) {
       lazyMs: LAZY_LOAD_EXTRA_MS,
     },
   ]);
-  const plan = await callPageTool(tabId, 'buildScrollPlan', [metrics, options.overlapPx ?? 80]);
+  const plan = await callPageTool(tabId, 'buildScrollPlan', [
+    metrics,
+    options.overlapPx ?? 80,
+    options.regionClamp || null,
+  ]);
   const slices = [];
   const scrollLog = [];
   const total = plan.positions.length;

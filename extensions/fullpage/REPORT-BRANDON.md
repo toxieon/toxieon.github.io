@@ -1,6 +1,6 @@
 # Reliability report (Brandon) — permissive-only vs SingleFile
 
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Priority:** It must **work** on real sites (e.g. Moodle quiz review on energyspace).  
 **This release:** permissive licences only (MIT pdf-lib + jsPDF). **No SingleFile (AGPL).**
 

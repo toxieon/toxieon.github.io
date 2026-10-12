@@ -329,23 +329,38 @@
     captureScrollState = null;
   }
 
-  function buildScrollPlan(metrics, overlapPx = 80) {
+  function buildScrollPlan(metrics, overlapPx = 80, region) {
     const vh = metrics.viewportHeight;
     const total = metrics.height;
     const header = metrics.sticky?.headerOverlap ?? 0;
     const effectiveOverlap = Math.max(overlapPx, header);
     const positions = [];
-    let y = 0;
-    while (y < total - 1) {
+    if (!region) {
+      let y = 0;
+      while (y < total - 1) {
+        positions.push(Math.round(y));
+        if (y + vh >= total) break;
+        y += vh - effectiveOverlap;
+      }
+      const last = Math.max(0, total - vh);
+      if (!positions.length || positions[positions.length - 1] !== last) {
+        positions.push(Math.round(last));
+      }
+      return { positions, overlap: effectiveOverlap, sliceHeight: vh, region: null };
+    }
+    const yMin = Math.max(0, Math.floor(region.y));
+    const yMax = Math.min(total, Math.ceil(region.y + region.height));
+    let y = yMin;
+    while (y < yMax - 1) {
       positions.push(Math.round(y));
-      if (y + vh >= total) break;
+      if (y + vh >= yMax) break;
       y += vh - effectiveOverlap;
     }
-    const last = Math.max(0, total - vh);
-    if (!positions.length || positions[positions.length - 1] !== last) {
+    const last = Math.max(yMin, yMax - vh);
+    if (!positions.length || positions[positions.length - 1] !== Math.round(last)) {
       positions.push(Math.round(last));
     }
-    return { positions, overlap: effectiveOverlap, sliceHeight: vh };
+    return { positions, overlap: effectiveOverlap, sliceHeight: vh, region };
   }
 
   async function blobToDataUrl(blob) {

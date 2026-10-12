@@ -6,6 +6,7 @@ const DEFAULTS = {
   followPagination: true,
   historyLimit: 40,
   showProgressOverlay: false,
+  copyToClipboardAfterCapture: false,
 };
 
 export async function getSettings() {

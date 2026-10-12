@@ -10,6 +10,7 @@ export const CAPTURE_TYPES = {
   RECONSTRUCT: 'reconstruct',
   FULLSCAN: 'fullscan',
   MULTIPAGE: 'multipage',
+  REGION: 'region',
 };
 
 export const NFP_FORMAT_VERSION = 1;
