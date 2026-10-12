@@ -3,35 +3,71 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Full Page Capture — Viewer</title>
+    <title>Full Page Capture</title>
     <link rel="stylesheet" href="viewer.css" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="app-header">
       <div class="brand">
         <span class="logo" aria-hidden="true">◫</span>
-        <h1>Full Page Capture</h1>
+        <span class="brand-name">Full Page Capture</span>
       </div>
-      <div class="actions">
-        <button type="button" id="btn-png" class="secondary" hidden>Download PNG</button>
-        <button type="button" id="btn-pdf" class="secondary" hidden>Download PDF</button>
-        <button type="button" id="btn-html" class="secondary" hidden>Download HTML</button>
-        <button type="button" id="btn-delete" class="danger ghost">Delete</button>
-      </div>
+      <nav class="toolbar" aria-label="Capture actions">
+        <button type="button" id="btn-edit" class="tool" title="Edit / annotate" disabled>
+          <span class="icon" aria-hidden="true">✎</span><span class="label">Edit</span>
+        </button>
+        <button type="button" id="btn-pdf" class="tool" title="Download PDF" hidden>
+          <span class="icon" aria-hidden="true">PDF</span>
+        </button>
+        <button type="button" id="btn-download" class="tool" title="Download" hidden>
+          <span class="icon" aria-hidden="true">↓</span>
+        </button>
+        <button type="button" id="btn-history" class="tool" title="History">
+          <span class="icon" aria-hidden="true">☰</span>
+        </button>
+        <button type="button" id="btn-delete" class="tool danger" title="Delete">
+          <span class="icon" aria-hidden="true">🗑</span>
+        </button>
+        <button type="button" id="btn-settings" class="tool" title="Settings">
+          <span class="icon" aria-hidden="true">⚙</span>
+        </button>
+      </nav>
     </header>
-    <aside class="sidebar">
+
+    <div id="edit-bar" class="edit-bar" hidden>
+      <span class="edit-label">Annotate</span>
+      <button type="button" data-tool="pen" class="active">Pen</button>
+      <button type="button" data-tool="highlight">Highlight</button>
+      <button type="button" data-tool="arrow">Arrow</button>
+      <button type="button" data-tool="text">Text</button>
+      <button type="button" id="btn-undo">Undo</button>
+      <button type="button" id="btn-save-edit" class="primary">Save</button>
+      <button type="button" id="btn-cancel-edit">Done</button>
+    </div>
+
+    <div id="extras-bar" class="extras-bar" hidden>
       <label class="search">
-        <span>Search capture</span>
+        <span>Search snapshot</span>
         <input type="search" id="search-input" placeholder="Find text…" autocomplete="off" />
       </label>
       <p id="search-status" class="muted"></p>
-      <h2>Recent captures</h2>
-      <ul id="history-list" class="history"></ul>
-    </aside>
-    <main class="preview">
-      <div id="meta" class="meta muted"></div>
+      <button type="button" id="btn-html" class="ghost" hidden>Download HTML</button>
+    </div>
+
+    <main class="stage">
+      <p id="meta" class="meta muted"></p>
       <div id="preview-root" class="preview-root"></div>
     </main>
+
+    <aside id="history-drawer" class="drawer" aria-label="Capture history" hidden>
+      <div class="drawer-head">
+        <h2>Recent captures</h2>
+        <button type="button" id="btn-close-history" class="ghost">Close</button>
+      </div>
+      <ul id="history-list" class="history"></ul>
+    </aside>
+    <div id="drawer-backdrop" class="backdrop" hidden></div>
+
     <script type="module" src="viewer.js"></script>
   </body>
 </html>

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Neill Full Page Capture",
   "short_name": "FullPage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scroll-and-stitch screenshots, searchable HTML snapshots, and multi-page scans. All data stays on your device.",
   "permissions": [
     "activeTab",
@@ -10,16 +10,17 @@
     "storage",
     "tabs",
     "unlimitedStorage",
-    "offscreen"
+    "offscreen",
+    "contextMenus"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
+  "options_page": "options/options.html",
   "action": {
-    "default_title": "Full Page Capture",
-    "default_popup": "popup/popup.html",
+    "default_title": "Capture full page (click)",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",

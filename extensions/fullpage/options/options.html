@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Full Page Capture — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <h1>Full Page Capture settings</h1>
+    <p class="muted">All captures stay on this device.</p>
+    <form id="settings-form">
+      <fieldset>
+        <legend>Toolbar click</legend>
+        <label>
+          Default action when clicking the extension icon
+          <select name="toolbarCaptureMode">
+            <option value="image">Full page image (PNG)</option>
+            <option value="reconstruct">Reconstruct (searchable HTML)</option>
+            <option value="fullscan">Full scan (multi-page)</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="openViewerAfterCapture" checked />
+          Open result tab when capture finishes
+        </label>
+        <label class="check">
+          <input type="checkbox" name="showProgressOverlay" checked />
+          Show in-page progress while capturing
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Capture quality</legend>
+        <label>
+          Sticky header overlap (pixels)
+          <input type="number" name="overlapPx" min="0" max="240" value="80" />
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Full scan defaults</legend>
+        <label>
+          Page limit
+          <input type="number" name="fullScanPageLimit" min="1" max="100" value="25" />
+        </label>
+        <label class="check">
+          <input type="checkbox" name="followPagination" checked />
+          Follow next / numbered pagination links
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>History</legend>
+        <label>
+          Keep up to
+          <input type="number" name="historyLimit" min="5" max="200" value="40" />
+          recent captures
+        </label>
+      </fieldset>
+      <p class="actions">
+        <button type="submit" class="primary">Save</button>
+        <span id="saved" class="saved" hidden>Saved</span>
+      </p>
+    </form>
+    <p class="muted small">Right-click the toolbar icon for Reconstruct, Full scan, history, and more options.</p>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

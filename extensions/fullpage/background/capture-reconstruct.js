@@ -1,5 +1,6 @@
 import { CAPTURE_TYPES } from '../lib/constants.js';
 import { putCapture, trimHistory } from '../lib/idb.js';
+import { getSettings } from '../lib/settings.js';
 import { callPageTool } from './inject.js';
 import { offscreenRequest } from './offscreen-manager.js';
 
@@ -8,12 +9,16 @@ function uuid() {
 }
 
 export async function captureTabReconstruct(tabId, options = {}) {
+  const onProgress = options.onProgress;
+  await onProgress?.(10, 'Expanding lazy content…');
   await callPageTool(tabId, 'prepareForCapture', [{ expandLazy: true }]);
+  await onProgress?.(40, 'Inlining styles & images…');
   const html = await callPageTool(tabId, 'reconstructHtml', [
     { inlineImages: options.inlineImages !== false },
   ]);
   const metrics = await callPageTool(tabId, 'getPageMetrics', []);
 
+  await onProgress?.(80, 'Building searchable PDF…');
   let pdfDataUrl = null;
   try {
     const pdfResp = await offscreenRequest('htmlPdf', {
@@ -40,7 +45,9 @@ export async function captureTabReconstruct(tabId, options = {}) {
   };
   if (!options.skipStore) {
     await putCapture(record);
-    await trimHistory();
+    const settings = await getSettings();
+    await trimHistory(settings.historyLimit);
   }
+  await onProgress?.(100, 'Done');
   return record;
 }

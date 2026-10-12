@@ -1,5 +1,6 @@
 import { CAPTURE_TYPES, DEFAULT_SCAN_LIMIT } from '../lib/constants.js';
 import { putCapture, trimHistory } from '../lib/idb.js';
+import { getSettings } from '../lib/settings.js';
 import { callPageTool, ensurePageTools } from './inject.js';
 import { captureTabReconstruct } from './capture-reconstruct.js';
 import { captureTabImage } from './capture-image.js';
@@ -78,6 +79,7 @@ function waitForTabComplete(tabId, timeoutMs = 60000) {
 }
 
 export async function captureFullScan(tabId, options = {}) {
+  const onProgress = options.onProgress;
   const mode = options.mode || 'reconstruct';
   const pageLimit = Math.min(options.pageLimit ?? DEFAULT_SCAN_LIMIT, 100);
   const tabIds = options.tabIds?.length ? options.tabIds : [tabId];
@@ -85,6 +87,7 @@ export async function captureFullScan(tabId, options = {}) {
 
   const pages = [];
   const visited = new Set();
+  await onProgress?.(5, 'Starting full scan…');
 
   for (const tid of tabIds) {
     if (pages.length >= pageLimit) break;
@@ -105,8 +108,12 @@ export async function captureFullScan(tabId, options = {}) {
         await ensurePageTools(currentTabId);
       }
 
+      const pageNum = pages.length + 1;
+      const pct = Math.min(85, 10 + Math.round((pageNum / pageLimit) * 70));
+      await onProgress?.(pct, `Capturing page ${pageNum} of up to ${pageLimit}…`);
+
       let record;
-      const innerOpts = { ...options, skipStore: true };
+      const innerOpts = { ...options, skipStore: true, onProgress: undefined };
       if (mode === 'image') {
         record = await captureTabImage(currentTabId, innerOpts);
         pages.push({
@@ -133,6 +140,7 @@ export async function captureFullScan(tabId, options = {}) {
   const rootTitle = pages[0]?.title || 'Full scan';
   const combinedHtml = buildCombinedHtml(pages, rootTitle);
 
+  await onProgress?.(90, 'Combining pages & building PDF…');
   const id = uuid();
   let pdfDataUrl = null;
   try {
@@ -159,6 +167,8 @@ export async function captureFullScan(tabId, options = {}) {
     metrics: { pageCount: pages.length },
   };
   await putCapture(record);
-  await trimHistory();
+  const settings = await getSettings();
+  await trimHistory(settings.historyLimit);
+  await onProgress?.(100, 'Done');
   return record;
 }
