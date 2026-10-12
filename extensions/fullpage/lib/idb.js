@@ -1,8 +1,8 @@
-import { DB_NAME, DB_VERSION, STORE_CAPTURES } from './constants.js';
+import { DB_NAME, DB_VERSION, STORE_CAPTURES, STORE_MULTIPAGE } from './constants.js';
 
 let dbPromise;
 
-function openDb() {
+export function openDb() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -14,6 +14,11 @@ function openDb() {
           const store = db.createObjectStore(STORE_CAPTURES, { keyPath: 'id' });
           store.createIndex('createdAt', 'createdAt', { unique: false });
           store.createIndex('type', 'type', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(STORE_MULTIPAGE)) {
+          const mp = db.createObjectStore(STORE_MULTIPAGE, { keyPath: 'id' });
+          mp.createIndex('updatedAt', 'updatedAt', { unique: false });
+          mp.createIndex('status', 'status', { unique: false });
         }
       };
     });

@@ -1,6 +1,6 @@
 # Reliability report (Brandon) — permissive-only vs SingleFile
 
-**Version:** 0.2.5  
+**Version:** 0.3.0  
 **Priority:** It must **work** on real sites (e.g. Moodle quiz review on energyspace).  
 **This release:** permissive licences only (MIT pdf-lib + jsPDF). **No SingleFile (AGPL).**
 
@@ -54,7 +54,7 @@ Use **SingleFile / single-file-core (AGPL-3.0)** only if:
 
 ## Recommended workflow on energyspace (this build)
 
-1. Reload extension **0.2.5** on Windows Chrome.
+1. Reload extension **0.3.0** on Windows Chrome.
 2. On quiz review tab, **click toolbar icon** (allow optional site access if prompted for some flows).
 3. Wait for progress popup → viewer opens.
 4. **Search** box: type `tuesday` (case-insensitive) — should match status lines in `pageText`.
@@ -64,7 +64,9 @@ Use **SingleFile / single-file-core (AGPL-3.0)** only if:
 
 If stitch still repeats headers on production Moodle after 0.2.5, report URL + “one page at a time” setting — that’s a **scroll target** bug, not a licence issue.
 
-**Viewer (0.2.5):** opens the **HTML page snapshot** by default (native Ctrl+F). Use **Screenshot** in the toolbar for the stitched PNG + invisible text overlay (export/annotate).
+**Viewer (0.2.5+):** opens the **HTML page snapshot** by default (native Ctrl+F). Use **Screenshot** in the toolbar for the stitched PNG + invisible text overlay (export/annotate).
+
+**Multipage (0.3.0):** Right-click extension icon → **Start multipage mode** → capture many quiz pages while browsing → **Finish** → reorder/hide/rename → export `.nfp` or combined HTML/PDF/PNG. Good for Topic 6-style quizzes without re-running full scan each time.
 
 ---
 

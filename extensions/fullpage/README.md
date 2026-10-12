@@ -1,6 +1,6 @@
 # Neill Full Page Capture (Chrome MV3)
 
-Version **0.2.5** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
+Version **0.3.0** — self-contained Chrome extension for scroll-and-stitch screenshots, offline-searchable HTML snapshots, **multipage sessions**, and multi-page scans. **No data leaves your browser** (IndexedDB + `chrome.storage` only). **No ads.**
 
 ## UX (GoFullPage-style core + our extras)
 
@@ -62,7 +62,7 @@ From the repository root (Git Bash or WSL on Windows):
 bash extensions/fullpage/scripts/build-zip.sh
 ```
 
-The archive is written to `extensions/fullpage/dist/fullpage-capture-0.2.5.zip`.
+The archive is written to `extensions/fullpage/dist/fullpage-capture-0.3.0.zip`.
 
 Library choices: `LIBRARIES.md` · legal: `THIRD_PARTY_NOTICES.md`.
 
@@ -96,7 +96,15 @@ npx puppeteer@23 browsers install chrome
 node extensions/fullpage/scripts/extension-e2e.mjs
 ```
 
-## Known limitations (0.2.5)
+## Multipage mode (0.3.0)
+
+Right-click the toolbar icon → **Start multipage mode**. A floating edge widget stays available while you browse; **camera** captures each page (image + inlined HTML), **Undo** removes the last scan, **Finish** opens the project editor. Export/import **`.nfp`** project files, download combined HTML (TOC), PDF, or PNG. Sessions persist in IndexedDB.
+
+```bash
+node extensions/fullpage/scripts/extension-e2e-multipage.mjs
+```
+
+## Known limitations (0.3.0)
 
 - Cross-origin stylesheets blocked by the page may not fully inline; a `<link>` fallback is kept when rules are unreadable.
 - Cross-origin images without CORS may remain external URLs in reconstruct mode.

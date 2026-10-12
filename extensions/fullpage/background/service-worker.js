@@ -5,6 +5,19 @@ import { listCaptures, getCapture } from '../lib/idb.js';
 import { getSettings } from '../lib/settings.js';
 import { ensureOptionalHostAccess } from '../lib/permissions.js';
 import {
+  startMultipageSession,
+  getActiveProject,
+  capturePageToSession,
+  undoLastPage,
+  finishMultipageSession,
+  endMultipageSession,
+  updateMultipageProject,
+  onTabReadyForWidget,
+} from './multipage.js';
+import { getMultipageProject, putMultipageProject } from '../lib/idb-multipage.js';
+import { exportProjectPng, exportProjectPdf } from './multipage-export.js';
+import { projectToNfpPayload } from '../lib/nfp-format.js';
+import {
   createProgressReporter,
   progressHide,
   progressUpdate,
@@ -21,6 +34,28 @@ const PROGRESS_TITLES = {
 };
 
 chrome.storage.session.set({ [BUSY_KEY]: false }).catch(() => {});
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'multipage-start',
+      title: 'Start multipage mode',
+      contexts: ['action'],
+    });
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === 'multipage-start') {
+    startMultipageSession().catch((err) => console.error('Multipage:', err));
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    onTabReadyForWidget(tabId, tab.url).catch(() => {});
+  }
+});
 
 async function setBusy(busy) {
   await chrome.storage.session.set({ [BUSY_KEY]: busy });
@@ -185,6 +220,87 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'FULLPAGE_GET_CAPTURE') {
     getCapture(message.id)
       .then((record) => sendResponse({ ok: Boolean(record), record }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_START') {
+    startMultipageSession(message.title)
+      .then((p) => sendResponse({ ok: true, projectId: p.id, pageCount: 0 }))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_GET_STATE') {
+    getActiveProject()
+      .then((p) =>
+        sendResponse({
+          ok: true,
+          active: Boolean(p && p.status === 'active'),
+          sessionId: p?.id,
+          pageCount: p?.pages?.length ?? 0,
+        })
+      )
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_CAPTURE') {
+    const tabId = _sender.tab?.id ?? message.tabId;
+    if (!tabId) {
+      sendResponse({ ok: false, error: 'No tab for capture' });
+      return true;
+    }
+    capturePageToSession(tabId)
+      .then((r) => sendResponse({ ok: true, pageCount: r.pageCount, pageId: r.page.id }))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_UNDO') {
+    undoLastPage()
+      .then((r) => sendResponse({ ok: true, pageCount: r.pageCount }))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_FINISH') {
+    finishMultipageSession()
+      .then((p) => sendResponse({ ok: true, projectId: p.id }))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_END') {
+    endMultipageSession(true)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_LOAD') {
+    getMultipageProject(message.id)
+      .then((project) => sendResponse({ ok: Boolean(project), project }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_SAVE') {
+    updateMultipageProject(message.project)
+      .then((project) => sendResponse({ ok: true, project }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_EXPORT_PNG') {
+    exportProjectPng(message.projectId)
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_EXPORT_PDF') {
+    exportProjectPdf(message.projectId)
+      .then((r) => sendResponse(r))
+      .catch((err) => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (message.type === 'MULTIPAGE_EXPORT_NFP') {
+    getMultipageProject(message.projectId)
+      .then((project) => {
+        if (!project) throw new Error('Not found');
+        sendResponse({ ok: true, payload: projectToNfpPayload(project) });
+      })
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }

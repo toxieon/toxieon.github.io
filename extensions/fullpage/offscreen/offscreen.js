@@ -90,6 +90,25 @@ async function htmlToSearchablePdf(html, title, meta = {}) {
   return pdf.output('blob');
 }
 
+async function verticalStackPng(pngDataUrls) {
+  const images = await Promise.all(pngDataUrls.map((u) => loadImage(u)));
+  const width = Math.max(...images.map((im) => im.width));
+  let height = 0;
+  for (const im of images) height += im.height;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  let y = 0;
+  for (const im of images) {
+    ctx.drawImage(im, 0, y);
+    y += im.height;
+  }
+  const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const pngDataUrl = await blobToDataUrl(pngBlob);
+  return { pngDataUrl, width, height };
+}
+
 async function searchableImagePdf(pngDataUrl, textLayer, metrics, title) {
   const pngBytes = dataUrlToBytes(pngDataUrl);
   const pdfDoc = await PDFDocument.create();
@@ -149,6 +168,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case 'htmlPdf': {
         const blob = await htmlToSearchablePdf(message.html, message.title, message.meta);
         sendResponse({ ok: true, blob: await blobToDataUrl(blob) });
+        break;
+      }
+      case 'verticalStackPng': {
+        const result = await verticalStackPng(message.pngDataUrls || []);
+        sendResponse({ ok: true, result });
         break;
       }
       default:

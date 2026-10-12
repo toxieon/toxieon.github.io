@@ -35,7 +35,7 @@ async function captureVisiblePng(windowId, tabId, sliceIndex) {
 export async function captureTabImage(tabId, options = {}) {
   const onProgress = options.onProgress;
   const tab = await chrome.tabs.get(tabId);
-  await onProgress?.(5, 'Preparing page…');
+  if (!options.skipProgress) await onProgress?.(5, 'Preparing page…');
   const metrics = await callPageTool(tabId, 'prepareForCapture', [
     {
       expandLazy: options.expandLazy !== false,

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multipage project</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1 id="project-title">Multipage project</h1>
+      <div class="top-actions">
+        <button type="button" id="btn-import" class="ghost">Import .nfp</button>
+        <button type="button" id="btn-export-nfp">Export .nfp</button>
+        <button type="button" id="btn-dl-html">Download HTML</button>
+        <button type="button" id="btn-dl-pdf">Download PDF</button>
+        <button type="button" id="btn-dl-png">Download PNG</button>
+      </div>
+    </header>
+    <p id="meta" class="meta"></p>
+    <ul id="page-list" class="page-list"></ul>
+    <input type="file" id="import-file" accept=".nfp,application/json" hidden />
+    <script type="module" src="editor.js"></script>
+  </body>
+</html>
