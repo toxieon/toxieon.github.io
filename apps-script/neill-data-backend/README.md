@@ -9,6 +9,7 @@ One web app, deployed once by Brandon, serves:
 | `timesheet/` (Quote bridge) | `login`, `get_quotes`, `set_status` (`change_status` alias) |
 | `checklist/` | `login`, `logout` |
 | `timesheetlive/` | `tsl_login`, `tsl_get`, `tsl_logout` |
+| Gate Codes + Timesheet (proximity / editors) | `gc_pin_status`, `gc_pin_verify`, `gc_pin_set`, `gc_nearby`, `gc_list` (editors only), `gc_upsert`, `gc_editors_*`, `gc_owner_app_link` |
 
 All pages find it through **one** setting: `shared/nd-backend.js` → `endpoint`.
 While that is empty, Quote / Timesheet / Checklist keep using the legacy Quote
@@ -43,7 +44,7 @@ Script Properties (created by `setup()`, never in the repo): `ND_PEPPER`,
 2. Project Settings (gear) → tick **Show "appsscript.json" manifest file**. Replace
    its contents with `appsscript.json` from this folder.
 3. Create script files named exactly like the `.gs` files here (`Config`, `Main`,
-   `Auth`, `Quote`, `TimesheetLive`, `Admin`, `PlannerOAuth`) and paste each one in
+   `Auth`, `Quote`, `TimesheetLive`, `GateCodes`, `Admin`, `PlannerOAuth`) and paste each one in
    (delete the default `Code.gs`). **Save**.
 4. In `Config.gs`, in the editor only, fill `SEED_TSL_CODES` with the Timesheet
    Live viewers: `[['Label', 'code'], ['Label', 'code']]`.

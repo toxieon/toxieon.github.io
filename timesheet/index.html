@@ -15,15 +15,16 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.3"></script>
+<script src="ts-time.js?v=0.4.4"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.3"></script>
-<script src="ts-clipboard.js?v=0.4.3"></script>
+<script src="ts-map.js?v=0.4.4"></script>
+<script src="ts-clipboard.js?v=0.4.4"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
-<script src="../assets/job-locator.js"></script>
+<script src="../shared/nd-site-match.js?v=0.4.4"></script>
+<script src="../shared/nd-gate-codes.js?v=0.4.4"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -397,6 +398,11 @@ body.ts-tl-dragging { overscroll-behavior: none; }
           <div class="clock-on-time mono" id="clock-on-time"></div>
         </div>
         <div id="off-info"><div class="last-shift" id="last-shift">No shifts yet.</div></div>
+        <div class="card gate-card" id="gate-card" style="display:none;margin-top:12px;">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;">Gate code</div>
+          <div class="mono" id="gate-code-val" style="font-size:22px;letter-spacing:.2em;">—</div>
+          <button type="button" class="btn btn-ghost" id="gate-code-edit" style="margin-top:8px;display:none;">Edit</button>
+        </div>
       </div>
       <div class="home-bottom">
         <button class="clock-btn" id="clock-btn">Clock On</button>
@@ -583,6 +589,14 @@ body.ts-tl-dragging { overscroll-behavior: none; }
         </div>
       </div>
     </div>
+    <div class="settings-section" id="gc-settings-section" style="display:none;">
+      <h3>Gate codes</h3>
+      <div class="card">
+        <p class="muted" style="font-size:12px;margin-top:0;">Editors can view and edit every site code. Crew at a site still only see the nearby code on the clock screen.</p>
+        <input type="search" id="gc-settings-search" placeholder="Search sites" style="width:100%;margin-bottom:10px;">
+        <div id="gc-settings-list"></div>
+      </div>
+    </div>
     <div class="settings-section">
       <h3>Notifications</h3>
       <div class="card">
@@ -723,7 +737,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.3';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.4';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -819,12 +833,7 @@ function netHours(onHHMM, offHHMM, breakMinutes) {
 function sessionBreakMinutes(s) { return Number(s.break_minutes) || 0; }
 function overtimeHours(totalHours, dayThreshold) { return Math.max(0, Math.round((totalHours - dayThreshold) * 100) / 100); }
 function distanceMetres(lat1, lng1, lat2, lng2) {
-  lat1 = parseFloat(lat1); lng1 = parseFloat(lng1); lat2 = parseFloat(lat2); lng2 = parseFloat(lng2);
-  if ([lat1, lng1, lat2, lng2].some(v => v === null || v === undefined || Number.isNaN(v))) return Infinity;
-  const R = 6371000; const toRad = d => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1); const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return window.NDSiteMatch.distanceMetres(lat1, lng1, lat2, lng2);
 }
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 function startOfWeek(date, firstDay = 'Monday') {
@@ -1042,26 +1051,11 @@ function currentUserId() {
 // same session_id (updateRowById appends if missing, updates if present).
 function upsertSession(session) { queueSheetWrite('sessions', session, true); }
 function findJobByLocation(lat, lng) {
-  let best = null, bestDist = Infinity;
-  for (const job of state.jobs) {
-    const d = distanceMetres(lat, lng, job.lat, job.lng);
-    const radius = job.radius_m || state.settings.radiusM;
-    if (d <= radius && d < bestDist) { best = job; bestDist = d; }
-  }
-  return best;
+  return NDSiteMatch.findJobByLocation(state.jobs, lat, lng, state.settings.radiusM);
 }
-// How far past the confirmed radius we'll still ASSUME it's the same job (then
-// ask, with a countdown). 3× the site radius comfortably covers "a bit away".
-const NEAR_RADIUS_MULT = 3;
-// Closest job that actually has coordinates, plus its distance in metres.
+const NEAR_RADIUS_MULT = NDSiteMatch.NEAR_RADIUS_MULT;
 function nearestJob(lat, lng) {
-  let job = null, dist = Infinity;
-  for (const j of state.jobs) {
-    if (j.lat == null || j.lng == null) continue;
-    const d = distanceMetres(lat, lng, j.lat, j.lng);
-    if (d < dist) { job = j; dist = d; }
-  }
-  return { job, dist };
+  return NDSiteMatch.nearestJob(state.jobs, lat, lng);
 }
 function createJob({ job_name, address, lat, lng, job_type, neill_quote_id, neill_quote_status }) {
   const job = {
@@ -1574,12 +1568,9 @@ const TsGeo = (() => {
     //   within radius        -> 'known'  (certain — quick confirm)
     //   within radius × MULT  -> 'near'   (assume it's this job, ask w/ countdown)
     //   further / no job      -> quote match, else 'unknown'
-    const near = nearestJob(lat, lng);
-    if (near.job) {
-      const confirmR = near.job.radius_m || getState().settings.radiusM;
-      if (near.dist <= confirmR) return { type: 'known', job: near.job, dist: near.dist };
-      if (near.dist <= confirmR * NEAR_RADIUS_MULT) return { type: 'near', job: near.job, dist: near.dist };
-    }
+    const tier = NDSiteMatch.classifyNearJob(getState().jobs, lat, lng, getState().settings.radiusM);
+    if (tier.type === 'known') return { type: 'known', job: tier.job, dist: tier.dist };
+    if (tier.type === 'near') return { type: 'near', job: tier.job, dist: tier.dist };
     if (window.TsNeillQuote) { const quoteJob = await window.TsNeillQuote.matchLocation(lat, lng); if (quoteJob) return { type: 'neill_quote', quoteJob }; }
     const address = await reverseGeocode(lat, lng); return { type: 'unknown', address };
   }
@@ -1596,6 +1587,95 @@ const TsGeo = (() => {
   return { getPosition, getPositionResilient, startWatching, stopWatching, reverseGeocode, resolveClockOnTarget, loadMapsJs, get lastPosition() { return lastPosition; } };
 })();
 window.TsGeo = TsGeo;
+
+/* ----- GATE CODES (shared backend) ----- */
+const TsGateCodes = (() => {
+  let isEditor = false;
+  let watchTimer = null;
+  function $(id) { return document.getElementById(id); }
+  async function refreshEditorFlag() {
+    isEditor = false;
+    const sec = $('gc-settings-section');
+    if (sec) sec.style.display = 'none';
+    if (!window.NDGateCodes || !NDGateCodes.backendReady() || !window.TsSheets || !TsSheets.isSignedIn()) return;
+    try {
+      const meta = await NDGateCodes.editorsMeta();
+      isEditor = NDGateCodes.isEditorMeta(meta, TsSheets.getProfile());
+      if (sec) sec.style.display = isEditor ? 'block' : 'none';
+      if (isEditor) renderSettingsList();
+    } catch (e) { isEditor = false; }
+  }
+  async function refreshProximityCard() {
+    const card = $('gate-card'); if (!card || !window.NDGateCodes) return;
+    if (!NDGateCodes.backendReady()) { card.style.display = 'none'; return; }
+    let pos = TsGeo.lastPosition;
+    if (!pos) { try { pos = await TsGeo.getPositionResilient(); } catch (e) {} }
+    if (!pos) { card.style.display = 'none'; return; }
+    try {
+      const data = await NDGateCodes.nearby(pos.coords.latitude, pos.coords.longitude);
+      if (data.site && data.site.code) {
+        card.style.display = 'block';
+        $('gate-code-val').textContent = data.site.code;
+        $('gate-code-edit').style.display = isEditor ? 'inline-flex' : 'none';
+        card.dataset.siteId = data.site.site_id || '';
+        card.dataset.siteName = data.site.site_name || '';
+      } else card.style.display = 'none';
+    } catch (e) { card.style.display = 'none'; }
+  }
+  async function renderSettingsList() {
+    const list = $('gc-settings-list'); if (!list) return;
+    const q = ($('gc-settings-search')?.value || '').trim().toLowerCase();
+    let codes = [];
+    try {
+      const data = await NDGateCodes.listEditor();
+      codes = data.codes || [];
+    } catch (e) { codes = NDGateCodes.readEditorCache(); }
+    list.replaceChildren();
+    codes.filter(row => !q || (row.site_name || '').toLowerCase().includes(q) || (row.site_id || '').includes(q))
+      .forEach(row => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-ghost btn-block';
+        btn.style.justifyContent = 'space-between';
+        btn.textContent = '';
+        const left = document.createElement('span');
+        left.textContent = row.site_name || row.site_id;
+        const right = document.createElement('span');
+        right.className = 'mono';
+        right.textContent = row.code || '—';
+        btn.append(left, right);
+        btn.addEventListener('click', () => promptEdit(row));
+        list.appendChild(btn);
+      });
+  }
+  function promptEdit(row) {
+    const code = prompt('4-digit gate code for ' + (row.site_name || row.site_id), row.code || '');
+    if (code == null) return;
+    const err = NDGateCodes.validateCode(code);
+    if (err) { toast(err); return; }
+    NDGateCodes.upsert({ site_id: row.site_id, site_name: row.site_name, code, lat: row.lat, lng: row.lng })
+      .then(() => { toast('Gate code saved'); renderSettingsList(); refreshProximityCard(); })
+      .catch(e => toast(e.message || 'Save failed'));
+  }
+  function startPolling() {
+    clearInterval(watchTimer);
+    refreshProximityCard();
+    watchTimer = setInterval(refreshProximityCard, 45000);
+  }
+  function init() {
+    const editBtn = $('gate-code-edit');
+    if (editBtn) editBtn.addEventListener('click', () => {
+      const card = $('gate-card');
+      promptEdit({ site_id: card.dataset.siteId, site_name: card.dataset.siteName, code: $('gate-code-val').textContent });
+    });
+    const search = $('gc-settings-search');
+    if (search) search.addEventListener('input', renderSettingsList);
+    refreshEditorFlag();
+    startPolling();
+  }
+  return { init, refreshEditorFlag, refreshProximityCard, startPolling };
+})();
+window.TsGateCodes = TsGateCodes;
 
 /* ----- GOOGLE SHEETS ----- */
 const TsSheets = (() => {
@@ -4187,6 +4267,7 @@ async function bootApp() {
   reconcileOpenSessions();   // §54 — snap any missed clock-offs before rendering
   const snapFab = document.getElementById('snap-fab'); if (snapFab) snapFab.addEventListener('click', snapTimes);
   window.Views.clock.init(); window.Views.history.init(); window.Views.jobs.init(); window.Views.settings.init();
+  if (window.TsGateCodes) TsGateCodes.init();
   showView('clock');
   await flushQueueOnNextOpen();
   TsSheets.boot().then(() => maybeDailyForceSync()).catch(() => {});
@@ -4201,6 +4282,7 @@ async function bootApp() {
       // Push local changes up, pull this user's rows down, refresh, then run the
       // once-a-day full sync check.
       flushQueue().then(() => pullFromSheet()).then(ok => { if (ok) { markSynced(); refreshAllViews(); } }).then(() => maybeDailyForceSync()).then(() => TsLive.schedule(500));
+      if (window.TsGateCodes) TsGateCodes.refreshEditorFlag();
     }
     document.dispatchEvent(new CustomEvent('ts:auth-changed', { detail: status }));
   };
