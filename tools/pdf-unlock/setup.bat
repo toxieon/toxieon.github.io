@@ -1,15 +1,27 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo Installing pdf-unlock dependencies...
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+echo pdf-unlock setup (lightweight — needs Python + qpdf only)
+echo.
+
+where python >nul 2>&1
 if errorlevel 1 (
-  echo.
-  echo Setup failed. Install Python 3.10+ from https://www.python.org/ and try again.
+  echo Python not found. Install Python 3.10+ from https://www.python.org/
   exit /b 1
 )
+
+where qpdf >nul 2>&1
+if errorlevel 1 (
+  echo qpdf not found on PATH.
+  echo Install with:  winget install qpdf.qpdf
+  echo Or download from https://github.com/qpdf/qpdf/releases
+  exit /b 1
+)
+
+echo Python:
+python --version
+echo qpdf:
+qpdf --version
 echo.
-echo Setup complete. Drag a PDF onto unlock.bat or run:
-echo   python pdf_unlock.py "path\to\locked.pdf"
+echo Ready. Double-click unlock-gui.bat or drag a PDF onto unlock.bat
 exit /b 0
