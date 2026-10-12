@@ -11,14 +11,15 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'planner-0.20.6';
+const CACHE_VERSION = 'planner-0.21.1';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./photos.js",
-  "./room-geometry.js?v=0.20.6",
-  "./room-export.js?v=0.20.6",
+  "./room-geometry.js?v=0.21.1",
+  "./room-export.js?v=0.21.1",
+  "./room-auto-detect.js?v=0.21.1",
   "../shared/vendor/exifr.umd.js",
   "../shared/nd-pdf.js",
   "../shared/vendor/papaparse/papaparse.min.js",
@@ -36,7 +37,7 @@ const SHELL_ASSETS = [
   "./favicon.svg",
   "../logo.png",
   "../shared/nd-core.css",
-  "./styles.css?v=0.20.6",
+  "./styles.css?v=0.21.1",
   "../shared/nd-config.js",
   "../assets/loading-bar.js",
   "../shared/nd-backend.js",
@@ -51,7 +52,7 @@ const SHELL_ASSETS = [
   "../shared/nd-sheets.js",
   "../shared/nd-inbox.js?v=2",
   "../shared/nd-pwa.js",
-  "./app.js?v=0.20.6"
+  "./app.js?v=0.21.1"
 ];
 
 const IS_API_HOST = (url) =>
@@ -72,7 +73,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('planner-') && k !== CACHE_VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
