@@ -153,7 +153,7 @@ test("text export: a skipped rule date just drops that rule's line (format uncha
   const travelBlock = /  Travel\n(?:    .+\n)+  Day travel total: .+\n/;
   const expected = GOLDEN_PREVIEW.split("\n").filter((l) => !l.includes("School pickup")).join("\n")
     .replace(/6\.5 hrs/g, "6 hrs")
-    .replace(travelBlock, "  Travel: km/cost omitted (expand day in History to load distances).\n")
+    .replace(travelBlock, "  Travel: km/cost omitted (distances unavailable for this day).\n")
     .replace("────────────────────────────\nWEEKLY TRAVEL COST\n\n  65.2 km  ·  $10.53\n", "");
   assert.equal(out, expected);
 });
@@ -163,4 +163,37 @@ test("text export: without cached travel, shifts still export with an omission n
   const out = app.TsExport.formatWeekPreview(new Date(2026, 9, 8, 12));
   assert.ok(out.includes("Travel: km/cost omitted"));
   assert.ok(!out.includes("WEEKLY TRAVEL COST"));
+});
+
+test("0.4.3 background travel: every day of the week is computed and cached without expanding, Distance Matrix not repeated", async () => {
+  const app = loadApp(seed());
+  // Two working days, two legs each.
+  const st = app.getState();
+  st.sessions.push(
+    S("F2", "2026-10-06", "07:30", "11:00", 3.5, { job_id: "jf", job_name: "Frankston" }),
+    S("M2", "2026-10-06", "11:30", "15:30", 4, { job_id: "jm", job_name: "Mornington" })
+  );
+  let dmCalls = 0;
+  app.window.google = { maps: {
+    Geocoder: function () {},
+    TravelMode: { DRIVING: "DRIVING" }, UnitSystem: { METRIC: 0 },
+    DistanceMatrixService: function () { this.getDistanceMatrix = (req, cb) => {
+      dmCalls++;
+      const rows = req.origins.map((o, i) => ({ elements: req.destinations.map((d, j) => ({ status: "OK", distance: { value: i === j ? 30000 + 1000 * i : 0 } })) }));
+      cb({ rows }, "OK");
+    }; }
+  } };
+  const week = new Date(2026, 9, 8, 12);
+  const before = app.TsExport.formatWeekPreview(week);
+  assert.ok(before.includes("Travel: km/cost omitted"), "nothing cached yet");
+  const sessions = st.sessions.filter((s) => s.date >= "2026-10-05" && s.date <= "2026-10-11");
+  const n = await app.TsTravel.prefetchWeek(sessions, st, { gapMs: 0 });
+  assert.equal(n, 2, "both days computed in the background");
+  const out = app.TsExport.formatWeekPreview(week);
+  assert.ok(!out.includes("omitted"), out);
+  assert.equal((out.match(/Day travel total:/g) || []).length, 2);
+  assert.match(out, /WEEKLY TRAVEL COST\n\n  \d+(\.\d)? km  ·  \$\d+\.\d\d/);
+  const calls = dmCalls;
+  assert.equal(await app.TsTravel.prefetchWeek(sessions, st, { gapMs: 0 }), 0, "cached days are skipped");
+  assert.equal(dmCalls, calls, "no repeat Distance Matrix requests");
 });
