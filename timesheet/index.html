@@ -15,17 +15,17 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.4"></script>
+<script src="ts-time.js?v=0.4.5"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.4"></script>
-<script src="ts-clipboard.js?v=0.4.4"></script>
+<script src="ts-map.js?v=0.4.5"></script>
+<script src="ts-clipboard.js?v=0.4.5"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
-<script src="../shared/nd-site-match.js?v=0.4.4"></script>
-<script src="../shared/nd-gate-codes.js?v=0.4.4"></script>
+<script src="../shared/nd-site-match.js?v=0.4.5"></script>
+<script src="../shared/nd-gate-codes.js?v=0.4.5"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -738,7 +738,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.4';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.4.5';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -1608,7 +1608,7 @@ const TsGateCodes = (() => {
   }
   async function refreshProximityCard() {
     const card = $('gate-card'); if (!card || !window.NDGateCodes) return;
-    if (!NDGateCodes.backendReady()) { card.style.display = 'none'; return; }
+    if (!NDGateCodes.backendReady()) { card.style.display = 'none'; stopPolling(); return; }
     let pos = TsGeo.lastPosition;
     if (!pos) { try { pos = await TsGeo.getPositionResilient(); } catch (e) {} }
     if (!pos) { card.style.display = 'none'; return; }
@@ -1621,7 +1621,10 @@ const TsGateCodes = (() => {
         card.dataset.siteId = data.site.site_id || '';
         card.dataset.siteName = data.site.site_name || '';
       } else card.style.display = 'none';
-    } catch (e) { card.style.display = 'none'; }
+    } catch (e) {
+      card.style.display = 'none';
+      if (/unknown action|pin_required|not_configured|forbidden|^HTTP \d/i.test(String(e && e.message))) stopPolling();
+    }
   }
   async function renderSettingsList() {
     const list = $('gc-settings-list'); if (!list) return;
@@ -1658,8 +1661,20 @@ const TsGateCodes = (() => {
       .then(() => { toast('Gate code saved'); renderSettingsList(); refreshProximityCard(); })
       .catch(e => toast(e.message || 'Save failed'));
   }
+  // Poll only while visible; an error reply (backend without Gate Codes, PIN on,
+  // not configured, HTTP error) stops polling until the next page load.
+  let pollStopped = false, visBound = false;
+  function stopPolling() { pollStopped = true; clearInterval(watchTimer); watchTimer = null; }
   function startPolling() {
-    clearInterval(watchTimer);
+    clearInterval(watchTimer); watchTimer = null;
+    if (!visBound) {
+      visBound = true;
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { clearInterval(watchTimer); watchTimer = null; }
+        else if (!pollStopped && !watchTimer) startPolling();
+      });
+    }
+    if (pollStopped || document.hidden) return;
     refreshProximityCard();
     watchTimer = setInterval(refreshProximityCard, 45000);
   }
