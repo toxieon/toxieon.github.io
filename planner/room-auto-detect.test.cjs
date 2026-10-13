@@ -69,6 +69,68 @@ test("existing polygon edges contribute to the wall mask", () => {
   assert.ok(merged >= alone);
 });
 
+function functionBody(src, signature) {
+  const start = src.indexOf(signature);
+  assert.ok(start >= 0, "missing " + signature);
+  const brace = src.indexOf("{", start);
+  let depth = 0;
+  for (let i = brace; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}") {
+      depth--;
+      if (depth === 0) return src.slice(brace, i + 1);
+    }
+  }
+  throw new Error("unbalanced " + signature);
+}
+
+test("0.21.3: detection uses a 720px canvas and releases it; auto rooms is button-only", () => {
+  const fs = require("node:fs"); const path = require("node:path");
+  const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
+  const version = read("VERSION").trim();
+  const app = read("app.js"), html = read("index.html"), sw = read("sw.js");
+  assert.equal(version, "0.21.3");
+  assert.match(app, new RegExp(`APP_VERSION = "${version}"`));
+  assert.match(sw, new RegExp(`CACHE_VERSION = 'planner-${version}'`));
+  for (const file of [html, sw]) {
+    assert.match(file, new RegExp(`styles\\.css\\?v=${version}`));
+    assert.match(file, new RegExp(`room-auto-detect\\.js\\?v=${version}`));
+    assert.match(file, new RegExp(`app\\.js\\?v=${version}`));
+  }
+  const detect = functionBody(app, "function pixelsForDetection");
+  assert.match(detect, /maxDim/);
+  assert.match(detect, /imageSmoothingEnabled = false/);
+  assert.match(detect, /getImageData\(0, 0, width, height\)/);
+  assert.match(detect, /releaseCanvas\(canvas\)/);
+  assert.doesNotMatch(detect, /naturalWidth \* naturalHeight|canvas\.width = sw/);
+  assert.match(app, /PLAN_ANALYSIS_MAX = 2000/);
+  assert.match(app, /releasePlanBitmap\(bitmap\)/);
+  assert.match(app, /isConnected/);
+  const ocr = functionBody(app, "async function runPlanOcr");
+  assert.equal(ocr.match(/createWorker\s*\(/g).length, 1);
+  assert.match(ocr, /terminate\(\)/);
+  assert.match(ocr, /releaseCanvas\(canvas\)/);
+  assert.doesNotMatch(ocr, /createElement\("canvas"\)[\s\S]*createElement\("canvas"\)/);
+  assert.match(functionBody(app, "async function startAutoRooms"), /_pausePlanViewer = true/);
+  assert.match(functionBody(app, "function osdFloorReady"), /_pausePlanViewer/);
+  const detectJs = read("room-auto-detect.js");
+  for (const name of ["function markExterior", "function labelInterior"]) {
+    const body = functionBody(detectJs, name);
+    assert.match(body, /new Int32Array\(free\.length\)/);
+    assert.doesNotMatch(body, /\[\[/);
+  }
+  assert.equal(app.match(/startAutoRooms\s*\(/g).length, 2);
+  assert.match(app, /case "auto-rooms": return startAutoRooms\(\)/);
+  const banned = /startAutoRooms|runPlanOcr|loadPlanImageData|detectRoomsFromRgba|Tesseract|getImageData/;
+  for (const signature of [
+    "function uploadFloorPlan()",
+    "async function replaceFloorPlanCache(",
+    "async function cacheFloorPlan(",
+    "function maybeFetchPlanForCurrentFloor()",
+    "async function hydrateFloorPlansFromCache()"
+  ]) assert.doesNotMatch(functionBody(app, signature), banned);
+});
+
 test("0.21.1: OCR is lazy (not in index.html or SW), pinned with SRI, and the icon stub has no UI", () => {
   const fs = require("node:fs"); const path = require("node:path");
   const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
