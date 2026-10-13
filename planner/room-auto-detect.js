@@ -118,12 +118,14 @@
 
   function markExterior(free, w, h, margin) {
     const outside = new Uint8Array(free.length);
-    const stack = [];
+    const stack = new Int32Array(free.length);
+    let top = 0;
     const push = (x, y) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return;
       const i = y * w + x;
       if (outside[i] || !free[i]) return;
       outside[i] = 1;
-      stack.push(x, y);
+      stack[top++] = i;
     };
     for (let x = 0; x < w; x++) {
       for (let m = 0; m <= margin; m++) { push(x, m); push(x, h - 1 - m); }
@@ -131,40 +133,50 @@
     for (let y = 0; y < h; y++) {
       for (let m = 0; m <= margin; m++) { push(m, y); push(w - 1 - m, y); }
     }
-    while (stack.length) {
-      const y = stack.pop(), x = stack.pop();
-      const n = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
-      for (const [nx, ny] of n) {
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        push(nx, ny);
-      }
+    while (top) {
+      const i = stack[--top];
+      const x = i % w, y = (i / w) | 0;
+      push(x + 1, y);
+      push(x - 1, y);
+      push(x, y + 1);
+      push(x, y - 1);
     }
     return outside;
   }
 
   function labelInterior(free, outside, w, h) {
     const labels = new Int32Array(free.length);
-    let next = 1;
+    const stack = new Int32Array(free.length);
     const areas = [];
-    const stack = [];
+    let next = 1;
     for (let y = 0; y < h; y++) {
+      const row = y * w;
       for (let x = 0; x < w; x++) {
-        const i = y * w + x;
-        if (!free[i] || outside[i] || labels[i]) continue;
+        const start = row + x;
+        if (!free[start] || outside[start] || labels[start]) continue;
         const id = next++;
-        let area = 0;
-        labels[i] = id;
-        stack.push(x, y);
-        while (stack.length) {
-          const cy = stack.pop(), cx = stack.pop();
+        let area = 0, top = 0;
+        labels[start] = id;
+        stack[top++] = start;
+        while (top) {
+          const i = stack[--top];
           area++;
-          const n = [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]];
-          for (const [nx, ny] of n) {
-            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-            const ni = ny * w + nx;
-            if (!free[ni] || outside[ni] || labels[ni]) continue;
-            labels[ni] = id;
-            stack.push(nx, ny);
+          const cx = i % w, cy = (i / w) | 0;
+          if (cx > 0) {
+            const ni = i - 1;
+            if (free[ni] && !outside[ni] && !labels[ni]) { labels[ni] = id; stack[top++] = ni; }
+          }
+          if (cx + 1 < w) {
+            const ni = i + 1;
+            if (free[ni] && !outside[ni] && !labels[ni]) { labels[ni] = id; stack[top++] = ni; }
+          }
+          if (cy > 0) {
+            const ni = i - w;
+            if (free[ni] && !outside[ni] && !labels[ni]) { labels[ni] = id; stack[top++] = ni; }
+          }
+          if (cy + 1 < h) {
+            const ni = i + w;
+            if (free[ni] && !outside[ni] && !labels[ni]) { labels[ni] = id; stack[top++] = ni; }
           }
         }
         areas[id] = area;

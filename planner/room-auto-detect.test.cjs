@@ -103,8 +103,22 @@ test("0.21.3: detection uses a 720px canvas and releases it; auto rooms is butto
   assert.match(detect, /getImageData\(0, 0, width, height\)/);
   assert.match(detect, /releaseCanvas\(canvas\)/);
   assert.doesNotMatch(detect, /naturalWidth \* naturalHeight|canvas\.width = sw/);
+  assert.match(app, /PLAN_ANALYSIS_MAX = 2000/);
   assert.match(app, /releasePlanBitmap\(bitmap\)/);
-  assert.match(functionBody(app, "async function runPlanOcr"), /releaseCanvas\(crop\.canvas\)/);
+  assert.match(app, /isConnected/);
+  const ocr = functionBody(app, "async function runPlanOcr");
+  assert.equal(ocr.match(/createWorker\s*\(/g).length, 1);
+  assert.match(ocr, /terminate\(\)/);
+  assert.match(ocr, /releaseCanvas\(canvas\)/);
+  assert.doesNotMatch(ocr, /createElement\("canvas"\)[\s\S]*createElement\("canvas"\)/);
+  assert.match(functionBody(app, "async function startAutoRooms"), /_pausePlanViewer = true/);
+  assert.match(functionBody(app, "function osdFloorReady"), /_pausePlanViewer/);
+  const detectJs = read("room-auto-detect.js");
+  for (const name of ["function markExterior", "function labelInterior"]) {
+    const body = functionBody(detectJs, name);
+    assert.match(body, /new Int32Array\(free\.length\)/);
+    assert.doesNotMatch(body, /\[\[/);
+  }
   assert.equal(app.match(/startAutoRooms\s*\(/g).length, 2);
   assert.match(app, /case "auto-rooms": return startAutoRooms\(\)/);
   const banned = /startAutoRooms|runPlanOcr|loadPlanImageData|detectRoomsFromRgba|Tesseract|getImageData/;
