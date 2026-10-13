@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.21.1";
+const APP_VERSION = "0.21.2";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -683,31 +683,64 @@ async function loadPlanImageData(floor) {
   return { data: imageData.data, width, height, dataUrl: src };
 }
 
-async function runPlanOcr(dataUrl, meta) {
+/* Whole-page OCR finds nothing on most floor plans: Tesseract's layout pass reads
+ * the wall lines as a picture and drops the labels. So each detected room is
+ * cropped just inside its walls and read on its own, one worker for all rooms. */
+function planOcrCrops(img, rooms) {
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  return (rooms || []).slice(0, 40).map((r) => {
+    const pts = r.points || [];
+    if (pts.length < 3) return null;
+    const xs = pts.map((p) => (Array.isArray(p) ? p[0] : p.x)), ys = pts.map((p) => (Array.isArray(p) ? p[1] : p.y));
+    let x0 = Math.min(...xs) / 100 * W, x1 = Math.max(...xs) / 100 * W, y0 = Math.min(...ys) / 100 * H, y1 = Math.max(...ys) / 100 * H;
+    const ix = (x1 - x0) * 0.08, iy = (y1 - y0) * 0.08;
+    x0 += ix; x1 -= ix; y0 += iy; y1 -= iy;
+    const w = Math.round(x1 - x0), h = Math.round(y1 - y0);
+    if (w < 12 || h < 12) return null;
+    const scale = Math.min(3, Math.max(1, 240 / Math.min(w, h)));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, x0, y0, w, h, 0, 0, c.width, c.height);
+    return { canvas: c, x0, y0, scale, W, H };
+  }).filter(Boolean);
+}
+
+async function runPlanOcr(dataUrl, meta, rooms) {
   if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("offline");
   let worker = null;
   const work = (async () => {
     if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC, PLANNER_TESSERACT_SRI);
     if (!window.Tesseract) throw new Error("OCR library unavailable");
     worker = await Tesseract.createWorker("eng", 1, Object.assign({ logger: () => {} }, PLANNER_TESSERACT_PATHS));
-    return (await worker.recognize(dataUrl)).data;
+    await worker.setParameters({ tessedit_pageseg_mode: "6" });
+    const img = new Image();
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = dataUrl; });
+    const words = [];
+    for (const crop of planOcrCrops(img, rooms)) {
+      const { data } = await worker.recognize(crop.canvas);
+      (data.words || []).forEach((w) => {
+        const b = w.bbox || {};
+        words.push({
+          text: w.text,
+          x: ((crop.x0 + (b.x0 + b.x1) / 2 / crop.scale) / crop.W) * 100,
+          y: ((crop.y0 + (b.y0 + b.y1) / 2 / crop.scale) / crop.H) * 100,
+          confidence: w.confidence
+        });
+      });
+    }
+    return words;
   })();
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("OCR timed out")), PLANNER_OCR_TIMEOUT_MS); });
-  let data;
-  try { data = await Promise.race([work, timeout]); }
-  finally { clearTimeout(timer); if (worker) worker.terminate().catch(() => {}); else work.then(() => worker && worker.terminate()).catch(() => {}); }
-  const sw = meta.sourceWidth || meta.width;
-  const sh = meta.sourceHeight || meta.height;
-  return (data.words || []).map((w) => {
-    const b = w.bbox || {};
-    return {
-      text: w.text,
-      x: ((b.x0 + b.x1) / 2 / sw) * 100,
-      y: ((b.y0 + b.y1) / 2 / sh) * 100,
-      confidence: w.confidence
-    };
-  }).filter((w) => w.text && Number.isFinite(w.x) && (w.confidence ?? 0) >= 35);
+  try {
+    const words = await Promise.race([work, timeout]);
+    return words.filter((w) => w.text && Number.isFinite(w.x) && (w.confidence ?? 0) >= 35);
+  } finally {
+    clearTimeout(timer);
+    if (worker) worker.terminate().catch(() => {}); else work.then(() => worker && worker.terminate()).catch(() => {});
+  }
 }
 
 async function startAutoRooms() {
@@ -731,7 +764,7 @@ async function startAutoRooms() {
     let ocrNote = "OCR off.";
     if (state.modal.useOcr !== false) {
       try {
-        const words = await runPlanOcr(dataUrl, detected.meta);
+        const words = await runPlanOcr(dataUrl, detected.meta, candidates);
         candidates = NDPlannerRoomAuto.assignOcrLabels(candidates, words);
         const named = candidates.filter((c) => c.name && !/^Room \d+$/i.test(c.name)).length;
         ocrNote = named ? `OCR applied ${named} label(s). Check spelling before saving.` : "OCR did not find reliable room numbers — edit names below.";
