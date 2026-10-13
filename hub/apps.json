@@ -1,7 +1,7 @@
 {
   "generated": "by hub/build-apps.cjs - edit nd:* meta tags or hub/discover.json, not this file",
   "apps": [
-    { "id": "planner", "name": "Planner", "path": "/planner/", "icon": "/assets/suite-icons/apps/planner.svg?v=1.2.0", "color": "#ff5252", "order": 1, "hidden": false, "version": "0.21.2" },
+    { "id": "planner", "name": "Planner", "path": "/planner/", "icon": "/assets/suite-icons/apps/planner.svg?v=1.2.0", "color": "#ff5252", "order": 1, "hidden": false, "version": "0.21.3" },
     { "id": "upload", "name": "Upload", "path": "/upload/", "icon": "/assets/suite-icons/apps/upload.svg?v=1.2.0", "color": "#a855f7", "order": 2, "hidden": false },
     { "id": "search", "name": "Search", "path": "/search/", "icon": "/assets/suite-icons/apps/search.svg?v=1.2.0", "color": "#facc15", "order": 3, "hidden": false },
     { "id": "quote", "name": "Quote", "path": "/quote/", "icon": "/assets/suite-icons/apps/quote.svg?v=1.2.0", "color": "#31d0ff", "order": 4, "hidden": false, "version": "0.1.6" },

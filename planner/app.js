@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.21.2";
+const APP_VERSION = "0.21.3";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -668,69 +668,122 @@ async function floorPlanImageForAnalysis(floor) {
   throw new Error("Plan image unavailable");
 }
 
-async function loadPlanImageData(floor) {
-  const src = await floorPlanImageForAnalysis(floor);
+/* Detection only uses NDPlannerRoomAuto's 720px working size. Reading every pixel of a
+ * 6000×4000 plan is ~96MB and, with the canvas copy, crashed Chrome. Sample a small
+ * canvas for detection; the full bitmap exists only so OCR can crop each room. */
+const _releasedPlanBitmaps = new WeakSet();
+function planDetectMaxDim() {
+  return (window.NDPlannerRoomAuto && NDPlannerRoomAuto.DEFAULTS && NDPlannerRoomAuto.DEFAULTS.maxDim) || 720;
+}
+function releaseCanvas(canvas) {
+  if (!canvas) return;
+  canvas.width = 0;
+  canvas.height = 0;
+}
+function releasePlanBitmap(bitmap) {
+  if (!bitmap || _releasedPlanBitmaps.has(bitmap)) return;
+  _releasedPlanBitmaps.add(bitmap);
+  try {
+    if (typeof bitmap.close === "function") bitmap.close();
+    else if ("src" in bitmap) bitmap.src = "";
+  } catch (e) {}
+}
+async function decodePlanBitmap(src) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const blob = await (await fetch(src)).blob();
+      return await createImageBitmap(blob);
+    } catch (e) { console.warn("Plan bitmap decode", e); }
+  }
   const img = new Image();
-  await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = src; });
-  const width = img.naturalWidth || img.width;
-  const height = img.naturalHeight || img.height;
+  await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("Plan image failed to decode")); img.src = src; });
+  return img;
+}
+function pixelsForDetection(source) {
+  const sw = source.naturalWidth || source.width;
+  const sh = source.naturalHeight || source.height;
+  if (!sw || !sh) throw new Error("Plan image has no size");
+  const maxDim = planDetectMaxDim();
+  const scale = Math.min(1, maxDim / Math.max(sw, sh));
+  const width = scale >= 1 ? sw : Math.max(8, Math.round(sw * scale));
+  const height = scale >= 1 ? sh : Math.max(8, Math.round(sh * scale));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0);
-  const imageData = ctx.getImageData(0, 0, width, height);
-  return { data: imageData.data, width, height, dataUrl: src };
+  try {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(source, 0, 0, width, height);
+    return { data: ctx.getImageData(0, 0, width, height).data, width, height };
+  } finally {
+    releaseCanvas(canvas);
+  }
+}
+async function loadPlanImageData(floor) {
+  const src = await floorPlanImageForAnalysis(floor);
+  const bitmap = await decodePlanBitmap(src);
+  try {
+    return { ...pixelsForDetection(bitmap), bitmap };
+  } catch (e) {
+    releasePlanBitmap(bitmap);
+    throw e;
+  }
 }
 
 /* Whole-page OCR finds nothing on most floor plans: Tesseract's layout pass reads
  * the wall lines as a picture and drops the labels. So each detected room is
  * cropped just inside its walls and read on its own, one worker for all rooms. */
-function planOcrCrops(img, rooms) {
+function planOcrCrop(img, room) {
   const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
-  return (rooms || []).slice(0, 40).map((r) => {
-    const pts = r.points || [];
-    if (pts.length < 3) return null;
-    const xs = pts.map((p) => (Array.isArray(p) ? p[0] : p.x)), ys = pts.map((p) => (Array.isArray(p) ? p[1] : p.y));
-    let x0 = Math.min(...xs) / 100 * W, x1 = Math.max(...xs) / 100 * W, y0 = Math.min(...ys) / 100 * H, y1 = Math.max(...ys) / 100 * H;
-    const ix = (x1 - x0) * 0.08, iy = (y1 - y0) * 0.08;
-    x0 += ix; x1 -= ix; y0 += iy; y1 -= iy;
-    const w = Math.round(x1 - x0), h = Math.round(y1 - y0);
-    if (w < 12 || h < 12) return null;
-    const scale = Math.min(3, Math.max(1, 240 / Math.min(w, h)));
-    const c = document.createElement("canvas");
-    c.width = Math.round(w * scale); c.height = Math.round(h * scale);
-    const ctx = c.getContext("2d");
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.drawImage(img, x0, y0, w, h, 0, 0, c.width, c.height);
-    return { canvas: c, x0, y0, scale, W, H };
-  }).filter(Boolean);
+  const pts = room?.points || [];
+  if (pts.length < 3 || !W || !H) return null;
+  const xs = pts.map((p) => (Array.isArray(p) ? p[0] : p.x)), ys = pts.map((p) => (Array.isArray(p) ? p[1] : p.y));
+  let x0 = Math.min(...xs) / 100 * W, x1 = Math.max(...xs) / 100 * W, y0 = Math.min(...ys) / 100 * H, y1 = Math.max(...ys) / 100 * H;
+  const ix = (x1 - x0) * 0.08, iy = (y1 - y0) * 0.08;
+  x0 += ix; x1 -= ix; y0 += iy; y1 -= iy;
+  const w = Math.round(x1 - x0), h = Math.round(y1 - y0);
+  if (w < 12 || h < 12) return null;
+  const scale = Math.min(3, Math.max(1, 240 / Math.min(w, h)));
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, x0, y0, w, h, 0, 0, c.width, c.height);
+  return { canvas: c, x0, y0, scale, W, H };
 }
 
-async function runPlanOcr(dataUrl, meta, rooms) {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("offline");
+async function runPlanOcr(bitmap, rooms) {
   let worker = null;
   const work = (async () => {
-    if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC, PLANNER_TESSERACT_SRI);
-    if (!window.Tesseract) throw new Error("OCR library unavailable");
-    worker = await Tesseract.createWorker("eng", 1, Object.assign({ logger: () => {} }, PLANNER_TESSERACT_PATHS));
-    await worker.setParameters({ tessedit_pageseg_mode: "6" });
-    const img = new Image();
-    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = dataUrl; });
-    const words = [];
-    for (const crop of planOcrCrops(img, rooms)) {
-      const { data } = await worker.recognize(crop.canvas);
-      (data.words || []).forEach((w) => {
-        const b = w.bbox || {};
-        words.push({
-          text: w.text,
-          x: ((crop.x0 + (b.x0 + b.x1) / 2 / crop.scale) / crop.W) * 100,
-          y: ((crop.y0 + (b.y0 + b.y1) / 2 / crop.scale) / crop.H) * 100,
-          confidence: w.confidence
-        });
-      });
+    try {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("offline");
+      if (!window.Tesseract) await loadScriptOnce(PLANNER_TESSERACT_SRC, PLANNER_TESSERACT_SRI);
+      if (!window.Tesseract) throw new Error("OCR library unavailable");
+      worker = await Tesseract.createWorker("eng", 1, Object.assign({ logger: () => {} }, PLANNER_TESSERACT_PATHS));
+      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      const words = [];
+      for (const room of (rooms || []).slice(0, 40)) {
+        const crop = planOcrCrop(bitmap, room);
+        if (!crop) continue;
+        try {
+          const { data } = await worker.recognize(crop.canvas);
+          (data.words || []).forEach((w) => {
+            const b = w.bbox || {};
+            words.push({
+              text: w.text,
+              x: ((crop.x0 + (b.x0 + b.x1) / 2 / crop.scale) / crop.W) * 100,
+              y: ((crop.y0 + (b.y0 + b.y1) / 2 / crop.scale) / crop.H) * 100,
+              confidence: w.confidence
+            });
+          });
+        } finally {
+          releaseCanvas(crop.canvas);
+        }
+      }
+      return words;
+    } finally {
+      releasePlanBitmap(bitmap);
     }
-    return words;
   })();
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("OCR timed out")), PLANNER_OCR_TIMEOUT_MS); });
@@ -743,6 +796,7 @@ async function runPlanOcr(dataUrl, meta, rooms) {
   }
 }
 
+/* Only the Auto rooms button reaches this. Opening or uploading a plan must not. */
 async function startAutoRooms() {
   const floor = currentFloor();
   const proj = project();
@@ -752,19 +806,26 @@ async function startAutoRooms() {
   if (state.roomDraw?.mode) clearRoomDraw();
   state.modal = { mode: "auto-rooms", loading: true, candidates: [], useOcr: true, floorId: floor.id };
   render();
+  let bitmap = null;
+  let handedToOcr = false;
   try {
-    const { data, width, height, dataUrl } = await loadPlanImageData(floor);
+    const loaded = await loadPlanImageData(floor);
+    bitmap = loaded.bitmap;
+    const useOcr = state.modal?.useOcr !== false;
+    if (!useOcr) { releasePlanBitmap(bitmap); bitmap = null; }
     const existing = floorRooms(floor.id).map((r) => parseRoomShape(r.shape)?.pts).filter(Boolean);
-    const detected = NDPlannerRoomAuto.detectRoomsFromRgba(data, width, height, { existingPolygons: existing });
+    const detected = NDPlannerRoomAuto.detectRoomsFromRgba(loaded.data, loaded.width, loaded.height, { existingPolygons: existing });
+    loaded.data = null;
     let candidates = detected.rooms.map((r, i) => ({
       ...r,
       name: r.name || NDPlannerRoomAuto.defaultRoomName(i),
       selected: true
     }));
     let ocrNote = "OCR off.";
-    if (state.modal.useOcr !== false) {
+    if (useOcr && bitmap) {
+      handedToOcr = true;
       try {
-        const words = await runPlanOcr(dataUrl, detected.meta, candidates);
+        const words = await runPlanOcr(bitmap, candidates);
         candidates = NDPlannerRoomAuto.assignOcrLabels(candidates, words);
         const named = candidates.filter((c) => c.name && !/^Room \d+$/i.test(c.name)).length;
         ocrNote = named ? `OCR applied ${named} label(s). Check spelling before saving.` : "OCR did not find reliable room numbers — edit names below.";
@@ -780,7 +841,7 @@ async function startAutoRooms() {
       ocrNote,
       floorId: floor.id,
       meta: detected.meta,
-      useOcr: state.modal.useOcr !== false
+      useOcr
     };
     if (!candidates.length) toast("No closed rooms detected — try a clearer scan or draw rooms manually.");
     render();
@@ -789,6 +850,8 @@ async function startAutoRooms() {
     state.modal = null;
     render();
     toast("Could not analyse this plan. Reload the plan or upload PNG/PDF.");
+  } finally {
+    if (!handedToOcr) releasePlanBitmap(bitmap);
   }
 }
 
