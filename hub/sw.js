@@ -16,7 +16,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'hub-v12'; // v12: hub 0.7.3 — owner-only private app shortcut (server-provided link; signed-in devices only); v11: hub 0.7.2 — bug sweep: window.NDMatch/NDRecentJobs/NDUI in app.js; v10: v10: hub 0.7.1 — Recent jobs quick launch (shared/nd-recent-jobs.js precached); v9: hub 0.6.5 — hub icons back to the teal Suite hub icon (favicon, apple-touch, manifest, maskable); v8: hub 0.6.4 — Neill Data (ND) suite logo: favicon, apple-touch, manifest + maskable icons; v7: hub 0.6.3 — header clears the sync badge; v6: hub 0.6.2 — opaque PNG home-screen icons (icon-180 apple-touch-icon); v5: apps.json + HTML network-first
+const CACHE_VERSION = 'hub-v13'; // v12: hub 0.7.3 — owner-only private app shortcut (server-provided link; signed-in devices only); v11: hub 0.7.2 — bug sweep: window.NDMatch/NDRecentJobs/NDUI in app.js; v10: v10: hub 0.7.1 — Recent jobs quick launch (shared/nd-recent-jobs.js precached); v9: hub 0.6.5 — hub icons back to the teal Suite hub icon (favicon, apple-touch, manifest, maskable); v8: hub 0.6.4 — Neill Data (ND) suite logo: favicon, apple-touch, manifest + maskable icons; v7: hub 0.6.3 — header clears the sync badge; v6: hub 0.6.2 — opaque PNG home-screen icons (icon-180 apple-touch-icon); v5: apps.json + HTML network-first
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -35,7 +35,7 @@ const SHELL_ASSETS = [
   "../shared/nd-ui.js",
   "../shared/nd-recent-jobs.js?v=1",
   "../shared/nd-pwa.js",
-  "./app.js?v=0.7.3"
+  "./app.js?v=0.7.4"
 ];
 
 const IS_API_HOST = (url) =>
@@ -56,7 +56,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('hub-') && k !== CACHE_VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

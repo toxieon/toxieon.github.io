@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'quote-0.1.6';
+const CACHE_VERSION = 'quote-0.1.7';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
@@ -52,7 +52,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('quote-') && k !== CACHE_VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
