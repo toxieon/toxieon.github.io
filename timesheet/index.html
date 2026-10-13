@@ -15,17 +15,17 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.4.5"></script>
+<script src="ts-time.js?v=0.5.1"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.4.5"></script>
-<script src="ts-clipboard.js?v=0.4.5"></script>
+<script src="ts-map.js?v=0.5.1"></script>
+<script src="ts-clipboard.js?v=0.5.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
 <script src="../assets/job-locator.js"></script>
-<script src="../shared/nd-site-match.js?v=0.4.5"></script>
-<script src="../shared/nd-gate-codes.js?v=0.4.5"></script>
+<script src="../shared/nd-site-match.js?v=0.5.1"></script>
+<script src="../shared/nd-gate-codes.js?v=0.5.1"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -276,6 +276,15 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .lp-card-name { font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; }
 .lp-card-addr { font-size:12px; overflow:hidden; text-overflow:ellipsis; }
 .lp-card .btn { flex:none; min-height:44px; }
+
+.lp-here { flex:none; margin-top:10px; min-height:52px; width:100%; display:flex; flex-direction:column; align-items:stretch; gap:2px; padding:12px 14px; text-align:left; border:1px dashed var(--on-glow); border-radius:12px; background:rgba(58,184,122,0.08); color:var(--text-primary); font-size:14px; cursor:pointer; }
+.lp-here[hidden] { display:none !important; }
+.lp-here:disabled { opacity:0.65; cursor:default; }
+.lp-here .lp-here-label { font-weight:600; color:var(--on-accent); font-size:13px; }
+.lp-here .lp-here-addr { font-size:12.5px; color:var(--text-muted); line-height:1.3; }
+.lp-here.lp-here-ready .lp-here-addr { color:var(--text-primary); }
+.lp-here .lp-here-hint { font-size:11px; color:var(--text-muted); }
+.pk-changeloc { min-height:44px; }
 
 @media print { .tabbar, .nd-sync-tube, .nd-sync-label, .export-actions, .week-nav, .fab, .today-chip, #day-cards, .week-summary, .nudge-card, .week-map-wrap { display: none !important; } body { background: #fff; color: #000; } .preview-box { border: none; max-height: none; } .view { display: none !important; } #view-history { display: block !important; } .export-panel { border: none; } .export-panel summary { display: none; } }
 .settings-section { margin-bottom: 22px; }
@@ -738,7 +747,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.4.5';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.5.1';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -2479,9 +2488,10 @@ window.Views = {};
   function openPicker(title, bodyHtml) { $('picker-title').textContent = title; $('picker-body').innerHTML = bodyHtml; $('picker-backdrop').style.display = 'flex'; }
   function closePicker() { $('picker-backdrop').style.display = 'none'; }
   function showConfirmKnown(job, lat, lng) {
-    openPicker(`You're at ${escapeHtml(job.job_name)}`, `<p class="muted">Clocking on?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-cancel">Cancel</button><button class="btn btn-primary" id="pk-confirm">Clock On</button></div>`);
+    openPicker(`You're at ${escapeHtml(job.job_name)}`, `<p class="muted">${escapeHtml(job.address || job.job_name)}</p><p class="muted" style="font-size:12px;margin-top:4px;">Clocking on?</p><div class="modal-actions"><button class="btn btn-ghost pk-changeloc" id="pk-changeloc">Change location</button><button class="btn btn-ghost" id="pk-cancel">Cancel</button><button class="btn btn-primary" id="pk-confirm">Clock On</button></div>`);
     $('pk-cancel').onclick = closePicker;
     $('pk-confirm').onclick = () => { closePicker(); doClockOn(job, lat, lng); };
+    $('pk-changeloc').onclick = () => { closePicker(); openChangeLocation(lat, lng); };
   }
   // "Near" tier: we're a bit outside the site radius but the nearest job is
   // almost certainly it. Assume it and clock on after a short countdown, but
@@ -2491,24 +2501,25 @@ window.Views = {};
     openPicker(`Near ${escapeHtml(job.job_name)}`,
       `<p class="muted">Assuming you're at <strong>${escapeHtml(job.address || job.job_name)}</strong>.</p>
        <div class="countdown-wrap"><div class="countdown-bar" id="pk-countdown"></div></div>
-       <p class="muted" style="font-size:12px;">Clocking on automatically — tap Change to pick a different job.</p>
-       <div class="modal-actions"><button class="btn btn-ghost" id="pk-change">Change</button><button class="btn btn-primary" id="pk-now">Clock On now</button></div>`);
+       <p class="muted" style="font-size:12px;">Clocking on automatically — tap Change location to pick somewhere else.</p>
+       <div class="modal-actions"><button class="btn btn-ghost pk-changeloc" id="pk-change">Change location</button><button class="btn btn-primary" id="pk-now">Clock On now</button></div>`);
     let settled = false;
     const bar = $('pk-countdown');
     requestAnimationFrame(() => { bar.style.transition = `width ${SECS}s linear`; bar.style.width = '0%'; });
     const timer = setTimeout(() => { if (!settled) { settled = true; closePicker(); doClockOn(job, lat, lng); } }, SECS * 1000);
     const stop = () => { settled = true; clearTimeout(timer); };
     $('pk-now').onclick = () => { stop(); closePicker(); doClockOn(job, lat, lng); };
-    $('pk-change').onclick = () => { stop(); closePicker(); showManualPicker(); };
+    $('pk-change').onclick = () => { stop(); closePicker(); openChangeLocation(lat, lng); };
   }
   function showNeillQuotePrompt(quoteJob, lat, lng) {
-    openPicker('Neill Data job site detected', `<p class="muted">First time here — are you quoting or working?</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-quoting">Quoting</button><button class="btn btn-primary" id="pk-working">Working</button></div>`);
+    openPicker('Neill Data job site detected', `<p class="muted">${escapeHtml(quoteJob.address || quoteJob.job_name || '')}</p><p class="muted" style="font-size:12px;margin-top:4px;">First time here — are you quoting or working?</p><div class="modal-actions"><button class="btn btn-ghost pk-changeloc" id="pk-changeloc">Change location</button><button class="btn btn-ghost" id="pk-quoting">Quoting</button><button class="btn btn-primary" id="pk-working">Working</button></div>`);
     const finish = async (status) => {
       closePicker();
       const job = createJob({ job_name: quoteJob.job_name, address: quoteJob.address, lat: quoteJob.lat, lng: quoteJob.lng, job_type: 'neill_data', neill_quote_id: quoteJob.neill_quote_id, neill_quote_status: status });
       TsNeillQuote.flagProject(quoteJob.neill_quote_id, status === 'quoting' ? 'quote' : 'in_progress');
       doClockOn(job, lat, lng);
     };
+    $('pk-changeloc').onclick = () => { closePicker(); openChangeLocation(lat, lng); };
     $('pk-quoting').onclick = () => finish('quoting');
     $('pk-working').onclick = () => finish('working');
   }
@@ -2521,9 +2532,11 @@ window.Views = {};
       const job = createJob({ job_name: finalAddr, address: finalAddr, lat, lng, job_type: 'employer' });
       doClockOn(job, lat, lng);
     };
-    openPicker('Is this your location?', `<p class="muted" id="pk-address">${escapeHtml(address || 'Unknown address')}</p><p class="muted" style="font-size:12px; margin-top:4px;">Saved as an employer job (not a Neill Quote site). You can rename or reclassify it later in History.</p><div class="modal-actions"><button class="btn btn-ghost" id="pk-edit">Edit</button><button class="btn btn-primary" id="pk-confirm-addr">Confirm</button></div>`);
+    openPicker('Is this your location?', `<p class="muted" id="pk-address">${escapeHtml(address || 'Unknown address')}</p><p class="muted" style="font-size:12px; margin-top:4px;">Saved as an employer job (not a Neill Quote site). You can rename or reclassify it later in History.</p><div class="modal-actions"><button class="btn btn-ghost pk-changeloc" id="pk-changeloc">Change location</button><button class="btn btn-ghost" id="pk-edit">Edit</button><button class="btn btn-primary" id="pk-confirm-addr">Confirm</button></div>`);
+    $('pk-changeloc').onclick = () => { closePicker(); openChangeLocation(lat, lng); };
     $('pk-edit').onclick = () => {
-      $('picker-body').innerHTML = `<div class="field"><label>Address</label><input id="pk-addr-input" value="${escapeHtml(address || '')}"></div><div class="modal-actions"><button class="btn btn-primary" id="pk-confirm-addr2">Create &amp; Clock On</button></div>`;
+      $('picker-body').innerHTML = `<div class="field"><label>Address</label><input id="pk-addr-input" value="${escapeHtml(address || '')}"></div><div class="modal-actions"><button class="btn btn-ghost pk-changeloc" id="pk-changeloc2">Change location</button><button class="btn btn-primary" id="pk-confirm-addr2">Create &amp; Clock On</button></div>`;
+      $('pk-changeloc2').onclick = () => { closePicker(); openChangeLocation(lat, lng); };
       $('pk-confirm-addr2').onclick = () => create($('pk-addr-input').value);
     };
     $('pk-confirm-addr').onclick = () => create(address);
@@ -2548,18 +2561,56 @@ window.Views = {};
       render(); TsGeo.startWatching(); toast(`Clocked on at ${job.job_name}`);
     });
   }
-  function showManualPicker() {
-    const st = getState();
-    if (!st.jobs.length) { toast('No saved jobs yet — clock on once to create one.'); return; }
-    // §5.3: most-recent jobs first; now searchable, with a map-pin tab too.
+  function applyPickedLocation(loc, fallbackLat, fallbackLng) {
+    const lat = loc.lat != null ? loc.lat : fallbackLat;
+    const lng = loc.lng != null ? loc.lng : fallbackLng;
+    if (loc.job_id) {
+      const job = getState().jobs.find(j => j.job_id === loc.job_id);
+      if (job) { doClockOn(job, lat ?? job.lat, lng ?? job.lng); return; }
+    }
+    const addr = (loc.address || loc.name || '').trim() || 'Unknown location';
+    const job = resolveOrCreateJob({ job_name: loc.name || addr, address: addr, lat: lat ?? null, lng: lng ?? null, job_type: loc.job_type || 'employer' });
+    doClockOn(job, lat ?? null, lng ?? null);
+  }
+  function openChangeLocation(lat, lng) {
+    const origin = (lat != null && lng != null) ? { lat, lng } : null;
     TsLocPicker.open({
-      title: 'Choose a job', jobsOnly: true,
-      onPick: async (loc) => {
-        const job = getState().jobs.find(j => j.job_id === loc.job_id); if (!job) return;
-        const pos = await TsGeo.getPositionResilient();
-        doClockOn(job, pos ? pos.coords.latitude : job.lat, pos ? pos.coords.longitude : job.lng);
+      title: 'Change location',
+      jobsOnly: false,
+      origin,
+      showHere: true,
+      onPick: (loc) => applyPickedLocation(loc, lat, lng),
+      onHere: (here) => {
+        const addr = (here.address || '').trim() || 'Current location';
+        const job = resolveOrCreateJob({ job_name: addr, address: addr, lat: here.lat, lng: here.lng, job_type: 'employer' });
+        doClockOn(job, here.lat, here.lng);
       }
     });
+  }
+  function showManualPicker() {
+    // Prefer the distance-sorted Change location sheet when GPS is available;
+    // otherwise fall back to jobs-only recent list (same sheet, no Here pin).
+    (async () => {
+      let pos = TsGeo.lastPosition;
+      if (!pos) { try { pos = await TsGeo.getPositionResilient(); } catch (e) { pos = null; } }
+      const lat = pos ? pos.coords.latitude : null;
+      const lng = pos ? pos.coords.longitude : null;
+      if (lat != null) { openChangeLocation(lat, lng); return; }
+      const st = getState();
+      if (!st.jobs.length && !(st.sessions || []).length) {
+        toast('No saved locations yet — try Clock On, or add a shift with an address.');
+        return;
+      }
+      TsLocPicker.open({
+        title: 'Choose a location', jobsOnly: false, showHere: true,
+        onPick: (loc) => applyPickedLocation(loc, null, null),
+        onHere: (here) => {
+          const addr = (here.address || '').trim() || 'Current location';
+          const job = resolveOrCreateJob({ job_name: addr, address: addr, lat: here.lat, lng: here.lng, job_type: 'employer' });
+          doClockOn(job, here.lat, here.lng);
+        }
+      });
+    })();
   }
   async function handleClockOff() {
     const st = getState(); const session = st.currentSession; if (!session) return;
@@ -2995,27 +3046,34 @@ window.TsTravel = TsTravel;
  * saved location with coordinates (tap a pin → name card → Use this), or a
  * type-to-filter list. "Saved locations" = Log book jobs + any past-shift
  * location that never became a job, deduped by name/address/coords.
+ * Optional origin sorts the list by distance; showHere pins "Use my current
+ * location" at the bottom (reverse-geocode via TsGeo, then onHere / pick).
  * Reuses TsGeo.loadMapsJs (same Maps key/loader as the day travel map); if
  * Maps can't load, the list still works and the Map tab says so. */
 const TsLocPicker = (() => {
-  let map = null, markers = [], onPickCb = null, items = [], mode = 'list', selected = null, jobsOnly = false;
+  let map = null, markers = [], onPickCb = null, onHereCb = null, items = [], mode = 'list', selected = null, jobsOnly = false;
+  let origin = null, showHere = false, hereState = null; // {status, address, lat, lng, error}
   function $(id) { return document.getElementById(id); }
   function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
   function num(v) { const n = (v === '' || v == null) ? NaN : Number(v); return Number.isFinite(n) ? n : null; }
+  function fmtDist(m) {
+    if (m == null || !Number.isFinite(m)) return '';
+    if (m < 1000) return Math.round(m) + ' m';
+    return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
+  }
   function savedLocations(opts) {
     const st = getState(); const out = []; const byKey = new Map();
     const push = (loc) => {
       const nk = norm(loc.name), ak = norm(loc.address);
       let hit = (nk && byKey.get('n:' + nk)) || (ak && byKey.get('a:' + ak)) || null;
       if (!hit && loc.lat != null && !loc.job_id) {
-        // a past-shift location within 60 m of a saved one is the same place
         hit = out.find(o => o.lat != null && distanceMetres(o.lat, o.lng, loc.lat, loc.lng) <= 60) || null;
       }
       if (hit && (!loc.job_id || !hit.job_id || hit.job_id === loc.job_id || (nk && norm(hit.name) === nk && ak === norm(hit.address)))) {
         if (hit.lat == null && loc.lat != null) { hit.lat = loc.lat; hit.lng = loc.lng; }
         if (!hit.address && loc.address) hit.address = loc.address;
         if (!hit.job_id && loc.job_id) { hit.job_id = loc.job_id; hit.name = loc.name || hit.name; hit.job_type = loc.job_type; }
-        if (!(hit.job_id && !loc.job_id)) hit.visits += loc.visits || 0;   // job visit_count already counts its shifts
+        if (!(hit.job_id && !loc.job_id)) hit.visits += loc.visits || 0;
         if ((loc.last || '') > (hit.last || '')) hit.last = loc.last;
         return;
       }
@@ -3036,8 +3094,12 @@ const TsLocPicker = (() => {
         push({ job_id: null, name, address: String(s.address_confirmed || '').trim(), lat: lat != null && lng != null ? lat : null, lng: lat != null && lng != null ? lng : null, job_type: s.job_type || '', visits: 1, last: s.date || '' });
       });
     }
-    // Only real job IDs survive — a session-derived location links to its job if one matched.
     out.forEach(o => { if (o.job_id && !(st.jobs || []).some(j => j.job_id === o.job_id)) o.job_id = null; });
+    const ori = opts && opts.origin;
+    if (ori && ori.lat != null && ori.lng != null) {
+      out.forEach(o => { o.distM = (o.lat != null && o.lng != null) ? distanceMetres(ori.lat, ori.lng, o.lat, o.lng) : Infinity; });
+      return out.sort((a, b) => (a.distM - b.distM) || (b.last || '').localeCompare(a.last || '') || b.visits - a.visits || a.name.localeCompare(b.name));
+    }
     return out.sort((a, b) => (b.last || '').localeCompare(a.last || '') || b.visits - a.visits || a.name.localeCompare(b.name));
   }
   function filtered() {
@@ -3063,6 +3125,11 @@ const TsLocPicker = (() => {
           <button type="button" class="btn btn-primary" id="lp-use">Use this</button>
         </div>
       </div>
+      <button type="button" class="lp-here" id="lp-here" hidden>
+        <span class="lp-here-label">📍 Use my current location</span>
+        <span class="lp-here-addr" id="lp-here-addr">Getting GPS…</span>
+        <span class="lp-here-hint" id="lp-here-hint">Tap to clock on here</span>
+      </button>
     </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) close(); });
@@ -3074,13 +3141,66 @@ const TsLocPicker = (() => {
       const row = e.target.closest('[data-lp-idx]'); if (!row) return;
       const it = filtered()[Number(row.dataset.lpIdx)]; if (it) pick(it);
     });
+    $('lp-here').addEventListener('click', () => useHere());
+  }
+  function renderHere() {
+    const btn = $('lp-here'); if (!btn) return;
+    btn.hidden = !showHere;
+    if (!showHere) return;
+    const addrEl = $('lp-here-addr'); const hintEl = $('lp-here-hint');
+    btn.classList.toggle('lp-here-ready', !!(hereState && hereState.status === 'ready'));
+    btn.disabled = !(hereState && hereState.status === 'ready');
+    if (!hereState || hereState.status === 'loading') {
+      addrEl.textContent = 'Getting GPS…';
+      hintEl.textContent = 'Hang on — looking up this spot';
+    } else if (hereState.status === 'ready') {
+      addrEl.textContent = hereState.address || `${Number(hereState.lat).toFixed(5)}, ${Number(hereState.lng).toFixed(5)}`;
+      hintEl.textContent = 'Tap to clock on with this address';
+    } else {
+      addrEl.textContent = hereState.error || 'Location unavailable';
+      hintEl.textContent = 'Pick a saved site above, or type an address in History';
+      btn.disabled = true;
+    }
+  }
+  async function refreshHere() {
+    if (!showHere) return;
+    hereState = { status: 'loading' }; renderHere();
+    let pos = null;
+    try { pos = await TsGeo.getPositionResilient(); } catch (e) { pos = null; }
+    if (!pos) {
+      hereState = { status: 'error', error: 'GPS denied or timed out' };
+      renderHere();
+      return;
+    }
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    let address = null;
+    try { address = await TsGeo.reverseGeocode(lat, lng); } catch (e) { address = null; }
+    if (!address) {
+      hereState = { status: 'ready', lat, lng, address: null };
+      renderHere();
+      return;
+    }
+    hereState = { status: 'ready', lat, lng, address };
+    renderHere();
+  }
+  function useHere() {
+    if (!hereState || hereState.status !== 'ready') return;
+    const payload = { here: true, name: hereState.address || 'Current location', address: hereState.address || '', lat: hereState.lat, lng: hereState.lng, job_id: null };
+    const hereCb = onHereCb; const pickCb = onPickCb;
+    close();
+    if (hereCb) hereCb(payload);
+    else if (pickCb) pickCb(payload);
   }
   function renderList() {
     const list = filtered();
     const wrap = $('lp-list');
     if (!items.length) { wrap.innerHTML = '<div class="lp-empty">No saved locations yet — clock on once or add a shift with an address.</div>'; return; }
     if (!list.length) { wrap.innerHTML = '<div class="lp-empty">No matches. Clear the search or type the address manually.</div>'; return; }
-    wrap.innerHTML = list.map((it, i) => `<button type="button" class="lp-item" data-lp-idx="${i}"><span class="pname">${escapeHtml(it.name)}</span>${it.address && norm(it.address) !== norm(it.name) ? `<span class="paddr">${escapeHtml(it.address)}</span>` : ''}<span class="lp-meta">${it.lat != null ? '📍' : '<span class="muted">no pin</span>'}${it.visits ? ` · ${it.visits} visit${it.visits === 1 ? '' : 's'}` : ''}</span></button>`).join('');
+    wrap.innerHTML = list.map((it, i) => {
+      const dist = (it.distM != null && Number.isFinite(it.distM) && it.distM !== Infinity) ? fmtDist(it.distM) : '';
+      const metaBits = [it.lat != null ? '📍' : '<span class="muted">no pin</span>', dist, it.visits ? `${it.visits} visit${it.visits === 1 ? '' : 's'}` : ''].filter(Boolean);
+      return `<button type="button" class="lp-item" data-lp-idx="${i}"><span class="pname">${escapeHtml(it.name)}</span>${it.address && norm(it.address) !== norm(it.name) ? `<span class="paddr">${escapeHtml(it.address)}</span>` : ''}<span class="lp-meta">${metaBits.join(' · ')}</span></button>`;
+    }).join('');
   }
   function showCard(it) {
     selected = it;
@@ -3104,7 +3224,11 @@ const TsLocPicker = (() => {
       mk.addListener('click', () => { showCard(it); map.panTo(pos); });
       markers.push(mk); bounds.extend(pos);
     });
-    if (pins.length === 1) { map.setCenter(bounds.getCenter()); map.setZoom(15); }
+    if (origin && origin.lat != null) {
+      const me = new google.maps.Marker({ map, position: { lat: origin.lat, lng: origin.lng }, title: 'You', label: '•' });
+      markers.push(me); bounds.extend({ lat: origin.lat, lng: origin.lng });
+    }
+    if (pins.length === 1 && !origin) { map.setCenter(bounds.getCenter()); map.setZoom(15); }
     else map.fitBounds(bounds, 40);
   }
   async function setMode(m) {
@@ -3131,23 +3255,29 @@ const TsLocPicker = (() => {
   }
   function pick(it) {
     const cb = onPickCb; close();
-    if (cb) cb({ job_id: it.job_id || null, name: it.name, address: it.address || '', lat: it.lat, lng: it.lng, job_type: it.job_type || '' });
+    if (cb) cb({ job_id: it.job_id || null, name: it.name, address: it.address || '', lat: it.lat, lng: it.lng, job_type: it.job_type || '', here: !!it.here });
   }
   function open(opts) {
     opts = opts || {};
     ensureDom();
     jobsOnly = !!opts.jobsOnly;
-    items = savedLocations({ jobsOnly });
+    origin = (opts.origin && opts.origin.lat != null && opts.origin.lng != null)
+      ? { lat: Number(opts.origin.lat), lng: Number(opts.origin.lng) } : null;
+    showHere = !!opts.showHere;
+    hereState = null;
+    items = savedLocations({ jobsOnly, origin });
     onPickCb = opts.onPick || null;
+    onHereCb = opts.onHere || null;
     $('lp-title').textContent = opts.title || 'Saved locations';
     $('lp-search').value = opts.query || '';
     $('lp-backdrop').style.display = 'flex';
     renderList();
+    renderHere();
     setMode(opts.mode === 'map' ? 'map' : 'list');
-    // Don't pop the iOS keyboard over the map; do focus the search in list mode on desktop.
+    if (showHere) refreshHere();
     if (opts.mode !== 'map' && !('ontouchstart' in window)) setTimeout(() => $('lp-search').focus(), 60);
   }
-  function close() { const el = $('lp-backdrop'); if (el) el.style.display = 'none'; selected = null; onPickCb = null; }
+  function close() { const el = $('lp-backdrop'); if (el) el.style.display = 'none'; selected = null; onPickCb = null; onHereCb = null; }
   return { open, close, savedLocations };
 })();
 window.TsLocPicker = TsLocPicker;
