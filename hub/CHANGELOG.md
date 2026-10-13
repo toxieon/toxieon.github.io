@@ -1,3 +1,4 @@
+## 0.7.5 · 2026-10-13 · sw-precache · Service worker hub-v14 precaches shared nd-backend.js, nd-config.js, nd-auth.js and nd-gate-codes.js?v=0.1.2 so the hub's sign-in scripts load offline.
 ## 0.7.4 · 2026-10-13 · sw-cache-scope · Service worker hub-v13 deletes only hub-* caches on activate (it used to delete every app's caches on the site).
 ## 0.7.3 · 2026-10-12 · owner-shortcut · For the owner only, on a device already signed in to the suite, the hub asks the backend for a private app shortcut and adds it as a tile; the path is never in a static hub file. No sign-in attempt on devices that have never signed in. Service worker hub-v12
 ## 0.7.2 · 2026-10-10 · bug-sweep · app.js reads the shared helpers as window.NDMatch / window.NDRecentJobs / window.NDUI (no bare globals in the ES module). Service worker hub-v11

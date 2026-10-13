@@ -221,14 +221,19 @@ function render() {
   });
 }
 
+async function parseApi(r) {
+  if (!r.ok) throw new Error('Server error ' + r.status);
+  try { return await r.json(); } catch (e) { throw new Error('Bad reply from server'); }
+}
+
 async function api(payload) {
   if (payload) {
     // text/plain avoids CORS preflight, which Apps Script can't answer
     const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-    return r.json();
+    return parseApi(r);
   }
   const r = await fetch(API_URL);
-  return r.json();
+  return parseApi(r);
 }
 
 async function refresh(silent) {
@@ -241,7 +246,7 @@ async function refresh(silent) {
     entries = data.entries || [];
     render();
   } catch (err) {
-    if (!silent) showMsg('Couldn\'t reach the leaderboard. Check your connection and hit refresh.', 'err');
+    if (!silent) showMsg('Couldn\'t load the leaderboard (' + (err && err.message || 'network') + '). Hit refresh to try again.', 'err');
   }
 }
 
@@ -301,7 +306,12 @@ $('height').oninput = livePreview;
 $('weight').oninput = livePreview;
 
 refresh(false);
-setInterval(() => refresh(true), 20000);
+// 20 s refresh only while visible; refresh at once when the page comes back.
+let refreshTimer = setInterval(() => refresh(true), 20000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { clearInterval(refreshTimer); refreshTimer = null; }
+  else if (!refreshTimer) { refresh(true); refreshTimer = setInterval(() => refresh(true), 20000); }
+});
 </script>
 </body>
 </html>
