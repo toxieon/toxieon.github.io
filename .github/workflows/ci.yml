@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # lint-release diffs icon PNGs against origin/main
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -23,3 +25,7 @@ jobs:
       - run: npm ci --omit=dev --prefix reelreader/server  # Reel Reader backend deps for its tests
       - run: npm test
       - run: npm run icons:check
+      - name: Release lint (versions, SW cache scope, icon PNGs)
+        run: node scripts/lint-release.cjs --base origin/main
+        env:
+          ICONS_CHANGED_OK: ${{ contains(github.event.pull_request.labels.*.name, 'icons-changed') && '1' || '0' }}
