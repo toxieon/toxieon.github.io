@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Protected pluginfile image (test)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; }
+    .que img { max-width: 100%; border: 1px solid #ccc; }
+    .fa-check::before { font-family: "FontAwesome"; content: "\\f00c"; }
+  </style>
+</head>
+<body>
+  <h1>Question with auth-protected image</h1>
+  <div class="que">
+    <p>What is pictured?</p>
+    <img
+      id="qimg"
+      width="120"
+      height="80"
+      alt="Protected quiz image"
+      src="/pluginfile.php?file=question.png"
+    />
+    <p>Correct: <i class="icon fa fa-check text-success" aria-hidden="true"></i> Cable tray</p>
+  </div>
+</body>
+</html>

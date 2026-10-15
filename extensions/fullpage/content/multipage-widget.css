@@ -1,0 +1,143 @@
+#neill-multipage-root {
+  position: fixed;
+  z-index: 2147483646;
+  top: 40%;
+  right: 0;
+  transform: translateY(-50%);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 13px;
+  color: #202124;
+  pointer-events: none;
+}
+
+#neill-multipage-root * {
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.nfp-dock {
+  display: flex;
+  align-items: stretch;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.18));
+}
+
+.nfp-tab {
+  width: 28px;
+  border-radius: 10px 0 0 10px;
+  background: linear-gradient(180deg, #1a73e8, #1557b0);
+  color: #fff;
+  border: none;
+  cursor: grab;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 10px 4px;
+}
+
+.nfp-tab:active {
+  cursor: grabbing;
+}
+
+.nfp-panel {
+  width: 200px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  overflow: hidden;
+  transition: width 0.2s ease, opacity 0.2s ease;
+}
+
+#neill-multipage-root.nfp-minimized .nfp-panel {
+  width: 0;
+  opacity: 0;
+  border: none;
+}
+
+.nfp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.nfp-brand {
+  font-weight: 600;
+  font-size: 12px;
+  color: #1a73e8;
+}
+
+.nfp-head-actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #5f6368;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.nfp-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nfp-count {
+  font-size: 12px;
+  color: #5f6368;
+  text-align: center;
+}
+
+.nfp-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.nfp-actions button {
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.nfp-actions button.nfp-primary {
+  grid-column: 1 / -1;
+  background: #1a73e8;
+  color: #fff;
+  border-color: #1a73e8;
+  font-weight: 600;
+}
+
+.nfp-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nfp-capture {
+  font-size: 20px;
+}
+
+.nfp-status {
+  font-size: 11px;
+  color: #188038;
+  text-align: center;
+  min-height: 14px;
+}
+
+.nfp-status.error {
+  color: #c5221f;
+}
+
+.nfp-busy .nfp-panel {
+  opacity: 0.85;
+}
