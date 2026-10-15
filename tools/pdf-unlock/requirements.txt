@@ -1,0 +1,1 @@
+# No pip dependencies — Python 3.10+ stdlib (including tkinter) plus the qpdf CLI.
