@@ -708,6 +708,13 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
         <div id="route-warn" class="tip warn" style="display:none;"></div>
       </div>
 
+      <!-- Scope of Works (customer-facing on quote & invoice PDFs) -->
+      <div class="card" id="scope-card">
+        <h3>Scope of Works <span class="pill">On quote &amp; invoice</span></h3>
+        <p class="panel-sub scope-hint" style="margin:0 0 10px;">What you are agreeing to install or deliver. Start a line with <b>-</b> to show it as a bullet on the PDF.</p>
+        <textarea id="scope-of-works" rows="5" placeholder="e.g.&#10;- Supply and install 4× cameras&#10;- Configure NVR and mobile app&#10;- Handover and basic user training" style="min-height:100px;"></textarea>
+      </div>
+
       <!-- Cameras (picker) -->
       <div class="card">
         <h3>Cameras <span class="pill hide-from-staff" id="pill-cameras">0% cap</span></h3>
@@ -1150,7 +1157,7 @@ details.cal-job-edit > summary:hover { color: var(--brand); }
 /* =====================================================
    HARD-CODED CONSTANTS
    ===================================================== */
-const APP_VERSION = "0.1.7";   // see quote/VERSIONING.md
+const APP_VERSION = "0.2.1";   // see quote/VERSIONING.md
 document.addEventListener("DOMContentLoaded", () => { const v = document.getElementById("app-version"); if (v) v.textContent = "v" + APP_VERSION; });
 /* ▼▼▼ PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES BELOW ▼▼▼ */
 const HARDCODED_MAPS_KEY        = 'AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w';
@@ -1363,6 +1370,7 @@ function blankQuote() {
     cashMode: false,
     cashStyle: null,
     notes: '',
+    scopeOfWorks: '',
     photos: [],
     extraMaterials: [],
     status: 'quote',
@@ -2426,6 +2434,7 @@ document.getElementById('cash-toggle').addEventListener('change', e => {
   renderTotals(); scheduleDraftSave();
 });
 document.getElementById('notes').addEventListener('input', e => { currentQuote.notes = e.target.value; scheduleDraftSave(); });
+document.getElementById('scope-of-works').addEventListener('input', e => { currentQuote.scopeOfWorks = e.target.value; scheduleDraftSave(); });
 document.getElementById('client-name').addEventListener('input', e => { currentQuote.client.name = e.target.value; scheduleDraftSave(); });
 document.getElementById('client-phone').addEventListener('input', e => { currentQuote.client.phone = e.target.value; scheduleDraftSave(); });
 document.getElementById('client-address').addEventListener('input', e => { currentQuote.client.address = e.target.value; scheduleDraftSave(); });
@@ -2451,6 +2460,7 @@ function resetQuoteUI() {
   document.getElementById('travel-auto').value = 0;
   document.getElementById('discount').value = 0;
   document.getElementById('notes').value = '';
+  document.getElementById('scope-of-works').value = '';
   document.getElementById('gst-toggle').checked = settings.gstDefault;
   document.getElementById('cash-toggle').checked = false;
   document.getElementById('save-cash-pdf').style.display = 'none';
@@ -2898,6 +2908,7 @@ function hydrateQuoteUI() {
   document.getElementById('travel-auto').value = currentQuote.bandPrice || 0;
   document.getElementById('discount').value = currentQuote.discountPct || 0;
   document.getElementById('notes').value    = currentQuote.notes || '';
+  document.getElementById('scope-of-works').value = currentQuote.scopeOfWorks || '';
   document.getElementById('gst-toggle').checked  = !!currentQuote.gst;
   document.getElementById('cash-toggle').checked = !!currentQuote.cashMode;
   document.getElementById('save-cash-pdf').style.display = currentQuote.cashMode ? '' : 'none';
@@ -3791,7 +3802,69 @@ async function sharePDF(blob, filename) {
   return false;
 }
 
+function scopeOfWorksTrim(raw) { return String(raw == null ? '' : raw).trim(); }
 
+/** Customer-facing scope block for PDF/image. Empty input → empty lines (section hidden). */
+function parseScopeOfWorks(raw) {
+  const text = scopeOfWorksTrim(raw);
+  if (!text) return { mode: 'text', lines: [] };
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return { mode: 'text', lines: [] };
+  if (lines.some(l => /^-/.test(l))) {
+    return { mode: 'list', lines: lines.map(l => l.replace(/^-\s*/, '')) };
+  }
+  return { mode: 'text', lines: text.split(/\r?\n/) };
+}
+
+function measureScopeOfWorksHeight(ctx, scope, maxWidth, titleSize, bodySize, titleGap, lineGap) {
+  if (!scope || !scope.lines.length) return 0;
+  let h = titleSize + titleGap;
+  setCanvasFont(ctx, '400', bodySize);
+  scope.lines.forEach(line => {
+    const t = scope.mode === 'list' ? '• ' + line : line;
+    if (!String(t).trim()) { h += lineGap; return; }
+    h += wrapCanvasText(ctx, t, maxWidth).length * lineGap + 4;
+  });
+  return h + 16;
+}
+
+function drawScopeOfWorksOnCanvas(ctx, scope, margin, y, maxWidth, titleSize, bodySize, titleGap, lineGap) {
+  if (!scope || !scope.lines.length) return y;
+  ctx.fillStyle = '#111827';
+  setCanvasFont(ctx, '700', titleSize);
+  ctx.fillText('Scope of Works', margin, y);
+  y += titleGap;
+  setCanvasFont(ctx, '400', bodySize);
+  ctx.fillStyle = '#374151';
+  scope.lines.forEach(line => {
+    const t = scope.mode === 'list' ? '• ' + line : line;
+    if (!String(t).trim()) { y += lineGap; return; }
+    y = drawWrappedCanvasText(ctx, t, margin + (scope.mode === 'list' ? 8 : 0), y, maxWidth - (scope.mode === 'list' ? 8 : 0), lineGap) + 4;
+  });
+  return y + 12;
+}
+
+function appendScopeOfWorksToPdf(doc, M, W, y) {
+  const scope = parseScopeOfWorks(currentQuote.scopeOfWorks);
+  if (!scope.lines.length) return y;
+  const pageH = doc.internal.pageSize.getHeight();
+  const ensureRoom = (need) => {
+    if (y + need > pageH - M) { doc.addPage(); y = M; }
+  };
+  ensureRoom(24);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0);
+  doc.text('Scope of Works', M, y); y += 16;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  scope.lines.forEach(line => {
+    const text = scope.mode === 'list' ? '• ' + line : line;
+    if (!String(text).trim()) return;
+    const wrapped = doc.splitTextToSize(text, W - M * 2 - (scope.mode === 'list' ? 8 : 0));
+    ensureRoom(wrapped.length * 12 + 6);
+    doc.text(wrapped, M + (scope.mode === 'list' ? 8 : 0), y);
+    y += wrapped.length * 12 + 4;
+  });
+  return y + 8;
+}
 
 function customerDocRows(c, isCash) {
   const rows = [];
@@ -3902,6 +3975,7 @@ function buildQuoteImageData(style) {
     clientName: currentQuote.client.name || '',
     clientAddress: currentQuote.client.address || '',
     metaLines,
+    scopeOfWorks: parseScopeOfWorks(currentQuote.scopeOfWorks),
     rows: customerDocRows(c, isCash),
     totalRows,
     footerText: !isCash ? (isInvoice
@@ -3953,6 +4027,7 @@ function measureQuoteImageHeight(data, width, margin) {
   if (data.clientName) y += 30;
   if (data.clientAddress) y += wrapCanvasText(ctx, data.clientAddress, width - margin * 2).length * 30;
   y += 34;
+  y += measureScopeOfWorksHeight(ctx, data.scopeOfWorks, width - margin * 2, 26, 22, 34, 28);
   y += 48;
   data.rows.forEach(row => {
     y += Math.max(48, wrapCanvasText(ctx, row.label, 520).length * 30) + 8;
@@ -4049,6 +4124,10 @@ async function renderQuoteImageCanvas(data) {
   }
   if (data.clientAddress) y = drawWrappedCanvasText(ctx, data.clientAddress, margin, y, width - margin * 2, 30);
   y += 34;
+
+  if (data.scopeOfWorks && data.scopeOfWorks.lines.length) {
+    y = drawScopeOfWorksOnCanvas(ctx, data.scopeOfWorks, margin, y, width - margin * 2, 26, 22, 34, 28);
+  }
 
   const tableX = margin - 16;
   const tableW = width - margin * 2 + 32;
@@ -4901,6 +4980,12 @@ function performMerge(quotes, client, gst) {
     const header = `— Imported from ${quoteLabel(q)}${quoteDateStr(q) ? ' (' + quoteDateStr(q) + ')' : ''} —`;
     return (q.notes && String(q.notes).trim()) ? `${header}\n${String(q.notes).trim()}` : header;
   }).join('\n\n');
+  merged.scopeOfWorks = quotes.map(q => {
+    const body = scopeOfWorksTrim(q.scopeOfWorks);
+    if (!body) return '';
+    const header = `— From ${quoteLabel(q)}${quoteDateStr(q) ? ' (' + quoteDateStr(q) + ')' : ''} —`;
+    return `${header}\n${body}`;
+  }).filter(Boolean).join('\n\n');
   quotes.forEach(q => {
     Object.entries(q.itemQty || {}).forEach(([k, v]) => { merged.itemQty[k] = (Number(merged.itemQty[k]) || 0) + (Number(v) || 0); });
     (q.customLines || []).forEach(c => merged.customLines.push(JSON.parse(JSON.stringify(c))));
@@ -5783,6 +5868,7 @@ function generatePDF(style) {
   if (currentQuote.client.name) { doc.text(currentQuote.client.name, M, y); y += 12; }
   if (currentQuote.client.address) { const w = doc.splitTextToSize(currentQuote.client.address, W - M*2); doc.text(w, M, y); y += w.length * 12; }
   y += 8;
+  y = appendScopeOfWorksToPdf(doc, M, W, y);
 
   const colX = [M, M + 280, M + 360, M + 460];
   if (isCash) doc.setFillColor(220, 252, 231);
