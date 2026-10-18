@@ -1909,6 +1909,33 @@ function effectiveCap(section, item) {
   }
   return settings.discountCaps[section] !== undefined ? settings.discountCaps[section] : 100;
 }
+/* Per-section totals for the customer-facing documents (image preview and PDF).
+ * One row per section that has priced items, in display order (cameras first,
+ * then extras A-Z). raw = undiscounted, net = after each item's discount cap,
+ * anyCapped = some item's cap was below the quote discount. */
+function sectionTotals(quote, s, d) {
+  const out = [];
+  const sectionOrder = ['cameras', ...Object.keys(s.extras).sort()];
+  sectionOrder.forEach(sec => {
+    let raw = 0, net = 0, anyCapped = false, totalQty = 0;
+    Object.entries(quote.itemQty).forEach(([key, qty]) => {
+      const [section] = key.split(':');
+      if (section !== sec) return;
+      const item = findItem(key); if (!item || !qty) return;
+      const r = (Number(item.price) || 0) * Number(qty);
+      const cap = effectiveCap(sec, item);
+      const eff = Math.min(d, cap);
+      raw += r; net += r * (1 - eff / 100);
+      totalQty += Number(qty);
+      if (cap < d && d > 0) anyCapped = true;
+    });
+    if (raw > 0) {
+      const label = sec.charAt(0).toUpperCase() + sec.slice(1);
+      out.push({ section: sec, label, raw, net, anyCapped, totalQty });
+    }
+  });
+  return out;
+}
 function calcQuote(source) {
   const q = source || currentQuote;
   const d = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
@@ -3878,24 +3905,8 @@ function customerDocRows(c, isCash) {
     });
   };
 
-  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
-  sectionOrder.forEach(sec => {
-    let raw = 0, net = 0, anyCapped = false, totalQty = 0;
-    Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
-      const [section] = key.split(':');
-      if (section !== sec) return;
-      const item = findItem(key); if (!item || !qty) return;
-      const r = (Number(item.price) || 0) * Number(qty);
-      const cap = effectiveCap(sec, item);
-      const eff = Math.min(c.d, cap);
-      raw += r; net += r * (1 - eff / 100);
-      totalQty += Number(qty);
-      if (cap < c.d && c.d > 0) anyCapped = true;
-    });
-    if (raw > 0) {
-      const label = sec.charAt(0).toUpperCase() + sec.slice(1);
-      rowOut(label, totalQty || null, null, net, anyCapped ? null : raw);
-    }
+  sectionTotals(currentQuote, settings, c.d).forEach(t => {
+    rowOut(t.label, t.totalQty || null, null, t.net, t.anyCapped ? null : t.raw);
   });
 
   currentQuote.customLines.forEach(line => {
@@ -5890,24 +5901,8 @@ function generatePDF(style) {
   };
 
   // PDF: collapse items into one line per category. Custom items still appear individually.
-  const sectionOrder = ['cameras', ...Object.keys(settings.extras).sort()];
-  sectionOrder.forEach(sec => {
-    let raw = 0, net = 0, anyCapped = false, totalQty = 0;
-    Object.entries(currentQuote.itemQty).forEach(([key, qty]) => {
-      const [section] = key.split(':');
-      if (section !== sec) return;
-      const item = findItem(key); if (!item || !qty) return;
-      const r = (Number(item.price) || 0) * Number(qty);
-      const cap = effectiveCap(sec, item);
-      const eff = Math.min(c.d, cap);
-      raw += r; net += r * (1 - eff / 100);
-      totalQty += Number(qty);
-      if (cap < c.d && c.d > 0) anyCapped = true;
-    });
-    if (raw > 0) {
-      const label = sec.charAt(0).toUpperCase() + sec.slice(1);
-      lineOut(label, totalQty || null, null, net, anyCapped ? null : raw);
-    }
+  sectionTotals(currentQuote, settings, c.d).forEach(t => {
+    lineOut(t.label, t.totalQty || null, null, t.net, t.anyCapped ? null : t.raw);
   });
   // Custom items: shown individually with qty + final unit price
   currentQuote.customLines.forEach(line => {
