@@ -6,6 +6,7 @@ const { mkdtempSync } = require("node:fs");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
 const { HttpError } = require("./errors.cjs");
+const { formatSize } = require("./format.cjs");
 
 function runCommand(command, args, opts = {}) {
   const timeoutMs = opts.timeoutMs || 90000;
@@ -128,11 +129,6 @@ async function probeUploadedVideo(filePath, limits, timeoutMs) {
 async function cleanupTemp(dirPath) {
   if (!dirPath) return;
   await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
-}
-
-function formatSize(bytes) {
-  const mb = bytes / (1024 * 1024);
-  return mb.toFixed(mb >= 10 ? 0 : 1) + " MB";
 }
 
 module.exports = {
