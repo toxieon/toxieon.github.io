@@ -810,7 +810,7 @@ function uid() {
   });
 }
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function pad2(n) { return String(n).padStart(2, '0'); }
+const pad2 = TsTime.pad2;
 function isoDate(d = new Date()) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function dayOfWeek(d) { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(d).getDay()]; }
 function hhmm(d = new Date()) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -842,9 +842,6 @@ function netHours(onHHMM, offHHMM, breakMinutes) {
 }
 function sessionBreakMinutes(s) { return Number(s.break_minutes) || 0; }
 function overtimeHours(totalHours, dayThreshold) { return Math.max(0, Math.round((totalHours - dayThreshold) * 100) / 100); }
-function distanceMetres(lat1, lng1, lat2, lng2) {
-  return window.NDSiteMatch.distanceMetres(lat1, lng1, lat2, lng2);
-}
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 function startOfWeek(date, firstDay = 'Monday') {
   const d = new Date(date);
@@ -1587,7 +1584,7 @@ const TsGeo = (() => {
   function checkMissedClockOff(pos) {
     const st = getState(); const session = st.currentSession; if (!session) return;
     const job = st.jobs.find(j => j.job_id === session.job_id); if (!job) return;
-    const dist = distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng);
+    const dist = NDSiteMatch.distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng);
     const openMinutes = (Date.now() - new Date(`${session.date}T${session.time_on}`).getTime()) / 60000;
     const cfg = st.settings;
     if (dist > (cfg.missedClockOffDistanceM || 300) && openMinutes > (cfg.missedClockOffDelayMin || 30)) {
@@ -1915,7 +1912,7 @@ const TsNeillQuote = (() => {
     if (!sessionHash) return null;
     if (Date.now() - lastFetch > 15 * 60 * 1000) await refreshJobs();
     for (const q of cachedJobs) {
-      const d = distanceMetres(lat, lng, q.clientLat, q.clientLng);
+      const d = NDSiteMatch.distanceMetres(lat, lng, q.clientLat, q.clientLng);
       if (d <= 150) {
         return { neill_quote_id: q.id, job_name: (q.client && q.client.name) || 'Neill Data job', address: (q.client && q.client.address) || '', lat: q.clientLat, lng: q.clientLng, status: mapStatus(q.status) };
       }
@@ -2616,7 +2613,7 @@ window.Views = {};
     const st = getState(); const session = st.currentSession; if (!session) return;
     const job = st.jobs.find(j => j.job_id === session.job_id);
     const pos = await TsGeo.getPositionResilient();
-    const within = pos && job ? distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng) <= (job.radius_m || st.settings.radiusM) : true;
+    const within = pos && job ? NDSiteMatch.distanceMetres(pos.coords.latitude, pos.coords.longitude, job.lat, job.lng) <= (job.radius_m || st.settings.radiusM) : true;
     openOffModal(within, pos);
   }
   function openOffModal(within, pos) {
@@ -2761,7 +2758,7 @@ const TsTravel = (() => {
   }
   function distFn() {
     if (window.NDJobLocator && typeof NDJobLocator.distanceMetres === 'function') return NDJobLocator.distanceMetres;
-    return distanceMetres;
+    return NDSiteMatch.distanceMetres;
   }
   function hasCoords(lat, lng) {
     lat = Number(lat); lng = Number(lng);
@@ -3067,7 +3064,7 @@ const TsLocPicker = (() => {
       const nk = norm(loc.name), ak = norm(loc.address);
       let hit = (nk && byKey.get('n:' + nk)) || (ak && byKey.get('a:' + ak)) || null;
       if (!hit && loc.lat != null && !loc.job_id) {
-        hit = out.find(o => o.lat != null && distanceMetres(o.lat, o.lng, loc.lat, loc.lng) <= 60) || null;
+        hit = out.find(o => o.lat != null && NDSiteMatch.distanceMetres(o.lat, o.lng, loc.lat, loc.lng) <= 60) || null;
       }
       if (hit && (!loc.job_id || !hit.job_id || hit.job_id === loc.job_id || (nk && norm(hit.name) === nk && ak === norm(hit.address)))) {
         if (hit.lat == null && loc.lat != null) { hit.lat = loc.lat; hit.lng = loc.lng; }
@@ -3097,7 +3094,7 @@ const TsLocPicker = (() => {
     out.forEach(o => { if (o.job_id && !(st.jobs || []).some(j => j.job_id === o.job_id)) o.job_id = null; });
     const ori = opts && opts.origin;
     if (ori && ori.lat != null && ori.lng != null) {
-      out.forEach(o => { o.distM = (o.lat != null && o.lng != null) ? distanceMetres(ori.lat, ori.lng, o.lat, o.lng) : Infinity; });
+      out.forEach(o => { o.distM = (o.lat != null && o.lng != null) ? NDSiteMatch.distanceMetres(ori.lat, ori.lng, o.lat, o.lng) : Infinity; });
       return out.sort((a, b) => (a.distM - b.distM) || (b.last || '').localeCompare(a.last || '') || b.visits - a.visits || a.name.localeCompare(b.name));
     }
     return out.sort((a, b) => (b.last || '').localeCompare(a.last || '') || b.visits - a.visits || a.name.localeCompare(b.name));
@@ -3984,7 +3981,7 @@ window.TsLocPicker = TsLocPicker;
         const b = jobs[k];
         if (used.has(b.job_id)) continue;
         const sameAddr = keyA && addrKey(b) === keyA;
-        const sameSpot = a.lat != null && a.lng != null && b.lat != null && b.lng != null && distanceMetres(a.lat, a.lng, b.lat, b.lng) <= 60;
+        const sameSpot = a.lat != null && a.lng != null && b.lat != null && b.lng != null && NDSiteMatch.distanceMetres(a.lat, a.lng, b.lat, b.lng) <= 60;
         const sameName = nameA && normName(b.job_name) === nameA;
         if (sameAddr || sameSpot || sameName) { group.push(b); used.add(b.job_id); }
       }
