@@ -23,7 +23,6 @@
 <script src="ts-clipboard.js?v=0.5.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
-<script src="../assets/job-locator.js"></script>
 <script src="../shared/nd-site-match.js?v=0.5.1"></script>
 <script src="../shared/nd-gate-codes.js?v=0.5.1"></script>
 <script src="../assets/logo.js"></script>
@@ -2757,7 +2756,6 @@ const TsTravel = (() => {
     return { lines, cost: 0, km: 0, hasData: false };
   }
   function distFn() {
-    if (window.NDJobLocator && typeof NDJobLocator.distanceMetres === 'function') return NDJobLocator.distanceMetres;
     return NDSiteMatch.distanceMetres;
   }
   function hasCoords(lat, lng) {
