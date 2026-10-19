@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Tennis court</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players as pl0,run,load} from '../common.js';
+// Generic centre-court tennis arena (blue hard court, no marks).
+const players=(S,sp)=>pl0(S,sp,{bounds:[30,14],net:true});
+const {r,S,c,ctl,night}=await setup({indoor:false});
+box(S,60,0.2,44,0x2a3442,0,-0.1,0);
+canvasPlane(S,36,18,(x,p,W,H)=>{x.fillStyle='#2f6f9e';x.fillRect(0,0,W,H);const X=m=>W/2+m*p,Z=m=>H/2+m*p;x.fillStyle='#1f4f8a';x.fillRect(X(-11.885),Z(-5.485),23.77*p,10.97*p);
+ x.strokeStyle='#fff';x.lineWidth=0.06*p;x.strokeRect(X(-11.885),Z(-5.485),23.77*p,10.97*p);x.strokeRect(X(-11.885),Z(-4.115),23.77*p,8.23*p);
+ x.beginPath();x.moveTo(X(-6.4),Z(-4.115));x.lineTo(X(-6.4),Z(4.115));x.moveTo(X(6.4),Z(-4.115));x.lineTo(X(6.4),Z(4.115));x.moveTo(X(-6.4),Z(0));x.lineTo(X(6.4),Z(0));x.stroke();},40,0.01);
+const net=new T.Mesh(new T.PlaneGeometry(12.8,0.95),new T.MeshStandardMaterial({color:0x111111,transparent:true,opacity:0.7,side:T.DoubleSide}));net.position.set(0,0.48,0);net.rotation.y=Math.PI/2;S.add(net);
+box(S,0.05,0.07,12.8,0xffffff,0,0.95,0);for(const z of[-6.4,6.4])box(S,0.1,1.07,0.1,0x333333,0,0.53,z);
+standRect(S,{w:36,d:18,gap:1,rows:18,rowH:0.8,rowD:1.0,y0:0.5});
+const led=await ledRibbons(S,[{pts:rectPath(36,18),y:0,h:0.8,closed:true},{pts:rectPath(36+2*19,18+2*19),y:15.2,h:1.2,closed:true}],night);
+const pl=await players(S,[{kit:'whites',x:-11,z:1.5,yaw:Math.PI/2},{kit:'red',x:9,z:-2,yaw:-Math.PI/2},{kit:'umpire',x:0,z:-7.2,yaw:0,anim:'idle'}]);
+const ball=new T.Mesh(new T.SphereGeometry(0.1,12,8),mat(0xd8f23a));ball.position.set(-3,1.6,0.5);S.add(ball);
+c.position.set(10,24,16);ctl.target.set(0,0,0);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

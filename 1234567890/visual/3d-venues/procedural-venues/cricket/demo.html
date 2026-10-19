@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Cricket oval</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players,run,load} from '../common.js';
+// Venue scene.
+const {r,S,c,ctl,night}=await setup();
+S.add((await load('../glb/web/stadium-oval.glb')).scene);
+for(const xx of[-10.06,10.06])for(const dz of[-0.11,0,0.11]){const st=new T.Mesh(new T.CylinderGeometry(0.02,0.02,0.71,6),mat(0xf3eedd));st.position.set(dz,0.3+0.355,xx);S.add(st);}
+// rescale players x2 so they read; pitch runs along z
+const P=2;const field=[[0,-24],[3,-14],[-6,-14],[22,-6],[-30,-4],[34,22],[-40,30],[10,45],[-12,60],[52,-30],[-60,-40]].map(([x,z])=>({kit:'whites',x,z,yaw:Math.atan2(-x,-z),anim:'idle',scale:P}));
+field.push({kit:'whites',x:0.6,z:-13,yaw:Math.PI,scale:P},{kit:'whites',x:-0.6,z:8.5,yaw:0,anim:'idle',scale:P},{kit:'whites',x:0.8,z:10.5,yaw:0,anim:'idle',scale:P},{kit:'umpire',x:0.4,z:-11.5,yaw:0,anim:'idle',scale:P});
+const pl=await players(S,field,{bounds:[150,130],loft:2});
+const led=await ledRibbons(S,[{pts:ellPath(88.5,75.7,180),y:0.2,h:1.4,closed:true}],night);
+c.position.set(40,35,-70);ctl.target.set(0,0,5);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

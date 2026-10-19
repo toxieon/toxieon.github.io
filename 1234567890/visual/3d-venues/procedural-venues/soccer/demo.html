@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Soccer pitch</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players as pl0,run,load} from '../common.js';
+// Small soccer pitch 68 x 45 m with LED boards.
+const players=(S,sp)=>pl0(S,sp,{bounds:[74,51]});
+const {r,S,c,ctl,night}=await setup();
+box(S,110,0.2,80,0x2f5b2c,0,-0.1,0);
+canvasPlane(S,72,49,(x,p,W,H)=>{for(let i=0;i<12;i++){x.fillStyle=i%2?'#3f8f3a':'#4a9a43';x.fillRect(i*W/12,0,W/12,H);}
+ x.strokeStyle='#fff';x.lineWidth=0.12*p;const o=2*p;x.strokeRect(o,o,W-2*o,H-2*o);x.beginPath();x.moveTo(W/2,o);x.lineTo(W/2,H-o);x.stroke();x.beginPath();x.arc(W/2,H/2,6*p,0,7);x.stroke();
+ for(const s of[0,1]){x.strokeRect(s?W-o-12*p:o,H/2-15*p,12*p,30*p);x.strokeRect(s?W-o-4*p:o,H/2-7*p,4*p,14*p);}},12,0.01);
+for(const s of[-1,1]){const g=mat(0xffffff);box(S,0.12,2.44,0.12,g,s*34,1.22,-3.66);box(S,0.12,2.44,0.12,g,s*34,1.22,3.66);box(S,0.12,0.12,7.44,g,s*34,2.44,0);
+ box(S,1.6,2.4,7.3,new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:0.25}),s*34.9,1.2,0);}
+standRect(S,{w:80,d:57,gap:1,rows:8,rowH:0.7,rowD:1.0,y0:0.4});
+const led=await ledRibbons(S,[{pts:rectPath(76,53),y:0,h:0.9,closed:true}],night);
+const kitA='green',kitB='orange';const pl=await players(S,[...[[-30,0],[-20,-12],[-20,0],[-20,12],[-8,-15],[-8,-4],[-8,6],[-8,16],[4,-6],[5,6],[-2,0]].map(([x,z])=>({kit:kitA,x,z,yaw:Math.PI/2})),...[[30,0],[20,-11],[20,1],[20,13],[9,-14],[9,-3],[9,7],[9,17],[-2,-7],[-3,7],[3,1]].map(([x,z])=>({kit:kitB,x,z,yaw:-Math.PI/2}))]);
+c.position.set(40,32,58);ctl.target.set(0,0,0);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

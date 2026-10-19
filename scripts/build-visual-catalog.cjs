@@ -56,6 +56,7 @@ const SKIP_DIRS = new Set([
 
 function shouldSkip(rel) {
   const norm = rel.split(path.sep).join("/");
+  if (norm.includes("1234567890/visual/3d-venues/")) return true;
   if (EXCLUDE_RE.test(norm)) return true;
   const parts = norm.split("/");
   for (const p of parts) {

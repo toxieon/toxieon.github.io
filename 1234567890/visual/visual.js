@@ -2,6 +2,7 @@
   "use strict";
 
   var gallery = document.getElementById("gallery");
+  var venues3dEl = document.getElementById("venues-3d");
   var countEl = document.getElementById("count");
   var qEl = document.getElementById("q");
   var catEl = document.getElementById("cat-filter");
@@ -77,6 +78,44 @@
     gallery.innerHTML = html;
   }
 
+  function venueCard(item) {
+    var preview = item.preview ? '<div class="preview venue-preview"><img src="' + esc(item.preview) + '" alt="" loading="lazy" decoding="async" /></div>' : '<div class="preview venue-preview"><span class="meta">—</span></div>';
+    var actions = "";
+    if (item.demo) {
+      actions += '<a class="dl" href="' + esc(item.demo) + '" target="_blank" rel="noopener">Open live demo</a>';
+    }
+    if (item.glb) {
+      actions += '<a class="dl secondary" href="' + esc(item.glb) + '" download>Download GLB (web)</a>';
+      if (item.glbFull) {
+        actions += '<a class="dl secondary" href="' + esc(item.glbFull) + '" download>Download GLB (full)</a>';
+      }
+    }
+    return (
+      '<article class="card venue-card">' +
+      preview +
+      '<div class="name">' + esc(item.name) + "</div>" +
+      '<div class="meta">' + esc(item.id) + "</div>" +
+      '<div class="venue-actions">' + actions + "</div>" +
+      "</article>"
+    );
+  }
+
+  function renderVenues3d(data) {
+    if (!venues3dEl || !data) return;
+    var cards = [];
+    (data.venues || []).forEach(function (v) { cards.push(venueCard(v)); });
+    (data.models || []).forEach(function (m) { cards.push(venueCard(m)); });
+    if (!cards.length) {
+      venues3dEl.innerHTML = "";
+      return;
+    }
+    venues3dEl.innerHTML =
+      '<section class="cat-block venues-block" id="venues-3d-section">' +
+      '<h2 class="cat-title">3D Venues</h2>' +
+      '<p class="cat-sub">Procedural stadium scenes (three.js, MIT) and downloadable GLB models. Demos open in a new tab.</p>' +
+      '<div class="grid venue-grid">' + cards.join("") + "</div></section>";
+  }
+
   function fillCategories(list) {
     var cats = {};
     list.forEach(function (it) { cats[it.category] = true; });
@@ -87,6 +126,11 @@
       catEl.appendChild(opt);
     });
   }
+
+  fetch("3d-venues/manifest.json", { cache: "no-cache" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(renderVenues3d)
+    .catch(function () { renderVenues3d(null); });
 
   fetch("../visual-catalog.json", { cache: "no-cache" })
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })

@@ -1,0 +1,68 @@
+{
+  "venues": [
+    {
+      "id": "baseball",
+      "name": "Baseball park",
+      "demo": "3d-venues/procedural-venues/baseball/demo.html",
+      "preview": "3d-venues/procedural-venues/baseball/preview-web.webp"
+    },
+    {
+      "id": "cricket",
+      "name": "Cricket ground",
+      "demo": "3d-venues/procedural-venues/cricket/demo.html",
+      "preview": "3d-venues/procedural-venues/cricket/preview-web.webp"
+    },
+    {
+      "id": "gridiron",
+      "name": "Gridiron stadium",
+      "demo": "3d-venues/procedural-venues/gridiron/demo.html",
+      "preview": "3d-venues/procedural-venues/gridiron/preview-web.webp"
+    },
+    {
+      "id": "arena",
+      "name": "Indoor arena",
+      "demo": "3d-venues/procedural-venues/arena/demo.html",
+      "preview": "3d-venues/procedural-venues/arena/preview-web.webp"
+    },
+    {
+      "id": "racecourse",
+      "name": "Racecourse",
+      "demo": "3d-venues/procedural-venues/racecourse/demo.html",
+      "preview": "3d-venues/procedural-venues/racecourse/preview-web.webp"
+    },
+    {
+      "id": "rugby-league",
+      "name": "Rugby league stadium",
+      "demo": "3d-venues/procedural-venues/rugby-league/demo.html",
+      "preview": "3d-venues/procedural-venues/rugby-league/preview-web.webp"
+    },
+    {
+      "id": "soccer",
+      "name": "Soccer stadium",
+      "demo": "3d-venues/procedural-venues/soccer/demo.html",
+      "preview": "3d-venues/procedural-venues/soccer/preview-web.webp"
+    },
+    {
+      "id": "tennis",
+      "name": "Tennis centre",
+      "demo": "3d-venues/procedural-venues/tennis/demo.html",
+      "preview": "3d-venues/procedural-venues/tennis/preview-web.webp"
+    }
+  ],
+  "models": [
+    {
+      "id": "stadium-oval",
+      "name": "Oval stadium (GLB)",
+      "preview": "3d-venues/glb/preview-stadium.webp",
+      "glb": "3d-venues/glb/web/stadium-oval.glb",
+      "glbFull": "3d-venues/glb/stadium-oval.glb"
+    },
+    {
+      "id": "player-figure",
+      "name": "Athlete figure (GLB)",
+      "preview": "3d-venues/glb/preview-player.webp",
+      "glb": "3d-venues/glb/web/player-figure.glb",
+      "glbFull": "3d-venues/glb/player-figure.glb"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Racecourse</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,facadeMat,ledRibbons,rectPath,ellPath,players,run,load} from '../common.js';
+// Venue scene.
+const {r,S,c,ctl,night}=await setup();
+box(S,700,0.2,400,0x2f5b2c,0,-0.1,0);
+const A=260,B=110,Wd=24;const ring=(a,b)=>{const sh=new T.Shape();ellPath(a+Wd/2,b+Wd/2,128).forEach(([x,z],i)=>i?sh.lineTo(x,z):sh.moveTo(x,z));const h=new T.Path();ellPath(a-Wd/2,b-Wd/2,128).forEach(([x,z],i)=>i?h.lineTo(x,z):h.moveTo(x,z));sh.holes.push(h);return sh;};
+const trk=new T.Mesh(new T.ShapeGeometry(ring(A,B)),mat(0x5aa04d));trk.rotation.x=Math.PI/2;trk.position.y=0.02;trk.receiveShadow=true;S.add(trk);
+const railM=mat(0xffffff);for(const off of[-Wd/2,Wd/2]){const pts=ellPath(A+off,B+off,160);const g=new T.BufferGeometry();const tube=new T.TubeGeometry(new T.CatmullRomCurve3(pts.map(([x,z])=>new T.Vector3(x,1.1,z)),true),320,0.12,5,true);S.add(new T.Mesh(tube,railM));}
+// grandstand along the home straight (z = +B side)
+for(let k=0;k<14;k++)box(S,220,0.8,1.6,k%2?0x3a4d6a:0x44597a,0,0.4+k*0.8,B+Wd/2+10+k*1.6);
+{const Zb=B+Wd/2+10+14*1.6;const f=new T.Mesh(new T.BoxGeometry(222,12,0.4),facadeMat());f.position.set(0,6,Zb);S.add(f);for(const sx of[-1,1]){const e=new T.Mesh(new T.ShapeGeometry(new T.Shape([new T.Vector2(-0.8,0),new T.Vector2(14*1.6,0),new T.Vector2(14*1.6,12),new T.Vector2(-0.8,1.2)])),facadeMat().clone());e.material.side=T.DoubleSide;e.rotation.y=-Math.PI/2;e.position.set(sx*111,0,B+Wd/2+10);S.add(e);}}
+box(S,230,1,26,0xe9ecef,0,13.5,B+Wd/2+20);
+const led=await ledRibbons(S,[{pts:[[-110,B+Wd/2+3],[110,B+Wd/2+3]],y:0.3,h:2.2},{pts:ellPath(A-Wd/2-1,B-Wd/2-1,160),y:0,h:0.7,closed:true}],night);
+// low-poly horse + jockey silks
+const silks=[0xc8202f,0x1f4fbf,0xf2c230,0x13804a,0xf07a1a,0x7b3fbf,0xffffff,0x111111];
+function horse(col){const g=new T.Group(),coat=mat([0x6b3e1f,0x3b2416,0x8a5a30,0x222222][Math.floor(Math.random()*4)]);
+ const body=new T.Mesh(new T.BoxGeometry(0.9,0.9,2.2),coat);body.position.y=1.6;g.add(body);
+ const neck=new T.Mesh(new T.BoxGeometry(0.45,1.1,0.5),coat);neck.position.set(0,2.15,1.15);neck.rotation.x=0.6;g.add(neck);
+ const head=new T.Mesh(new T.BoxGeometry(0.35,0.4,0.85),coat);head.position.set(0,2.6,1.6);head.rotation.x=0.3;g.add(head);
+ const legs=[];for(const [x,z] of[[-0.3,0.85],[0.3,0.85],[-0.3,-0.85],[0.3,-0.85]]){const pv=new T.Group();pv.position.set(x,1.25,z);const l=new T.Mesh(new T.BoxGeometry(0.16,1.25,0.16),coat);l.position.y=-0.62;pv.add(l);g.add(pv);legs.push(pv);}
+ const jk=new T.Mesh(new T.BoxGeometry(0.5,0.6,0.5),mat(col));jk.position.set(0,2.3,0.2);jk.rotation.x=0.7;g.add(jk);const cap=new T.Mesh(new T.SphereGeometry(0.17,8,6),mat(col));cap.position.set(0,2.65,0.55);g.add(cap);
+ g.traverse(m=>{if(m.isMesh)m.castShadow=true;});g.userData.legs=legs;g.scale.setScalar(1.6);return g;}
+const horses=silks.map((col,i)=>{const h=horse(col);S.add(h);return {h,lane:(i%4-1.5)*4,ph:-i*0.012-(i>3?0.006:0),sp:0.022+Math.random()*0.002};});
+let t=0;const upd=dt=>{t+=dt;for(const o of horses){o.ph+=o.sp*dt;const a=o.ph*Math.PI*2+Math.PI/2;const x=Math.cos(a)*(A+o.lane),z=Math.sin(a)*(B+o.lane);
+ const dx=-Math.sin(a)*(A+o.lane),dz=Math.cos(a)*(B+o.lane);o.h.position.set(x,0,z);o.h.rotation.y=Math.atan2(dx,dz);
+ const g=t*11+o.lane;o.h.userData.legs.forEach((L,k)=>{L.rotation.x=Math.sin(g+[0,0.5,Math.PI,Math.PI+0.5][k])*0.8;});o.h.children[0].position.y=1.6+Math.abs(Math.sin(g))*0.12;}};
+c.position.set(70,18,B-40);ctl.target.set(0,2,B);ctl.update();run(r,S,c,[led.update,upd]);
+</script></body></html>

@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Gridiron field</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players as pl0,run,load} from '../common.js';
+// Venue scene.
+const players=(S,sp)=>pl0(S,sp,{bounds:[120,64]});
+const {r,S,c,ctl,night}=await setup();
+box(S,180,0.2,110,0x2f5b2c,0,-0.1,0);
+canvasPlane(S,114,53,(x,p,W,H)=>{x.fillStyle='#3f8a3a';x.fillRect(0,0,W,H);const o=2.2*p,fl=W-2*o;x.fillStyle='#24456e';x.fillRect(o,o,9.14*p,H-2*o);x.fillStyle='#7a1f2b';x.fillRect(W-o-9.14*p,o,9.14*p,H-2*o);
+ x.strokeStyle='#fff';x.lineWidth=0.15*p;x.strokeRect(o,o,fl,H-2*o);for(let y=0;y<=100;y+=5){const px=o+9.14*p+y*0.9144*p;x.beginPath();x.moveTo(px,o);x.lineTo(px,H-o);x.stroke();}
+ x.fillStyle='#fff';x.font=`bold ${2*p}px sans-serif`;x.textAlign='center';for(let y=10;y<100;y+=10){const n=y<=50?y:100-y,px=o+9.14*p+y*0.9144*p;x.fillText(String(n),px,o+9*p);x.fillText(String(n),px,H-o-7*p);}},10,0.01);
+for(const s of[-1,1]){const y=mat(0xf2d230);box(S,0.2,3,0.2,y,s*55,1.5,0);box(S,0.2,0.2,5.6,y,s*55,3.05,0);box(S,0.15,9,0.15,y,s*55,7.5,-2.8);box(S,0.15,9,0.15,y,s*55,7.5,2.8);}
+standRect(S,{w:122,d:66,gap:2,rows:22,rowH:0.75,rowD:1.0,y0:0.5});
+const led=await ledRibbons(S,[{pts:rectPath(124,68),y:0,h:1.2,closed:true},{pts:rectPath(124+44,68+44),y:12.2,h:1.6,closed:true}],night);
+const sp=[];for(let i=0;i<11;i++)sp.push({kit:'red',x:-2,z:-15+i*3,yaw:Math.PI/2,anim:'idle'},{kit:'blue',x:2,z:-15+i*3,yaw:-Math.PI/2,anim:'idle'});const pl=await players(S,sp);
+c.position.set(70,48,80);ctl.target.set(0,0,0);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>
