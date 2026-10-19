@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Rugby league pitch</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players as pl0,run,load} from '../common.js';
+// Venue scene.
+const players=(S,sp)=>pl0(S,sp,{bounds:[120,68]});
+const {r,S,c,ctl,night}=await setup();
+box(S,150,0.2,90,0x2f5b2c,0,-0.1,0);
+canvasPlane(S,124,72,(x,p,W,H)=>{for(let i=0;i<24;i++){x.fillStyle=i%2?'#3f8f3a':'#4a9a43';x.fillRect(i*W/24,0,W/24,H);}
+ const o=2*p,X=m=>W/2+m*p;x.strokeStyle='#fff';x.lineWidth=0.12*p;x.strokeRect(o,o,W-2*o,H-2*o);
+ for(let m=-50;m<=50;m+=10){x.lineWidth=(m%50===0)?0.2*p:0.12*p;x.beginPath();x.moveTo(X(m),o);x.lineTo(X(m),H-o);x.stroke();}
+ x.setLineDash([1*p,1*p]);for(const m of[-45,-35,-25,-15,-5,5,15,25,35,45]){x.beginPath();x.moveTo(X(m),o);x.lineTo(X(m),H-o);x.stroke();}x.setLineDash([]);
+ x.fillStyle='#fff';x.font=`bold ${2.4*p}px sans-serif`;x.textAlign='center';for(const m of[-40,-30,-20,-10,0,10,20,30,40]){const n=50-Math.abs(m);x.fillText(n==50?'50':String(n),X(m),o+8*p);x.fillText(n==50?'50':String(n),X(m),H-o-6*p);}},8,0.01);
+for(const s of[-1,1]){const w=mat(0xffffff);for(const z of[-2.8,2.8]){box(S,0.25,16,0.25,w,s*50,8,z);box(S,0.9,2,0.9,mat(0x1f4fbf),s*50,1,z);}box(S,0.2,0.2,5.6,w,s*50,3,0);}
+standRect(S,{w:124,d:72,gap:1,rows:12,rowH:0.75,rowD:1.0,y0:0.4});
+const led=await ledRibbons(S,[{pts:rectPath(124,72),y:0,h:0.9,closed:true}],night);
+const sp=[];for(let i=0;i<13;i++){sp.push({kit:'red',x:-6-(i%3)*4,z:-24+i*4,yaw:Math.PI/2},{kit:'blue',x:6+(i%3)*4,z:-24+i*4+2,yaw:-Math.PI/2});}const pl=await players(S,sp);
+c.position.set(70,45,75);ctl.target.set(0,0,0);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

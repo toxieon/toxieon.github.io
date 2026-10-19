@@ -1,0 +1,3 @@
+3D venue demos use three.js v0.170.0 (MIT).
+ES modules are loaded from jsDelivr with a pinned version in each demo.html import map.
+Original stadium and figure meshes and procedural venue scenes were authored in-house with three.js.

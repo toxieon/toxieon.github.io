@@ -1,0 +1,24 @@
+{
+  "tileMeters": 8,
+  "height": 1.4,
+  "slides": [
+    {
+      "image": "boards/slides/slide-1.webp",
+      "duration": 3.5,
+      "scroll": 0.015,
+      "bg": "#0d2840"
+    },
+    {
+      "image": "boards/slides/slide-2.webp",
+      "duration": 4,
+      "scroll": 0.015,
+      "bg": "#1a3d2e"
+    },
+    {
+      "image": "boards/slides/slide-3.webp",
+      "duration": 4.5,
+      "scroll": 0.015,
+      "bg": "#3a2a10"
+    }
+  ]
+}

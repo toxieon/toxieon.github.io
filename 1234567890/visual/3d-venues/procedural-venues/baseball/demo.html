@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Baseball park</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,facadeMat,ledRibbons,rectPath,ellPath,players,run,load} from '../common.js';
+// Baseball park: diamond, dirt infield, mound, outfield wall with LED ribbon.
+const {r,S,c,ctl,night}=await setup();
+box(S,260,0.2,260,0x2f5b2c,40,-0.1,40);
+const R=110;const fan=new T.Mesh(new T.CircleGeometry(R,48,-Math.PI/4,Math.PI/2),mat(0x4a9a43));fan.rotation.x=Math.PI/2;fan.position.y+=0.03;fan.material.side=T.DoubleSide;fan.rotation.z=Math.PI/4;fan.position.y=0.01;fan.receiveShadow=true;S.add(fan);
+// rotate world so the diamond points along +x/+z quadrant: home at origin, 1B on +x, 3B on +z
+const dirt=new T.Mesh(new T.CircleGeometry(29,40,0,Math.PI/2),mat(0xb5835a));dirt.rotation.x=Math.PI/2;dirt.material.side=T.DoubleSide;dirt.position.y=0.02;S.add(dirt);
+const inf=new T.Mesh(new T.PlaneGeometry(23,23),mat(0x4a9a43));inf.rotation.x=-Math.PI/2;inf.position.set(13.7,0.03,13.7);S.add(inf);
+for(const [x,z] of [[27.4,0],[27.4,27.4],[0,27.4]])box(S,0.6,0.15,0.6,0xffffff,x,0.1,z);box(S,0.6,0.1,0.6,0xffffff,0,0.1,0);
+const mound=new T.Mesh(new T.CylinderGeometry(2.7,2.9,0.25,24),mat(0xb5835a));mound.position.set(13.7,0.1,13.7);S.add(mound);
+const lineM=mat(0xffffff);for(const a of[0,Math.PI/2]){const l=new T.Mesh(new T.BoxGeometry(R,0.05,0.12),lineM);l.position.set(Math.cos(a)*R/2,0.05,Math.sin(a)*R/2);l.rotation.y=-a;S.add(l);}
+const wall=[...Array(41)].map((_,i)=>{const a=i/40*Math.PI/2;return[Math.cos(a)*R,Math.sin(a)*R];});
+const wg=new T.Mesh(new T.CylinderGeometry(R,R,3,48,1,true,0,Math.PI/2),mat(0x1f4f3a,{side:T.DoubleSide}));wg.position.y=1.5;wg.rotation.y=Math.PI/2;S.add(wg);
+// stands behind home plate
+const g=new T.Group();for(let k=0;k<14;k++){const rr=23+k*1.2;for(let j=0;j<24;j++){const ang=Math.PI*1.25-Math.PI/3+(j+0.5)/24*(Math.PI*2/3);const m=new T.Mesh(new T.BoxGeometry(rr*(Math.PI*2/3)/24+0.1,0.7,1.2),mat(k%2?0x3a4d6a:0x44597a));m.position.set(Math.cos(ang)*rr,0.35+k*0.7,Math.sin(ang)*rr);m.rotation.y=-ang+Math.PI/2;m.castShadow=true;g.add(m);}}S.add(g);
+{const Rf=23+14*1.2-0.45,Hf=0.35+14*0.7;const fm=facadeMat().clone();fm.side=T.DoubleSide;const f=new T.Mesh(new T.CylinderGeometry(Rf,Rf,Hf,40,1,true,Math.PI/2-(Math.PI*1.25+Math.PI/3),Math.PI*2/3),fm);f.position.y=Hf/2;S.add(f);}
+const led=await ledRibbons(S,[{pts:wall,y:3,h:1.4},{pts:[...Array(41)].map((_,i)=>{const a=Math.PI*1.25-Math.PI/3+i/40*(Math.PI*2/3);return[Math.cos(a)*22.2,Math.sin(a)*22.2];}),y:0.2,h:1}],night);
+const pl=await players(S,[[13.7,13.7],[1,-1.5],[25,4],[24,22],[17,24],[4,25],[70,15],[60,60],[15,70]].map(([x,z])=>({kit:'blue',x,z,yaw:-2.35,anim:'idle'})).concat([{kit:'red',x:-0.8,z:0.8,yaw:0.8,anim:'idle'}]),{bounds:[180,180],loft:2});
+c.position.set(-80,70,-80);ctl.target.set(35,0,35);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

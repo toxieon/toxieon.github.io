@@ -1,3 +1,5 @@
+## 1.2.4 · 2026-10-19 · 3d-venues · Visual library adds a **3D Venues** section: eight procedural stadium demos (three.js, pinned CDN) plus oval stadium and athlete figure GLB downloads (web meshopt builds and full-quality files). Service worker `assets-1.2.4`
+
 ## 1.2.3 · 2026-10-11 · reelreader-icon · Visual library catalogue now includes the Reel Reader suite icon and home-screen PNGs (244 items). Service worker `assets-1.2.3`
 
 ## 1.2.2 · 2026-10-11 · reelreader-catalog · Visual library catalogue now includes the Reel Reader icon. Service worker `assets-1.2.2`

@@ -1,0 +1,94 @@
+{
+  "red": {
+    "name": "Kit red",
+    "jumper": {
+      "pattern": "plain",
+      "colors": [
+        "#c8202f",
+        "#ffffff"
+      ]
+    },
+    "shorts": "#ffffff",
+    "socks": {
+      "base": "#c8202f",
+      "top": "#ffffff"
+    }
+  },
+  "blue": {
+    "name": "Kit blue",
+    "jumper": {
+      "pattern": "plain",
+      "colors": [
+        "#1f4fbf",
+        "#ffffff"
+      ]
+    },
+    "shorts": "#1f4fbf",
+    "socks": {
+      "base": "#ffffff",
+      "top": "#1f4fbf"
+    }
+  },
+  "green": {
+    "name": "Kit green",
+    "jumper": {
+      "pattern": "hoops",
+      "colors": [
+        "#13804a",
+        "#f2c230"
+      ],
+      "bands": 6
+    },
+    "shorts": "#ffffff",
+    "socks": {
+      "base": "#13804a",
+      "top": "#f2c230"
+    }
+  },
+  "orange": {
+    "name": "Kit orange",
+    "jumper": {
+      "pattern": "plain",
+      "colors": [
+        "#f07a1a",
+        "#111111"
+      ]
+    },
+    "shorts": "#111111",
+    "socks": {
+      "base": "#111111",
+      "top": "#f07a1a"
+    }
+  },
+  "whites": {
+    "name": "Kit light",
+    "jumper": {
+      "pattern": "plain",
+      "colors": [
+        "#f3f1ea",
+        "#f3f1ea"
+      ]
+    },
+    "shorts": "#f3f1ea",
+    "socks": {
+      "base": "#f3f1ea",
+      "top": "#f3f1ea"
+    },
+    "boots": "#f3f1ea"
+  },
+  "umpire": {
+    "name": "Kit official",
+    "jumper": {
+      "pattern": "plain",
+      "colors": [
+        "#e9e2c8",
+        "#e9e2c8"
+      ]
+    },
+    "shorts": "#1c1f24",
+    "socks": {
+      "base": "#1c1f24",
+      "top": "#1c1f24"
+    }
+  }
+}

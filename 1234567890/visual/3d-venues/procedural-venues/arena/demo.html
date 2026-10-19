@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Indoor arena</title><style>body{margin:0;overflow:hidden}</style></head><body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import {T,q,setup,box,mat,canvasPlane,standRect,ledRibbons,rectPath,ellPath,players as pl0,run,load} from '../common.js';
+// Generic indoor basketball arena (no league marks). Court 28 x 15 m.
+const players=(S,sp)=>pl0(S,sp,{bounds:[28,15]});
+const {r,S,c,ctl,night}=await setup({indoor:true});
+box(S,60,0.2,46,0x2a2f36,0,-0.1,0);
+canvasPlane(S,28,15,(x,p,W,H)=>{x.fillStyle='#c99a5e';x.fillRect(0,0,W,H);for(let i=0;i<W;i+=p*0.9){x.fillStyle=i%(p*1.8)?'#c4935a':'#cfa066';x.fillRect(i,0,p*0.9,H);}
+ x.strokeStyle='#fff';x.lineWidth=0.06*p*2;x.strokeRect(2,2,W-4,H-4);x.beginPath();x.moveTo(W/2,0);x.lineTo(W/2,H);x.stroke();x.beginPath();x.arc(W/2,H/2,1.8*p,0,7);x.stroke();
+ for(const s of[0,1]){const bx=s?W-2:2,dir=s?-1:1;x.fillStyle='rgba(31,79,191,0.85)';x.fillRect(s?W-2-5.8*p:2,H/2-2.45*p,5.8*p,4.9*p);x.strokeRect(s?W-2-5.8*p:2,H/2-2.45*p,5.8*p,4.9*p);
+  x.beginPath();x.arc(bx+dir*1.575*p,H/2,6.75*p,-Math.PI/2+0.06,Math.PI/2-0.06,s===1);x.stroke();}},40,0.01);
+for(const s of[-1,1]){box(S,0.3,3.05,0.3,0x333a44,s*14.6,1.5,0);box(S,0.05,1.05,1.8,new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:0.6}),s*13.2,3.4,0);
+ const rim=new T.Mesh(new T.TorusGeometry(0.23,0.02,8,24),mat(0xf06a1a));rim.rotation.x=Math.PI/2;rim.position.set(s*12.8,3.05,0);S.add(rim);box(S,1.4,0.1,0.1,0x333a44,s*13.9,3.05,0);}
+standRect(S,{w:32,d:19,gap:2,rows:16,rowH:0.75,rowD:0.95,y0:0.4});
+const jb=box(S,8,5,8,0x14181e,0,16,0);
+const led=await ledRibbons(S,[{pts:rectPath(32,19),y:0.05,h:0.9,closed:true},{pts:rectPath(32+2*9.5,19+2*9.5),y:9.6,h:1.2,closed:true},{pts:rectPath(8.02,8.02),y:14.2,h:1.6,closed:true}],true);
+for(const [x,z,y] of [[-10,-10,0],[10,-10,0],[-10,10,0],[10,10,0]]){const sp=new T.SpotLight(0xfff4e0,900,80,0.6,0.5,1.4);sp.position.set(x,24,z);sp.target.position.set(x*0.3,0,z*0.3);sp.castShadow=true;S.add(sp,sp.target);}
+const pl=await players(S,[...[[-5,-3],[-3,2],[-8,4],[2,-1],[-1,5]].map(([x,z],i)=>({kit:'red',x,z,yaw:1.5+i*0.3})),...[[-6,-1],[-2,0],[-9,1],[4,3],[0,-4]].map(([x,z],i)=>({kit:'blue',x,z,yaw:-1.6+i*0.4}))]);
+c.position.set(16,22,20);ctl.target.set(0,1,0);ctl.update();run(r,S,c,[led.update,pl.update]);
+</script></body></html>

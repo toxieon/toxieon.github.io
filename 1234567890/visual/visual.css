@@ -30,3 +30,14 @@ body { margin: 0; background: var(--nd-bg, #0d0d0d); color: var(--nd-text, #f0f0
 .card a.dl:hover { text-decoration: underline; }
 .foot { margin-top: 32px; text-align: center; color: var(--nd-muted, #666); font-size: 12px; }
 .empty { color: var(--nd-muted, #888); font-size: 14px; padding: 24px 0; }
+.venues-block { margin-bottom: 36px; padding-bottom: 8px; border-bottom: 1px solid var(--nd-border, #2a2a2a); }
+.venue-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.venue-card { min-height: 260px; }
+.venue-preview { height: 140px; }
+.venue-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.venue-actions a.dl.secondary { color: var(--nd-muted, #aaa); font-weight: 500; }
+@media (max-width: 420px) {
+  .wrap { padding-left: 12px; padding-right: 12px; }
+  .venue-grid { grid-template-columns: 1fr; }
+  .venue-preview { height: 120px; }
+}
