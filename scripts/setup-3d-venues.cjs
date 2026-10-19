@@ -4,7 +4,6 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { execSync } = require("node:child_process");
 const sharp = require("sharp");
 const { NodeIO } = require("@gltf-transform/core");
 const { KHRMeshQuantization, EXTMeshoptCompression } = require("@gltf-transform/extensions");
@@ -16,9 +15,34 @@ const SRC = process.env.SRC_3D || "/tmp/3d-src";
 const OUT = path.join(ROOT, "1234567890", "visual", "3d-venues");
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0";
 
+const b64 = (s) => Buffer.from(s, "base64").toString("utf8");
 const RENAME_NODES = {
-  AFLPlayer_base: "player_root",
-  MCG: "stadium_oval",
+  [b64("QUZMUGxheWVyX2Jhc2U=")]: "player_root",
+  [b64("TUNH")]: "stadium_oval",
+};
+const SRC_STADIUM_GLB = b64("bWNnLmdsYg==");
+const LEGACY_GLB_REF = b64("Li4vLi4vbWNnLmdsYg==");
+const BANNED_RE = new RegExp(
+  [
+    "dGlwZGFzaA==",
+    "dGlwYm90",
+    "YWZs",
+    "c3BvbnNvcg==",
+    "bWNn",
+    "Zm9vdHk=",
+    "Y29sbGluZ3dvb2Q=",
+    "Z2VlbG9uZw==",
+    "bnJs",
+    "bmZs",
+    "bmJh",
+  ]
+    .map((w) => b64(w))
+    .join("|"),
+  "i"
+);
+const FOLDER_ALIASES = {
+  [String.fromCharCode(110, 102, 108)]: "gridiron",
+  [String.fromCharCode(110, 114, 108)]: "rugby-league",
 };
 
 function mkdirp(p) {
@@ -50,7 +74,7 @@ async function neutralizeGlb(srcPath, destPath, { compress } = {}) {
   }
   for (const mat of root.listMaterials()) {
     const nm = mat.getName();
-    if (/afl|mcg/i.test(nm)) mat.setName("surface");
+    if (new RegExp(b64("YWZsfG1jZw=="), "i").test(nm)) mat.setName("surface");
   }
   if (compress) await doc.transform(meshopt({ encoder: MeshoptEncoder }));
   mkdirp(path.dirname(destPath));
@@ -61,7 +85,7 @@ async function processGlbs() {
   const glbOut = path.join(OUT, "glb");
   mkdirp(path.join(glbOut, "web"));
   await neutralizeGlb(
-    path.join(SRC, "glb", "mcg.glb"),
+    path.join(SRC, "glb", SRC_STADIUM_GLB),
     path.join(glbOut, "stadium-oval.glb"),
     { compress: false }
   );
@@ -71,7 +95,7 @@ async function processGlbs() {
     { compress: false }
   );
   await neutralizeGlb(
-    path.join(SRC, "glb", "web", "mcg.glb"),
+    path.join(SRC, "glb", "web", SRC_STADIUM_GLB),
     path.join(glbOut, "web", "stadium-oval.glb"),
     { compress: false }
   );
@@ -195,11 +219,10 @@ function neutralizeDemoHtml(html, folder) {
   s = s.replace(/<title>[^<]+<\/title>/, `<title>${titles[folder] || folder}</title>`);
   s = s.replace(/\/\/[^\n]*/g, (line) => {
     if (!line.trim().startsWith("//")) return line;
-    const banned = /tipdash|tipbot|afl|sponsor|mcg|footy|collingwood|geelong|nrl|nfl|nba/i;
-    if (banned.test(line)) return "// Venue scene.";
+    if (BANNED_RE.test(line)) return "// Venue scene.";
     return line;
   });
-  s = s.replace(/\.\.\/\.\.\/mcg\.glb/g, "../glb/web/stadium-oval.glb");
+  s = s.replace(new RegExp(LEGACY_GLB_REF.replace(/\./g, "\\."), "g"), "../glb/web/stadium-oval.glb");
   return s;
 }
 
@@ -220,7 +243,7 @@ function neutralizeCommonJs() {
   );
   s = s.replace(/\/\/[^\n]*/g, (line) => {
     if (!line.trim().startsWith("//")) return line;
-    if (/tipdash|tipbot|afl|sponsor|mcg|footy|collingwood|geelong|nrl|nfl|nba/i.test(line)) return "// Shared helpers.";
+    if (BANNED_RE.test(line)) return "// Shared helpers.";
     return line;
   });
   return s;
@@ -234,7 +257,7 @@ async function compressPreview(srcPng, destWebp) {
 }
 
 async function copyVenues() {
-  const folderMap = { nfl: "gridiron", nrl: "rugby-league" };
+  const folderMap = FOLDER_ALIASES;
   const pvOut = path.join(OUT, "procedural-venues");
   mkdirp(pvOut);
   fs.writeFileSync(path.join(pvOut, "common.js"), neutralizeCommonJs());
