@@ -10,6 +10,8 @@
     "icons:render": "node scripts/render-app-icons.cjs",
     "icons:check": "node scripts/render-app-icons.cjs --check",
     "visual:catalog": "node scripts/build-visual-catalog.cjs",
-    "visual:check": "node scripts/build-visual-catalog.cjs --check"
+    "visual:check": "node scripts/build-visual-catalog.cjs --check",
+    "live:check": "node scripts/live-check.cjs",
+    "ship": "node scripts/ship.cjs"
   }
 }
