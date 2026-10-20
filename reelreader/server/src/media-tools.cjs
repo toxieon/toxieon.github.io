@@ -37,7 +37,10 @@ function runCommand(command, args, opts = {}) {
   });
 }
 
-async function inspectVideo(url, limits, timeoutMs, cookieContent) {
+// opts (used by link-fetch.cjs): extraArgs, e.g. ["--proxy", url], go before the "--" separator;
+// runCommand swaps the process runner (tests). Without opts, behaviour is exactly as before.
+async function inspectVideo(url, limits, timeoutMs, cookieContent, opts = {}) {
+  const run = opts.runCommand || runCommand;
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "reel-reader-inspect-"));
   try {
     const args = ["--dump-single-json", "--no-playlist"];
@@ -46,8 +49,9 @@ async function inspectVideo(url, limits, timeoutMs, cookieContent) {
       await fs.writeFile(cookiesPath, cookieContent, "utf8");
       args.push("--cookies", cookiesPath);
     }
+    if (opts.extraArgs && opts.extraArgs.length) args.push(...opts.extraArgs);
     args.push("--", url); // "--": the URL can never be read as an option
-    const { stdout } = await runCommand("yt-dlp", args, { timeoutMs });
+    const { stdout } = await run("yt-dlp", args, { timeoutMs });
     let info;
     try {
       info = JSON.parse(stdout);
@@ -69,31 +73,39 @@ async function inspectVideo(url, limits, timeoutMs, cookieContent) {
   }
 }
 
-async function downloadVideo(url, limits, timeoutMs, cookieContent) {
+async function downloadVideo(url, limits, timeoutMs, cookieContent, opts = {}) {
+  const run = opts.runCommand || runCommand;
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "reel-reader-"));
-  const outputTemplate = path.join(tempDir, "input.%(ext)s");
-  const args = [
-    "--no-playlist",
-    "--max-filesize", String(Math.floor(limits.maxBytes / (1024 * 1024))) + "M",
-    "--print", "after_move:filepath",
-    "-o", outputTemplate
-  ];
-  if (cookieContent) {
-    const cookiesPath = path.join(tempDir, "cookies.txt");
-    await fs.writeFile(cookiesPath, cookieContent, "utf8");
-    args.push("--cookies", cookiesPath);
-  }
-  args.push("--", url); // "--": the URL can never be read as an option
-  const { stdout } = await runCommand("yt-dlp", args, { timeoutMs });
-  const filePath = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
-  if (!filePath) throw new HttpError(502, "download_failed", "yt-dlp did not return a downloaded file path.");
+  try {
+    const outputTemplate = path.join(tempDir, "input.%(ext)s");
+    const args = [
+      "--no-playlist",
+      "--max-filesize", String(Math.floor(limits.maxBytes / (1024 * 1024))) + "M",
+      "--print", "after_move:filepath",
+      "-o", outputTemplate
+    ];
+    if (cookieContent) {
+      const cookiesPath = path.join(tempDir, "cookies.txt");
+      await fs.writeFile(cookiesPath, cookieContent, "utf8");
+      args.push("--cookies", cookiesPath);
+    }
+    if (opts.extraArgs && opts.extraArgs.length) args.push(...opts.extraArgs);
+    args.push("--", url); // "--": the URL can never be read as an option
+    const { stdout } = await run("yt-dlp", args, { timeoutMs });
+    const filePath = stdout.trim().split(/\r?\n/).filter(Boolean).pop();
+    if (!filePath) throw new HttpError(502, "download_failed", "yt-dlp did not return a downloaded file path.");
 
-  const stat = await fs.stat(filePath).catch(() => null);
-  if (!stat) throw new HttpError(502, "download_failed", "Downloaded media file was not found.");
-  if (stat.size > limits.maxBytes) {
-    throw new HttpError(413, "video_too_large", "Downloaded video exceeded the size limit of " + formatSize(limits.maxBytes) + ".");
+    const stat = await fs.stat(filePath).catch(() => null);
+    if (!stat) throw new HttpError(502, "download_failed", "Downloaded media file was not found.");
+    if (stat.size > limits.maxBytes) {
+      throw new HttpError(413, "video_too_large", "Downloaded video exceeded the size limit of " + formatSize(limits.maxBytes) + ".");
+    }
+    return { tempDir, filePath };
+  } catch (error) {
+    // The caller only learns tempDir on success, so a failed download cleans up after itself.
+    await cleanupTemp(tempDir);
+    throw error;
   }
-  return { tempDir, filePath };
 }
 
 async function ensureMp4(inputPath, timeoutMs) {

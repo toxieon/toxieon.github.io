@@ -43,6 +43,24 @@ Errors come back as `{"error":{"code","message"}}` with a short message (codes i
 - `REEL_READER_MAX_BYTES` – max downloaded bytes (default `125829120`).
 - `PORT` – defaults to `8080`.
 
+## Link fetcher (optional, for sites that block the server)
+
+Instagram, TikTok and sometimes YouTube block datacenter IPs. Link mode can go through a proxy or a paid downloader API instead. With none of these set, behaviour is unchanged (`yt-dlp` from the server's own IP). Upload mode never uses any of this.
+
+- `REEL_READER_FETCHER`: which fetcher to use. Default `ytdlp`. Options:
+  - `ytdlp`: `yt-dlp` direct (today's behaviour).
+  - `ytdlp-proxy`: `yt-dlp --proxy <REEL_READER_PROXY_URL>`.
+  - `http-api`: a downloader API that returns a direct media URL as JSON. The file is streamed to disk with the same size and duration limits.
+  - A comma-separated list is a **fallback chain**, e.g. `ytdlp,ytdlp-proxy`: try direct first, and use the proxy only when the site **blocks or rate-limits** the request. Validation errors (too long, too large, private, not found) never move on to the next fetcher.
+- `REEL_READER_PROXY_URL`: for `ytdlp-proxy`. `http://`, `https://` or `socks5://` only, e.g. `http://<user>:<password>@<proxy-host>:<port>`. It's never logged; error messages show `[hidden]` in its place.
+- `REEL_READER_PROXY_HOSTS`: optional comma-separated list of link hosts that use the proxy, e.g. `instagram.com,tiktok.com` (subdomains included). Other hosts go direct. Empty means every host uses the proxy.
+- `REEL_READER_API_URL`: for `http-api`. A URL template with a `{url}` placeholder that gets the URL-encoded link, e.g. `https://<downloader-api-host>/v1/fetch?url={url}`. Keep keys out of this URL and use the header below instead.
+- `REEL_READER_API_KEY`: the downloader API key (never logged).
+- `REEL_READER_API_KEY_HEADER`: the header name for the key. Default `x-api-key`.
+- `REEL_READER_API_MEDIA_FIELD`: dot path to the media URL in the API's JSON response. Default `url`; array indexes are allowed, e.g. `data.medias.0.url`.
+
+A bad combination (an unknown fetcher, a missing proxy URL, a `{url}`-less API template) stops the service at boot with a short message. The boot log line shows which fetcher is active, e.g. `fetcher=ytdlp,ytdlp-proxy proxy=set hosts=instagram.com,tiktok.com`, never the values.
+
 ## Render deploy steps
 
 1. Create a new **Web Service** in Render from this repository.
