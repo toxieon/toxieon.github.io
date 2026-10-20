@@ -1,7 +1,9 @@
 // Report times shown in Sydney (display only). Run with TZ unset/UTC: the output must not depend on the device zone.
 const test=require('node:test'),assert=require('node:assert/strict');
 const {section,context}=require('./test-utils.cjs');
-const time=section('function nowStamp()','function parseBool(');
+// nowStamp() sits at the end of js/state.js since the split (loadState() needs it at load), so take it
+// on its own, then the Sydney helpers that followed it in HELPERS.
+const time=section('function nowStamp()','\n')+'\n'+section('/* Cover "Generated" stamp','function parseBool(');
 
 test('stored UTC stamps render as Sydney time with AEDT/AEST', () => {
   const ctx=context(time,{});
