@@ -35,6 +35,15 @@ const RULES = [
     msg: () => "The AI step failed. Try again in a minute." },
 ];
 
+// A block or rate limit from the video site (or a downloader API). These are the only errors
+// link-fetch.cjs moves on to the next fetcher for; validation errors (HttpError: too long, too
+// large) and "private" / "not found" never retry.
+const BLOCK_RE = RULES.find((r) => r.code === "source_blocked").re;
+function isRetryableFetchError(error) {
+  if (!error || error instanceof HttpError) return false;
+  return BLOCK_RE.test(String(error.message || error));
+}
+
 function toFriendlyError(error, url, log = console) {
   const raw = String((error && error.message) || error || "unknown error");
   log.error("[reel-reader] processing error for " + siteName(url) + ": " + raw);
@@ -45,4 +54,4 @@ function toFriendlyError(error, url, log = console) {
   return new HttpError(502, "processing_failed", "Couldn't process that video. Try again later or use another link.");
 }
 
-module.exports = { toFriendlyError, siteName };
+module.exports = { toFriendlyError, siteName, isRetryableFetchError };
