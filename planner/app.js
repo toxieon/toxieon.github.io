@@ -410,7 +410,7 @@ function icon(name) { return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="
 /* Drive's own thumbnail endpoint — far more reliable than the cached
  * lh3.googleusercontent.com thumbnailLink, which goes stale and shows blank. */
 function driveThumb(id, size) { return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size || 400}` : ""; }
-function escapeHtml(value) { return String(value ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
+function escapeHtml(value) { return NDUI.escapeHtml(value); }  // shared/nd-ui.js
 function statusStyle(status) { return `--status:${statusMeta[status]?.color || "#2563eb"}`; }
 function statusPill(status) { return `<span class="status-pill" style="${statusStyle(status)}">${escapeHtml(status)}</span>`; }
 function initials(name) { if (!name) return "?"; return name.trim().split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase(); }

@@ -250,7 +250,7 @@
     return { ran: true, record: state.migrations[FLAG], ids: ids };
   }
 
-  return { parseTypedTime: parseTypedTime, snapClock: snapClock, isEntryLocked: isEntryLocked, toMin: toMin, toHHMM: toHHMM,
+  return { pad2: pad2, parseTypedTime: parseTypedTime, snapClock: snapClock, isEntryLocked: isEntryLocked, toMin: toMin, toHHMM: toHHMM,
     timelineHandles: timelineHandles, timelineSnap: timelineSnap, timelineAxis: timelineAxis, assignLanes: assignLanes, timelineApply: timelineApply,
     ruleSkips: ruleSkips, addRuleSkip: addRuleSkip, removeRuleSkip: removeRuleSkip, isRuleSkipped: isRuleSkipped, normaliseRuleSkips: normaliseRuleSkips, staticDaysFor: staticDaysFor,
     migrateStartFinish: migrateStartFinish, MIGRATION_FLAG: FLAG, NEW_START: NEW_START, NEW_FINISH: NEW_FINISH };

@@ -7,6 +7,7 @@ const os = require("node:os");
 const { pipeline } = require("node:stream/promises");
 const Busboy = require("busboy");
 const { HttpError } = require("./errors.cjs");
+const { formatSize } = require("./format.cjs");
 const { assertAllowedVideoMime, extensionForMime } = require("./upload-validation.cjs");
 
 /**
@@ -111,11 +112,6 @@ function receiveVideoUpload(req, limits) {
 
     req.pipe(bb);
   });
-}
-
-function formatSize(bytes) {
-  const mb = bytes / (1024 * 1024);
-  return mb.toFixed(mb >= 10 ? 0 : 1) + " MB";
 }
 
 module.exports = { receiveVideoUpload };

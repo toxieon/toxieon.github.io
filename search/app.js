@@ -94,14 +94,7 @@ function icon(name) {
   return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+function escapeHtml(value) { return NDUI.escapeHtml(value); }  // shared/nd-ui.js
 
 /* Normalisers + match engine now live in shared/nd-match.js (§1.7).
  * Search consumes the shared copy — behaviour is unchanged. */
