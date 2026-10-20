@@ -88,14 +88,16 @@ test("0.21.3: detection uses a 720px canvas and releases it; auto rooms is butto
   const fs = require("node:fs"); const path = require("node:path");
   const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
   const version = read("VERSION").trim();
-  const app = read("app.js"), html = read("index.html"), sw = read("sw.js");
-  assert.equal(version, "0.21.3");
+  const app = require("./test-utils.cjs").loadPlannerSource(), html = read("index.html"), sw = read("sw.js");
+  assert.equal(version, "0.21.4");
   assert.match(app, new RegExp(`APP_VERSION = "${version}"`));
   assert.match(sw, new RegExp(`CACHE_VERSION = 'planner-${version}'`));
   for (const file of [html, sw]) {
     assert.match(file, new RegExp(`styles\\.css\\?v=${version}`));
     assert.match(file, new RegExp(`room-auto-detect\\.js\\?v=${version}`));
-    assert.match(file, new RegExp(`app\\.js\\?v=${version}`));
+    for (const script of require("./test-utils.cjs").plannerScripts()) {
+      assert.match(file, new RegExp(`${script.replace(/[.]/g, "\\.")}\\?v=${version}`));
+    }
   }
   const detect = functionBody(app, "function pixelsForDetection");
   assert.match(detect, /maxDim/);
@@ -134,7 +136,7 @@ test("0.21.3: detection uses a 720px canvas and releases it; auto rooms is butto
 test("0.21.1: OCR is lazy (not in index.html or SW), pinned with SRI, and the icon stub has no UI", () => {
   const fs = require("node:fs"); const path = require("node:path");
   const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
-  const html = read("index.html"), sw = read("sw.js"), app = read("app.js");
+  const html = read("index.html"), sw = read("sw.js"), app = require("./test-utils.cjs").loadPlannerSource();
   assert.doesNotMatch(html, /tesseract/i);
   assert.doesNotMatch(sw, /tesseract|jsdelivr/i);
   assert.match(app, /PLANNER_TESSERACT_SRI = "sha384-/);

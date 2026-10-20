@@ -421,9 +421,9 @@
     <!-- Planner UI icons -->
     <div class="card">
       <h2>Planner UI icons <span class="tag">planner</span></h2>
-      <p class="desc">Planner's in-house 24 px stroke icon set (<span id="pi-count">38</span> icons: toolbar, plan, portal, switchboard/sub-board). These glyphs differ from the suite's 24 interface icons. Rendered live from <code>planner/app.js</code>:</p>
-      <div class="demo"><div class="pi-grid" id="pi-grid"><span class="status" style="color:var(--nd-muted,#888);">Loading from planner/app.js…</span></div></div>
-      <code class="use">icon("camera")   // planner/app.js iconPaths
+      <p class="desc">Planner's in-house 24 px stroke icon set (<span id="pi-count">38</span> icons: toolbar, plan, portal, switchboard/sub-board). These glyphs differ from the suite's 24 interface icons. Rendered live from <code>planner/js/state.js</code>:</p>
+      <div class="demo"><div class="pi-grid" id="pi-grid"><span class="status" style="color:var(--nd-muted,#888);">Loading from planner/js/state.js…</span></div></div>
+      <code class="use">icon("camera")   // planner/js/state.js iconPaths
 // &lt;svg viewBox="0 0 24 24" fill="none" stroke="currentColor"&gt;</code>
     </div>
 
@@ -453,10 +453,10 @@ border-radius: var(--nd-radius); min-height: var(--nd-tap);</code>
     <!-- Planner palette -->
     <div class="card">
       <h2>Planner palette <span class="tag">planner</span></h2>
-      <p class="desc">Planner's theme colours, node status colours, default category tabs (Electrical / Data / AC) and folder colours. Read live from <code>planner/styles.css</code> and <code>planner/app.js</code>:</p>
+      <p class="desc">Planner's theme colours, node status colours, default category tabs (Electrical / Data / AC) and folder colours. Read live from <code>planner/styles.css</code> and <code>planner/js/state.js</code>:</p>
       <div class="demo" id="pp-demo"><span class="status" style="color:var(--nd-muted,#888);">Loading…</span></div>
       <code class="use">:root { --blue --cyan --teal --amber --green --red --violet … }  // styles.css
-statusMeta · DEFAULT_CATEGORY_TABS · DEFAULT_FOLDER_COLORS  // app.js</code>
+statusMeta · DEFAULT_CATEGORY_TABS · DEFAULT_FOLDER_COLORS  // js/state.js</code>
     </div>
 
     <!-- Node markers -->
@@ -508,7 +508,7 @@ statusMeta · DEFAULT_CATEGORY_TABS · DEFAULT_FOLDER_COLORS  // app.js</code>
         </div>
       </div>
       <code class="use">.print-cover { --cover-logo-w:440px; --cover-logo-gap:8px }
-REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</code>
+REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/js/render-hours-report.js · logo: /logo.png</code>
     </div>
 
   </div>
@@ -549,7 +549,7 @@ REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</co
 </div>
 
 <script>
-  var APP_VERSION = "1.2.4";   // see 1234567890/VERSIONING.md
+  var APP_VERSION = "1.2.5";   // see 1234567890/VERSIONING.md
   document.getElementById("app-version").textContent = "Assets v" + APP_VERSION;
   document.getElementById("count").textContent = document.querySelectorAll(".grid .card").length + " assets";
 
@@ -877,10 +877,10 @@ REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</co
       } else tokBox.textContent = "shared/nd-core.css not readable here.";
     }
 
-    /* Planner UI icons + palette: parsed from planner/app.js and planner/styles.css */
+    /* Planner UI icons + palette: parsed from planner/js/state.js and planner/styles.css */
     var piGrid = document.getElementById("pi-grid"), ppDemo = document.getElementById("pp-demo");
     function getText(url) { return fetch(url, { cache: "no-cache" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }); }
-    var appJs = getText("../planner/app.js"), stylesCss = getText("../planner/styles.css");
+    var appJs = getText("../planner/js/state.js"), stylesCss = getText("../planner/styles.css");
 
     appJs.then(function (src) {
       var i = src.indexOf("const iconPaths = {"), j = src.indexOf("\n};", i);
@@ -892,7 +892,7 @@ REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</co
       piGrid.innerHTML = names.map(function (n) { return '<span class="pi" title="icon(&quot;' + n + '&quot;)">' + svg(n) + "</span>"; }).join("");
       document.getElementById("pi-count").textContent = names.length;
       document.querySelectorAll("[data-pi]").forEach(function (b) { var n = b.getAttribute("data-pi"); if (paths[n]) b.innerHTML = svg(n); });
-    }).catch(function () { piGrid.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/app.js. See iconPaths there.</span>'; });
+    }).catch(function () { piGrid.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/js/state.js. See iconPaths there.</span>'; });
 
     Promise.all([stylesCss, appJs]).then(function (res) {
       var css = res[0], js = res[1], rootM = /:root\s*\{([^}]*)\}/.exec(css), frag = document.createDocumentFragment();
@@ -914,7 +914,7 @@ REPORT_COVER_LOGO_SRC = "../logo.png"   // planner/app.js · logo: /logo.png</co
       if (fc) (fc[1].match(/#[0-9a-fA-F]{6}/g) || []).forEach(function (c, k) { folders.push(["folder " + (k + 1), c]); });
       group("Default folder colours", folders);
       ppDemo.innerHTML = ""; ppDemo.appendChild(frag);
-    }).catch(function () { ppDemo.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/styles.css / app.js.</span>'; });
+    }).catch(function () { ppDemo.innerHTML = '<span class="status" style="color:var(--nd-muted,#888);">Could not read planner/styles.css / js/state.js.</span>'; });
   })();
 
 </script>

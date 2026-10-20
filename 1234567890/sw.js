@@ -1,6 +1,6 @@
 /* Service worker — Assets showroom + visual library (offline shell). */
 
-const CACHE_VERSION = "assets-1.2.4";
+const CACHE_VERSION = "assets-1.2.5";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -9,8 +9,8 @@ const SHELL_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./visual/index.html",
-  "./visual/visual.css?v=1.2.4",
-  "./visual/visual.js?v=1.2.4",
+  "./visual/visual.css?v=1.2.5",
+  "./visual/visual.js?v=1.2.5",
   "./visual-catalog.json",
   "../assets/suite-icons/apps/assets.svg?v=1.2.0",
   "../shared/nd-core.css",

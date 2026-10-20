@@ -1,6 +1,6 @@
 /* Planner Auto rooms smoke test (module level, no browser).
  * Covers: generated plan -> detection -> mocked OCR labels -> preview candidates ->
- * commitAutoRooms (real source from app.js, run in a vm with Sheets/Drive/UI stubbed)
+ * commitAutoRooms (real source from js/*.js, run in a vm with Sheets/Drive/UI stubbed)
  * writes rooms + title pins; Auto rooms is reachable only from its button action;
  * heap growth stays bounded. The signed-in UI (modal DOM, OSD viewer, real Drive/Sheets)
  * is not exercised here. */
@@ -10,7 +10,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const A = require("./room-auto-detect.js");
-const APP = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
+const APP = require("./test-utils.cjs").loadPlannerSource();
 
 function samplePlan(w, h) {
   const d = new Uint8ClampedArray(w * h * 4).fill(255);
