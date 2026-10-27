@@ -20,6 +20,14 @@
  *
  * Private app paths are never printed (table, JSON, screenshots) unless --show-private is passed;
  * they show as "private app #n". Exit code 1 on any failure. No dependencies (Node built-ins only).
+ *
+ * --lines [--checks file.json]: run a plain list of URL checks instead, printing one JSON line each:
+ *   {"target":"pages","check":"status|text|noindex|console","url":"...","ok":true,"detail":"..."}
+ * then {"summary":true,"passed":N,"failed":N,"skipped":N}. A check that can't run (no browser) prints
+ * ok:true with "skipped":true and is counted as skipped, never passed. Exit 0 only if nothing failed.
+ * List items: {"path":"/","status":200,"text":"CCTV","noindex":true,"console":true}. Without --checks the
+ * DEFAULT_LINE_CHECKS below are used. The console check (390px, console errors + failed requests) needs
+ * playwright or playwright-core from the box's tooling (LIVE_CHECK_PLAYWRIGHT_MODULE=/path/to/module).
  */
 "use strict";
 const fs = require("node:fs");
@@ -43,6 +51,8 @@ function parseArgs(argv) {
     else if (a === "--show-private") out.showPrivate = true;
     else if (a === "--no-browser") out.browser = false;
     else if (a === "--root") out.root = path.resolve(val());
+    else if (a === "--lines") out.lines = true;
+    else if (a === "--checks") { out.lines = true; out.checksFile = path.resolve(val()); }
     else if (a === "--help" || a === "-h") out.help = true;
     else throw new Error("unknown option " + a);
   }
@@ -180,8 +190,74 @@ async function checkSiteFiles(targets, opts) {
 
 // ── optional browser step ───────────────────────────────────────────────────
 function loadPlaywright() {
-  const name = process.env.LIVE_CHECK_PLAYWRIGHT_MODULE || "playwright"; // tests point this at a missing module
-  try { return require(name); } catch (e) { return null; }
+  const names = process.env.LIVE_CHECK_PLAYWRIGHT_MODULE ? [process.env.LIVE_CHECK_PLAYWRIGHT_MODULE] : ["playwright", "playwright-core"]; // tests point this at a missing module
+  for (const name of names) { try { return require(name); } catch (e) { /* try next */ } }
+  return null;
+}
+
+// ── --lines mode: plain URL checks, one JSON line each ──────────────────────
+const DEFAULT_LINE_CHECKS = [
+  { path: "/", status: 200, text: "CCTV", console: true },
+  { path: "/quote/", status: 200 },
+  { path: "/planner/", status: 200 },
+  { path: "/1234567890/", status: 200, noindex: true },
+];
+
+async function runLines(opts, print = (o) => console.log(JSON.stringify(o))) {
+  const list = opts.checksFile ? JSON.parse(fs.readFileSync(opts.checksFile, "utf8")) : DEFAULT_LINE_CHECKS;
+  const tally = { passed: 0, failed: 0, skipped: 0 };
+  const emit = (check, url, ok, detail, skipped) => {
+    const o = { target: "pages", check, url, ok, detail };
+    if (skipped) o.skipped = true;
+    tally[skipped ? "skipped" : ok ? "passed" : "failed"]++;
+    print(o);
+  };
+  const pw = opts.browser ? loadPlaywright() : null;
+  let browser = null, browserErr = null;
+  for (const c of list) {
+    const url = opts.base + c.path;
+    let res;
+    try {
+      const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { "user-agent": "neilldata-live-check/1" } });
+      res = { status: r.status, text: await r.text(), robots: r.headers.get("x-robots-tag") || "" };
+    } catch (e) { res = { status: 0, text: "", robots: "", error: (e && e.name === "TimeoutError") ? "timed out" : "request failed" }; }
+    const want = c.status || 200;
+    emit("status", url, res.status === want, res.status ? "HTTP " + res.status + (res.status === want ? "" : " (want " + want + ")") : res.error);
+    if (c.text) {
+      const ok = res.text.includes(c.text);
+      emit("text", url, ok, (ok ? "found " : "missing ") + JSON.stringify(c.text));
+    }
+    if (c.noindex) {
+      const meta = isNoindex(res.text), hdr = /noindex/i.test(res.robots);
+      emit("noindex", url, meta || hdr, meta ? "meta robots noindex" : hdr ? "X-Robots-Tag noindex" : "no noindex meta or X-Robots-Tag");
+    }
+    if (c.console) {
+      if (!pw || !pw.chromium) { emit("console", url, true, "skipped: no playwright browser available on this machine", true); continue; }
+      try {
+        if (!browser && !browserErr) {
+          const launch = {};
+          if (process.env.LIVE_CHECK_CHROMIUM) launch.executablePath = process.env.LIVE_CHECK_CHROMIUM;
+          browser = await pw.chromium.launch(launch);
+        }
+      } catch (e) { browserErr = "browser failed to launch"; }
+      if (!browser) { emit("console", url, true, "skipped: " + browserErr, true); continue; }
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const page = await ctx.newPage();
+      const errs = [], failed = [];
+      page.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+      page.on("pageerror", () => errs.push("page error"));
+      page.on("requestfailed", (r) => failed.push(new URL(r.url()).pathname));
+      try { await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }); await page.waitForTimeout(1000); }
+      catch (e) { errs.push("page did not load"); }
+      await ctx.close();
+      // Only counts and paths are reported: never message bodies, query strings or storage values.
+      const ok = errs.length === 0 && failed.length === 0;
+      emit("console", url, ok, "390px: " + errs.length + " console error(s), " + failed.length + " failed request(s)" + (failed.length ? " " + failed.slice(0, 3).join(", ") : ""));
+    }
+  }
+  if (browser) await browser.close();
+  print({ summary: true, ...tally });
+  return tally;
 }
 
 async function browserStep(rows, opts) {
@@ -297,6 +373,10 @@ async function main() {
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (e) { console.error("live-check: " + e.message); process.exit(2); }
   if (opts.help) { console.log(fs.readFileSync(__filename, "utf8").split("*/")[0].replace(/^#!.*\n\/\* ?/, "")); return; }
+  if (opts.lines) {
+    try { const t = await runLines(opts); process.exit(t.failed ? 1 : 0); }
+    catch (e) { console.error("live-check: " + e.message); process.exit(2); }
+  }
   try {
     const { report, text, failed } = await run(opts);
     console.log(opts.json ? JSON.stringify(report, null, 2) : text);
@@ -309,4 +389,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs, repoTargets, versionsIn, isNoindex, run, liveVersions };
+module.exports = { parseArgs, repoTargets, versionsIn, isNoindex, run, liveVersions, runLines, DEFAULT_LINE_CHECKS };
