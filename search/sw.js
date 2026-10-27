@@ -11,7 +11,7 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'search-v6';
+const CACHE_VERSION = 'search-v7';
 const SHELL_ASSETS = [
   "../shared/nd-inbox.js?v=2",
   "./",

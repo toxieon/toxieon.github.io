@@ -1,3 +1,4 @@
+## 0.7.6 · 2026-10-27 · csp · Content-Security-Policy <meta> added to the page (script-src limited to this site plus the Google hosts it loads; inline scripts allowed by hash; object-src none, base-uri and form-action self). Service worker hub-v15.
 ## 0.7.5 · 2026-10-13 · sw-precache · Service worker hub-v14 precaches shared nd-backend.js, nd-config.js, nd-auth.js and nd-gate-codes.js?v=0.1.2 so the hub's sign-in scripts load offline.
 ## 0.7.4 · 2026-10-13 · sw-cache-scope · Service worker hub-v13 deletes only hub-* caches on activate (it used to delete every app's caches on the site).
 ## 0.7.3 · 2026-10-12 · owner-shortcut · For the owner only, on a device already signed in to the suite, the hub asks the backend for a private app shortcut and adds it as a tile; the path is never in a static hub file. No sign-in attempt on devices that have never signed in. Service worker hub-v12

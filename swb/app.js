@@ -271,7 +271,7 @@ function restore() {
 let _uid = 0;
 function uid(prefix="id") { return `${prefix}_${Date.now()}_${++_uid}`; }
 function nowStamp() { return new Date().toLocaleString("en-AU"); }
-function escHtml(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function escHtml(s) { return (s==null||s===false?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function parseNum(v,def=0) { const n=parseFloat(v); return isNaN(n)?def:n; }
 function project(id=state.selectedProjectId) { return state.projects.find(p=>p.id===id)||null; }
 function boards(projectId=state.selectedProjectId) { const p=project(projectId); return p?.boards||[]; }
@@ -1190,15 +1190,15 @@ function renderProjectCard(proj, idx) {
   const warnings   = cc.filter(c=>c.loadStatus==="warning").length;
   const style = `animation-delay:${idx*40}ms`;
   return `
-    <div class="project-card" data-open-project="${proj.id}" style="${style}">
+    <div class="project-card" data-open-project="${escHtml(proj.id)}" style="${style}">
       <div class="project-card-header">
         <div>
           <div class="project-card-name">${escHtml(proj.name)}</div>
           ${proj.address?`<div class="project-card-addr">${escHtml(proj.address)}</div>`:""}
         </div>
         <div class="project-card-actions" onclick="event.stopPropagation()">
-          <button class="btn-icon" data-action="edit-project" data-project-id="${proj.id}" title="Edit">${I.edit}</button>
-          <button class="btn-icon" data-action="delete-project" data-project-id="${proj.id}" title="Delete">${I.trash}</button>
+          <button class="btn-icon" data-action="edit-project" data-project-id="${escHtml(proj.id)}" title="Edit">${I.edit}</button>
+          <button class="btn-icon" data-action="delete-project" data-project-id="${escHtml(proj.id)}" title="Delete">${I.trash}</button>
         </div>
       </div>
       <div class="project-card-meta">
@@ -1233,7 +1233,7 @@ function renderBoardView() {
     ${overloaded.length ? renderOverloadBanner(overloaded) : ""}
     <div class="board-tabs-wrap">
       <div class="board-tabs">
-        ${bs.map(b=>`<button class="board-tab ${b.id===curBoard.id?"is-active":""}" data-board="${b.id}">${escHtml(b.label)}</button>`).join("")}
+        ${bs.map(b=>`<button class="board-tab ${b.id===curBoard.id?"is-active":""}" data-board="${escHtml(b.id)}">${escHtml(b.label)}</button>`).join("")}
         <button class="board-tab-add btn-icon" data-action="new-board" title="Add sub-board">${I.plus}</button>
       </div>
     </div>
@@ -1242,7 +1242,7 @@ function renderBoardView() {
       <div class="board-stat"><div class="board-stat-val ${overloaded.length?"err":""}">${overloaded.length}</div><div class="board-stat-lbl">Overloaded</div></div>
       <div class="board-stat"><div class="board-stat-val ${circs.filter(c=>c.loadStatus==="warning").length?"warn":""}">${circs.filter(c=>c.loadStatus==="warning").length}</div><div class="board-stat-lbl">At Limit</div></div>
       <div class="board-stat"><div class="board-stat-val ${totalLoadA>maxLoadA?"err":"ok"}" style="font-family:var(--font-mono)">${totalLoadA.toFixed(1)}A</div><div class="board-stat-lbl">Total load</div></div>
-      ${maxLoadA?`<div class="board-stat"><div class="board-stat-val" style="font-family:var(--font-mono)">${maxLoadA}A <button type="button" class="btn-icon btn-inline" data-action="edit-board" data-board="${curBoard.id}" title="Edit board" style="vertical-align:middle;margin-left:2px;opacity:0.6">${I.edit}</button></div><div class="board-stat-lbl">Main breaker</div></div>`:""}
+      ${maxLoadA?`<div class="board-stat"><div class="board-stat-val" style="font-family:var(--font-mono)">${maxLoadA}A <button type="button" class="btn-icon btn-inline" data-action="edit-board" data-board="${escHtml(curBoard.id)}" title="Edit board" style="vertical-align:middle;margin-left:2px;opacity:0.6">${I.edit}</button></div><div class="board-stat-lbl">Main breaker</div></div>`:""}
     </div>
     <div class="toolbar">
       <div class="search-wrap">${I.search}<input data-filter="query" placeholder="Search circuits…" value="${escHtml(state.filters.query)}" /></div>
@@ -1351,7 +1351,7 @@ function renderOverloadBanner(overloaded) {
       ${I.warn}
       <div class="overload-banner-text">
         <strong>${overloaded.length} overloaded circuit${overloaded.length!==1?"s":""}</strong>
-        <span>${overloaded.map(c=>c.name).join(", ")}</span>
+        <span>${overloaded.map(c=>escHtml(c.name)).join(", ")}</span>
       </div>
     </div>`;
 }
@@ -1368,13 +1368,13 @@ function renderCircuitCard(c, idx) {
   }).join("");
   const style = `animation-delay:${idx*30}ms`;
   return `
-    <div class="circuit-card status-${c.loadStatus}" data-circuit="${c.id}" style="${style}">
+    <div class="circuit-card status-${escHtml(c.loadStatus)}" data-circuit="${escHtml(c.id)}" style="${style}">
       <div class="circuit-card-header">
         <div class="phase-dot ${phaseDotClass}"></div>
         <div style="flex:1">
           <div class="circuit-name">${escHtml(c.name)}</div>
         </div>
-        <div class="circuit-num">#${c.slot||"—"}</div>
+        <div class="circuit-num">#${escHtml(c.slot||"—")}</div>
         <div class="circuit-badges">
           <span class="badge ${typeColors[c.type]||"badge-type-custom"}">${escHtml(c.type||"—")}</span>
           <span class="badge badge-${c.loadStatus==="ok"?"ok":c.loadStatus==="warning"?"edge":"err"}">${statusLabel}</span>
@@ -1413,8 +1413,8 @@ function renderCircuitCard(c, idx) {
         </div>`:""}
       ${devChips?`<div class="circuit-devices">${devChips}</div>`:""}
       <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end">
-        <button class="btn btn-ghost btn-sm" data-action="edit-circuit" data-circuit-id="${c.id}">${I.edit} Edit</button>
-        <button class="btn-icon" data-action="delete-circuit" data-circuit-id="${c.id}" title="Delete">${I.trash}</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit-circuit" data-circuit-id="${escHtml(c.id)}">${I.edit} Edit</button>
+        <button class="btn-icon" data-action="delete-circuit" data-circuit-id="${escHtml(c.id)}" title="Delete">${I.trash}</button>
       </div>
     </div>`;
 }
@@ -1446,7 +1446,7 @@ function renderDevicesView() {
                   <td style="font-size:11px;color:var(--text-2)">${escHtml(d.std||"—")}</td>
                   <td>${d.amp}A</td>
                   <td>${d.ded?`<span class="badge badge-ok">Yes${d.defBreaker?` ${d.defBreaker}A`:""}</span>`:""}</td>
-                  <td><button type="button" class="btn-icon" data-action="edit-device" data-device-id="${d.id}" title="Edit">${I.edit}</button></td>
+                  <td><button type="button" class="btn-icon" data-action="edit-device" data-device-id="${escHtml(d.id)}" title="Edit">${I.edit}</button></td>
                 </tr>`).join("")}
             </tbody>
           </table>
@@ -1668,7 +1668,7 @@ function renderProjectModal(m) {
               <option value="3ph" ${proj?.phase==="3ph"?"selected":""}>Three phase</option>
             </select>
           </div>
-          <div class="field"><label>Main breaker size (A)</label><input name="mainBreakerA" type="number" min="20" max="400" value="${proj?.boards?.[0]?.mainBreakerA||63}" /></div>
+          <div class="field"><label>Main breaker size (A)</label><input name="mainBreakerA" type="number" min="20" max="400" value="${escHtml(proj?.boards?.[0]?.mainBreakerA||63)}" /></div>
           <div class="field full"><label>Main board label</label><input name="mainBoardLabel" value="${escHtml(proj?.boards?.[0]?.label||"Main Switchboard")}" /></div>
           <div class="field full"><label>Main board location</label><input name="mainBoardLocation" value="${escHtml(proj?.boards?.[0]?.location||"")}" placeholder="e.g. Garage wall" /></div>
           <hr class="field-separator" />
@@ -1679,7 +1679,7 @@ function renderProjectModal(m) {
         </div>
       </div>
       <div class="modal-actions">
-        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-project" data-project-id="${m.projectId}">${I.trash}</button>`:""}
+        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-project" data-project-id="${escHtml(m.projectId)}">${I.trash}</button>`:""}
         <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
         <button type="submit" class="btn btn-primary">${I.check} ${isEdit?"Save changes":"Create project"}</button>
       </div>
@@ -1708,18 +1708,18 @@ function renderBoardModal(m) {
               <option value="3ph" ${b?.phase==="3ph"?"selected":""}>Three phase</option>
             </select>
           </div>
-          <div class="field"><label>Main breaker (A)</label><input name="mainBreakerA" type="number" min="6" max="400" value="${b?.mainBreakerA||32}" /></div>
+          <div class="field"><label>Main breaker (A)</label><input name="mainBreakerA" type="number" min="6" max="400" value="${escHtml(b?.mainBreakerA||32)}" /></div>
           <div class="field full"><label>Location</label><input name="location" value="${escHtml(b?.location||"")}" placeholder="e.g. Level 2 comms room" /></div>
           <div class="field full"><label>Feed from (main board)</label>
             <select name="parentBoardId">
-              ${mainBoards.map(mb=>`<option value="${mb.id}" ${b?.parentBoardId===mb.id||(!b&&mb===mainBoards[0])?"selected":""}>${escHtml(mb.label)}</option>`).join("")}
+              ${mainBoards.map(mb=>`<option value="${escHtml(mb.id)}" ${b?.parentBoardId===mb.id||(!b&&mb===mainBoards[0])?"selected":""}>${escHtml(mb.label)}</option>`).join("")}
             </select>
             <span class="form-note">SWB will include this board's load in the main board total.</span>
           </div>
         </div>
       </div>
       <div class="modal-actions">
-        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-board" data-board-id="${m.boardId}">${I.trash}</button>`:""}
+        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-board" data-board-id="${escHtml(m.boardId)}">${I.trash}</button>`:""}
         <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
         <button type="submit" class="btn btn-primary">${I.check} ${isEdit?"Save":"Add board"}</button>
       </div>
@@ -1746,7 +1746,7 @@ function renderCircuitModal(m) {
     const dev=devs.find(d=>d.id===sel.id); if (!dev) return "";
     return `<span class="device-chip">
       <span class="qty">${sel.qty||1}×</span>${escHtml(dev.name)} (${dev.amp}A)
-      <button type="button" data-remove-device="${sel.id}" style="margin-left:4px;opacity:0.6;font-size:12px">✕</button>
+      <button type="button" data-remove-device="${escHtml(sel.id)}" style="margin-left:4px;opacity:0.6;font-size:12px">✕</button>
     </span>`;
   }).join("");
 
@@ -1769,7 +1769,7 @@ function renderCircuitModal(m) {
               ${(proj?.phase==="single" ? [["L1","L1"]] : [["L1","L1"],["L2","L2"],["L3","L3"],["3ph","3-phase"]]).map(([v,l])=>`<option value="${v}" ${(c?.phase||"L1")===v?"selected":""}>${l}</option>`).join("")}
             </select>
           </div>
-          <div class="field"><label>Slot #</label><input name="slot" type="number" min="1" value="${c?.slot||((proj?.circuits?.length||0)+1)}" /></div>
+          <div class="field"><label>Slot #</label><input name="slot" type="number" min="1" value="${escHtml(c?.slot||((proj?.circuits?.length||0)+1))}" /></div>
           <div class="field"><label>Install status</label>
             <select name="installStatus">
               ${[["planned","Planned"],["roughed","Roughed-in"],["complete","Complete"]].map(([v,l])=>`<option value="${v}" ${(c?.installStatus||"planned")===v?"selected":""}>${l}</option>`).join("")}
@@ -1814,7 +1814,7 @@ function renderCircuitModal(m) {
               ${[["TPS","TPS"],["singles","Singles"],["flex","Flex"],["other","Other"]].map(([v,l])=>`<option value="${v}" ${(c?.cableType||"TPS")===v?"selected":""}>${l}</option>`).join("")}
             </select>
           </div>
-          <div class="field"><label>Est. run length (m)</label><input name="runLength" type="number" min="0" step="0.5" value="${c?.runLength||""}" placeholder="0" /></div>
+          <div class="field"><label>Est. run length (m)</label><input name="runLength" type="number" min="0" step="0.5" value="${escHtml(c?.runLength||"")}" placeholder="0" /></div>
           <div class="field"><label>In conduit</label>
             <select name="conduit">
               <option value="false" ${!c?.conduit?"selected":""}>No</option>
@@ -1823,8 +1823,8 @@ function renderCircuitModal(m) {
           </div>
           <hr class="field-separator" />
           <div class="form-section"><div class="form-section-title">Connected devices</div></div>
-          ${(()=>{ const r=c?.breakerRating||20; const sug=(r<=10)?["Light Point","Exhaust Fan","Down Light"]:(r<=20)?["10A GPO","Double GPO"]:(r>=20)?["Oven","Cooktop","Air Con","Hot Water System"]:[];  const sugDevs=devs.filter(d=>sug.some(s=>d.name.toLowerCase().includes(s.toLowerCase()))); return sugDevs.length?`<div class="field full" style="margin-bottom:0"><div class="form-section-title" style="margin-bottom:6px">Suggested for ${r}A breaker</div><div style="display:flex;flex-wrap:wrap;gap:6px">${sugDevs.map(d=>`<button type="button" class="btn btn-ghost btn-sm" data-qty-inc="${d.id}" style="font-size:12px">${I.plus}${escHtml(d.name)}</button>`).join("")}</div></div>`:""})()}
-          ${(()=>{ const others=(proj?.circuits||[]).filter(x=>(!isEdit||x.id!==m.circuitId)&&(x.devices||[]).length); return others.length?`<div class="field full" style="margin-bottom:8px"><label>Batch fill — copy devices from another circuit</label><select id="copyDevicesFrom"><option value="">Choose a circuit…</option>${others.map(x=>`<option value="${x.id}">${escHtml(x.name)} · ${(x.devices||[]).reduce((s,d)=>s+(d.qty||0),0)} device(s)</option>`).join("")}</select></div>`:"" })()}
+          ${(()=>{ const r=c?.breakerRating||20; const sug=(r<=10)?["Light Point","Exhaust Fan","Down Light"]:(r<=20)?["10A GPO","Double GPO"]:(r>=20)?["Oven","Cooktop","Air Con","Hot Water System"]:[];  const sugDevs=devs.filter(d=>sug.some(s=>d.name.toLowerCase().includes(s.toLowerCase()))); return sugDevs.length?`<div class="field full" style="margin-bottom:0"><div class="form-section-title" style="margin-bottom:6px">Suggested for ${r}A breaker</div><div style="display:flex;flex-wrap:wrap;gap:6px">${sugDevs.map(d=>`<button type="button" class="btn btn-ghost btn-sm" data-qty-inc="${escHtml(d.id)}" style="font-size:12px">${I.plus}${escHtml(d.name)}</button>`).join("")}</div></div>`:""})()}
+          ${(()=>{ const others=(proj?.circuits||[]).filter(x=>(!isEdit||x.id!==m.circuitId)&&(x.devices||[]).length); return others.length?`<div class="field full" style="margin-bottom:8px"><label>Batch fill — copy devices from another circuit</label><select id="copyDevicesFrom"><option value="">Choose a circuit…</option>${others.map(x=>`<option value="${escHtml(x.id)}">${escHtml(x.name)} · ${(x.devices||[]).reduce((s,d)=>s+(d.qty||0),0)} device(s)</option>`).join("")}</select></div>`:"" })()}
           <div class="device-picker field full">
             <div class="device-search-wrap">${I.search}<input id="deviceSearch" placeholder="Search devices…" value="${escHtml(state.deviceSearch||"")}" /></div>
             <div class="device-picker-list">
@@ -1835,11 +1835,11 @@ function renderCircuitModal(m) {
                   const ampVal=(sel&&sel.value!=null&&sel.value!=="")?sel.value:d.amp;
                   return `<div class="device-row">
                     <div class="device-row-name">${escHtml(d.name)}</div>
-                    <div class="device-row-amp"><input type="number" min="0" step="0.1" value="${ampVal}" id="amp_${d.id}" data-amp-override="${d.id}" title="Override draw for this circuit" style="width:54px" />A</div>
+                    <div class="device-row-amp"><input type="number" min="0" step="0.1" value="${escHtml(ampVal)}" id="amp_${escHtml(d.id)}" data-amp-override="${escHtml(d.id)}" title="Override draw for this circuit" style="width:54px" />A</div>
                     <div class="device-qty-ctrl">
-                      <button type="button" data-qty-dec="${d.id}">−</button>
-                      <input type="number" min="0" step="1" class="device-qty-val" id="qty_${d.id}" value="${qty}" data-qty-input="${d.id}" style="width:40px;text-align:center" />
-                      <button type="button" data-qty-inc="${d.id}">+</button>
+                      <button type="button" data-qty-dec="${escHtml(d.id)}">−</button>
+                      <input type="number" min="0" step="1" class="device-qty-val" id="qty_${escHtml(d.id)}" value="${escHtml(qty)}" data-qty-input="${escHtml(d.id)}" style="width:40px;text-align:center" />
+                      <button type="button" data-qty-inc="${escHtml(d.id)}">+</button>
                     </div>
                   </div>`;
                 }).join("")}`).join("")}
@@ -1851,7 +1851,7 @@ function renderCircuitModal(m) {
         </div>
       </div>
       <div class="modal-actions">
-        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-circuit" data-circuit-id="${m.circuitId}">${I.trash}</button>`:""}
+        ${isEdit?`<button type="button" class="btn btn-danger" data-action="delete-circuit" data-circuit-id="${escHtml(m.circuitId)}">${I.trash}</button>`:""}
         <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
         <button type="submit" class="btn btn-primary">${I.check} ${isEdit?"Save":"Add circuit"}</button>
       </div>
@@ -1879,19 +1879,19 @@ function renderDeviceEditModal(m) {
               ${["Lighting","Power","Dedicated","Climate","EV/Solar","Data/Comms","Custom"].map(c=>`<option value="${c}" ${dev.cat===c?"selected":""}>${c}</option>`).join("")}
             </select>
           </div>
-          <div class="field"><label>Load (A)</label><input name="amp" type="number" step="0.1" min="0" required value="${dev.amp}" /></div>
+          <div class="field"><label>Load (A)</label><input name="amp" type="number" step="0.1" min="0" required value="${escHtml(dev.amp)}" /></div>
           <div class="field"><label>Dedicated circuit</label>
             <select name="ded">
               <option value="false" ${!dev.ded?"selected":""}>No</option>
               <option value="true"  ${dev.ded?"selected":""}>Yes</option>
             </select>
           </div>
-          <div class="field"><label>Default breaker (A)</label><input name="defBreaker" type="number" step="1" min="0" value="${dev.defBreaker||""}" placeholder="optional" /></div>
+          <div class="field"><label>Default breaker (A)</label><input name="defBreaker" type="number" step="1" min="0" value="${escHtml(dev.defBreaker||"")}" placeholder="optional" /></div>
           <div class="field"><label>Standard ref</label><input name="std" value="${escHtml(dev.std||"")}" placeholder="e.g. AS/NZS 3000:2018" /></div>
         </div>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger btn-sm" data-action="delete-device" data-device-id="${dev.id}">${I.trash}</button>
+        <button type="button" class="btn btn-danger btn-sm" data-action="delete-device" data-device-id="${escHtml(dev.id)}">${I.trash}</button>
         <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
         <button type="submit" class="btn btn-primary">${I.check} Save</button>
       </div>
@@ -2104,7 +2104,7 @@ function updateQtyDisplay() {
   const chips=_modalDevices.filter(d=>d.qty>0).map(d=>{
     const dev=devs.find(x=>x.id===d.id); if (!dev) return "";
     const amp=(d.value!=null&&d.value!=="")?d.value:dev.amp;
-    return `<span class="device-chip"><span class="qty">${d.qty}×</span>${escHtml(dev.name)} (${amp}A)<button type="button" data-remove-device="${d.id}" style="margin-left:4px;opacity:0.6;font-size:12px">✕</button></span>`;
+    return `<span class="device-chip"><span class="qty">${d.qty}×</span>${escHtml(dev.name)} (${amp}A)<button type="button" data-remove-device="${escHtml(d.id)}" style="margin-left:4px;opacity:0.6;font-size:12px">✕</button></span>`;
   }).join("");
   wrap.innerHTML = chips||`<span style="color:var(--text-3);font-size:12px">No devices added yet</span>`;
 }

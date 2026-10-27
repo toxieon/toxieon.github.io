@@ -88,7 +88,7 @@ test("a matching site passes, the browser step is skipped, and private paths sta
   const out = await check(null);
   assert.equal(out.code, 0, out.stdout + out.stderr);
   for (const label of ["Home /", "Planner /planner/", "Quote /quote/", "Company /company/", "private app #1"]) assert.ok(row(out, label), "row " + label);
-  assert.match(row(out, "Company /company/"), /ok 0\.1\.1 \(sw\)/, "version falls back to the SW cache name");
+  assert.match(row(out, "Company /company/"), /ok 0\.1\.2 \(sw\)/, "version falls back to the SW cache name");
   assert.match(row(out, "private app #1"), /ok noindex/);
   assert.match(out.stdout, /browser step skipped/);
   assert.ok(!out.stdout.includes(PRIVATE_DIR), "private path printed");
