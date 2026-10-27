@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "Neill Full Page Capture",
+  "short_name": "FullPage",
+  "version": "0.3.1",
+  "description": "Full-page screenshots with searchable text, HTML snapshots, multipage sessions, and scans. Data stays on your device.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "offscreen",
+    "contextMenus",
+    "clipboardWrite"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "options_page": "options/options.html",
+  "action": {
+    "default_title": "Capture full page (click)",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "commands": {
+    "capture-image": {
+      "suggested_key": {
+        "default": "Alt+Shift+P",
+        "windows": "Alt+Shift+P",
+        "mac": "Alt+Shift+P"
+      },
+      "description": "Capture full page image"
+    },
+    "capture-reconstruct": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "windows": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Reconstruct searchable HTML snapshot"
+    },
+    "capture-fullscan": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "windows": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Full scan (multi-page)"
+    },
+    "capture-region": {
+      "suggested_key": {
+        "default": "Alt+Shift+A",
+        "windows": "Alt+Shift+A",
+        "mac": "Alt+Shift+A"
+      },
+      "description": "Capture selected area"
+    }
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}

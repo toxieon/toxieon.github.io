@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Long page test — sticky header</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    header.sticky {
+      position: sticky; top: 0; z-index: 2;
+      background: #1e4d72; color: #fff; padding: 1rem;
+    }
+    section { min-height: 90vh; padding: 1rem 1.5rem; border-bottom: 1px solid #ddd; }
+    section:nth-child(odd) { background: #f7f7f8; }
+    .lazy { opacity: 0.2; transition: opacity 0.3s; }
+    .lazy.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header class="sticky">Sticky site header — Full Page Capture test</header>
+  <main id="main"></main>
+  <script>
+    const main = document.getElementById('main');
+    for (let i = 1; i <= 12; i++) {
+      const s = document.createElement('section');
+      s.className = 'lazy';
+      s.innerHTML = '<h2>Section ' + i + '</h2><p>' + 'Lorem ipsum '.repeat(80) + '</p>';
+      main.appendChild(s);
+    }
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('loaded'); });
+    }, { rootMargin: '200px' });
+    document.querySelectorAll('.lazy').forEach((el) => obs.observe(el));
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Moodle-style inner scroll test</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; height: 100vh; overflow: hidden; }
+    .navbar { height: 48px; background: #0f6cbf; color: #fff; display: flex; align-items: center; padding: 0 1rem; }
+    .layout { display: flex; height: calc(100vh - 48px); }
+    .drawer { width: 200px; background: #f5f5f5; padding: 1rem; flex-shrink: 0; }
+    #region-main {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem 1.5rem;
+      background: #fff;
+    }
+    .block { margin-bottom: 1rem; padding: 1rem; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="navbar">Energy Space — Quiz review (test)</div>
+  <div class="layout">
+    <aside class="drawer">Course menu</aside>
+    <main id="region-main" role="main"></main>
+  </div>
+  <script>
+    const main = document.getElementById('region-main');
+    for (let q = 1; q <= 30; q++) {
+      const b = document.createElement('div');
+      b.className = 'block';
+      b.innerHTML = '<h2>Question ' + q + '</h2><p>' + 'Answer feedback '.repeat(40) + '</p>';
+      main.appendChild(b);
+    }
+  </script>
+</body>
+</html>
