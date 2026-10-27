@@ -12,6 +12,7 @@
     "visual:catalog": "node scripts/build-visual-catalog.cjs",
     "visual:check": "node scripts/build-visual-catalog.cjs --check",
     "live:check": "node scripts/live-check.cjs",
+    "live:lines": "node scripts/live-check.cjs --lines",
     "ship": "node scripts/ship.cjs"
   }
 }

@@ -57,3 +57,7 @@ node scripts/ship.cjs --branch claude/some-fix --slug some-fix --execute  # real
 It uses the `gh` CLI that's already signed in on your machine. **The script never reads, stores or prints a token.** If CI fails, nothing is merged. If the live site doesn't update in time, the PR is already merged, so check the Pages deploy.
 
 Other options: `--base origin/main` (the default) and `--site https://www.neilldata.com` (the default).
+
+## Plain URL checks (JSON lines)
+
+`npm run live:lines` prints one JSON line per check (status, text, noindex, console at 390px), then `{"summary":true,"passed":N,"failed":N,"skipped":N}`. Exit 0 only if nothing failed. Pass `--checks list.json` for your own list. The console check needs playwright from the machine's own tooling (`LIVE_CHECK_PLAYWRIGHT_MODULE=/path/to/playwright-core` and `LIVE_CHECK_CHROMIUM=/path/to/chrome`). It is skipped, not passed, when no browser is available.
