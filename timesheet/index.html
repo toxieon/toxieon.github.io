@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-LGu/iG3h6UP2o3jVvWeb3FYXr85oh3plzPsuGyhpoD8=' https://accounts.google.com/gsi/client https://apis.google.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://docs.google.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org data: blob:; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0d0d0d" />
 <title>Timesheet — Neill Data</title>
@@ -15,16 +16,16 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.5.1"></script>
+<script src="ts-time.js?v=0.5.2"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.5.1"></script>
-<script src="ts-clipboard.js?v=0.5.1"></script>
+<script src="ts-map.js?v=0.5.2"></script>
+<script src="ts-clipboard.js?v=0.5.2"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
-<script src="../shared/nd-site-match.js?v=0.5.1"></script>
-<script src="../shared/nd-gate-codes.js?v=0.5.1"></script>
+<script src="../shared/nd-site-match.js?v=0.5.2"></script>
+<script src="../shared/nd-gate-codes.js?v=0.5.2"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -746,7 +747,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.5.1';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.5.2';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */

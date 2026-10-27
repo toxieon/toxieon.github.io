@@ -11,15 +11,15 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'planner-0.21.4';
+const CACHE_VERSION = 'planner-0.21.5';
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./photos.js",
-  "./room-geometry.js?v=0.21.4",
-  "./room-export.js?v=0.21.4",
-  "./room-auto-detect.js?v=0.21.4",
+  "./room-geometry.js?v=0.21.5",
+  "./room-export.js?v=0.21.5",
+  "./room-auto-detect.js?v=0.21.5",
   "../shared/vendor/exifr.umd.js",
   "../shared/nd-pdf.js",
   "../shared/vendor/papaparse/papaparse.min.js",
@@ -37,7 +37,7 @@ const SHELL_ASSETS = [
   "./favicon.svg",
   "../logo.png",
   "../shared/nd-core.css",
-  "./styles.css?v=0.21.4",
+  "./styles.css?v=0.21.5",
   "../shared/nd-config.js",
   "../assets/loading-bar.js",
   "../shared/nd-backend.js",
@@ -52,20 +52,20 @@ const SHELL_ASSETS = [
   "../shared/nd-sheets.js",
   "../shared/nd-inbox.js?v=2",
   "../shared/nd-pwa.js",
-  "./js/state.js?v=0.21.4",
-  "./js/helpers.js?v=0.21.4",
-  "./js/auth.js?v=0.21.4",
-  "./js/drive-sheets.js?v=0.21.4",
-  "./js/drive-import.js?v=0.21.4",
-  "./js/master-sync.js?v=0.21.4",
-  "./js/render.js?v=0.21.4",
-  "./js/render-hours-report.js?v=0.21.4",
-  "./js/events.js?v=0.21.4",
-  "./js/mutations.js?v=0.21.4",
-  "./js/drive-pdf.js?v=0.21.4",
-  "./js/inbox.js?v=0.21.4",
-  "./js/diagnostic.js?v=0.21.4",
-  "./js/boot.js?v=0.21.4"
+  "./js/state.js?v=0.21.5",
+  "./js/helpers.js?v=0.21.5",
+  "./js/auth.js?v=0.21.5",
+  "./js/drive-sheets.js?v=0.21.5",
+  "./js/drive-import.js?v=0.21.5",
+  "./js/master-sync.js?v=0.21.5",
+  "./js/render.js?v=0.21.5",
+  "./js/render-hours-report.js?v=0.21.5",
+  "./js/events.js?v=0.21.5",
+  "./js/mutations.js?v=0.21.5",
+  "./js/drive-pdf.js?v=0.21.5",
+  "./js/inbox.js?v=0.21.5",
+  "./js/diagnostic.js?v=0.21.5",
+  "./js/boot.js?v=0.21.5"
 ];
 
 const IS_API_HOST = (url) =>

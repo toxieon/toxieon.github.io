@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-BZVAdLOATfCKj+un1scJHS5Z9jEyagnGkElwLAZv7MA=' https://accounts.google.com/gsi/client https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleusercontent.com https://drive.google.com https://maps.googleapis.com https://maps.gstatic.com https://*.google.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com; frame-src https://accounts.google.com/gsi/; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Fit-off &middot; NeillPlanner</title>
@@ -103,7 +104,7 @@
 <div id="app"><div class="center"><div class="spinner"></div><p>Starting&hellip;</p></div></div>
 
 <script>
-var APP_VERSION = "0.1.5";   // see fitoff/VERSIONING.md
+var APP_VERSION = "0.1.6";   // see fitoff/VERSIONING.md
 (function () {
   "use strict";
   var cfg = (window.ND && ND.config) ? ND.config.forApp("planner") : {};
@@ -329,19 +330,21 @@ var APP_VERSION = "0.1.5";   // see fitoff/VERSIONING.md
   }
 
   /* ---- boot ---- */
+  /* CSP forbids inline on*= handlers: Retry/Reload buttons carry data-reload */
+  document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("[data-reload]")) location.reload(); });
   function startFlow() {
     screenCenter('<div class="spinner"></div><p>Loading jobs&hellip;</p>');
     loadData().then(autoOpen).catch(function (e) {
-      screenCenter('<p class="err">Could not load: ' + esc(e.message) + "</p>", '<button class="btn ghost" onclick="location.reload()">Retry</button>');
+      screenCenter('<p class="err">Could not load: ' + esc(e.message) + "</p>", '<button class="btn ghost" data-reload>Retry</button>');
     });
   }
   function showSignIn() {
     screenCenter("<p>Sign in with your Neill account to load the fit-off view.</p><p class=\"note\" style=\"opacity:.6\">Fit-off v" + APP_VERSION + "</p>", '<button class="btn" id="signin">Sign in with Google</button>');
     var b = document.getElementById("signin");
-    if (b) b.addEventListener("click", function () { NDAuth.ensureToken({ interactive: true }).catch(function (e) { screenCenter('<p class="err">Sign-in failed: ' + esc(e && e.message || e) + "</p>", '<button class="btn" onclick="location.reload()">Retry</button>'); }); });
+    if (b) b.addEventListener("click", function () { NDAuth.ensureToken({ interactive: true }).catch(function (e) { screenCenter('<p class="err">Sign-in failed: ' + esc(e && e.message || e) + "</p>", '<button class="btn" data-reload>Retry</button>'); }); });
   }
 
-  var retryBtn = '<button class="btn ghost" onclick="location.reload()">Retry</button>';
+  var retryBtn = '<button class="btn ghost" data-reload>Retry</button>';
   function fail(msg) { screenCenter('<p class="err">' + esc(msg) + '</p>', retryBtn); }
 
   // The Google Identity Services (GIS) library loads async — nd-auth needs it

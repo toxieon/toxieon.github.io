@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-5oVm64sHR0t58lOzyVD0zUIazlMTqpPdwOxr4MhDR3E=' https://accounts.google.com/gsi/client https://apis.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://*.googleusercontent.com https://drive.google.com; font-src 'self' data:; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Company &middot; Neill Data &amp; Security</title>
 <link rel="icon" href="favicon.svg" />
@@ -265,7 +266,7 @@
     return '<div class="center"><h2 style="margin:0">You\'re not on this workspace yet</h2>' +
       "<p>Signed in as <strong>" + esc(me.email) + "</strong>. Ask " + esc(OWNER_EMAIL) +
       " to invite this Google account from the Company page.</p>" +
-      '<button class="btn ghost" onclick="location.reload()">Reload</button></div>';
+      '<button class="btn ghost" data-reload>Reload</button></div>';
   }
 
   function viewMembers() {
@@ -381,8 +382,10 @@
   function errText(e) { return (e && (e.result && e.result.error && e.result.error.message)) || (e && e.message) || String(e); }
 
   /* ============================================================= boot */
+  /* CSP forbids inline on*= handlers: Retry/Reload buttons carry data-reload */
+  document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("[data-reload]")) location.reload(); });
   function screen(msg, btn) { app.innerHTML = '<div class="center">' + msg + (btn || "") + "</div>"; }
-  var retry = '<button class="btn ghost" onclick="location.reload()">Retry</button>';
+  var retry = '<button class="btn ghost" data-reload>Retry</button>';
   function fail(msg) { screen('<p class="err">' + esc(msg) + "</p>", retry); }
 
   async function loadGapi() {

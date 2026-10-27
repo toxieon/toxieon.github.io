@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-C4Xr4nfNvD2CEVjrUXrikKYvEkBJR2u6fiy91UJgGHQ=' 'sha256-L57HO19aGa2iNlQ3r0PikFzf9Jd11hubQ0N2ZBQbB4M='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/; frame-src 'none'; media-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
 <title>ND • Install Checklist</title>
@@ -671,7 +672,7 @@ textarea.field{min-height:110px;resize:vertical;font-family:inherit;line-height:
 <!-- ============ CHECKLIST APP ============ -->
 <script>
 ND.app = 'checklist';
-const APP_VERSION = '0.1.2';   // see checklist/VERSIONING.md
+const APP_VERSION = '0.1.3';   // see checklist/VERSIONING.md
 
 ND.records.define('job',     { expiresDays: null, label: 'Install job' });
 
