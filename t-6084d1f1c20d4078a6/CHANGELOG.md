@@ -1,1 +1,2 @@
+## 0.1.2 · 2026-10-27 · Sport picker: clips and ball follow the sport (14 sports, missing clips listed). Ground list marks REAL vs STAND-IN; MCG slot uses the real MCG file when present, else shows "MCG model not found".
 ## 0.1.1 · 2026-10-27 · initial · Local test-only assets page: every view, ball, player clip, game and leg state, guernsey, bookie mark and racecourse, plus goal, behind, fly-past and sponsor-win effects. Fake data, no network, 2D fallback when WebGL is missing.

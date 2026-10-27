@@ -11,7 +11,7 @@ const read = (f) => fs.readFileSync(path.join(DIR, f), "utf8");
 const ownFiles = ["index.html", "app.js", "states.js", "style.css"];
 
 test("state tables have the planned counts", () => {
-  const n = { CAMERAS: 5, TIMES: 2, VIEWS: 3, BALLS: 17, CLIPS: 23, GAME_STATES: 3, LEG_STATES: 7, GUERNSEYS: 19, BOOKIES: 14, COURSES: 7, EFFECTS: 4, WIN_STYLES: 2 };
+  const n = { CAMERAS: 5, TIMES: 2, VIEWS: 3, BALLS: 17, CLIPS: 23, GAME_STATES: 3, LEG_STATES: 7, GUERNSEYS: 19, BOOKIES: 14, COURSES: 7, EFFECTS: 4, WIN_STYLES: 2, SPORTS: 14, VENUES: 9 };
   for (const [k, v] of Object.entries(n)) assert.equal(S[k].length, v, k);
   assert.deepEqual(S.LEG_STATES.map((l) => l.id), ["on-track", "at-risk", "near-miss", "hit", "miss", "push", "void"]);
   assert.deepEqual(S.GAME_STATES.map((l) => l.id), ["upcoming", "live", "final"]);
@@ -33,6 +33,59 @@ test("player clip table equals the clips inside the player GLB", () => {
   const json = JSON.parse(d.subarray(20, 20 + d.readUInt32LE(12)).toString("utf8"));
   assert.deepEqual(json.animations.map((a) => a.name), S.CLIPS);
   assert.ok(S.LOOP_CLIPS.every((c) => S.CLIPS.includes(c)));
+});
+
+test("each sport has only clips that fit it, and its own ball", () => {
+  const fits = {
+    afl: ["idle", "run", "kick", "mark", "tackle", "jump", "passFoot", "passChest", "celebrate", "celebrateArms", "celebrateFist", "celebrateKnee"],
+    soccer: ["idle", "run", "kick", "passFoot", "dive", "jump", "tackle", "celebrateKnee", "celebrateArms"],
+    basketball: ["idle", "dribble", "shot", "passChest", "catch", "jump", "run", "celebrateFist"],
+    netball: ["idle", "passChest", "catch", "throw", "shot", "jump", "run"],
+    cricket: ["idle", "bowl", "batCricket", "catch", "throw", "dive", "run", "celebrateArms"],
+    tennis: ["idle", "serve", "run", "jump", "celebrateFist"],
+    volleyball: ["idle", "serve", "jump", "dive", "passChest", "celebrateFist"],
+    baseball: ["idle", "pitch", "batBaseball", "catch", "throw", "run", "dive"],
+    "american-football": ["idle", "throw", "catch", "run", "tackle", "dive", "celebrateArms"],
+    rugby: ["idle", "run", "passChest", "throw", "catch", "tackle", "dive", "celebrateKnee"],
+    golf: ["idle", "golfSwing", "celebrateFist", "celebrateArms"],
+    "ice-hockey": ["idle", "run", "tackle", "shot", "celebrateFist"],
+    "water-polo": ["idle", "passChest", "throw", "shot", "catch"],
+    "table-tennis": ["idle"],
+  };
+  assert.deepEqual(S.SPORTS.map((x) => x.id).sort(), Object.keys(fits).sort());
+  for (const sp of S.SPORTS) {
+    assert.deepEqual(S.sportClips(sp.id), fits[sp.id], sp.id);
+    assert.ok(S.sportClips(sp.id).every((c) => S.CLIPS.includes(c)), sp.id + " uses a clip the model lacks");
+    assert.ok(sp.missing.length, sp.id + " must say what is missing");
+    assert.ok(sp.def === "idle" || S.sportClips(sp.id).includes(sp.def), sp.id + " default clip");
+    for (const k of ["goal", "win"]) assert.ok(sp[k] == null || S.sportClips(sp.id).includes(sp[k]), sp.id + " " + k + " clip");
+    assert.ok(sp.balls.every((b) => S.BALLS.includes(b) && S.sportOf(b) === sp), sp.id + " balls");
+  }
+  assert.deepEqual(S.SPORTS.flatMap((x) => x.balls).sort(), [...S.BALLS].sort(), "every ball belongs to exactly one sport");
+  assert.deepEqual(S.byId(S.SPORTS, "basketball").balls, ["basketball"]);
+  for (const bad of ["kick", "passFoot", "tackle", "mark", "celebrateKnee", "bowl", "serve", "golfSwing"]) assert.ok(!S.sportClips("basketball").includes(bad), "basketball must not offer " + bad);
+  for (const bad of ["dribble", "shot", "batCricket", "serve"]) assert.ok(!S.sportClips("soccer").includes(bad), "soccer must not offer " + bad);
+  assert.ok(!S.sportClips("afl").includes("dribble"));
+  assert.ok(S.sportClips("table-tennis").length === 1 && S.sportMissing("table-tennis").length === 22);
+  assert.equal(S.byId(S.SPORTS, "basketball").goal, "shot");
+  assert.equal(S.byId(S.SPORTS, "soccer").goal, "kick");
+  const app = read("app.js");
+  assert.ok(!/main\.play\("kick"\)|main\.play\("celebrateArms"\)/.test(app), "triggers must use the sport's own clips");
+});
+
+test("venue list: real vs stand-in labels, no MCG stand-in, the MCG file is never committed", () => {
+  const v = (id) => S.byId(S.VENUES, id);
+  assert.equal(v("mcg").kind, "real");
+  assert.equal(v("none").kind, "stand-in");
+  assert.deepEqual(S.VENUES.filter((x) => x.kind === "real").map((x) => x.id).sort(), ["caulfield", "flemington", "mcg", "moonee-valley", "sandown-hillside"]);
+  assert.ok(S.VENUES.filter((x) => x.id.startsWith("generic")).every((x) => x.kind === "stand-in"));
+  assert.ok(!/MCG/.test(v("none").source), "the procedural oval is not presented as the MCG");
+  for (const x of S.VENUES) if (!x.optional && x.file.startsWith("models/")) assert.ok(fs.existsSync(path.join(DIR, x.file)), x.file);
+  const app = read("app.js");
+  assert.ok(app.includes("MCG model not found"), "placeholder card exists for a missing MCG file");
+  let tracked = null;
+  try { tracked = require("node:child_process").execSync("git ls-files", { cwd: ROOT, encoding: "utf8" }); } catch (e) { /* not a git checkout */ }
+  if (tracked) assert.ok(!/(^|\/)mcg[^/]*\.glb$/im.test(tracked), "the MCG model must stay out of git");
 });
 
 test("score, progress, multi summary and goal end helpers", () => {

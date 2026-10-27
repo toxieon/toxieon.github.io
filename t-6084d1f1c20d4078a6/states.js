@@ -16,6 +16,40 @@
   ];
   const BALLS = ["afl", "american-football", "baseball", "basketball", "cricket-red", "cricket-white", "golf", "ice-hockey-puck", "netball", "rugby-league", "rugby-union", "soccer", "softball", "table-tennis", "tennis", "volleyball", "water-polo"];
   const CLIPS = ["idle", "run", "kick", "jump", "mark", "tackle", "celebrate", "throw", "shot", "catch", "bowl", "batCricket", "batBaseball", "serve", "dribble", "passChest", "passFoot", "dive", "celebrateArms", "celebrateKnee", "celebrateFist", "pitch", "golfSwing"];
+  /* Sport -> balls and the player-v2.1 clips that truly fit it (after the clip table in the player v2.1 notes).
+     "approx" clips are reuse the notes name; "missing" says plainly what has no clip. idle is always available. goal/win are the clips the two Trigger buttons play. */
+  const SPORTS = [
+    { id: "afl", label: "AFL", balls: ["afl"], clips: ["run", "kick", "mark", "tackle", "jump", "passFoot", "passChest", "celebrate", "celebrateArms", "celebrateFist", "celebrateKnee"], approx: { passChest: "handball" }, missing: ["ground-ball pickup", "ruck tap", "dedicated handball clip (passChest used)"], def: "run", goal: "kick", win: "celebrateArms" },
+    { id: "soccer", label: "Soccer", balls: ["soccer"], clips: ["run", "kick", "passFoot", "dive", "jump", "tackle", "celebrateKnee", "celebrateArms"], approx: { dive: "goalkeeper" }, missing: ["header", "throw-in", "dedicated shot"], def: "run", goal: "kick", win: "celebrateKnee" },
+    { id: "basketball", label: "Basketball", balls: ["basketball"], clips: ["dribble", "shot", "passChest", "catch", "jump", "run", "celebrateFist"], approx: {}, missing: ["layup", "dunk", "rebound", "defensive stance"], def: "dribble", goal: "shot", win: "celebrateFist" },
+    { id: "netball", label: "Netball", balls: ["netball"], clips: ["passChest", "catch", "throw", "shot", "jump", "run"], approx: { shot: "basketball jump shot reused" }, missing: ["goal shooting stance", "dodge", "celebration"], def: "passChest", goal: "shot", win: null },
+    { id: "cricket", label: "Cricket", balls: ["cricket-red", "cricket-white"], clips: ["bowl", "batCricket", "catch", "throw", "dive", "run", "celebrateArms"], approx: {}, missing: ["wicketkeeping crouch"], def: "bowl", goal: "batCricket", win: "celebrateArms" },
+    { id: "tennis", label: "Tennis", balls: ["tennis"], clips: ["serve", "run", "jump", "celebrateFist"], approx: { jump: "overhead" }, missing: ["forehand", "backhand", "volley"], def: "serve", goal: "serve", win: "celebrateFist" },
+    { id: "volleyball", label: "Volleyball", balls: ["volleyball"], clips: ["serve", "jump", "dive", "passChest", "celebrateFist"], approx: { passChest: "bump or set" }, missing: ["spike", "block"], def: "serve", goal: "serve", win: "celebrateFist" },
+    { id: "baseball", label: "Baseball / softball", balls: ["baseball", "softball"], clips: ["pitch", "batBaseball", "catch", "throw", "run", "dive"], approx: { pitch: "overarm; softball pitching is underarm" }, missing: ["underarm softball pitch", "base slide"], def: "pitch", goal: "batBaseball", win: null },
+    { id: "american-football", label: "American football", balls: ["american-football"], clips: ["throw", "catch", "run", "tackle", "dive", "celebrateArms"], approx: {}, missing: ["snap", "kick", "blocking stance"], def: "throw", goal: "throw", win: "celebrateArms" },
+    { id: "rugby", label: "Rugby league / union", balls: ["rugby-league", "rugby-union"], clips: ["run", "passChest", "throw", "catch", "tackle", "dive", "celebrateKnee"], approx: { dive: "try-line dive", passChest: "pass" }, missing: ["goal kick", "scrum", "ruck"], def: "run", goal: "dive", win: "celebrateKnee" },
+    { id: "golf", label: "Golf", balls: ["golf"], clips: ["golfSwing", "celebrateFist", "celebrateArms"], approx: {}, missing: ["putt", "walking with club"], def: "golfSwing", goal: "golfSwing", win: "celebrateFist" },
+    { id: "ice-hockey", label: "Ice hockey", balls: ["ice-hockey-puck"], clips: ["run", "tackle", "shot", "celebrateFist"], approx: { shot: "basketball shot reused as a wrist-shot lean", run: "no skating clip" }, missing: ["skating", "stick handling", "slap shot"], def: "run", goal: "shot", win: "celebrateFist" },
+    { id: "water-polo", label: "Water polo", balls: ["water-polo"], clips: ["passChest", "throw", "shot", "catch"], approx: { shot: "basketball shot reused" }, missing: ["swimming", "treading water", "celebration"], def: "passChest", goal: "shot", win: null },
+    { id: "table-tennis", label: "Table tennis", balls: ["table-tennis"], clips: [], approx: {}, missing: ["every stroke: no table-tennis clip exists (idle only)"], def: "idle", goal: null, win: null },
+  ];
+  const sportOf = (ball) => SPORTS.find((s) => s.balls.includes(ball));
+  const sportClips = (id) => ["idle"].concat((byId(SPORTS, id) || { clips: [] }).clips);
+  const sportMissing = (id) => CLIPS.filter((c) => !sportClips(id).includes(c));
+  /* Ground and venue models on the page. real = Brandon's or Cinna's approved asset; stand-in = generic or built in code. */
+  const VENUES = [
+    { id: "mcg", name: "MCG", file: "models/mcg.glb", source: "Brandon's own MCG model (local copy for preview, not in git)", kind: "real", optional: true },
+    { id: "none", name: "Football ground", file: "(built in app.js)", source: "Procedural oval made for this page", kind: "stand-in" },
+    { id: "flemington", name: "Flemington", file: "models/racecourses/flemington.glb", source: "Cinna racecourse set, approved (named, outline approximate)", kind: "real" },
+    { id: "caulfield", name: "Caulfield", file: "models/racecourses/caulfield.glb", source: "Cinna racecourse set, approved (named, outline approximate)", kind: "real" },
+    { id: "moonee-valley", name: "Moonee Valley", file: "models/racecourses/moonee-valley.glb", source: "Cinna racecourse set, approved (named, outline approximate)", kind: "real" },
+    { id: "sandown-hillside", name: "Sandown Hillside", file: "models/racecourses/sandown-hillside.glb", source: "Cinna racecourse set, approved (named, outline approximate)", kind: "real" },
+    { id: "generic-turf-oval", name: "Generic turf oval", file: "models/racecourses/generic-turf-oval.glb", source: "Cinna racecourse set (generic, not a real course)", kind: "stand-in" },
+    { id: "generic-synthetic-oval", name: "Generic synthetic oval", file: "models/racecourses/generic-synthetic-oval.glb", source: "Cinna racecourse set (generic, not a real course)", kind: "stand-in" },
+    { id: "generic-straight-1000", name: "Generic straight 1000", file: "models/racecourses/generic-straight-1000.glb", source: "Cinna racecourse set (generic, not a real course)", kind: "stand-in" },
+  ];
+
   const LOOP_CLIPS = ["idle", "run", "dribble"];
   const GAME_STATES = [
     { id: "upcoming", label: "UPCOMING", clock: "Sat 7:40 PM", score: false },
@@ -81,7 +115,7 @@
   /* The goal end the effect uses, given the camera position: end cameras look at the far goal, others use north. */
   function goalEnd(camPos) { return Math.abs(camPos[2]) > 20 ? -Math.sign(camPos[2]) : -1; }
 
-  const API = { CAMERAS, TIMES, VIEWS, BALLS, CLIPS, LOOP_CLIPS, GAME_STATES, LEG_LINE, LEG_STATES, GUERNSEYS, BOOKIES, COURSES, EFFECTS, WIN_STYLES, MULTI_LEGS, SINGLE_LEG, STAKE, WIN_UNITS, TEST_BANNER, byId, scoreTotal, clockText, legProgress, summarizeMulti, goalEnd };
+  const API = { CAMERAS, TIMES, VIEWS, BALLS, CLIPS, LOOP_CLIPS, GAME_STATES, SPORTS, VENUES, sportOf, sportClips, sportMissing, LEG_LINE, LEG_STATES, GUERNSEYS, BOOKIES, COURSES, EFFECTS, WIN_STYLES, MULTI_LEGS, SINGLE_LEG, STAKE, WIN_UNITS, TEST_BANNER, byId, scoreTotal, clockText, legProgress, summarizeMulti, goalEnd };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   root.TA_STATES = API;
 })(typeof window !== "undefined" ? window : globalThis);

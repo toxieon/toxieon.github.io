@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 const GU = "../assets/tipdash/guernseys/", BK = "../assets/tipdash/bookies/";
 const SPONSOR = "QUOKKA";
 const reducedMq = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const st = { camera: "broadcast", time: "day", view: "owner", ball: "afl", clip: "idle", game: "live", home: "geelong", away: "collingwood", hg: 8, hb: 5, ag: 6, ab: 9, quarter: 2, secs: 754, legState: "on-track", current: 14, multi: false, bookie: "sportsbet", course: "none", boards: true, ballPatch: true, emblems: true, winStyle: "glow", reduced: reducedMq, width: "phone" };
+const st = { camera: "broadcast", time: "day", view: "owner", sport: "afl", ball: "afl", clip: "idle", mcg: "unknown", game: "live", home: "geelong", away: "collingwood", hg: 8, hb: 5, ag: 6, ab: 9, quarter: 2, secs: 754, legState: "on-track", current: 14, multi: false, bookie: "sportsbet", course: "none", boards: true, ballPatch: true, emblems: true, winStyle: "glow", reduced: reducedMq, width: "phone" };
 const log = [];
 const note = (e) => log.push({ e, t: Math.round(performance.now()) });
 const club = (id) => CLUBS.find((c) => c.id === id) || { primary: "#444", secondary: "#ddd", pattern: "solid" };
@@ -19,6 +19,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let scene2 = null; // active scene implementation (3D or 2D)
 
 /* ---------- HUD ---------- */
+function venueTag() {
+  if (st.course === "mcg") {
+    if (st.mcg === "ok") return scene2 && scene2.mode === "2d" ? `<div class="vtag real">MCG model loaded (drawn in 3D only, not in this 2D view)</div>` : `<div class="vtag real">MCG: Brandon's real model</div>`;
+    return `<div class="vtag missing"><b>MCG model not found</b><small>models/mcg.glb is not on this page. The ground shown is a generic stand-in, not the MCG.</small></div>`;
+  }
+  const v = S.byId(S.VENUES, st.course); if (!v) return "";
+  return v.kind === "real" ? `<div class="vtag real">REAL: ${v.name}</div>` : `<div class="vtag stand">STAND-IN: ${v.name}${v.id === "none" ? " (generic oval, not the MCG)" : " (generic, not a real course)"}</div>`;
+}
 function renderHud() {
   const v = S.byId(S.VIEWS, st.view), g = S.byId(S.GAME_STATES, st.game), ls = S.byId(S.LEG_STATES, st.legState);
   const hs = S.scoreTotal(st.hg, st.hb), as = S.scoreTotal(st.ag, st.ab);
@@ -44,7 +52,7 @@ function renderHud() {
       <div class="bar"><i style="width:${p * 100}%"></i></div>
       <div class="r3"><span>${ls.current == null ? "voided" : st.current + " / " + S.LEG_LINE}</span><span>${v.odds ? "@" + leg.odds.toFixed(2) : ""}</span><span>${v.stake ? "Stake $" + S.STAKE : ""}</span><span>${v.payout ? pay : ""}</span></div>`;
   }
-  $("hud").innerHTML = sb + `<div class="${cls}" id="legcard" style="--tone:${ls.tone}">${body}<div class="tag">${v.owner ? "owner view (edit enabled)" : st.view + " view"}</div></div>`;
+  $("hud").innerHTML = sb + venueTag() + `<div class="${cls}" id="legcard" style="--tone:${ls.tone}">${body}<div class="tag">${v.owner ? "owner view (edit enabled)" : st.view + " view"}</div></div>`;
 }
 
 /* ---------- controls ---------- */
@@ -55,7 +63,7 @@ function change(key) {
   if (key === "width") $("wrap").className = "w-" + st.width;
   scene2 && scene2.apply(key);
 }
-const set = (k, v) => { st[k] = v; if (k === "legState") { const c = S.byId(S.LEG_STATES, v).current; if (c != null) st.current = c; } change(k); };
+const set = (k, v) => { st[k] = v; if (k === "sport") { const sp = S.byId(S.SPORTS, v); st.ball = sp.balls[0]; st.clip = sp.def; } if (k === "legState") { const c = S.byId(S.LEG_STATES, v).current; if (c != null) st.current = c; } change(k); };
 function group(title, open, fn) {
   const d = document.createElement("details"); d.open = open; d.innerHTML = `<summary>${title}</summary>`;
   const b = document.createElement("div"); b.className = "grp"; d.appendChild(b); fn(b); $("controls").appendChild(d);
@@ -70,6 +78,11 @@ function select(parent, label, list, key, extra) {
   const r = row(parent, label), s = document.createElement("select"); s.dataset.k = key;
   s.innerHTML = (extra || []).concat(list).map((o) => `<option value="${o.id}">${o.label}</option>`).join("");
   s.onchange = () => set(key, s.value); r.appendChild(s); const rf = () => { s.value = st[key]; }; refreshers.push(rf); rf();
+}
+/* a select whose options depend on state (rebuilt on every refresh) */
+function dyn(parent, label, key, optsFn) {
+  const r = row(parent, label), s = document.createElement("select"); s.dataset.k = key; s.onchange = () => set(key, s.value); r.appendChild(s);
+  refreshers.push(() => { const o = optsFn(); s.innerHTML = o.map((x) => `<option value="${x.id}">${x.label}</option>`).join(""); s.value = st[key]; });
 }
 function check(parent, label, key) {
   const l = document.createElement("label"); l.className = "chk"; l.innerHTML = `<input type="checkbox" data-k="${key}"> ${label}`;
@@ -97,8 +110,18 @@ function buildControls() {
     check(b, "Multi (4 legs, summary bar)", "multi"); select(b, "Bookie mark", L(S.BOOKIES), "bookie");
   });
   group("Sponsors", false, (b) => { check(b, "Ground boards and logo", "boards"); check(b, "Ball patch", "ballPatch"); check(b, "Club emblems", "emblems"); seg(b, "Win style", S.WIN_STYLES, "winStyle"); });
-  group("Ball and player", false, (b) => { select(b, "Ball (17)", L(S.BALLS), "ball"); select(b, "Player clip (23)", L(S.CLIPS), "clip"); });
-  group("Ground", false, (b) => select(b, "Racecourse", S.COURSES.map((c) => ({ id: c.id, label: c.name + (c.circuit ? " " + c.circuit + "m" : " straight") })), "course", [{ id: "none", label: "Football ground" }]));
+  group("Sport, ball and player", false, (b) => {
+    select(b, "Sport (14)", S.SPORTS.map((x) => ({ id: x.id, label: x.label })), "sport");
+    dyn(b, "Ball", "ball", () => S.byId(S.SPORTS, st.sport).balls.map((id) => ({ id, label: id })));
+    dyn(b, "Player clip", "clip", () => S.sportClips(st.sport).map((id) => { const n = (S.byId(S.SPORTS, st.sport).approx || {})[id]; return { id, label: id + (n ? " (approx: " + n + ")" : "") }; }));
+    const n = document.createElement("div"); n.className = "note"; n.id = "clipnote"; b.appendChild(n);
+    refreshers.push(() => { const sp = S.byId(S.SPORTS, st.sport), have = S.sportClips(st.sport); n.innerHTML = `<b>${have.length} of ${S.CLIPS.length} clips fit ${sp.label}.</b> Not available for this sport: ${sp.missing.join(", ")}. Hidden because they belong to other sports: ${S.sportMissing(st.sport).join(", ") || "none"}.`; });
+  });
+  group("Ground", false, (b) => {
+    dyn(b, "Ground / venue", "course", () => S.VENUES.map((v) => ({ id: v.id, label: (v.kind === "real" ? "REAL " : "STAND-IN ") + v.name + (v.id === "none" ? " (not the MCG)" : "") + (v.id === "mcg" && st.mcg === "missing" ? " - file not found" : "") })));
+    const t = document.createElement("table"); t.className = "venues"; t.innerHTML = "<tr><th>Model</th><th>Status</th><th>File</th></tr>" + S.VENUES.map((v) => `<tr class="${v.kind}"><td>${v.name}</td><td><b>${v.kind === "real" ? "REAL" : "STAND-IN"}</b></td><td>${v.file}<br><small>${v.source}</small></td></tr>`).join("");
+    b.appendChild(t);
+  });
   group("Effects", true, (b) => {
     const r = row(b); S.EFFECTS.forEach((e) => { const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = e.label; x.dataset.fx = e.id; x.onclick = () => trigger(e.id); r.appendChild(x); });
   });
@@ -187,21 +210,37 @@ async function start3D(renderer) {
     const mats = kitMaterials(base.scene, kitFor(id)), obj = dressedPlayer(base.scene, mats); obj.position.set(x, 0, z); obj.scale.setScalar(sc); pitch.add(obj);
     const mixer = new THREE.AnimationMixer(obj), p = { obj, mixer, actions: {}, id, cur: null }; p.play = (name) => { const clip = base.animations.find((c) => c.name === name); if (!clip) return; const a = mixer.clipAction(clip); a.reset(); const loop = S.LOOP_CLIPS.includes(name); a.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity); a.clampWhenFinished = true; if (p.cur && p.cur !== a) p.cur.fadeOut(0.2); a.fadeIn(0.2).play(); p.cur = a; if (!loop) { const done = (e) => { if (e.action === a) { mixer.removeEventListener("finished", done); p.play("idle"); } }; mixer.addEventListener("finished", done); } }; p.play(clipName); players.push(p); return p;
   };
-  const main = addPlayer(st.home, -3, 4, 2.2, st.clip); addPlayer(st.away, 5, -6, 1, "run"); addPlayer(st.home, -6, -9, 1, "idle");
+  const main = addPlayer(st.home, -3, 4, 2.2, st.clip); const side = [addPlayer(st.away, 5, -6, 1, "run"), addPlayer(st.home, -6, -9, 1, "idle")];
+  const sideClips = () => side[0].play(S.sportClips(st.sport).includes("run") ? "run" : "idle");
   const recolour = () => { main.obj.traverse((o) => { if (o.isMesh && o.material.name === "jumper") o.material.map = kitMaterials(base.scene, kitFor(st.home)).jumper.map; }); };
   // balls
   const balls = {}; const sponsorTex = texCanvas(512, 512, (g, w, h) => { g.fillStyle = "#ff6a00"; g.fillRect(0, 0, w, h); g.fillStyle = "#fff"; g.font = "bold 150px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("QKA", w / 2, h / 2); });
+  const onFooty = () => st.course === "none" || st.course === "mcg";
   let ballObj = null; const KICK = new THREE.Vector3(0, 0.3, 8);
   const getBall = async (id) => (balls[id] = balls[id] || (await loadBall(id, "models/balls")).object);
   const setBall = async () => {
     const proto = await getBall(st.ball); const o = proto.clone(true); if (st.ballPatch) applySponsorTexture(o, sponsorTex); o.scale.setScalar(3); o.position.copy(KICK); o.position.y = 0.45;
-    if (ballObj) pitch.remove(ballObj); ballObj = o; ballObj.visible = st.course === "none"; pitch.add(o);
+    if (ballObj) pitch.remove(ballObj); ballObj = o; ballObj.visible = onFooty(); pitch.add(o);
   };
   await setBall();
   // course
-  const courses = {}; let courseObj = null;
+  const courses = {}; let courseObj = null, mcgObj = null, mcgProto = null;
+  const procedural = [ground, outer, line, cc, stands];
+  const loadMcg = async () => {
+    if (mcgProto || st.mcg === "missing") return;
+    try {
+      const o = (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync("models/mcg.glb")).scene; o.updateMatrixWorld(true);
+      const f = o.getObjectByName("Field") || o, fb = new THREE.Box3().setFromObject(f), fs = fb.getSize(new THREE.Vector3()), fc = fb.getCenter(new THREE.Vector3());
+      const g = new THREE.Group(); o.position.set(-fc.x, -fb.max.y, -fc.z); g.add(o); if (fs.x > fs.z) g.rotation.y = Math.PI / 2; g.scale.setScalar((2 * RZ) / Math.max(fs.x, fs.z)); mcgProto = g; st.mcg = "ok";
+    } catch (e) { st.mcg = "missing"; }
+    renderHud(); refreshers.forEach((f) => f());
+  };
   const setCourse = async () => {
-    if (courseObj) courseG.remove(courseObj); courseObj = null; const on = st.course !== "none"; pitch.visible = !on;
+    if (courseObj) courseG.remove(courseObj); courseObj = null; if (mcgObj) pitch.remove(mcgObj); mcgObj = null;
+    const isMcg = st.course === "mcg"; if (isMcg) await loadMcg();
+    const useMcg = isMcg && st.mcg === "ok"; procedural.forEach((m) => { m.visible = !useMcg; });
+    if (useMcg) { mcgObj = mcgProto.clone(true); pitch.add(mcgObj); }
+    const on = st.course !== "none" && !isMcg; pitch.visible = !on;
     if (!on) return;
     if (!courses[st.course]) courses[st.course] = (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`models/racecourses/${st.course}.glb`)).scene;
     const o = courses[st.course].clone(true); const box = new THREE.Box3().setFromObject(o), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3()); const k = 64 / Math.max(size.x, size.z);
@@ -209,9 +248,9 @@ async function start3D(renderer) {
   };
   // camera
   const cp = new THREE.Vector3(), cl = new THREE.Vector3(), tp = new THREE.Vector3(), tl = new THREE.Vector3();
-  const aim = (snap) => { const c = S.byId(S.CAMERAS, st.camera); tp.set(...c.pos); tl.set(...c.look); if (snap || st.reduced) { cp.copy(tp); cl.copy(tl); } main.obj.rotation.y = Math.atan2(c.pos[0] - main.obj.position.x, c.pos[2] - main.obj.position.z); };
+  const aim = (snap) => { const c = S.byId(S.CAMERAS, st.camera); const f = mcgObj ? 1.1 : 1; tp.set(c.pos[0] * f, c.pos[1] * (mcgObj ? 3.4 : 1), c.pos[2] * f); tl.set(...c.look); if (snap || st.reduced) { cp.copy(tp); cl.copy(tl); } main.obj.rotation.y = Math.atan2(c.pos[0] - main.obj.position.x, c.pos[2] - main.obj.position.z); };
   const applyTime = () => { const n = st.time === "night"; const bg = new THREE.Color(n ? 0x070b14 : 0x8fc1ee); scene.background = bg; scene.fog = new THREE.Fog(bg, 90, 300); hemi.intensity = n ? 0.22 : 1; sun.intensity = n ? 0.03 : 2; flood.forEach((l) => { l.intensity = n ? 1.1 : 0; }); logoMat.emissiveIntensity = n ? 0.6 : 0; boardMats.forEach((m) => { m.emissiveIntensity = n ? 0.7 : 0; }); };
-  const syncVis = () => { boards.visible = st.boards; logo.visible = st.boards; emblems.visible = st.emblems; if (ballObj) ballObj.visible = st.course === "none"; };
+  const syncVis = () => { boards.visible = st.boards; logo.visible = st.boards; emblems.visible = st.emblems; if (ballObj) ballObj.visible = onFooty(); };
   aim(true); applyTime(); syncVis();
   // effects
   let fb = null, flight = null, glowT = -1;
@@ -219,16 +258,16 @@ async function start3D(renderer) {
   const impl = {
     mode: "webgl",
     async apply(k) {
-      if (k === "camera") aim(); else if (k === "time") applyTime(); else if (k === "clip") main.play(st.clip);
-      else if (k === "ball" || k === "ballPatch") await setBall(); else if (k === "course") await setCourse();
+      if (k === "camera") aim(); else if (k === "time") applyTime(); else if (k === "clip") main.play(st.clip); else if (k === "sport") { await setBall(); main.play(st.clip); sideClips(); }
+      else if (k === "ball" || k === "ballPatch") await setBall(); else if (k === "course") { await setCourse(); aim(); }
       else if (k === "home") { main.id = st.home; recolour(); emblems.children.forEach((m) => { if (m.name) m.material.color.set(club(m.position.z < 0 ? st.home : st.away).primary); }); } else if (k === "away") emblems.children.forEach((m) => { if (m.name && m.position.z > 0) m.material.color.set(club(st.away).primary); });
       syncVis();
     },
     kick(isGoal, cb) {
-      if (!ballObj || st.course !== "none") { cb(); return; } const z = goalZ(); const to = new THREE.Vector3(isGoal ? 0 : 6.4, isGoal ? 2.4 : 2.6, z); flight = { t: 0, dur: st.reduced ? 0.25 : 0.9, from: ballObj.position.clone(), to, isGoal, cb };
-      main.play("kick"); },
+      if (!ballObj || !onFooty()) { cb(); return; } const z = goalZ(); const to = new THREE.Vector3(isGoal ? 0 : 6.4, isGoal ? 2.4 : 2.6, z); flight = { t: 0, dur: st.reduced ? 0.25 : 0.9, from: ballObj.position.clone(), to, isGoal, cb };
+      const gc = S.byId(S.SPORTS, st.sport).goal; if (gc) main.play(gc); },
     flyby() { startFly(new THREE.Vector3(0, 1.2, 0)); },
-    winPulse() { glowT = 0; main.play("celebrateArms"); },
+    winPulse() { glowT = 0; const wc = S.byId(S.SPORTS, st.sport).win; if (wc) main.play(wc); },
   };
   const startFly = (from) => { if (fb) fb.cancel(); const proto = balls[st.ball]; if (!proto) return; fb = startBallFlyby({ scene, camera, ball: proto.clone(true), from, sport: st.ball, sponsorTexture: st.ballPatch ? sponsorTex : undefined, scale: 1, onDone: () => { note("flyby-done"); } }); note("flyby-start"); };
   // loop
@@ -269,11 +308,11 @@ function start2D() {
   const refresh = () => {
     set("f-bg", { fill: st.time === "night" ? "#070b14" : "#8fc1ee" }); q("f-night").setAttribute("opacity", st.time === "night" ? 0.45 : 0);
     q("f-cam").style.transform = ""; q("f-cam").setAttribute("transform", CAM2D[st.camera]);
-    const on = st.course !== "none"; q("f-course").setAttribute("display", on ? "" : "none"); q("f-ground").setAttribute("display", on ? "none" : "");
+    const on = !!S.byId(S.COURSES, st.course); q("f-course").setAttribute("display", on ? "" : "none"); q("f-ground").setAttribute("display", on ? "none" : "");
     if (on) { const c = S.byId(S.COURSES, st.course); q("f-cname").textContent = c.name + (c.circuit ? " " + c.circuit + "m" : " straight " + c.straight + "m"); q("f-track").setAttribute("d", c.circuit ? "M60 110a90 50 0 1 0 180 0a90 50 0 1 0-180 0Z" : "M30 110H270"); }
     q("f-boards").setAttribute("display", st.boards ? "" : "none"); q("f-emb").setAttribute("display", st.emblems ? "" : "none");
     set("f-e1", { fill: club(st.home).primary, stroke: club(st.home).secondary }); set("f-e2", { fill: club(st.away).primary, stroke: club(st.away).secondary });
-    q("f-p1").setAttribute("href", GU + st.home + ".svg"); q("f-p2").setAttribute("href", GU + st.away + ".svg"); q("f-clip").textContent = "clip: " + st.clip;
+    q("f-p1").setAttribute("href", GU + st.home + ".svg"); q("f-p2").setAttribute("href", GU + st.away + ".svg"); q("f-clip").textContent = S.byId(S.SPORTS, st.sport).label + " clip: " + st.clip;
     set("f-ball", { fill: BALL_COL[st.ball] || "#ddd", stroke: st.ballPatch ? "#ff6a00" : "#0006", "stroke-width": st.ballPatch ? 2.5 : 1 });
   };
   const A = (el, kf, opt) => el.animate(kf, { fill: "none", duration: st.reduced ? 80 : 700, ...opt });
@@ -291,6 +330,7 @@ function start2D() {
 /* ---------- boot ---------- */
 async function boot() {
   document.body.classList.toggle("reduced", st.reduced); $("wrap").className = "w-" + st.width;
+  try { await new THREE.FileLoader().setResponseType("arraybuffer").loadAsync("models/mcg.glb"); st.mcg = "ok"; } catch (e) { st.mcg = "missing"; }
   buildControls(); renderHud(); $("btn-goal").onclick = () => trigger("goal"); $("btn-win").onclick = () => trigger("win");
   const forced = location.search.includes("fallback=1"); let renderer = null, failed3d = false;
   if (!forced) { const c = document.createElement("canvas"); let gl = null; try { gl = c.getContext("webgl2") || c.getContext("webgl"); } catch (e) { gl = null; } if (gl) { try { renderer = new THREE.WebGLRenderer({ canvas: c, antialias: true }); } catch (e) { renderer = null; } } }
