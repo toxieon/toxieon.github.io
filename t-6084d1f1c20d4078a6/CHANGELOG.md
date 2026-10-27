@@ -1,0 +1,1 @@
+## 0.1.1 · 2026-10-27 · initial · Local test-only assets page: every view, ball, player clip, game and leg state, guernsey, bookie mark and racecourse, plus goal, behind, fly-past and sponsor-win effects. Fake data, no network, 2D fallback when WebGL is missing.

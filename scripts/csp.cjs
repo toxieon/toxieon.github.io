@@ -97,6 +97,24 @@ const APPS = {
   "assets/studio": { file: "assets/studio/index.html", features: [] },
 };
 
+/* Unlisted pages (a folder with .nd-private) pick a profile here with <meta name="csp-profile" content="NAME">, so this file
+ * never names the folder. */
+const PRIVATE_PROFILES = {
+  // Local test page: own static files only; blob:/data: for GLB textures; wasm for the meshopt decoder. Nothing external.
+  testassets: { features: [], extra: { script: ["'wasm-unsafe-eval'"], connect: ["blob:", "data:"] } },
+};
+function privateApps(root = ROOT) {
+  const out = {};
+  for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!ent.isDirectory() || ent.name.startsWith(".") || ent.name === "node_modules") continue;
+    const idx = path.join(root, ent.name, "index.html");
+    if (!fs.existsSync(path.join(root, ent.name, ".nd-private")) || !fs.existsSync(idx)) continue;
+    const m = fs.readFileSync(idx, "utf8").match(/<meta name="csp-profile" content="([\w-]+)"/);
+    if (m && PRIVATE_PROFILES[m[1]]) out["private:" + m[1]] = Object.assign({ file: ent.name + "/index.html" }, PRIVATE_PROFILES[m[1]]);
+  }
+  return out;
+}
+
 const DIRECTIVE_OF = { script: "script-src", connect: "connect-src", img: "img-src", style: "style-src", font: "font-src", frame: "frame-src", worker: "worker-src", media: "media-src" };
 
 function inlineScriptHashes(html) {
@@ -152,7 +170,7 @@ function apply(app, html) {
 
 function run(check) {
   const stale = [];
-  for (const [name, app] of Object.entries(APPS)) {
+  for (const [name, app] of Object.entries({ ...APPS, ...privateApps() })) {
     const file = path.join(ROOT, app.file);
     const html = fs.readFileSync(file, "utf8");
     const next = apply(app, html);
@@ -161,7 +179,7 @@ function run(check) {
   return stale;
 }
 
-module.exports = { APPS, FEATURES, build, apply, inlineScriptHashes, DIRECTIVE_OF };
+module.exports = { privateApps, PRIVATE_PROFILES, APPS, FEATURES, build, apply, inlineScriptHashes, DIRECTIVE_OF };
 
 if (require.main === module) {
   const check = process.argv.includes("--check");
