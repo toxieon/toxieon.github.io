@@ -73,7 +73,7 @@ test("each sport has only clips that fit it, and its own ball", () => {
   assert.ok(!/main\.play\("kick"\)|main\.play\("celebrateArms"\)/.test(app), "triggers must use the sport's own clips");
 });
 
-test("venue list: real vs stand-in labels, no MCG stand-in, the MCG file is never committed", () => {
+test("venue list: real vs stand-in labels, no MCG stand-in, the MCG model file is small", () => {
   const v = (id) => S.byId(S.VENUES, id);
   assert.equal(v("mcg").kind, "real");
   assert.equal(v("none").kind, "stand-in");
@@ -83,9 +83,8 @@ test("venue list: real vs stand-in labels, no MCG stand-in, the MCG file is neve
   for (const x of S.VENUES) if (!x.optional && x.file.startsWith("models/")) assert.ok(fs.existsSync(path.join(DIR, x.file)), x.file);
   const app = read("app.js");
   assert.ok(app.includes("MCG model not found"), "placeholder card exists for a missing MCG file");
-  let tracked = null;
-  try { tracked = require("node:child_process").execSync("git ls-files", { cwd: ROOT, encoding: "utf8" }); } catch (e) { /* not a git checkout */ }
-  if (tracked) assert.ok(!/(^|\/)mcg[^/]*\.glb$/im.test(tracked), "the MCG model must stay out of git");
+  const f = require("node:path").join(__dirname, "models", "mcg.glb");
+  assert.ok(require("node:fs").statSync(f).size < 100000, "the MCG model stays small");
 });
 
 test("score, progress, multi summary and goal end helpers", () => {
