@@ -1,3 +1,4 @@
+## 0.3.4 · 2026-11-03 · storage-guard · Saving the API key no longer throws when browser storage is full or blocked (private mode); analysis carries on. Service worker reelreader-0.3.4.
 ## 0.3.3 · 2026-10-27 · csp · Content-Security-Policy <meta> added to the page (script-src limited to this site plus the Google hosts it loads; inline scripts allowed by hash; object-src none, base-uri and form-action self). Fetches limited to its own backend. Service worker reelreader-0.3.3.
 ## 0.3.2 · 2026-10-11 · suite-icon · New Reel Reader icon by Cinna (a reel frame with a play mark turning into text lines, pink #f472b6): favicon, hub tile (suite icon library 1.3.0) and its own opaque home-screen icons icons/icon-180/192/512.png on #101922, replacing the borrowed Hub PNGs in the page, manifest and service worker. Service worker `reelreader-0.3.2`
 

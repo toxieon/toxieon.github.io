@@ -55,9 +55,14 @@
     ? "Backend: " + backendUrl
     : "Backend not configured yet. Ask Brandon to set reelreader/config.js backendUrl.";
 
-  apiKeyInput.value = root.localStorage.getItem(STORAGE_KEY) || "";
+  function saveKey(value) {
+    try { root.localStorage.setItem(STORAGE_KEY, value); } catch (e) { /* storage full or blocked: keep going */ }
+  }
+  let savedKey = "";
+  try { savedKey = root.localStorage.getItem(STORAGE_KEY) || ""; } catch (e) { savedKey = ""; }
+  apiKeyInput.value = savedKey;
   apiKeyInput.addEventListener("change", function () {
-    root.localStorage.setItem(STORAGE_KEY, apiKeyInput.value.trim());
+    saveKey(apiKeyInput.value.trim());
   });
 
   modeLinkBtn.addEventListener("click", function () { setMode("link"); });
@@ -130,7 +135,7 @@
       return;
     }
 
-    root.localStorage.setItem(STORAGE_KEY, apiKey);
+    saveKey(apiKey);
     setLinkLoading(true);
     clearOutput();
     setStatus("Submitting video for analysis...", false);
@@ -168,7 +173,7 @@
       return;
     }
 
-    root.localStorage.setItem(STORAGE_KEY, apiKey);
+    saveKey(apiKey);
     clearOutput();
     setUploadBusy(true);
     setStatus("Uploading video…", false);
