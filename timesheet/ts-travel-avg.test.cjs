@@ -115,3 +115,73 @@ test("export toggles persist in localStorage and survive bad JSON", () => {
   app.localStorage.setItem("ts_export_opts_v1", "{bad");
   assert.equal(app.TsExport.getExportOpts().tripCount, false);
 });
+
+// 0.6.2 — blank lat/lng used to read as (0,0) and add ~14,000 km legs.
+const MEL_JOBS = [
+  { job_id: "be", job_name: "Brighton East", lat: -37.918, lng: 145.020 },
+  { job_id: "fr", job_name: "Frankston", lat: -38.142, lng: 145.122 },
+  { job_id: "mo", job_name: "Mornington", lat: -38.217, lng: 145.039 },
+  { job_id: "wh", job_name: "Wheelers Hill", lat: -37.898, lng: 145.182 },
+  { job_id: "nb", job_name: "No coords", lat: null, lng: "" },
+  { job_id: "zz", job_name: "Zero", lat: 0, lng: 0 },
+];
+const melSeed = (sessions, settings) => Object.assign(seed(), {
+  jobs: MEL_JOBS, staticDays: [], sessions,
+  settings: Object.assign({ firstDayOfWeek: "Monday", fuelLPer100km: 8.5, fuelPricePerLitre: 1.90, includeCommute: false }, settings || {}),
+});
+const J = (id, date, job, on) => S(id, date, on, on, 1, { job_id: job, job_name: MEL_JOBS.find((j) => j.job_id === job).job_name, lat_on: null, lng_on: null });
+// A working week of Melbourne runs (Mon 26 – Fri 30 Oct), each day with one unlocated stop mixed in.
+const melWeek = () => {
+  const out = [];
+  ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30"].forEach((d, i) => {
+    out.push(J("a" + i, d, "be", "07:30"), J("b" + i, d, "nb", "09:00"), J("c" + i, d, "fr", "10:00"), J("d" + i, d, "mo", "12:00"), J("e" + i, d, i % 2 ? "zz" : "wh", "14:00"));
+  });
+  return out;
+};
+
+test("0.6.2: blank, null or 0,0 coords never make a leg", () => {
+  const st = melSeed(melWeek());
+  const app = loadApp(st);
+  const day = st.sessions.filter((s) => s.date === "2026-10-27");
+  const est = app.TsTravel.estimateDayTravel(day, st);
+  // Brighton East → (no coords) skipped, (no coords) → Frankston skipped, Frankston → Mornington ≈ 11 km, Mornington → Zero skipped.
+  assert.equal(est.trips, 1);
+  assert.ok(est.totalKm > 8 && est.totalKm < 15, String(est.totalKm));
+});
+
+test("0.6.2: Melbourne week gives plausible km and $ per day and week", () => {
+  const st = melSeed(melWeek());
+  const app = loadApp(st);
+  const mon = app.TsTravel.estimateDayTravel(st.sessions.filter((s) => s.date === "2026-10-26"), st);
+  // Frankston → Mornington (~11 km) + Mornington → Wheelers Hill (~37 km) straight-line.
+  assert.equal(mon.trips, 2);
+  assert.ok(mon.totalKm > 40 && mon.totalKm < 60, String(mon.totalKm));
+  assert.ok(mon.cost > 6 && mon.cost < 10, String(mon.cost));
+  const r = app.TsTravel.travelAverage(st, 7, "days", new Date(2026, 10, 1));
+  assert.ok(r.perDay > 1 && r.perDay < 10, "perDay " + r.perDay);
+  assert.ok(r.perWeek > 10 && r.perWeek < 60, "perWeek " + r.perWeek);
+  const m = app.TsTravel.travelAverage(st, 1, "months", new Date(2026, 10, 4));
+  assert.ok(m.perDay < 5 && m.perWeek < 35, JSON.stringify(m));
+});
+
+test("0.6.2: commute on with blank home adds nothing; with home it adds two real legs", () => {
+  const day = melWeek().filter((s) => s.date === "2026-10-26");
+  const off = loadApp(melSeed(day)).TsTravel.estimateDayTravel(day, melSeed(day));
+  const blank = melSeed(day, { includeCommute: true, homeLat: "", homeLng: null });
+  assert.equal(loadApp(blank).TsTravel.estimateDayTravel(day, blank).totalKm, off.totalKm);
+  const home = melSeed(day, { includeCommute: true, homeLat: -37.918, homeLng: 145.020 });
+  const on = loadApp(home).TsTravel.estimateDayTravel(day, home);
+  assert.equal(on.trips, off.trips + 2);
+  assert.ok(on.totalKm - off.totalKm < 60, String(on.totalKm));
+});
+
+test("0.6.2: export travel cost toggle uses the same fixed day maths", () => {
+  const st = melSeed(melWeek());
+  const app = loadApp(st);
+  app.TsExport.setExportOpts({ travelCost: true });
+  const out = app.TsExport.formatWeekPreview(new Date(2026, 9, 28, 12));
+  const week = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30"]
+    .reduce((s, d) => s + app.TsTravel.estimateDayTravel(st.sessions.filter((x) => x.date === d), st).cost, 0);
+  assert.ok(week > 10 && week < 60, String(week));
+  assert.ok(out.includes(`Travel cost: $${week.toFixed(2)}`), out);
+});
