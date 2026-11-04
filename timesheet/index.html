@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-LGu/iG3h6UP2o3jVvWeb3FYXr85oh3plzPsuGyhpoD8=' https://accounts.google.com/gsi/client https://apis.google.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://docs.google.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org data: blob:; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-E2aIyMEndRJjsjRLU0AHYDjSSI1lJKwvDRTslmI/wek=' https://accounts.google.com/gsi/client https://apis.google.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://docs.google.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org data: blob:; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0d0d0d" />
 <title>Timesheet — Neill Data</title>
@@ -16,16 +16,16 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.5.2"></script>
+<script src="ts-time.js?v=0.6.1"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.5.2"></script>
-<script src="ts-clipboard.js?v=0.5.2"></script>
+<script src="ts-map.js?v=0.6.1"></script>
+<script src="ts-clipboard.js?v=0.6.1"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
-<script src="../shared/nd-site-match.js?v=0.5.2"></script>
-<script src="../shared/nd-gate-codes.js?v=0.5.2"></script>
+<script src="../shared/nd-site-match.js?v=0.6.1"></script>
+<script src="../shared/nd-gate-codes.js?v=0.6.1"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -236,6 +236,11 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 /* ── Slice 3 additions ── */
 .today-chip { display:inline-flex; align-items:center; min-height:34px; margin:0 0 10px; padding:4px 16px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-primary); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; }
 .period-summary { margin-top:10px; }
+.travel-avg { position: static; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.travel-avg-range input { width: 64px; min-height: 36px; margin-right: 4px; }
+.travel-avg-range select { min-height: 36px; }
+.export-opts { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:13px; margin:4px 0 10px; }
+.export-opts label { display:flex; align-items:center; gap:6px; min-height:44px; }
 .export-panel { border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-top:12px; padding:0 14px 14px; }
 .export-panel summary { list-style:none; cursor:pointer; min-height:48px; display:flex; align-items:center; font-weight:600; }
 .export-panel summary::-webkit-details-marker { display:none; }
@@ -439,8 +444,20 @@ body.ts-tl-dragging { overscroll-behavior: none; }
       <div><div class="muted" style="font-size:11px;">DAYS</div><div class="mono" id="wk-days">0</div></div>
     </div>
     <div class="week-summary period-summary" id="period-summary" style="display:none;"></div>
+    <div class="week-summary period-summary travel-avg" id="travel-avg">
+      <div class="travel-avg-range"><div class="muted" style="font-size:11px;">TRAVEL AVG · LAST</div>
+        <input type="number" min="1" step="1" id="ta-n" value="30" aria-label="Range length">
+        <select id="ta-unit" aria-label="Range unit"><option value="days">days</option><option value="months">months</option><option value="years">years</option></select></div>
+      <div><div class="muted" style="font-size:11px;">PER DAY</div><div class="mono" id="ta-day">—</div></div>
+      <div><div class="muted" style="font-size:11px;">PER WEEK</div><div class="mono" id="ta-week">—</div></div>
+    </div>
     <details class="export-panel" id="export-panel">
       <summary>Export this week</summary>
+      <div class="export-opts" id="export-opts">
+        <label><input type="checkbox" id="xo-travelTime"> Travel time</label>
+        <label><input type="checkbox" id="xo-travelCost"> Travel cost</label>
+        <label><input type="checkbox" id="xo-tripCount"> Trip count</label>
+      </div>
       <div class="preview-box" id="preview"></div>
       <div class="week-map-wrap" id="week-map-wrap" hidden>
         <div id="week-map" class="week-map" hidden></div>
@@ -747,7 +764,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.5.2';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.6.1';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
@@ -2026,8 +2043,33 @@ const TsExport = (() => {
       .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
     return { start, range: fmtRange(start), name: exporterName(st), employer: cleanName(st.settings.employerName, ''), days, sites: siteList, totals, dayCount: days.length };
   }
+  /* 0.6.1 — optional export extras; all off keeps the text byte-identical. */
+  const EXPORT_OPTS_KEY = 'ts_export_opts_v1';
+  function getExportOpts() {
+    let o = {};
+    try { o = JSON.parse(localStorage.getItem(EXPORT_OPTS_KEY) || '{}') || {}; } catch (e) { o = {}; }
+    return { travelTime: o.travelTime === true, travelCost: o.travelCost === true, tripCount: o.tripCount === true };
+  }
+  function setExportOpts(patch) {
+    const o = Object.assign(getExportOpts(), patch || {});
+    try { localStorage.setItem(EXPORT_OPTS_KEY, JSON.stringify(o)); } catch (e) {}
+    return o;
+  }
+  /** Minutes between one shift's end and the next shift's start (gaps only). */
+  function dayTravelMinutes(daySessions) {
+    const toM = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+    const rows = (daySessions || []).map(x => ({ on: toM(x.time_on_rounded || x.time_on), off: toM(x.time_off_rounded || x.time_off) }))
+      .filter(r => r.on != null && r.off != null).sort((a, b) => a.on - b.on);
+    let mins = 0, lastOff = null;
+    rows.forEach(r => { if (lastOff != null && r.on > lastOff) mins += r.on - lastOff; lastOff = lastOff == null ? r.off : Math.max(lastOff, r.off); });
+    return mins;
+  }
+  function fmtMins(m) { return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
   function formatWeekPreview(weekStart) {
     const st = getState();
+    const xo = getExportOpts();
+    const anyExtra = xo.travelTime || xo.travelCost || xo.tripCount;
+    const wx = { mins: 0, cost: 0, trips: 0 };
     const m = buildWeekModel(weekStart);
     const start = startOfWeek(weekStart, st.settings.firstDayOfWeek);
     const weekSessions = sessionsForWeek(start);
@@ -2059,6 +2101,15 @@ const TsExport = (() => {
           lines.push('  Travel: km/cost omitted (distances unavailable for this day).');
         }
       }
+      if (anyExtra) {
+        const est = window.TsTravel ? TsTravel.estimateDayTravel(daySessions, st) : { cost: 0, trips: 0 };
+        const mins = dayTravelMinutes(daySessions);
+        const bits = [];
+        if (xo.travelTime) { bits.push(`travel time ${fmtMins(mins)}`); wx.mins += mins; }
+        if (xo.travelCost) { bits.push(`travel cost $${est.cost.toFixed(2)}`); wx.cost += est.cost; }
+        if (xo.tripCount) { bits.push(`trips ${est.trips}`); wx.trips += est.trips; }
+        lines.push(`  Extras: ${bits.join('  ·  ')}`);
+      }
       const extras = [];
       if (d.breakMin > 0) extras.push(`break ${d.breakMin} min`);
       if (d.ot > 0) extras.push(`OT ${fmtHrs(d.ot)}`);
@@ -2074,6 +2125,16 @@ const TsExport = (() => {
       lines.push('WEEKLY TRAVEL COST');
       lines.push('');
       lines.push(`  ${TsTravel.fmtKm(weekTravelKm)}  ·  ${TsTravel.fmtMoney(weekTravelCost)}`);
+    }
+    if (anyExtra) {
+      const bits = [];
+      if (xo.travelTime) bits.push(`Travel time: ${fmtMins(wx.mins)}`);
+      if (xo.travelCost) bits.push(`Travel cost: $${wx.cost.toFixed(2)}`);
+      if (xo.tripCount) bits.push(`Trips: ${wx.trips}`);
+      lines.push(RULE);
+      lines.push('WEEKLY EXTRAS');
+      lines.push('');
+      bits.forEach(b => lines.push(`  ${b}`));
     }
     lines.push(RULE);
     lines.push(`TOTAL: ${fmtHrs(m.totals.total)}  ·  ${m.dayCount} day${m.dayCount === 1 ? '' : 's'}${m.totals.ot > 0 ? `  ·  OT ${fmtHrs(m.totals.ot)}` : ''}`);
@@ -2132,7 +2193,7 @@ const TsExport = (() => {
   }
   function csvCell(v) { const s = String(v ?? ''); return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
   function printPdf() { window.print(); }
-  return { formatWeekPreview, buildTimesheetText, buildWeekModel, fmtHrs, exporterName: () => exporterName(getState()), composeMailUrl, copyTimesheet, openInMail, exportCsv, printPdf };
+  return { formatWeekPreview, getExportOpts, setExportOpts, dayTravelMinutes, buildTimesheetText, buildWeekModel, fmtHrs, exporterName: () => exporterName(getState()), composeMailUrl, copyTimesheet, openInMail, exportCsv, printPdf };
 })();
 window.TsExport = TsExport;
 
@@ -3030,9 +3091,67 @@ const TsTravel = (() => {
     }
     return `<div class="day-travel" data-day-travel="${iso}">${body}</div>`;
   }
+  /** Synchronous day travel (0.6.1): the cached History result when there is
+   * one, else the same legs/commute/fuel maths using cached road km per leg
+   * and straight-line km for the rest. Never calls Distance Matrix. */
+  function estimateDayTravel(daySessions, st) {
+    const ds = sortDaySessions(daySessions || []);
+    if (!ds.length) return { totalKm: 0, cost: 0, trips: 0, usableCount: 0 };
+    const hit = getDayTravelCache(ds[0].date, ds, st);
+    if (hit) return { totalKm: hit.totalKm || 0, cost: Number.isFinite(hit.cost) ? hit.cost : 0, trips: hit.usableCount || 0, usableCount: hit.usableCount || 0 };
+    const includeCommute = !!(st.settings && st.settings.includeCommute);
+    const stops = stopsForDay(ds, st);
+    const geocoded = stops.filter(x => x.geocoded);
+    const home = homeStop(st);
+    let legs = buildLegs(stops);
+    if (includeCommute && home.geocoded && geocoded.length) {
+      const [out, back] = buildCommuteLegs(geocoded, home);
+      legs = [out, ...legs, back];
+    }
+    legs.forEach(l => {
+      if (l.skipped) return;
+      const r = roadKmCache.get(legKey(l));
+      if (r != null) { l.km = r; l.method = 'road'; } else { l.km = haversineKm(l.from, l.to); l.method = 'haversine'; }
+    });
+    const usable = legs.filter(l => !l.skipped && l.km != null && Number.isFinite(l.km));
+    const totalKm = usable.reduce((sum, l) => sum + l.km, 0);
+    const eff = Number(st.settings.fuelLPer100km), price = Number(st.settings.fuelPricePerLitre);
+    const cost = (Number.isFinite(eff) && eff > 0 && Number.isFinite(price) && price >= 0) ? totalKm * (eff / 100) * price : 0;
+    return { totalKm, cost, trips: usable.length, usableCount: usable.length };
+  }
+  /** First day (Date, local midnight) of "last n days|months|years" ending on `today` (inclusive). */
+  function rangeStart(today, n, unit) {
+    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const k = Math.max(1, Math.floor(Number(n) || 1));
+    if (unit === 'months') { const d = new Date(t.getFullYear(), t.getMonth() - k, t.getDate()); d.setDate(d.getDate() + 1); return d; }
+    if (unit === 'years') { const d = new Date(t.getFullYear() - k, t.getMonth(), t.getDate()); d.setDate(d.getDate() + 1); return d; }
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate() - k + 1);
+  }
+  /** Pure averaging: dayCosts = { iso: cost }. Average spreads over every
+   * calendar day in [start, end], so days with no travel count as $0. */
+  function averageTravelCost(dayCosts, start, end) {
+    const days = Math.round((new Date(end.getFullYear(), end.getMonth(), end.getDate()) - new Date(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000) + 1;
+    const a = isoDate(start), b = isoDate(end);
+    let total = 0, travelDays = 0;
+    Object.keys(dayCosts || {}).forEach(iso => { const c = Number(dayCosts[iso]); if (iso >= a && iso <= b && Number.isFinite(c)) { total += c; if (c > 0) travelDays++; } });
+    if (days < 1) return { days: 0, total: 0, perDay: 0, perWeek: 0, travelDays: 0 };
+    const perDay = total / days;
+    return { days, total, perDay, perWeek: perDay * 7, travelDays };
+  }
+  function travelAverage(st, n, unit, today) {
+    const end = today || new Date();
+    const start = rangeStart(end, n, unit);
+    const a = isoDate(start), b = isoDate(end);
+    const byDay = new Map();
+    (st.sessions || []).forEach(x => { if (x.date && x.date >= a && x.date <= b) { if (!byDay.has(x.date)) byDay.set(x.date, []); byDay.get(x.date).push(x); } });
+    const dayCosts = {};
+    byDay.forEach((ds, iso) => { dayCosts[iso] = estimateDayTravel(ds, st).cost; });
+    return Object.assign(averageTravelCost(dayCosts, start, end), { start: a, end: b });
+  }
   return {
     computeDayTravel, panelHtml, renderMap, fmtKm, fmtL, fmtMoney, hasHomeCoords, homeStop,
-    getDayTravelCache, travelExportLines, rememberDayTravel, prefetchWeek, sortDaySessions
+    getDayTravelCache, travelExportLines, rememberDayTravel, prefetchWeek, sortDaySessions,
+    estimateDayTravel, rangeStart, averageTravelCost, travelAverage
   };
 })();
 window.TsTravel = TsTravel;
@@ -3298,6 +3417,7 @@ window.TsLocPicker = TsLocPicker;
     const isCurrentWeek = isoDate(weekCursor) === isoDate(startOfWeek(new Date(), st.settings.firstDayOfWeek));
     $('wk-today').style.display = isCurrentWeek ? 'none' : 'inline-flex';
     renderPeriodSummary(st);
+    renderTravelAvg(st);
     if ($('export-panel').open) renderExportPreview();
     // Compute travel for every day of this week in the background (cached,
     // throttled) so Copy timesheet has km/cost without expanding each day.
@@ -3427,6 +3547,32 @@ window.TsLocPicker = TsLocPicker;
     el.style.display = parts.length ? 'flex' : 'none';
   }
 
+  /* 0.6.1 — average travel cost over a chosen range */
+  const TA_KEY = 'ts_travel_avg_v1';
+  function renderTravelAvg(st) {
+    const nEl = $('ta-n'), uEl = $('ta-unit');
+    if (!nEl || !uEl || !window.TsTravel) return;
+    const r = TsTravel.travelAverage(st, nEl.value, uEl.value, new Date());
+    $('ta-day').textContent = TsTravel.fmtMoney(r.perDay);
+    $('ta-week').textContent = TsTravel.fmtMoney(r.perWeek);
+  }
+  function wireTravelAvg() {
+    const nEl = $('ta-n'), uEl = $('ta-unit');
+    if (!nEl || !uEl) return;
+    try { const v = JSON.parse(localStorage.getItem(TA_KEY) || 'null'); if (v && v.n) { nEl.value = v.n; uEl.value = v.unit || 'days'; } } catch (e) {}
+    const on = () => {
+      if (!(Number(nEl.value) >= 1)) return;
+      try { localStorage.setItem(TA_KEY, JSON.stringify({ n: Math.floor(Number(nEl.value)), unit: uEl.value })); } catch (e) {}
+      renderTravelAvg(getState());
+    };
+    nEl.addEventListener('input', on); uEl.addEventListener('change', on);
+    const xo = TsExport.getExportOpts();
+    ['travelTime', 'travelCost', 'tripCount'].forEach(k => {
+      const cb = $('xo-' + k); if (!cb) return;
+      cb.checked = xo[k];
+      cb.addEventListener('change', () => { TsExport.setExportOpts({ [k]: cb.checked }); renderExportPreview(); });
+    });
+  }
   function renderExportPreview() {
     $('preview').textContent = TsExport.formatWeekPreview(weekCursor) || 'No sessions this week.';
   }
@@ -3549,6 +3695,7 @@ window.TsLocPicker = TsLocPicker;
     $('wk-next').addEventListener('click', () => { weekCursor = addDays(weekCursor, 7); render(); });
     $('wk-today').addEventListener('click', () => { weekCursor = startOfWeek(new Date(), getState().settings.firstDayOfWeek); render(); });
     $('btn-add-shift').addEventListener('click', () => openAddShift(isoDate(new Date())));
+    wireTravelAvg();
     $('export-panel').addEventListener('toggle', () => { if ($('export-panel').open) { renderExportPreview(); if (window.TsWeekMap) TsWeekMap.invalidate(); } });
     $('btn-copy').addEventListener('click', () => {
       const text = TsExport.buildTimesheetText(weekCursor).body;
