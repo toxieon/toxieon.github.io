@@ -289,7 +289,7 @@ const APP_VERSION = "0.1.2";
       select("Number of storeys", "job.storeys", [["", "Select"], ["1", "1"], ["2", "2"], ["3", "3"], ["4+", "4 or more"]]) +
       '<p class="lbl">Alarm installed on every storey</p>' + chips("property.everyStorey", YN) +
       '<p class="lbl">Alarm in each hallway serving bedrooms, or between the bedrooms and the rest of the dwelling</p>' + chips("property.sleeping", YN) +
-      '<p class="lbl">Renter provided with written information on smoke alarm operation and testing (RTR 2021 Sch 3 cl 3(3))</p>' +
+      '<p class="lbl">Renter provided with written information on smoke alarm operation and testing (Residential Tenancies Regulations 2021 (Vic))</p>' +
       chips("job.renterInfo", YN) +
       area("Recommendations", "property.recommendations") +
       "</section>";
@@ -322,7 +322,7 @@ const APP_VERSION = "0.1.2";
       '<p class="lbl">RCD / safety switch fitted</p>' + chips("switchboard.rcdFitted", YN) +
       field("How many RCDs", "switchboard.rcdCount") +
       select("Circuits protected", "switchboard.rcdCircuits", [["", "Select"], ["all", "Power and lighting"], ["power", "Power only"], ["lighting", "Lighting only"], ["some", "Some circuits"], ["none", "None"]]) +
-      '<p class="lbl">Every power outlet and lighting circuit protected by a circuit breaker and an RCD (RTR 2021 Sch 4 cl 9)</p>' +
+      '<p class="lbl">Every power outlet and lighting circuit protected by a circuit breaker and an RCD (Residential Tenancies Regulations 2021 (Vic))</p>' +
       chips("switchboard.minStandard", YN) +
       "<h3>RCD push-button tests</h3>" + (sb.rcdTests || []).map(rcdRow).join("") +
       '<button type="button" class="btn" data-action="add-rcd">Add RCD test</button>' +

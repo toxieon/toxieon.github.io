@@ -73,7 +73,7 @@
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       const subW = W - M * 2 - (pillW ? pillW + 8 : 0);
-      const sub = doc.splitTextToSize("Residential Tenancies Regulations 2021  ·  Smoke alarm safety check (RTA 1997 s68AA) and visual switchboard inspection  ·  AS 3786", subW);
+      const sub = doc.splitTextToSize("Residential Tenancies Regulations 2021 (Vic)  ·  Smoke alarm safety check under the Residential Tenancies Act 1997 (Vic) and visual switchboard inspection  ·  AS 3786", subW);
       doc.text(sub[0], M, band + 11);
       return band + 16;
     }

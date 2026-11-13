@@ -7,8 +7,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const LIMITATIONS = "This is a smoke alarm safety check (RTA 1997 s68AA) and a visual switchboard inspection. It is not an Electrical Safety Check under RTR 2021 Sch 3 cl 1 / AS/NZS 3019.";
-  const REFERENCES = "RTA 1997 s68AA; RTR 2021 Sch 3 cl 1 and 3, Sch 4 cl 9; AS 3786; NCC Housing Provisions Part 9.5; AS/NZS 3000.";
+  const LIMITATIONS = "This is a smoke alarm safety check under the Residential Tenancies Act 1997 (Vic) and a visual switchboard inspection. It is not an Electrical Safety Check under the Residential Tenancies Regulations 2021 (Vic) or AS/NZS 3019.";
+  const REFERENCES = "Residential Tenancies Act 1997 (Vic); Residential Tenancies Regulations 2021 (Vic); AS 3786; AS/NZS 3019.";
   const TITLE = "Smoke Alarm Safety Check & Switchboard Inspection Report";
 
   const ERA_LABEL = {
@@ -226,13 +226,13 @@ function recommendation(text) {
     }
     if (job.renterInfo === "no") {
       push(out, { id: "renter", auto: true, priority: "High", source: "Property",
-        text: "Renter was not provided with written information on smoke alarm operation and testing (RTR 2021 Sch 3 cl 3(3))" });
+        text: "Renter was not provided with written information on smoke alarm operation and testing (Residential Tenancies Regulations 2021 (Vic))" });
     }
 
     const minFail = boardOn && (sb.protection === "rewireable" || sb.protection === "mixed-fuses" || sb.minStandard === "no" || sb.rcdFitted === "no");
     if (minFail) {
       push(out, { id: "minstd", auto: true, priority: "Urgent", source: "Switchboard",
-        text: "Switchboard does not meet the rental minimum standard. Every power outlet and lighting circuit must be protected by switchboard circuit breakers and RCDs (RTR 2021 Sch 4 cl 9)" });
+        text: "Switchboard does not meet the rental minimum standard. Every power outlet and lighting circuit must be protected by switchboard circuit breakers and RCDs (Residential Tenancies Regulations 2021 (Vic))" });
     }
     if (boardOn) (sb.rcdTests || []).forEach(function (t, i) {
       if (t && t.result === "fail") {
@@ -423,7 +423,7 @@ function recommendation(text) {
       { item: "Circuit labelling", observation: obs(sb.labelNote, sb.labelling === "yes" ? "Legible and complete" : "Not legible or not complete"), result: mark(sb.labelling), omit: isNA(sb.labelling) || !sb.labelling },
       { item: "Signs of heat / damage", observation: obs(sb.heatNote, heat ? "Overheating, scorching, burning smell or exposed live parts observed" : "No discolouration, arcing or burning observed"), result: heat ? "FAIL" : "PASS", omit: (isNA(sb.overheating) || !sb.overheating) && (isNA(sb.exposed) || !sb.exposed) },
       { item: "Rewireable fuses", observation: obs(sb.fuseNote, fuse ? "Rewireable fuses present — does not meet the rental minimum standard" : (sb.protection === "rcbo" ? "Not present — RCBOs" : "Not present — all circuit breakers")), result: fuse ? "FAIL" : "N/A", omit: isNA(sb.protection) || !sb.protection },
-      { item: "Power and lighting protected", observation: obs(sb.minNote, (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "Not every power outlet and lighting circuit is on a circuit breaker and an RCD (RTR 2021 Sch 4 cl 9)" : "Every power outlet and lighting circuit is on a circuit breaker and an RCD"), result: (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "FAIL" : "PASS", omit: isNA(sb.minStandard) && !fuse && sb.rcdFitted !== "no" },
+      { item: "Power and lighting protected", observation: obs(sb.minNote, (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "Not every power outlet and lighting circuit is on a circuit breaker and an RCD (Residential Tenancies Regulations 2021 (Vic))" : "Every power outlet and lighting circuit is on a circuit breaker and an RCD"), result: (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "FAIL" : "PASS", omit: isNA(sb.minStandard) && !fuse && sb.rcdFitted !== "no" },
       { item: "Enclosure, blanks, moisture", observation: obs(sb.enclosureNote, encParts.join(". ")), result: (sb.enclosure === "no" || sb.blanks === "no" || sb.dry === "no" || sb.waterVermin === "yes" || sb.secure === "no" || sb.damage === "yes" || sb.door === "no") ? "FAIL" : "PASS", omit: encNA || (!encParts.length && !String(sb.enclosureNote || "").trim()) },
       { item: "Possible asbestos (switchboard backing)", observation: obs(sb.asbestosNote, asbestos ? "Suspected asbestos backing, do not drill or disturb" : "Not indicated"), result: asbestos ? "CHECK" : "PASS", omit: isNA(sb.pre1990) || (!sb.pre1990 && !sb.asbestos) },
       { item: "Main earthing", observation: obs(sb.earthNote, sb.earth === "yes" ? "Main earth / MEN visible where accessible" : "Main earth / MEN not visible where the board was accessible"), result: sb.earth === "no" ? "CHECK" : "PASS", omit: isNA(sb.earth) || !sb.earth },
