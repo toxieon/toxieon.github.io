@@ -570,6 +570,21 @@ const APP_VERSION = "0.1.1";
     g.font = "22px sans-serif"; g.fillText(label, 40, 400);
     return c.toDataURL("image/jpeg", 0.7);
   }
+  function sampleAudio() {
+    const sr = 8000, n = 2400;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const v = new DataView(buf);
+    const set = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    set(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); set(8, "WAVE"); set(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    set(36, "data"); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 880 * i / sr) * 6000), true);
+    let bin = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return "data:audio/wav;base64," + btoa(bin);
+  }
   function sampleSign() {
     const c = document.createElement("canvas");
     c.width = 500; c.height = 140;
@@ -595,7 +610,7 @@ const APP_VERSION = "0.1.1";
     };
     s.property = { everyStorey: "yes", sleeping: "yes", recommendations: "Replace the living room alarm." };
     s.alarms = [
-      Object.assign(blankAlarm(), { location: "Hallway", locationDetail: "bedrooms", storey: "Ground", type: "Photoelectric", power: "240V hardwired", interconnected: "yes", dateKind: "manufacture", dateValue: "2021-03-01", mounting: "yes", as3786: "yes", testButton: "pass", secure: "yes", cleaned: "yes", hush: "yes", result: "Pass", photo: sampleShot("Hallway") }),
+      Object.assign(blankAlarm(), { location: "Hallway", locationDetail: "bedrooms", storey: "Ground", type: "Photoelectric", power: "240V hardwired", interconnected: "yes", dateKind: "manufacture", dateValue: "2021-03-01", mounting: "yes", as3786: "yes", testButton: "pass", secure: "yes", cleaned: "yes", hush: "yes", result: "Pass", photo: sampleShot("Hallway"), audio: { mime: "audio/wav", dataUrl: sampleAudio(), seconds: 8 } }),
       Object.assign(blankAlarm(), { location: "Living", storey: "Ground", type: "Ionisation", power: "9V battery", interconnected: "no", dateKind: "manufacture", dateValue: "2014-05-01", mounting: "yes", as3786: "yes", testButton: "fail", secure: "yes", cleaned: "no", hush: "na", result: "Fail", photo: sampleShot("Living") })
     ];
     s.switchboard = {
