@@ -94,11 +94,31 @@ test("pdf is blocked until each alarm has location, photo and date, named in the
   assert.ok(blockers.some((line) => /Alarm 1/.test(line) && /location/.test(line) && /photo/.test(line) && /date/.test(line)));
 });
 
-test("mains-powered alarms require the supervising electrician fields", () => {
+test("a mains alarm does not block the PDF unless a licensed electrician is signing off", () => {
   const s = base();
   s.inspector = { techName: "Alex Example" };
-  const blockers = L.pdfBlockers(s, NOW);
-  assert.ok(blockers.some((line) => /supervising licensed electrician/.test(line)));
+  s.sign.elecSignoff = false;
+  assert.equal(L.pdfBlockers(s, NOW).some((line) => /electrician sign-off/.test(line)), false);
+  s.sign.elecSignoff = true;
+  assert.ok(L.pdfBlockers(s, NOW).some((line) => /Licensed electrician sign-off/.test(line)));
+});
+
+test("N/A is not a fail and is left out of the switchboard rows", () => {
+  const s = base();
+  s.alarms[0].as3786 = "na";
+  s.alarms[0].hush = "na";
+  s.job.renterInfo = "na";
+  s.property.everyStorey = "na";
+  s.switchboard.diy = "na";
+  s.switchboard.earth = "na";
+  assert.equal(L.collectDefects(s, NOW).some((d) => /AS 3786|Hush|written information|DIY|Main earth/.test(d.text)), false);
+  assert.equal(L.propertyCompliant(s, NOW), true);
+  assert.equal(L.switchboardRows(s).some((r) => /DIY|earthing/i.test(r.item)), false);
+});
+
+test("an unticked smoke scope does not demand alarms", () => {
+  const s = base({ scope: { smoke: false, switchboard: true }, alarms: [] });
+  assert.equal(L.pdfBlockers(s, NOW).some((line) => /smoke alarm/i.test(line)), false);
 });
 
 test("a complete example has no pdf blockers and is compliant", () => {

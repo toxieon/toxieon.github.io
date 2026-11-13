@@ -244,7 +244,10 @@
     const ins = state.inspector || {};
     const sign = state.sign || {};
     const badge = L().overall(state, now);
-    const smokeYes = L().propertyCompliant(state, now);
+    const smokeOn = L().inScope(state, "smoke");
+    const boardOn = L().inScope(state, "switchboard");
+    const elecOn = !!(sign.elecSignoff);
+    const smokeYes = smokeOn && L().propertyCompliant(state, now);
 
     section("A. INSTALLATION & INSPECTION DETAILS");
     const addr = [job.unit, job.address].filter(Boolean).join(", ") || "—";
@@ -255,11 +258,17 @@
       [{ k: "Property address", v: addr, span: 3 }],
       [{ k: "Inspection date", v: L().fmtWhen(job.inspectedAt) }, { k: "Previous check", v: job.previousCheck ? L().fmtDate(job.previousCheck) : "Not recorded" }],
       [{ k: "Technician", v: ins.techName || "—" }, { k: "Managing agent", v: job.agency || "—" }],
-      [{ k: "Property manager", v: [job.pmName, job.pmEmail].filter(Boolean).join(" · ") || "—" }, { k: "Occupancy", v: job.occupancy === "vacant" ? "Vacant" : job.occupancy === "tenanted" ? "Tenanted" : "—" }],
-      [{ k: "Supervision", v: sup, span: 3 }],
-      [{ k: "Build / approval", v: L().ERA_LABEL[job.buildEra] || "—" }, { k: "Storeys", v: job.storeys || "—" }],
-      [{ k: "Renter written information", v: job.renterInfo === "yes" ? "Yes — provided" : job.renterInfo === "no" ? "No" : "—" }, { k: "Tenant", v: job.tenantPresent === "yes" ? ("Present" + (job.tenantName ? " — " + job.tenantName : "")) : job.tenantPresent === "no" ? "Not present" : "—" }]
+      [{ k: "Property manager", v: [job.pmName, job.pmEmail].filter(Boolean).join(" · ") || "—" }, { k: "Occupancy", v: job.occupancy === "vacant" ? "Vacant" : job.occupancy === "tenanted" ? "Tenanted" : "—" }]
     ];
+    if (elecOn && ins.supName) kv.push([{ k: "Supervision", v: sup, span: 3 }]);
+    if (smokeOn && (job.buildEra || job.storeys)) kv.push([{ k: "Build / approval", v: L().ERA_LABEL[job.buildEra] || "—" }, { k: "Storeys", v: job.storeys || "—" }]);
+    if (smokeOn && job.renterInfo && job.renterInfo !== "na") {
+      const tenant = job.tenantPresent === "na" ? "" : (job.tenantPresent === "yes" ? ("Present" + (job.tenantName ? " — " + job.tenantName : "")) : job.tenantPresent === "no" ? "Not present" : "");
+      const row = [{ k: "Renter written information", v: job.renterInfo === "yes" ? "Yes — provided" : "No" }];
+      if (tenant) row.push({ k: "Tenant", v: tenant });
+      else row[0].span = 3;
+      kv.push(row);
+    }
     const col = [CW * 0.22, CW * 0.28, CW * 0.22, CW * 0.28];
     kv.forEach(function (pair) {
       const cells = [];
@@ -279,21 +288,28 @@
     });
     const badgeH = 28;
     need(badgeH);
-    drawRow([
-      { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8, center: true },
-      { text: "", w: col[1], size: 8 },
-      { text: "Property smoke alarms compliant", w: col[2], bold: true, fill: WASH, size: 8, center: true },
-      { text: "", w: col[3], size: 8 }
-    ], y, badgeH, false);
     const resultFill = badge === "FAIL" ? RED : badge === "PASS" ? [21, 128, 61] : AMBER_B;
     const resultText = badge === "PASS" ? "PASS" : badge === "FAIL" ? "FAIL" : "ACTION REQUIRED";
-    solidBadge(resultText, resultFill, M + col[0] + 4, y, badgeH);
-    const compText = smokeYes ? "YES: COMPLIANT" : "NO: NOT COMPLIANT";
-    const compFill = smokeYes ? [21, 128, 61] : RED;
-    solidBadge(compText, compFill, M + col[0] + col[1] + col[2] + 4, y, badgeH);
+    if (smokeOn) {
+      drawRow([
+        { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: col[1], size: 8 },
+        { text: "Property smoke alarms compliant", w: col[2], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: col[3], size: 8 }
+      ], y, badgeH, false);
+      solidBadge(resultText, resultFill, M + col[0] + 4, y, badgeH);
+      solidBadge(smokeYes ? "YES: COMPLIANT" : "NO: NOT COMPLIANT", smokeYes ? [21, 128, 61] : RED, M + col[0] + col[1] + col[2] + 4, y, badgeH);
+    } else {
+      drawRow([
+        { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: CW - col[0], size: 8 }
+      ], y, badgeH, false);
+      solidBadge(resultText, resultFill, M + col[0] + 4, y, badgeH);
+    }
     y += badgeH;
 
-    section("B. SMOKE ALARMS");
+    if (smokeOn) section("B. SMOKE ALARMS");
+    if (smokeOn) {
     const widths = [22, 108, 72, 86, 78, 52, 58, 63];
     const sum = widths.reduce(function (a, b) { return a + b; }, 0);
     const scale = CW / sum;
@@ -334,7 +350,9 @@
         doc.setTextColor(RED[0], RED[1], RED[2]);
         doc.text(flag, x + 13, flagTop + 2);
       }
-      pill(testLabel, testKind, M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + 4, y, h);
+      const testX = M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4];
+      if (a.testButton === "na") dash(testX, y, h, sw[5]);
+      else pill(testLabel, testKind, testX + 4, y, h);
       const photoX = M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + sw[5];
       if (a.photo && fitImage(a.photo, photoX + 3, y + (h - 22) / 2, 30, 22)) { /* fitted */ }
       else dash(photoX, y, h, sw[6]);
@@ -362,27 +380,30 @@
       audioNotes.forEach(function (line) { need(11); doc.text(line, M, y + 8); y += 11; });
     }
     y += 6;
-    const detail = (state.alarms || []).map(function (a, i) {
-      return [
-        String(i + 1),
-        L().locationText(a, i),
-        a.mounting === "yes" ? "Compliant" : a.mounting === "no" ? "Not compliant" : "—",
-        a.interconnected === "yes" ? "Yes" : a.interconnected === "no" ? "No" : a.interconnected === "na" ? "N/A" : "—",
-        a.as3786 === "yes" ? "Present" : a.as3786 === "no" ? "Not seen" : "—",
-        [a.batteryReplaced === "yes" ? "Replaced" : a.batteryReplaced === "no" ? "Not replaced" : "", a.batteryType || ""].filter(Boolean).join(" ") || "—",
-        a.notes || "—"
-      ];
-    });
-    if (detail.length) {
+    const shown = function (v, yes, no) { if (!v || v === "na") return null; return v === "yes" ? yes : v === "no" ? no : null; };
+    const detailSpecs = [
+      { h: "MOUNTING", w: 78, get: function (a) { return shown(a.mounting, "Compliant", "Not compliant"); } },
+      { h: "LINKED", w: 58, get: function (a) { return shown(a.interconnected, "Yes", "No"); } },
+      { h: "AS 3786", w: 62, get: function (a) { return shown(a.as3786, "Present", "Not seen"); } },
+      { h: "BATTERY", w: 72, get: function (a) { if (!a.batteryReplaced || a.batteryReplaced === "na") return a.batteryType || null; return (a.batteryReplaced === "yes" ? "Replaced" : "Not replaced") + (a.batteryType ? " " + a.batteryType : ""); } },
+      { h: "NOTES", w: 0, get: function (a) { return a.notes || null; } }
+    ].filter(function (spec) { return (state.alarms || []).some(function (a) { return spec.get(a); }); });
+    if ((state.alarms || []).length && detailSpecs.length) {
       need(14);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(INK[0], INK[1], INK[2]);
       doc.text("Alarm details", M, y + 11);
       y += 16;
-      const rest = [78, 58, 62, 72];
-      const notesW = CW - sw[0] - sw[1] - rest.reduce(function (a, b) { return a + b; }, 0);
-      table(["#", "LOCATION", "MOUNTING", "LINKED", "AS 3786", "BATTERY", "NOTES"], detail, [sw[0], sw[1]].concat(rest, [notesW]), { size: 8 });
+      const fixed = detailSpecs.filter(function (s) { return s.h !== "NOTES"; });
+      const used = sw[0] + sw[1] + fixed.reduce(function (n, s) { return n + s.w; }, 0);
+      const widthsD = [sw[0], sw[1]].concat(fixed.map(function (s) { return s.w; }));
+      if (detailSpecs.some(function (s) { return s.h === "NOTES"; })) widthsD.push(Math.max(60, CW - used));
+      const headers = ["#", "LOCATION"].concat(detailSpecs.map(function (s) { return s.h; }));
+      const detail = (state.alarms || []).map(function (a, i) {
+        return [String(i + 1), L().locationText(a, i)].concat(detailSpecs.map(function (s) { return s.get(a) || ""; }));
+      });
+      table(headers, detail, widthsD, { size: 8 });
     }
     const prop = state.property || {};
     if (prop.recommendations) {
@@ -395,14 +416,11 @@
       need(rec.length * 10);
       doc.text(rec, M, y + 8); y += rec.length * 10 + 4;
     }
-
-    section("C. SWITCHBOARD — SAFETY CHECK (VISUAL INSPECTION & TESTING)");
-    if ((state.switchboard || {}).location) {
-      need(12);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text("Location: " + state.switchboard.location, M, y + 10); y += 14;
     }
-    const sRows = L().switchboardRows(state).filter(function (r) { return r.item !== "Switchboard location"; });
+
+    const sRows = boardOn ? L().switchboardRows(state) : [];
+    if (sRows.length) {
+    section("C. SWITCHBOARD — SAFETY CHECK (VISUAL INSPECTION & TESTING)");
     const iw = CW * 0.30, rw = 52, ow = CW - iw - rw;
     need(16);
     drawRow([{ text: "ITEM", w: iw }, { text: "OBSERVATION", w: ow }, { text: "RESULT", w: rw }], y, 16, true);
@@ -412,7 +430,7 @@
       const h = Math.max(rowH(cells, 8), 18);
       need(h);
       drawRow(cells, y, h, false);
-      pill(r.result, r.result, M + iw + ow + 4, y, h);
+      if (r.result && r.result !== "N/A") pill(r.result, r.result, M + iw + ow + 4, y, h);
       y += h;
     });
     y += 6;
@@ -424,6 +442,7 @@
       const n = doc.splitTextToSize("Notes: " + state.switchboard.notes, CW);
       need(n.length * 10);
       doc.text(n, M, y + 8); y += n.length * 10;
+    }
     }
 
     section("D. DEFECTS & RECOMMENDED ACTIONS");
@@ -469,24 +488,32 @@
 
     section("F. DECLARATION & SIGNATURES");
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]);
-    const dec = doc.splitTextToSize("I confirm that the smoke alarm safety check and the visual switchboard inspection described in this report were carried out at the property on the date shown. Inspected by " + (ins.techName || "—") + ". Under supervision of " + (ins.supName || "—") + ", REC " + (ins.supRec || "—") + ", Licence " + (ins.supLic || "—") + ".", CW);
+    const decLead = "I confirm that the inspection described in this report was carried out at the property on the date shown. Inspected by " + (ins.techName || "—") + "."
+      + (elecOn ? " Under supervision of " + (ins.supName || "—") + ", REC " + (ins.supRec || "—") + ", Licence " + (ins.supLic || "—") + "." : " " + L().VISUAL_NOTE);
+    const dec = doc.splitTextToSize(decLead, CW);
     need(dec.length * 11 + 70);
     doc.text(dec, M, y + 12); y += dec.length * 11 + 6;
-    const half = CW / 2;
+    const half = elecOn ? CW / 2 : CW;
     need(78);
-    drawRow([{ text: "TECHNICIAN", w: half }, { text: "SUPERVISING LICENSED ELECTRICIAN", w: half }], y, 16, true);
+    const sigHeads = elecOn
+      ? [{ text: "TECHNICIAN", w: half }, { text: "SUPERVISING LICENSED ELECTRICIAN", w: half }]
+      : [{ text: "TECHNICIAN", w: CW }];
+    drawRow(sigHeads, y, 16, true);
     y += 16;
     doc.setFillColor(255, 255, 255); doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-    doc.rect(M, y, half, 72, "FD"); doc.rect(M + half, y, half, 72, "FD");
-    if (sign.signature) fitImage(sign.signature, M + 8, y + 4, 120, 28);
-    if (sign.elecSignature) fitImage(sign.elecSignature, M + half + 8, y + 4, 120, 28);
+    doc.rect(M, y, half, 72, "FD");
+    if (elecOn) doc.rect(M + half, y, half, 72, "FD");
+    if (sign.signature) fitImage(sign.signature, M + 8, y + 4, Math.min(120, half - 16), 28);
+    if (elecOn && sign.supSignature) fitImage(sign.supSignature, M + half + 8, y + 4, 120, 28);
     doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]); doc.setFont("helvetica", "normal");
     doc.text("Name: " + (sign.printedName || ins.techName || "—"), M + 8, y + 44);
     doc.text("Phone: " + (ins.techPhone || "—"), M + 8, y + 56);
     doc.text("Date: " + L().fmtDate(sign.date), M + 8, y + 68);
-    doc.text("Name: " + (ins.supName || "—"), M + half + 8, y + 44);
-    doc.text("REC " + (ins.supRec || "—") + "   Licence " + (ins.supLic || "—"), M + half + 8, y + 56);
-    doc.text("Date: " + L().fmtDate(sign.date), M + half + 8, y + 68);
+    if (elecOn) {
+      doc.text("Name: " + (ins.supName || "—"), M + half + 8, y + 44);
+      doc.text("REC " + (ins.supRec || "—") + "   Licence " + (ins.supLic || "—"), M + half + 8, y + 56);
+      doc.text((ins.supBusiness || "") + (ins.supBusiness ? "  " : "") + "Date: " + L().fmtDate(sign.date), M + half + 8, y + 68);
+    }
     y += 78;
     const dueCells = [
       { text: "Next smoke alarm check due", w: col[0] + 20, bold: true, fill: WASH, size: 8 },
@@ -500,10 +527,10 @@
     y += dh;
 
     const photos = [];
-    (state.alarms || []).forEach(function (a, i) {
+    if (smokeOn) (state.alarms || []).forEach(function (a, i) {
       if (a.photo) photos.push({ src: a.photo, title: "Alarm " + (i + 1) + " — " + L().locationText(a, i), sub: [a.type, a.power, (a.dateKind === "expiry" ? "Exp " : "Mfd ") + (a.dateValue || "")].filter(Boolean).join(", "), test: a.testButton === "fail" ? "FAIL" : a.testButton === "pass" ? "PASS" : "", audio: a.audio && a.audio.dataUrl ? L().audioFilename(state, a, i) : "", seconds: a.audio && a.audio.seconds });
     });
-    ((state.switchboard || {}).photos || []).forEach(function (p, i) {
+    if (boardOn) ((state.switchboard || {}).photos || []).forEach(function (p, i) {
       photos.push({ src: p.dataUrl || p, title: "Switchboard — photo " + (i + 1), sub: p.caption || (state.switchboard.location || ""), test: "" });
     });
     if (photos.length) {

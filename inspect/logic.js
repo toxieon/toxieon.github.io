@@ -68,6 +68,15 @@
     return !!alarm && (alarm.power === "240V hardwired" || alarm.power === "240V with 10-yr lithium backup");
   }
 
+  function inScope(state, key) {
+    if (!state || !state.scope) return true;
+    return !!state.scope[key];
+  }
+
+  function isNA(v) { return v === "na"; }
+
+  const VISUAL_NOTE = "Visual inspection by the technician. This report is not an Electrical Safety Check. Mains, hardwired alarms and switchboard items are not certified. Items that need a licensed electrician are recommended for follow-up.";
+
   function is9v(alarm) {
     return !!alarm && alarm.power === "9V battery";
   }
@@ -152,7 +161,8 @@ function recommendation(text) {
     const job = state.job || {};
     const prop = state.property || {};
     const sb = state.switchboard || {};
-    const alarms = state.alarms || [];
+    const alarms = inScope(state, "smoke") ? (state.alarms || []) : [];
+    const boardOn = inScope(state, "switchboard");
 
     alarms.forEach(function (a, i) {
       const where = locationText(a, i);
@@ -219,27 +229,27 @@ function recommendation(text) {
         text: "Renter was not provided with written information on smoke alarm operation and testing (RTR 2021 Sch 3 cl 3(3))" });
     }
 
-    const minFail = sb.protection === "rewireable" || sb.protection === "mixed-fuses" || sb.minStandard === "no" || sb.rcdFitted === "no";
+    const minFail = boardOn && (sb.protection === "rewireable" || sb.protection === "mixed-fuses" || sb.minStandard === "no" || sb.rcdFitted === "no");
     if (minFail) {
       push(out, { id: "minstd", auto: true, priority: "Urgent", source: "Switchboard",
         text: "Switchboard does not meet the rental minimum standard. Every power outlet and lighting circuit must be protected by switchboard circuit breakers and RCDs (RTR 2021 Sch 4 cl 9)" });
     }
-    (sb.rcdTests || []).forEach(function (t, i) {
+    if (boardOn) (sb.rcdTests || []).forEach(function (t, i) {
       if (t && t.result === "fail") {
         push(out, { id: "rcd-" + i, auto: true, priority: "Urgent", source: "Switchboard",
           text: "RCD push-button test failed" + (t.circuit ? " (" + t.circuit + ")" : "") + ". A timed trip test requires a licensed electrician" });
       }
     });
-    if (sb.overheating === "yes") push(out, { id: "heat", auto: true, priority: "Urgent", source: "Switchboard", text: "Switchboard shows signs of overheating, scorching or a burning smell" });
-    if (sb.exposed === "yes") push(out, { id: "live", auto: true, priority: "Urgent", source: "Switchboard", text: "Exposed live parts were observed at the switchboard" });
-    if (sb.diy === "yes") push(out, { id: "diy", auto: true, priority: "Urgent", source: "Switchboard", text: "Signs of DIY or non-compliant work at the switchboard. Requires a licensed electrician" });
-    if (sb.pre1990 === "yes" || sb.asbestos === "yes") push(out, { id: "asb", auto: true, priority: "High", source: "Switchboard", text: "Suspected asbestos backing, do not drill or disturb" });
-    if (sb.mainSwitch === "no") push(out, { id: "mainsw", auto: true, priority: "Urgent", source: "Switchboard", text: "Main switch is missing or not labelled" });
-    if (sb.enclosure === "no" || sb.secure === "no" || sb.damage === "yes" || sb.door === "no") push(out, { id: "enc", auto: true, priority: "High", source: "Switchboard", text: "Switchboard enclosure is damaged or insecure, or the door does not close" });
-    if (sb.labelling === "no") push(out, { id: "labels", auto: true, priority: "High", source: "Switchboard", text: "Circuit labelling is not legible and complete" });
-    if (sb.blanks === "no") push(out, { id: "blanks", auto: true, priority: "High", source: "Switchboard", text: "Switchboard has missing blanks" });
-    if (sb.dry === "no" || sb.waterVermin === "yes") push(out, { id: "wet", auto: true, priority: "High", source: "Switchboard", text: "Switchboard is not dry, or shows water or vermin" });
-    if (sb.earth === "no") push(out, { id: "earth", auto: true, priority: "High", source: "Switchboard", text: "Main earth / MEN was not visible where the switchboard was accessible" });
+    if (boardOn && sb.overheating === "yes") push(out, { id: "heat", auto: true, priority: "Urgent", source: "Switchboard", text: "Switchboard shows signs of overheating, scorching or a burning smell" });
+    if (boardOn && sb.exposed === "yes") push(out, { id: "live", auto: true, priority: "Urgent", source: "Switchboard", text: "Exposed live parts were observed at the switchboard" });
+    if (boardOn && sb.diy === "yes") push(out, { id: "diy", auto: true, priority: "Urgent", source: "Switchboard", text: "Signs of DIY or non-compliant work at the switchboard. Requires a licensed electrician" });
+    if (boardOn && (sb.pre1990 === "yes" || sb.asbestos === "yes")) push(out, { id: "asb", auto: true, priority: "High", source: "Switchboard", text: "Suspected asbestos backing, do not drill or disturb" });
+    if (boardOn && sb.mainSwitch === "no") push(out, { id: "mainsw", auto: true, priority: "Urgent", source: "Switchboard", text: "Main switch is missing or not labelled" });
+    if (boardOn && (sb.enclosure === "no" || sb.secure === "no" || sb.damage === "yes" || sb.door === "no")) push(out, { id: "enc", auto: true, priority: "High", source: "Switchboard", text: "Switchboard enclosure is damaged or insecure, or the door does not close" });
+    if (boardOn && sb.labelling === "no") push(out, { id: "labels", auto: true, priority: "High", source: "Switchboard", text: "Circuit labelling is not legible and complete" });
+    if (boardOn && sb.blanks === "no") push(out, { id: "blanks", auto: true, priority: "High", source: "Switchboard", text: "Switchboard has missing blanks" });
+    if (boardOn && (sb.dry === "no" || sb.waterVermin === "yes")) push(out, { id: "wet", auto: true, priority: "High", source: "Switchboard", text: "Switchboard is not dry, or shows water or vermin" });
+    if (boardOn && sb.earth === "no") push(out, { id: "earth", auto: true, priority: "High", source: "Switchboard", text: "Main earth / MEN was not visible where the switchboard was accessible" });
 
     (state.extraDefects || []).forEach(function (d, i) {
       const pri = d && (d.priority === "Urgent" || d.priority === "High" || d.priority === "Routine") ? d.priority : "Routine";
@@ -257,7 +267,7 @@ function recommendation(text) {
     if (!alarms.length) return false;
     if (alarms.some(function (a) { return isExpired(a, now); })) return false;
     if (alarms.some(function (a) { return a.result === "Fail" || a.result === "Requires electrician" || a.testButton === "fail" || a.mounting === "no"; })) return false;
-    if (prop.everyStorey !== "yes" || prop.sleeping !== "yes") return false;
+    if (prop.everyStorey === "no" || prop.sleeping === "no") return false;
     if (post1997((state.job || {}).buildEra) && alarms.some(is9v)) return false;
     return true;
   }
@@ -288,15 +298,18 @@ function recommendation(text) {
 
   /* PASS, FAIL, or ACTION REQUIRED. Smoke compliance NO never produces a pass badge. */
   function overall(state, now) {
-    const smokeNo = !propertyCompliant(state, now);
-    if (smokeNo && smokeHardFail(state, now)) return "FAIL";
-    if (smokeNo) return "ACTION REQUIRED";
-    const sb = switchboardResult(state);
-    if (sb === "Does not meet rental minimum standard" || sb === "Requires licensed electrician") return "FAIL";
     const defs = collectDefects(state, now);
-    if (sb === "Defects found" || sb === "Check required" || defs.some(function (d) { return d.priority === "Urgent" || d.priority === "High"; })) {
-      return "ACTION REQUIRED";
+    if (inScope(state, "smoke")) {
+      const smokeNo = !propertyCompliant(state, now);
+      if (smokeNo && smokeHardFail(state, now)) return "FAIL";
+      if (smokeNo) return "ACTION REQUIRED";
     }
+    if (inScope(state, "switchboard")) {
+      const sb = switchboardResult(state);
+      if (sb === "Does not meet rental minimum standard" || sb === "Requires licensed electrician") return "FAIL";
+      if (sb === "Defects found" || sb === "Check required") return "ACTION REQUIRED";
+    }
+    if (defs.some(function (d) { return d.priority === "Urgent" || d.priority === "High"; })) return "ACTION REQUIRED";
     return "PASS";
   }
 
@@ -313,30 +326,37 @@ function recommendation(text) {
     const sb = state.switchboard || {};
     const sign = state.sign || {};
     const alarms = state.alarms || [];
+    const smoke = inScope(state, "smoke");
+    const board = inScope(state, "switchboard");
+    if (state.scope && !smoke && !board) b.push("Tick at least one part of the inspection");
     if (!job.address) b.push("Property address is required");
     if (!job.inspectedAt) b.push("Inspection date is required");
-    if (!job.buildEra) b.push("Build date / era is required");
-    if (!job.storeys) b.push("Number of storeys is required");
-    if (!job.renterInfo) b.push("Answer whether the renter was given written smoke alarm information");
     if (!ins.techName) b.push("Technician name is required");
-    if (!alarms.length) b.push("Add at least one smoke alarm");
-    alarms.forEach(function (a, i) {
-      const miss = alarmMissing(a);
-      if (miss.length) b.push("Alarm " + (i + 1) + " (" + locationText(a, i) + "): add " + miss.join(", "));
-    });
-    if (alarms.some(isMains) && (!ins.supName || !ins.supRec || !ins.supLic || !ins.supBusiness)) {
-      b.push("A mains-powered alarm needs the supervising licensed electrician: name, REC number, licence number and business name");
+    if (smoke) {
+      if (!job.buildEra) b.push("Build date / era is required");
+      if (!job.storeys) b.push("Number of storeys is required");
+      if (!job.renterInfo) b.push("Answer whether the renter was given written smoke alarm information");
+      if (!alarms.length) b.push("Add at least one smoke alarm");
+      alarms.forEach(function (a, i) {
+        const miss = alarmMissing(a);
+        if (miss.length) b.push("Alarm " + (i + 1) + " (" + locationText(a, i) + "): add " + miss.join(", "));
+      });
+      if (!prop.everyStorey) b.push("Answer whether an alarm is installed on every storey");
+      if (!prop.sleeping) b.push("Answer whether each hallway serving bedrooms is covered");
     }
-    if (!prop.everyStorey) b.push("Answer whether an alarm is installed on every storey");
-    if (!prop.sleeping) b.push("Answer whether each hallway serving bedrooms is covered");
-    if (!sb.location) b.push("Switchboard location is required");
-    if (!sb.protection) b.push("Circuit protection type is required");
-    if (!sb.minStandard) b.push("Answer whether every power and lighting circuit has a breaker and an RCD");
+    if (board) {
+      if (!sb.location) b.push("Switchboard location is required");
+      if (!sb.protection) b.push("Circuit protection type is required");
+      if (!sb.minStandard) b.push("Answer whether every power and lighting circuit has a breaker and an RCD");
+    }
     if (!sign.printedName) b.push("Printed name on the declaration is required");
     if (!sign.signature) b.push("Inspector signature is required");
     if (!sign.date) b.push("Sign-off date is required");
     if (!sign.nextDue) b.push("Next smoke alarm check due date is required");
     if (!sign.nextElectrical) b.push("Next electrical check due date is required");
+    if (sign.elecSignoff && (!ins.supName || !ins.supRec || !ins.supLic || !ins.supBusiness)) {
+      b.push("Licensed electrician sign-off needs the name, REC number, licence number and business name");
+    }
     if (sign.onBehalf) {
       const c = sign.contractor || {};
       if (!sign.preparer) b.push("Report-preparer business name is required");
@@ -366,43 +386,58 @@ function recommendation(text) {
     return n || fallback;
   }
 
+  function part(label, v, yesText, noText) {
+    if (!v || isNA(v)) return "";
+    return label + ": " + yn(v, yesText, noText);
+  }
+
   function switchboardRows(state) {
     const sb = state.switchboard || {};
-    const tests = (sb.rcdTests || []).filter(function (t) { return t && (t.circuit || t.result || t.trip); });
+    const tests = (sb.rcdTests || []).filter(function (t) { return t && t.result !== "na" && (t.circuit || t.result || t.trip); });
     const rcdFail = tests.some(function (t) { return t.result === "fail"; });
     const rcdPass = tests.length > 0 && tests.every(function (t) { return t.result === "pass"; });
     const circuits = { all: "power and lighting", power: "power", lighting: "lighting", some: "some circuits", none: "no circuits" };
     const rcdObs = obs(sb.rcdNote, tests.length
-      ? (sb.rcdCount ? sb.rcdCount + " RCD" + (String(sb.rcdCount) === "1" ? "" : "s") + " tested" : tests.length + " RCD test" + (tests.length === 1 ? "" : "s"))
-        + (sb.rcdCircuits ? " — " + (circuits[sb.rcdCircuits] || sb.rcdCircuits) : "")
+      ? (sb.rcdCount && !isNA(sb.rcdFitted) ? sb.rcdCount + " RCD" + (String(sb.rcdCount) === "1" ? "" : "s") + " tested" : tests.length + " RCD test" + (tests.length === 1 ? "" : "s"))
+        + (sb.rcdCircuits && !isNA(sb.rcdCircuits) ? " — " + (circuits[sb.rcdCircuits] || sb.rcdCircuits) : "")
         + ". " + tests.map(function (t) {
           return (t.circuit || "RCD") + " " + (t.result === "pass" ? "pass" : t.result === "fail" ? "fail" : "not recorded") + (t.trip ? " (instrument " + t.trip + ")" : "");
         }).join("; ")
       : "Push-button test not recorded");
     const fuse = sb.protection === "rewireable" || sb.protection === "mixed-fuses";
     const heat = sb.overheating === "yes" || sb.exposed === "yes";
-    const asbestos = sb.pre1990 === "yes" || sb.asbestos === "yes";
-    const encBits = ["Secure: " + yn(sb.secure), "Damage: " + yn(sb.damage, "Yes", "None seen"), "Door closes: " + yn(sb.door)].join(". ");
-    return [
-      { item: "Switchboard location", observation: sb.location || "—", result: sb.location ? "PASS" : "N/A" },
-      { item: "Main switch", observation: obs(sb.mainSwitchNote, sb.mainSwitch === "yes" ? "Present and labelled" : sb.mainSwitch === "no" ? "Missing or not labelled" : "Not recorded"), result: mark(sb.mainSwitch) },
-      { item: "RCD push-button test", observation: rcdObs, result: rcdFail ? "FAIL" : rcdPass ? "PASS" : "N/A" },
-      { item: "Circuit labelling", observation: obs(sb.labelNote, sb.labelling === "yes" ? "Legible and complete" : sb.labelling === "no" ? "Not legible or not complete" : "Not recorded"), result: mark(sb.labelling) },
-      { item: "Signs of heat / damage", observation: obs(sb.heatNote, heat ? "Overheating, scorching, burning smell or exposed live parts observed" : "No discolouration, arcing or burning observed"), result: heat ? "FAIL" : (sb.overheating || sb.exposed) ? "PASS" : "N/A" },
-      { item: "Rewireable fuses", observation: obs(sb.fuseNote, fuse ? "Rewireable fuses present — does not meet the rental minimum standard" : (sb.protection === "rcbo" ? "Not present — RCBOs" : sb.protection === "breakers" ? "Not present — all circuit breakers" : "Not recorded")), result: fuse ? "FAIL" : sb.protection ? "N/A" : "N/A" },
-      { item: "Power and lighting protected", observation: obs(sb.minNote, (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "Not every power outlet and lighting circuit is on a circuit breaker and an RCD (RTR 2021 Sch 4 cl 9)" : "Every power outlet and lighting circuit is on a circuit breaker and an RCD"), result: (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "FAIL" : sb.minStandard === "yes" ? "PASS" : "N/A" },
-      { item: "Enclosure, blanks, moisture", observation: obs(sb.enclosureNote, encBits + ". Blanks fitted: " + yn(sb.blanks) + ". Dry: " + yn(sb.dry) + ". Water or vermin: " + yn(sb.waterVermin, "Present", "None seen")), result: (sb.enclosure === "no" || sb.blanks === "no" || sb.dry === "no" || sb.waterVermin === "yes") ? "FAIL" : (sb.secure || sb.blanks || sb.dry) ? "PASS" : "N/A" },
-      { item: "Possible asbestos (switchboard backing)", observation: obs(sb.asbestosNote, asbestos ? "Suspected asbestos backing, do not drill or disturb" : "Not indicated"), result: asbestos ? "CHECK" : "N/A" },
-      { item: "Main earthing", observation: obs(sb.earthNote, sb.earth === "yes" ? "Main earth / MEN visible where accessible" : sb.earth === "no" ? "Main earth / MEN not visible where the board was accessible" : "Not recorded"), result: sb.earth === "yes" ? "PASS" : sb.earth === "no" ? "CHECK" : "N/A" },
-      { item: "Consumer mains / meter enclosure", observation: obs(sb.mainsNote, sb.mains === "yes" ? "No visible damage" : sb.mains === "no" ? "Damage observed" : "Not recorded"), result: mark(sb.mains) },
-      { item: "DIY or non-compliant work", observation: obs(sb.diyNote, sb.diy === "yes" ? "Signs of DIY or non-compliant work" : sb.diy === "no" ? "None seen" : "Not recorded"), result: sb.diy === "yes" ? "FAIL" : sb.diy === "no" ? "PASS" : "N/A" }
+    const asbestos = !isNA(sb.pre1990) && (sb.pre1990 === "yes" || sb.asbestos === "yes");
+    const encParts = [
+      part("Secure", sb.secure),
+      part("Damage", sb.damage, "Yes", "None seen"),
+      part("Door closes", sb.door),
+      part("Blanks fitted", sb.blanks),
+      part("Dry", sb.dry),
+      part("Water or vermin", sb.waterVermin, "Present", "None seen")
+    ].filter(Boolean);
+    const encNA = [sb.secure, sb.damage, sb.door, sb.blanks, sb.dry, sb.waterVermin].every(isNA);
+    const rows = [
+      { item: "Switchboard location", observation: sb.location || "—", result: sb.location ? "PASS" : "N/A", omit: !sb.location },
+      { item: "Main switch", observation: obs(sb.mainSwitchNote, sb.mainSwitch === "yes" ? "Present and labelled" : "Missing or not labelled"), result: mark(sb.mainSwitch), omit: isNA(sb.mainSwitch) || !sb.mainSwitch },
+      { item: "RCD push-button test", observation: rcdObs, result: rcdFail ? "FAIL" : rcdPass ? "PASS" : "N/A", omit: isNA(sb.rcdFitted) && !tests.length },
+      { item: "Circuit labelling", observation: obs(sb.labelNote, sb.labelling === "yes" ? "Legible and complete" : "Not legible or not complete"), result: mark(sb.labelling), omit: isNA(sb.labelling) || !sb.labelling },
+      { item: "Signs of heat / damage", observation: obs(sb.heatNote, heat ? "Overheating, scorching, burning smell or exposed live parts observed" : "No discolouration, arcing or burning observed"), result: heat ? "FAIL" : "PASS", omit: (isNA(sb.overheating) || !sb.overheating) && (isNA(sb.exposed) || !sb.exposed) },
+      { item: "Rewireable fuses", observation: obs(sb.fuseNote, fuse ? "Rewireable fuses present — does not meet the rental minimum standard" : (sb.protection === "rcbo" ? "Not present — RCBOs" : "Not present — all circuit breakers")), result: fuse ? "FAIL" : "N/A", omit: isNA(sb.protection) || !sb.protection },
+      { item: "Power and lighting protected", observation: obs(sb.minNote, (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "Not every power outlet and lighting circuit is on a circuit breaker and an RCD (RTR 2021 Sch 4 cl 9)" : "Every power outlet and lighting circuit is on a circuit breaker and an RCD"), result: (sb.minStandard === "no" || sb.rcdFitted === "no" || fuse) ? "FAIL" : "PASS", omit: isNA(sb.minStandard) && !fuse && sb.rcdFitted !== "no" },
+      { item: "Enclosure, blanks, moisture", observation: obs(sb.enclosureNote, encParts.join(". ")), result: (sb.enclosure === "no" || sb.blanks === "no" || sb.dry === "no" || sb.waterVermin === "yes" || sb.secure === "no" || sb.damage === "yes" || sb.door === "no") ? "FAIL" : "PASS", omit: encNA || (!encParts.length && !String(sb.enclosureNote || "").trim()) },
+      { item: "Possible asbestos (switchboard backing)", observation: obs(sb.asbestosNote, asbestos ? "Suspected asbestos backing, do not drill or disturb" : "Not indicated"), result: asbestos ? "CHECK" : "PASS", omit: isNA(sb.pre1990) || (!sb.pre1990 && !sb.asbestos) },
+      { item: "Main earthing", observation: obs(sb.earthNote, sb.earth === "yes" ? "Main earth / MEN visible where accessible" : "Main earth / MEN not visible where the board was accessible"), result: sb.earth === "no" ? "CHECK" : "PASS", omit: isNA(sb.earth) || !sb.earth },
+      { item: "Consumer mains / meter enclosure", observation: obs(sb.mainsNote, sb.mains === "yes" ? "No visible damage" : "Damage observed"), result: mark(sb.mains), omit: isNA(sb.mains) || !sb.mains },
+      { item: "DIY or non-compliant work", observation: obs(sb.diyNote, sb.diy === "yes" ? "Signs of DIY or non-compliant work" : "None seen"), result: sb.diy === "yes" ? "FAIL" : "PASS", omit: isNA(sb.diy) || !sb.diy }
     ];
+    return rows.filter(function (r) { return !r.omit; });
   }
 
   return {
     LIMITATIONS: LIMITATIONS,
     REFERENCES: REFERENCES,
     TITLE: TITLE,
+    VISUAL_NOTE: VISUAL_NOTE,
     ERA_LABEL: ERA_LABEL,
     LOCATIONS: LOCATIONS,
     POWERS: POWERS,
@@ -413,6 +448,8 @@ function recommendation(text) {
     plusMonths: plusMonths,
     reportNoFrom: reportNoFrom,
     isMains: isMains,
+    inScope: inScope,
+    isNA: isNA,
     is9v: is9v,
     post1997: post1997,
     isExpired: isExpired,
