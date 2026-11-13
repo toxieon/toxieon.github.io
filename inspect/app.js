@@ -1,5 +1,5 @@
 /* Neill Inspect — on-device smoke alarm and switchboard report. No login. */
-const APP_VERSION = "0.1.2";
+const APP_VERSION = "0.1.3";
 (function () {
   "use strict";
   const L = window.NILogic;
@@ -690,12 +690,23 @@ const APP_VERSION = "0.1.2";
   }
 
   function startNew() {
-    if (!confirm("Start a new inspection? The current draft on this device will be cleared. Saved reports stay in the list.")) return;
+    if (!confirm("Start a new blank report?")) return;
+    if (recCtl) {
+      clearTimeout(recCtl.timer);
+      try { if (recCtl.rec && recCtl.rec.state !== "inactive") recCtl.rec.stop(); } catch (e) {}
+      recCtl = null;
+    }
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
     const keep = loadProfile();
     state = blank();
     if (keep && keep.inspector) state.inspector = Object.assign(state.inspector, keep.inspector);
     if (keep && keep.preparer) state.sign.preparer = keep.preparer;
+    state.example = false;
+    state.step = 0;
+    state.alarms = [];
     alarmOpen = 0;
+    const panel = document.getElementById("saved-panel");
+    if (panel) panel.classList.remove("open");
     saveDraft();
     render();
   }
@@ -828,7 +839,7 @@ const APP_VERSION = "0.1.2";
       if (key && state.scope) { state.scope[key] = !state.scope[key]; saveSoon(); render(); }
     }
     else if (act === "example") loadExample(false);
-    else if (act === "new") startNew();
+    else if (act === "new" || act === "new-report") startNew();
     else if (act === "saved") showSaved();
     else if (act === "close-saved") document.getElementById("saved-panel").classList.remove("open");
     else if (act === "add-alarm") { state.alarms.push(blankAlarm()); alarmOpen = state.alarms.length - 1; saveSoon(); render(); }
@@ -900,7 +911,9 @@ const APP_VERSION = "0.1.2";
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const d = JSON.parse(raw);
-        if (d && d.reportNo && d.job) {
+        if (d && d.example) {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+          } else if (d && d.reportNo && d.job) {
           state = Object.assign(blank(), d);
           state.job = Object.assign(blank().job, d.job || {});
           state.inspector = Object.assign(blank().inspector, d.inspector || {});

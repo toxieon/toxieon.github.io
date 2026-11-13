@@ -1,2 +1,3 @@
+## 0.1.3 · 2026-11-13 · new-report · New report button on every step clears the current draft, including example data, and leaves Saved reports. Example data does not restore on a fresh visit. Service worker inspect-0.1.3.
 ## 0.1.2 · 2026-11-13 · scope-na-signoff · Scope step, N/A answers left off the PDF, Here for the address, and licensed-electrician sign-off moved to the last question. Service worker inspect-0.1.2.
 ## 0.1.1 · 2026-11-13 · inspect · Neill Inspect: on-device smoke alarm safety check and visual switchboard inspection, local draft, IndexedDB copies of the PDF and form data, and an agency PDF. Service worker inspect-0.1.1.
