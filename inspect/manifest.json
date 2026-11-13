@@ -1,0 +1,14 @@
+{
+  "name": "Neill Inspect",
+  "short_name": "Inspect",
+  "description": "Smoke alarm safety check and visual switchboard inspection.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

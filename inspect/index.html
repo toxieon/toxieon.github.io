@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; media-src 'self' blob: data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#07111f" />
+<title>ND • Neill Inspect</title>
+<meta name="nd:app" content="Neill Inspect" />
+<meta name="nd:color" content="#14213D" />
+<meta name="nd:order" content="13" />
+<meta name="nd:description" content="Smoke alarm safety check and visual switchboard inspection" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Inspect" />
+<style>
+:root {
+  --bg: #07111f; --card: rgba(255,255,255,0.08); --card-border: rgba(255,255,255,0.14);
+  --text: #f6f8fb; --muted: #b9c5d6; --brand: #31d0ff; --brand-2: #6affb8;
+  --warning: #ffd166; --danger: #ff6b88; --navy: #14213d;
+  --radius: 18px; --radius-sm: 12px; --max: 720px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, rgba(49,208,255,0.18), transparent 28rem), var(--bg);
+  color: var(--text); line-height: 1.45; min-height: 100vh; -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font-family: inherit; font-size: 16px; }
+button { cursor: pointer; }
+.container { width: min(var(--max), calc(100% - 20px)); margin: 0 auto; }
+header { position: sticky; top: 0; z-index: 20; background: rgba(7,17,31,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.08); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 58px; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: -0.03em; }
+.mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #06101d; background: linear-gradient(135deg, var(--brand), var(--brand-2)); }
+.head-actions { display: flex; gap: 6px; }
+.progress { height: 6px; background: rgba(255,255,255,0.08); }
+.progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand-2)); width: 0; }
+.step-label { margin: 0; padding: 8px 0 10px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.banner { background: rgba(180,83,9,0.18); color: #ffd7a8; border-bottom: 1px solid rgba(255,209,102,0.35); padding: 8px 12px; font-size: 13px; font-weight: 700; }
+main { padding: 14px 0 110px; }
+.card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.card h2, .card h3 { margin: 0 0 8px; font-size: 1.05rem; letter-spacing: -0.02em; }
+.help, .muted { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.field { display: block; margin-bottom: 12px; }
+.field span, .lbl { display: block; color: var(--muted); font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+input, select, textarea { width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--card-border); background: rgba(0,0,0,0.28); color: var(--text); }
+textarea { min-height: 72px; resize: vertical; }
+.grid { display: grid; gap: 10px; }
+@media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip, .btn { min-height: 48px; border-radius: 12px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.06); color: var(--text); font-weight: 750; padding: 10px 14px; }
+.chip.on { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; border-color: transparent; }
+.btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06101d; border-color: transparent; width: 100%; }
+.btn-ghost { background: transparent; color: var(--muted); min-height: 40px; }
+.btn-utility { background: rgba(49,208,255,0.12); color: var(--brand); border-color: rgba(49,208,255,0.3); min-height: 40px; font-size: 13px; }
+.btn-danger { background: rgba(255,107,136,0.12); color: var(--danger); border-color: rgba(255,107,136,0.3); }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.row-actions .btn { flex: 1; }
+.dock { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); background: rgba(7,17,31,0.94); border-top: 1px solid rgba(255,255,255,0.08); }
+.dock .btn { flex: 1; }
+.err { color: #ffd0d8; background: rgba(255,107,136,0.12); border: 1px solid rgba(255,107,136,0.35); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.badge { display: inline-block; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 4px 10px; }
+.badge.bad { background: rgba(185,28,28,0.2); color: #fecaca; border: 1px solid #fca5a5; }
+.badge.ok { background: rgba(22,101,52,0.25); color: #bbf7d0; }
+.badge.warn { background: rgba(180,83,9,0.25); color: #fde68a; }
+.thumb { width: 100%; max-height: 180px; object-fit: cover; border-radius: 12px; margin-top: 8px; }
+.sig { width: 100%; height: 140px; background: #fff; border-radius: 12px; touch-action: none; }
+.alarm-sum { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+audio { width: 100%; margin-top: 8px; }
+.panel { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; display: none; }
+.panel.open { display: block; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 85vh; overflow: auto; background: #0d1b2f; border-radius: 18px 18px 0 0; padding: 16px; }
+.toast { position: fixed; left: 12px; right: 12px; bottom: 88px; background: #10243f; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px; display: none; z-index: 50; }
+.req { color: var(--warning); font-weight: 700; }
+footer.ver { text-align: center; color: var(--muted); font-size: 12px; padding-bottom: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="container head">
+    <div class="logo"><span class="mark">NI</span> Neill Inspect</div>
+    <div class="head-actions">
+      <button type="button" class="btn btn-ghost" data-action="saved">Saved</button>
+      <button type="button" class="btn btn-utility" id="btn-example" data-action="example">Example data</button>
+    </div>
+  </div>
+  <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+  <div class="container"><p class="step-label" id="step-label"></p></div>
+</header>
+<div id="banner" class="banner" hidden>Example data — not a real inspection</div>
+<main class="container" id="app"></main>
+<footer class="ver container">Neill Inspect v0.1.1</footer>
+<nav class="dock">
+  <button type="button" class="btn" id="btn-back" data-action="back">Back</button>
+  <button type="button" class="btn btn-primary" id="btn-next" data-action="next">Next</button>
+</nav>
+<div id="saved-panel" class="panel"><div class="sheet" id="saved-sheet"></div></div>
+<div id="toast" class="toast" role="status"></div>
+<script src="../shared/vendor/jspdf/jspdf.umd.min.js"></script>
+<script src="logic.js?v=0.1.1"></script>
+<script src="pdf.js?v=0.1.1"></script>
+<script src="app.js?v=0.1.1"></script>
+<script src="../shared/nd-pwa.js" defer></script>
+</body>
+</html>

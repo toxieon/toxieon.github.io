@@ -1,0 +1,1 @@
+## 0.1.1 · 2026-11-13 · inspect · Neill Inspect: on-device smoke alarm safety check and visual switchboard inspection, local draft, IndexedDB copies of the PDF and form data, and an agency PDF. Service worker inspect-0.1.1.

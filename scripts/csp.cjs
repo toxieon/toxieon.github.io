@@ -94,6 +94,7 @@ const APPS = {
   },
   "reelreader":    { file: "reelreader/index.html",    features: [], extra: { connect: ["https://reel-reader-e0aw.onrender.com"], media: ["blob:"] } },
   "ico":           { file: "ico/index.html",           features: [] },
+  "inspect":       { file: "inspect/index.html",       features: [], extra: { media: ["blob:", "data:"] } },
   "assets/studio": { file: "assets/studio/index.html", features: [] },
 };
 
