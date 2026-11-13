@@ -1,11 +1,12 @@
 /* Offline shell for Neill Inspect. */
-const CACHE_VERSION = 'inspect-0.1.1';
+const CACHE_VERSION = 'inspect-0.1.3';
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './app.js?v=0.1.1',
-  './logic.js?v=0.1.1',
-  './pdf.js?v=0.1.1',
+  './app.js?v=0.1.3',
+  './logic.js?v=0.1.3',
+  './pdf.js?v=0.1.3',
+  '../assets/here.js',
   './manifest.json',
   './favicon.svg',
   '../shared/vendor/jspdf/jspdf.umd.min.js',

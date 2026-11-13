@@ -1,5 +1,5 @@
 /* Neill Inspect — on-device smoke alarm and switchboard report. No login. */
-const APP_VERSION = "0.1.1";
+const APP_VERSION = "0.1.3";
 (function () {
   "use strict";
   const L = window.NILogic;
@@ -7,7 +7,7 @@ const APP_VERSION = "0.1.1";
   const PROFILE_KEY = "nd:inspect:profile:v1";
   const DB_NAME = "nd-inspect";
   const STORE = "reports";
-  const STEPS = ["Job details", "Inspector", "Smoke alarms", "Switchboard", "Defects", "Sign-off", "Report"];
+  const MAPS_KEY = "AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w";
 
   let state = null;
   let alarmOpen = 0;
@@ -63,6 +63,7 @@ const APP_VERSION = "0.1.1";
       reportNo: L.reportNoFrom(new Date()),
       example: false,
       step: 0,
+      scope: { smoke: false, switchboard: false },
       savedAt: "",
       uploadStatus: "",
       job: {
@@ -85,7 +86,7 @@ const APP_VERSION = "0.1.1";
       },
       extraDefects: [],
       sign: {
-        signature: "", elecSignature: "", printedName: ins.techName || "", date: today(),
+        signature: "", elecSignature: "", supSignature: "", elecSignoff: false, printedName: ins.techName || "", date: today(),
         nextDue: L.plusMonths(today(), 12), nextElectrical: L.plusMonths(today(), 24),
         onBehalf: false, preparer: profile.preparer || "Neill Data",
         contractor: { name: "", rec: "", electrician: "", licence: "", phone: "", email: "", logo: "" }
@@ -177,14 +178,36 @@ const APP_VERSION = "0.1.1";
     const cur = getPath(state, path) || "";
     return '<div class="chips">' + options.map((o) => '<button type="button" class="chip' + (cur === o[0] ? " on" : "") + '" data-chip="' + esc(path) + '" data-val="' + esc(o[0]) + '">' + esc(o[1]) + '</button>').join("") + '</div>';
   }
-  const YN = [["yes", "Yes"], ["no", "No"]];
-  const YNN = [["yes", "Yes"], ["no", "No"], ["na", "N/A"]];
+  const YN = [["yes", "Yes"], ["no", "No"], ["na", "N/A"]];
+  const PF = [["pass", "Pass"], ["fail", "Fail"], ["na", "N/A"]];
 
+  function steps() {
+    const list = [
+      { id: "scope", title: "Scope" },
+      { id: "job", title: "Job details" },
+      { id: "inspector", title: "Inspector" }
+    ];
+    if (state.scope && state.scope.smoke) list.push({ id: "alarms", title: "Smoke alarms" });
+    if (state.scope && state.scope.switchboard) list.push({ id: "board", title: "Switchboard" });
+    list.push({ id: "defects", title: "Defects" });
+    list.push({ id: "sign", title: "Sign-off" });
+    list.push({ id: "report", title: "Report" });
+    return list;
+  }
+  function scopeHtml() {
+    const on = (k) => !!(state.scope && state.scope[k]);
+    const box = (k, label, help) => '<button type="button" class="chip' + (on(k) ? " on" : "") + '" data-scope="' + k + '">' + label + '</button><p class="help">' + help + '</p>';
+    return '<section class="card"><h2>What is being inspected?</h2><p class="help">Tick at least one. Only the ticked parts are asked later and printed on the PDF.</p>' +
+      box("smoke", "Smoke alarms", "Each alarm, where they are fitted, and the written information for the renter.") +
+      box("switchboard", "Switchboard (visual)", "A visual look at the switchboard. Not a full electrical safety check.") +
+      "</section>";
+  }
   function jobHtml() {
     const j = "job";
     return '<section class="card"><h2>When and where</h2>' +
       field("Inspection date and time", j + ".inspectedAt", "datetime-local") +
-      field("Property address", j + ".address") +
+      '<div class="addr"><label class="field" style="flex:1"><span>Property address</span><input id="job-address" data-bind="job.address" value="' + esc(state.job.address || "") + '" placeholder="Type the address, or use Here"></label>' +
+      '<button type="button" class="btn btn-utility" id="use-location-btn" title="Use my current location">Here</button></div>' +
       field("Unit / lot", j + ".unit") +
       "</section><section class=\"card\"><h2>Agency</h2>" +
       field("Agency name", j + ".agency") +
@@ -200,18 +223,11 @@ const APP_VERSION = "0.1.1";
   }
 
   function inspectorHtml() {
-    const mains = (state.alarms || []).some(L.isMains);
     return '<section class="card"><h2>Technician (performed inspection)</h2>' +
       field("Full name", "inspector.techName") +
       field("Phone", "inspector.techPhone", "tel") +
       field("Email", "inspector.techEmail", "email") +
       field("Licence or ID (optional)", "inspector.techLic") +
-      "</section><section class=\"card\"><h2>Supervising licensed electrician / REC</h2>" +
-      (mains ? '<p class="err">Required: a mains-powered alarm is on this report. Add the supervising electrician before the PDF.</p>' : '<p class="help">Required when any alarm is 240V mains-powered.</p>') +
-      field("Name", "inspector.supName") +
-      field("REC number", "inspector.supRec") +
-      field("Licence number", "inspector.supLic") +
-      field("Business name", "inspector.supBusiness") +
       "</section><section class=\"card\"><h2>Logo</h2><p class=\"help\">Shown at the top left of the PDF. Remembered on this device.</p>" +
       '<button type="button" class="btn" data-action="pick" data-for="logo-tech">Upload logo</button>' +
       '<input id="logo-tech" type="file" accept="image/*" data-logo="inspector" hidden>' +
@@ -235,22 +251,22 @@ const APP_VERSION = "0.1.1";
       field("Storey", p + ".storey", "text", 'placeholder="Ground, 1, 2"') +
       select("Type", p + ".type", [["", "Select"], ["Photoelectric", "Photoelectric"], ["Ionisation", "Ionisation"], ["Unknown", "Unknown"]]) +
       select("Power", p + ".power", [["" , "Select"]].concat(L.POWERS.map((x) => [x, x]))) +
-      '<p class="lbl">Interconnected</p>' + chips(p + ".interconnected", YNN) +
+      '<p class="lbl">Interconnected</p>' + chips(p + ".interconnected", YN) +
       '<p class="lbl">Date on the alarm</p>' + chips(p + ".dateKind", [["manufacture", "Manufacture date"], ["expiry", "Expiry date"]]) +
       field("Manufacture or expiry date", p + ".dateValue", "date") +
       '<p class="req">A manufacture date or an expiry date is required. Over 10 years, or past expiry, is flagged for replacement.</p>' +
       '<p class="lbl">Mounting position compliant</p><p class="help">Ceiling, at least 300 mm from walls and corners and away from dead air, or on the wall at least 300 mm below the ceiling. Not within about 300 mm of a light or about 400 mm of an air vent.</p>' +
       chips(p + ".mounting", YN) +
       '<p class="lbl">AS 3786 label present</p>' + chips(p + ".as3786", YN) +
-      '<p class="lbl">Test button operated and alarm sounded</p>' + chips(p + ".testButton", [["pass", "Pass"], ["fail", "Fail"]]) +
-      '<p class="lbl">Interconnect activated other alarms</p>' + chips(p + ".interconnectTest", YNN) +
-      '<p class="lbl">Smoke / aerosol test (optional)</p>' + chips(p + ".smokeTest", [["pass", "Pass"], ["fail", "Fail"], ["skip", "Not done"]]) +
+      '<p class="lbl">Test button operated and alarm sounded</p>' + chips(p + ".testButton", PF) +
+      '<p class="lbl">Interconnect activated other alarms</p>' + chips(p + ".interconnectTest", YN) +
+      '<p class="lbl">Smoke / aerosol test (optional)</p>' + chips(p + ".smokeTest", PF) +
       '<p class="lbl">Battery replaced</p>' + chips(p + ".batteryReplaced", YN) +
       field("Battery type", p + ".batteryType") +
       '<p class="lbl">Clean and dust-free</p>' + chips(p + ".cleaned", YN) +
       '<p class="lbl">Secure, no damage, paint or cover</p>' + chips(p + ".secure", [["yes", "Yes"], ["no", "No"]]) +
-      '<p class="lbl">Hush works</p>' + chips(p + ".hush", YNN) +
-      select("Result", p + ".result", [["", "Select"], ["Pass", "Pass"], ["Fail", "Fail"], ["Replaced", "Replaced"], ["Requires electrician", "Requires electrician"]]) +
+      '<p class="lbl">Hush works</p><p class="help">Press hush/silence button; alarm should quieten then re-arm.</p>' + chips(p + ".hush", YN) +
+      select("Result", p + ".result", [["", "Select"], ["Pass", "Pass"], ["Fail", "Fail"], ["Replaced", "Replaced"], ["Requires electrician", "Requires electrician"], ["na", "N/A"]]) +
       '<p class="lbl">Photo of this alarm <span class="req">required</span></p>' +
       '<button type="button" class="btn" data-action="pick" data-for="photo-' + i + '">Take photo</button>' +
       '<input id="photo-' + i + '" hidden type="file" accept="image/*" capture="environment" data-photo="' + i + '">' +
@@ -273,7 +289,7 @@ const APP_VERSION = "0.1.1";
       select("Number of storeys", "job.storeys", [["", "Select"], ["1", "1"], ["2", "2"], ["3", "3"], ["4+", "4 or more"]]) +
       '<p class="lbl">Alarm installed on every storey</p>' + chips("property.everyStorey", YN) +
       '<p class="lbl">Alarm in each hallway serving bedrooms, or between the bedrooms and the rest of the dwelling</p>' + chips("property.sleeping", YN) +
-      '<p class="lbl">Renter provided with written information on smoke alarm operation and testing (RTR 2021 Sch 3 cl 3(3))</p>' +
+      '<p class="lbl">Renter provided with written information on smoke alarm operation and testing (Residential Tenancies Regulations 2021 (Vic))</p>' +
       chips("job.renterInfo", YN) +
       area("Recommendations", "property.recommendations") +
       "</section>";
@@ -283,7 +299,7 @@ const APP_VERSION = "0.1.1";
     const p = "switchboard.rcdTests." + i;
     return '<div class="card"><p class="lbl">RCD ' + (i + 1) + '</p>' +
       field("Circuit", p + ".circuit") +
-      '<p class="lbl">Push-button test</p>' + chips(p + ".result", [["pass", "Pass"], ["fail", "Fail"]]) +
+      '<p class="lbl">Push-button test</p>' + chips(p + ".result", PF) +
       field("Trip time if a licensed electrician used an instrument (optional)", p + ".trip") +
       '<button type="button" class="btn btn-ghost" data-action="remove-rcd" data-i="' + i + '">Remove test</button></div>';
   }
@@ -293,29 +309,29 @@ const APP_VERSION = "0.1.1";
     return '<section class="card"><h2>Switchboard</h2><p class="help">Visual check only. Push-button RCD test. A timed trip test is for a licensed electrician.</p>' +
       field("Switchboard location", "switchboard.location") +
       '<p class="lbl">Enclosure secure</p>' + chips("switchboard.secure", YN) +
-      '<p class="lbl">Visible damage</p>' + chips("switchboard.damage", [["no", "No damage"], ["yes", "Damage"]]) +
+      '<p class="lbl">Visible damage</p>' + chips("switchboard.damage", [["no", "No damage"], ["yes", "Damage"], ["na", "N/A"]]) +
       '<p class="lbl">Door closes / lockable</p>' + chips("switchboard.door", YN) +
       '<p class="lbl">Blanks fitted (no missing blanks)</p>' + chips("switchboard.blanks", YN) +
       '<p class="lbl">Dry</p>' + chips("switchboard.dry", YN) +
-      '<p class="lbl">Water or vermin</p>' + chips("switchboard.waterVermin", [["no", "None seen"], ["yes", "Present"]]) +
+      '<p class="lbl">Water or vermin</p>' + chips("switchboard.waterVermin", [["no", "None seen"], ["yes", "Present"], ["na", "N/A"]]) +
       '<p class="lbl">Main switch present and labelled</p>' + chips("switchboard.mainSwitch", YN) +
       field("Main switch note", "switchboard.mainSwitchNote") +
       '<p class="lbl">Circuit labelling legible and complete</p>' + chips("switchboard.labelling", YN) +
       field("Labelling note", "switchboard.labelNote") +
-      select("Circuit protection", "switchboard.protection", [["", "Select"], ["breakers", "Circuit breakers"], ["rcbo", "RCBOs"], ["rewireable", "Rewireable fuses"], ["mixed-fuses", "Mixed, includes rewireable fuses"]]) +
+      select("Circuit protection", "switchboard.protection", [["", "Select"], ["breakers", "Circuit breakers"], ["rcbo", "RCBOs"], ["rewireable", "Rewireable fuses"], ["mixed-fuses", "Mixed, includes rewireable fuses"], ["na", "N/A"]]) +
       '<p class="lbl">RCD / safety switch fitted</p>' + chips("switchboard.rcdFitted", YN) +
       field("How many RCDs", "switchboard.rcdCount") +
       select("Circuits protected", "switchboard.rcdCircuits", [["", "Select"], ["all", "Power and lighting"], ["power", "Power only"], ["lighting", "Lighting only"], ["some", "Some circuits"], ["none", "None"]]) +
-      '<p class="lbl">Every power outlet and lighting circuit protected by a circuit breaker and an RCD (RTR 2021 Sch 4 cl 9)</p>' +
+      '<p class="lbl">Every power outlet and lighting circuit protected by a circuit breaker and an RCD (Residential Tenancies Regulations 2021 (Vic))</p>' +
       chips("switchboard.minStandard", YN) +
       "<h3>RCD push-button tests</h3>" + (sb.rcdTests || []).map(rcdRow).join("") +
       '<button type="button" class="btn" data-action="add-rcd">Add RCD test</button>' +
-      '<p class="lbl">Overheating, scorching or burning smell</p>' + chips("switchboard.overheating", [["no", "None seen"], ["yes", "Yes"]]) +
-      '<p class="lbl">Exposed live parts</p>' + chips("switchboard.exposed", [["no", "None seen"], ["yes", "Yes"]]) +
-      '<p class="lbl">Pre-1990 board (suspected asbestos backing — do not drill or disturb)</p>' + chips("switchboard.pre1990", [["no", "No"], ["yes", "Yes — flag CHECK"]]) +
+      '<p class="lbl">Overheating, scorching or burning smell</p>' + chips("switchboard.overheating", [["no", "None seen"], ["yes", "Yes"], ["na", "N/A"]]) +
+      '<p class="lbl">Exposed live parts</p>' + chips("switchboard.exposed", [["no", "None seen"], ["yes", "Yes"], ["na", "N/A"]]) +
+      '<p class="lbl">Pre-1990 board (suspected asbestos backing — do not drill or disturb)</p>' + chips("switchboard.pre1990", [["no", "No"], ["yes", "Yes — flag CHECK"], ["na", "N/A"]]) +
       '<p class="lbl">Main earth / MEN visible where accessible</p>' + chips("switchboard.earth", YN) +
-      '<p class="lbl">Consumer mains / meter enclosure undamaged</p>' + chips("switchboard.mains", [["yes", "No visible damage"], ["no", "Damage"]]) +
-      '<p class="lbl">Signs of DIY or non-compliant work</p>' + chips("switchboard.diy", [["no", "None seen"], ["yes", "Yes"]]) +
+      '<p class="lbl">Consumer mains / meter enclosure undamaged</p>' + chips("switchboard.mains", [["yes", "No visible damage"], ["no", "Damage"], ["na", "N/A"]]) +
+      '<p class="lbl">Signs of DIY or non-compliant work</p>' + chips("switchboard.diy", [["no", "None seen"], ["yes", "Yes"], ["na", "N/A"]]) +
       area("Notes", "switchboard.notes") +
       '<button type="button" class="btn" data-action="pick" data-for="sb-photo">Add switchboard photo</button>' +
       '<input id="sb-photo" hidden type="file" accept="image/*" capture="environment" data-sb-photo="1">' +
@@ -360,6 +376,18 @@ const APP_VERSION = "0.1.1";
         '<p class="lbl">Authorising electrician signature</p><canvas class="sig" data-sign="sign.elecSignature"></canvas>' +
         '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.elecSignature">Clear signature</button>'
         : "") +
+      "</section>" + elecHtml();
+  }
+  function elecHtml() {
+    const on = !!state.sign.elecSignoff;
+    return '<section class="card"><h2>Licensed electrician sign-off</h2><p class="help">This is the last question. An Electrical Safety Check, and work on mains or hardwired alarms, needs a licensed electrician.</p>' +
+      '<p class="lbl">Is a licensed electrician signing this job off?</p><div class="chips">' +
+      '<button type="button" class="chip' + (on ? " on" : "") + '" data-chip="sign.elecSignoff" data-val="yes">Yes</button>' +
+      '<button type="button" class="chip' + (on ? "" : " on") + '" data-chip="sign.elecSignoff" data-val="no">No</button></div>' +
+      (on ? field("Name", "inspector.supName") + field("REC number", "inspector.supRec") + field("Licence number", "inspector.supLic") + field("Business name", "inspector.supBusiness") +
+        '<p class="lbl">Supervising electrician signature</p><canvas class="sig" data-sign="sign.supSignature"></canvas>' +
+        '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.supSignature">Clear signature</button>'
+        : '<p class="help">The PDF will be labelled as a visual inspection by the technician. It will not say the mains alarms or the switchboard were certified.</p>') +
       "</section>";
   }
 
@@ -383,15 +411,41 @@ const APP_VERSION = "0.1.1";
   function render() {
     const root = document.getElementById("app");
     const scroll = document.scrollingElement ? document.scrollingElement.scrollTop : 0;
-    const html = [jobHtml, inspectorHtml, alarmsHtml, boardHtml, defectsHtml, signHtml, reportHtml][state.step]();
-    root.innerHTML = html;
-    document.getElementById("step-label").textContent = "Step " + (state.step + 1) + " of " + STEPS.length + " — " + STEPS[state.step];
-    document.getElementById("bar").style.width = ((state.step + 1) / STEPS.length * 100) + "%";
+    const list = steps();
+    if (state.step >= list.length) state.step = list.length - 1;
+    if (state.step < 0) state.step = 0;
+    const id = list[state.step].id;
+    const pages = { scope: scopeHtml, job: jobHtml, inspector: inspectorHtml, alarms: alarmsHtml, board: boardHtml, defects: defectsHtml, sign: signHtml, report: reportHtml };
+    root.innerHTML = pages[id]();
+    document.getElementById("step-label").textContent = "Step " + (state.step + 1) + " of " + list.length + " — " + list[state.step].title;
+    document.getElementById("bar").style.width = ((state.step + 1) / list.length * 100) + "%";
     document.getElementById("banner").hidden = !state.example;
     document.getElementById("btn-back").style.display = state.step === 0 ? "none" : "";
-    document.getElementById("btn-next").textContent = state.step === STEPS.length - 1 ? "Done" : "Next";
+    document.getElementById("btn-next").textContent = state.step === list.length - 1 ? "Done" : "Next";
     bindPads();
+    wireHere();
     if (document.scrollingElement) document.scrollingElement.scrollTop = scroll;
+  }
+  function wireHere() {
+    const btn = document.getElementById("use-location-btn");
+    const input = document.getElementById("job-address");
+    if (!btn || !input || !window.NDHere) return;
+    NDHere.attachButton(btn, input, {
+      region: "au",
+      busyLabel: "Locating…",
+      notify: toast,
+      onResult: function (address) { state.job.address = address; saveSoon(); }
+    });
+  }
+  function loadMaps() {
+    if (window.google && window.google.maps) return;
+    if (document.getElementById("nd-maps")) return;
+    window.__ndMapsReady = function () {};
+    const s = document.createElement("script");
+    s.id = "nd-maps";
+    s.async = true;
+    s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(MAPS_KEY) + "&loading=async&callback=__ndMapsReady";
+    document.head.appendChild(s);
   }
 
   function bindPads() {
@@ -570,6 +624,21 @@ const APP_VERSION = "0.1.1";
     g.font = "22px sans-serif"; g.fillText(label, 40, 400);
     return c.toDataURL("image/jpeg", 0.7);
   }
+  function sampleAudio() {
+    const sr = 8000, n = 2400;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const v = new DataView(buf);
+    const set = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    set(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); set(8, "WAVE"); set(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    set(36, "data"); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 880 * i / sr) * 6000), true);
+    let bin = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return "data:audio/wav;base64," + btoa(bin);
+  }
   function sampleSign() {
     const c = document.createElement("canvas");
     c.width = 500; c.height = 140;
@@ -582,6 +651,7 @@ const APP_VERSION = "0.1.1";
     if (!force && !confirm("Replace the current inspection with example data? It is marked as an example and is not a real report.")) return;
     const s = blank();
     s.example = true;
+    s.scope = { smoke: true, switchboard: true };
     s.reportNo = "NI-20261113-0900";
     s.job = {
       inspectedAt: "2026-11-13T09:00", address: "12 Example Street, Brighton VIC 3186", unit: "",
@@ -595,7 +665,7 @@ const APP_VERSION = "0.1.1";
     };
     s.property = { everyStorey: "yes", sleeping: "yes", recommendations: "Replace the living room alarm." };
     s.alarms = [
-      Object.assign(blankAlarm(), { location: "Hallway", locationDetail: "bedrooms", storey: "Ground", type: "Photoelectric", power: "240V hardwired", interconnected: "yes", dateKind: "manufacture", dateValue: "2021-03-01", mounting: "yes", as3786: "yes", testButton: "pass", secure: "yes", cleaned: "yes", hush: "yes", result: "Pass", photo: sampleShot("Hallway") }),
+      Object.assign(blankAlarm(), { location: "Hallway", locationDetail: "bedrooms", storey: "Ground", type: "Photoelectric", power: "240V hardwired", interconnected: "yes", dateKind: "manufacture", dateValue: "2021-03-01", mounting: "yes", as3786: "yes", testButton: "pass", secure: "yes", cleaned: "yes", hush: "yes", result: "Pass", photo: sampleShot("Hallway"), audio: { mime: "audio/wav", dataUrl: sampleAudio(), seconds: 8 }, hush: "na" }),
       Object.assign(blankAlarm(), { location: "Living", storey: "Ground", type: "Ionisation", power: "9V battery", interconnected: "no", dateKind: "manufacture", dateValue: "2014-05-01", mounting: "yes", as3786: "yes", testButton: "fail", secure: "yes", cleaned: "no", hush: "na", result: "Fail", photo: sampleShot("Living") })
     ];
     s.switchboard = {
@@ -604,13 +674,13 @@ const APP_VERSION = "0.1.1";
       protection: "breakers", rcdFitted: "yes", rcdCount: "2", rcdCircuits: "all",
       rcdTests: [{ circuit: "Power", result: "pass" }, { circuit: "Lighting", result: "pass" }],
       minStandard: "yes", overheating: "no", exposed: "no", pre1990: "yes", asbestosNote: "Older backing panel — possible asbestos, not disturbed",
-      earth: "yes", earthNote: "Main earth / MEN visible where accessible", mains: "yes", diy: "no",
+      earth: "yes", earthNote: "Main earth / MEN visible where accessible", mains: "yes", diy: "na",
       notes: "", photos: [{ dataUrl: sampleShot("Switchboard"), caption: "Cover closed" }]
     };
     s.extraDefects = [];
     s.sign = {
       signature: sampleSign(), elecSignature: sampleSign(), printedName: "Sam Example", date: "2026-11-13",
-      nextDue: "2027-11-13", nextElectrical: "2028-11-13", onBehalf: true, preparer: "Neill Data",
+      nextDue: "2027-11-13", nextElectrical: "2028-11-13", onBehalf: true, elecSignoff: true, preparer: "Neill Data",
       contractor: { name: "Example Electrical", rec: "12345", electrician: "Alex Sample", licence: "A12345", phone: "0400 000 001", email: "office@example.test", logo: "" }
     };
     state = s;
@@ -620,12 +690,23 @@ const APP_VERSION = "0.1.1";
   }
 
   function startNew() {
-    if (!confirm("Start a new inspection? The current draft on this device will be cleared. Saved reports stay in the list.")) return;
+    if (!confirm("Start a new blank report?")) return;
+    if (recCtl) {
+      clearTimeout(recCtl.timer);
+      try { if (recCtl.rec && recCtl.rec.state !== "inactive") recCtl.rec.stop(); } catch (e) {}
+      recCtl = null;
+    }
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
     const keep = loadProfile();
     state = blank();
     if (keep && keep.inspector) state.inspector = Object.assign(state.inspector, keep.inspector);
     if (keep && keep.preparer) state.sign.preparer = keep.preparer;
+    state.example = false;
+    state.step = 0;
+    state.alarms = [];
     alarmOpen = 0;
+    const panel = document.getElementById("saved-panel");
+    if (panel) panel.classList.remove("open");
     saveDraft();
     render();
   }
@@ -724,14 +805,14 @@ const APP_VERSION = "0.1.1";
     if (el.type === "file") onFile(el);
   });
   document.body.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-action], [data-chip]");
+    const t = e.target.closest("[data-action], [data-chip], [data-scope]");
     if (!t) return;
     if (t.hasAttribute("data-chip")) {
       const path = t.getAttribute("data-chip");
       let val = t.getAttribute("data-val");
-      if (path === "sign.onBehalf") {
-        state.sign.onBehalf = val === "yes";
-      } else setPath(state, path, val);
+      if (path === "sign.onBehalf") state.sign.onBehalf = val === "yes";
+      else if (path === "sign.elecSignoff") state.sign.elecSignoff = val === "yes";
+      else setPath(state, path, val);
       if (/^inspector\.|^sign\.preparer$/.test(path)) saveProfile();
       saveSoon();
       render();
@@ -741,10 +822,24 @@ const APP_VERSION = "0.1.1";
     const i = Number(t.getAttribute("data-i"));
     if (act === "back") { state.step = Math.max(0, state.step - 1); saveSoon(); render(); }
     else if (act === "next") {
-      if (state.step < STEPS.length - 1) { state.step += 1; if (state.step === 5) ensureDates(); saveSoon(); render(); }
+      const list = steps();
+      if (list[state.step] && list[state.step].id === "scope" && !(state.scope.smoke || state.scope.switchboard)) {
+        toast("Tick at least one part of the inspection.");
+        return;
+      }
+      if (state.step < list.length - 1) {
+        state.step += 1;
+        if (steps()[state.step] && steps()[state.step].id === "sign") ensureDates();
+        saveSoon();
+        render();
+      }
+    }
+    else if (act === "scope" || t.hasAttribute("data-scope")) {
+      const key = t.getAttribute("data-scope");
+      if (key && state.scope) { state.scope[key] = !state.scope[key]; saveSoon(); render(); }
     }
     else if (act === "example") loadExample(false);
-    else if (act === "new") startNew();
+    else if (act === "new" || act === "new-report") startNew();
     else if (act === "saved") showSaved();
     else if (act === "close-saved") document.getElementById("saved-panel").classList.remove("open");
     else if (act === "add-alarm") { state.alarms.push(blankAlarm()); alarmOpen = state.alarms.length - 1; saveSoon(); render(); }
@@ -816,7 +911,9 @@ const APP_VERSION = "0.1.1";
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const d = JSON.parse(raw);
-        if (d && d.reportNo && d.job) {
+        if (d && d.example) {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+          } else if (d && d.reportNo && d.job) {
           state = Object.assign(blank(), d);
           state.job = Object.assign(blank().job, d.job || {});
           state.inspector = Object.assign(blank().inspector, d.inspector || {});
@@ -826,11 +923,13 @@ const APP_VERSION = "0.1.1";
           state.sign.contractor = Object.assign(blank().sign.contractor, (d.sign && d.sign.contractor) || {});
           state.alarms = d.alarms || [];
           state.extraDefects = d.extraDefects || [];
+          if (!d.scope) state.scope = { smoke: true, switchboard: true };
         }
       }
     } catch (e) { state = null; }
     if (!state) state = blank();
     ensureDates();
+    loadMaps();
     render();
     window.addEventListener("pagehide", saveDraft);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveDraft(); });

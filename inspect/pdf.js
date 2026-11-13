@@ -27,56 +27,71 @@
     let y = 0;
 
     function chrome() {
+      const band = 56;
       doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
-      doc.rect(0, 0, W, 70, "F");
+      doc.rect(0, 0, W, band, "F");
       let left = M;
       const logo = state.inspector && state.inspector.logo;
-      if (logo) {
-        try { doc.addImage(logo, fmtImg(logo), M, 14, 52, 34); left = M + 60; }
-        catch (e) { left = wordmark(M); }
-      } else left = wordmark(M);
+      if (logo && fitImage(logo, M, 11, 110, 34)) left = M + 118;
+      else left = wordmark(M);
       const cLogo = state.sign && state.sign.onBehalf && state.sign.contractor && state.sign.contractor.logo;
       let rightLimit = W - M;
-      if (cLogo) {
-        try { doc.addImage(cLogo, fmtImg(cLogo), W - M - 52, 14, 52, 34); rightLimit = W - M - 60; }
-        catch (e) { /* skip */ }
-      }
+      if (cLogo && fitImage(cLogo, W - M - 110, 11, 110, 34)) rightLimit = W - M - 118;
       doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      const titleW = Math.max(120, rightLimit - left - 100);
-      const title = doc.splitTextToSize(L().TITLE, titleW).slice(0, 3);
-      doc.text(title, left, 22);
+      doc.setFontSize(13);
+      const titleW = Math.min(230, Math.max(140, rightLimit - left - 96));
+      const title = doc.splitTextToSize(L().TITLE, titleW).slice(0, 2);
+      doc.text(title[0] || "", left, 26);
+      if (title[1]) doc.text(title[1], left, 41);
       doc.setFontSize(11);
       const rn = state.reportNo || "";
-      doc.text(rn, rightLimit, 22, { align: "right" });
+      doc.text(rn, rightLimit, 26, { align: "right" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(210, 218, 230);
-      doc.text("Issued " + L().fmtDate(state.sign && state.sign.date || (state.job && state.job.inspectedAt)), rightLimit, 36, { align: "right" });
+      doc.text("Issued " + L().fmtDate(state.sign && state.sign.date || (state.job && state.job.inspectedAt)), rightLimit, 40, { align: "right" });
       doc.setFillColor(HEADW[0], HEADW[1], HEADW[2]);
-      doc.rect(0, 70, W, 16, "F");
+      doc.rect(0, band, W, 16, "F");
+      let pillW = 0;
+      if (state.example) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        const label = "EXAMPLE DATA";
+        pillW = doc.getTextWidth(label) + 10;
+        const px = W - M - pillW;
+        const py = band + 2.5;
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(AMBER_B[0], AMBER_B[1], AMBER_B[2]);
+        doc.setLineWidth(0.8);
+        doc.roundedRect(px, py, pillW, 11, 2, 2, "FD");
+        doc.setTextColor(AMBER_B[0], AMBER_B[1], AMBER_B[2]);
+        doc.text(label, px + 5, py + 8);
+        doc.setLineWidth(0.6);
+      }
       doc.setTextColor(51, 65, 85);
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
-      const sub = doc.splitTextToSize("Residential Tenancies Regulations 2021  ·  Smoke alarm safety check (RTA 1997 s68AA) and visual switchboard inspection  ·  AS 3786", W - M * 2);
-      doc.text(sub[0], M, 81);
-      return 98;
+      const subW = W - M * 2 - (pillW ? pillW + 8 : 0);
+      const sub = doc.splitTextToSize("Residential Tenancies Regulations 2021 (Vic)  ·  Smoke alarm safety check under the Residential Tenancies Act 1997 (Vic) and visual switchboard inspection  ·  AS 3786", subW);
+      doc.text(sub[0], M, band + 11);
+      return band + 16;
     }
 
     function wordmark(x) {
       doc.setFillColor(224, 123, 42);
-      doc.roundedRect(x, 16, 26, 26, 4, 4, "F");
+      doc.roundedRect(x, 15, 26, 26, 4, 4, "F");
       doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
-      doc.text("ND", x + 13, 33, { align: "center" });
+      doc.text("ND", x + 13, 32, { align: "center" });
       doc.setFontSize(11);
-      doc.text("Neill Data", x + 32, 27);
+      doc.text("Neill Data", x + 32, 26);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(203, 213, 225);
-      doc.text("Neill Inspect", x + 32, 39);
-      return x + 108;
+      doc.text("Neill Inspect", x + 32, 38);
+      return x + 118;
     }
 
     function need(h) {
@@ -84,14 +99,33 @@
     }
 
     function section(title) {
-      need(52);
+      need(10 + 16 + 4);
+      y += 10;
       doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
       doc.rect(M, y, CW, 16, "F");
       doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.text(title, M + 6, y + 11.5);
-      y += 16;
+      y += 16 + 4;
+    }
+
+    function fitImage(src, x, y0, boxW, boxH) {
+      if (!src) return false;
+      let props;
+      try { props = doc.getImageProperties(src); }
+      catch (e) { return false; }
+      const iw = props.width || 1;
+      const ih = props.height || 1;
+      const scale = Math.min(boxW / iw, boxH / ih);
+      const w = iw * scale;
+      const h = ih * scale;
+      const dx = x + (boxW - w) / 2;
+      const dy = y0 + (boxH - h) / 2;
+      doc.setFillColor(WASH[0], WASH[1], WASH[2]);
+      doc.rect(x, y0, boxW, boxH, "F");
+      try { doc.addImage(src, fmtImg(src), dx, dy, w, h); return true; }
+      catch (e) { return false; }
     }
 
     function linesOf(text, width, size) {
@@ -124,7 +158,9 @@
         doc.setFontSize(size);
         if (c.text !== "") {
           const ls = linesOf(c.text, c.w - 8, size);
-          doc.text(ls, x + 4, y0 + size + 3);
+          const block = ls.length * (size + 2);
+          const base = c.center ? y0 + (h - block) / 2 + size : y0 + size + 3;
+          doc.text(ls, x + 4, base);
         }
         x += c.w;
       });
@@ -147,28 +183,49 @@
       });
     }
 
-    function pill(text, kind, x, baseline) {
+    function pill(text, kind, x, y0, rowH) {
       const map = {
         PASS: { t: GREEN, b: GREEN, f: [240, 253, 244] },
         FAIL: { t: RED, b: RED, f: [254, 242, 242] },
         CHECK: { t: AMBER, b: AMBER_B, f: [255, 251, 235] },
-        "N/A": { t: MUTED, b: [148, 163, 184], f: [255, 255, 255] },
-        "ACTION REQUIRED": { t: AMBER, b: AMBER_B, f: [255, 251, 235] }
+        "N/A": { t: MUTED, b: [148, 163, 184], f: [255, 255, 255] }
       };
       const c = map[kind] || map["N/A"];
+      const h = 12;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(kind === "ACTION REQUIRED" || kind === "FAIL" || kind === "PASS" ? 9 : 7.5);
-      const tw = doc.getTextWidth(text);
-      const w = tw + 10;
-      const h = kind === "ACTION REQUIRED" || (kind === "FAIL" && text === "FAIL" && tw > 20) ? 16 : 12;
+      doc.setFontSize(7.5);
+      const w = doc.getTextWidth(text) + 10;
+      const top = y0 + (rowH - h) / 2;
+      const baseline = top + h - 3.5;
       doc.setDrawColor(c.b[0], c.b[1], c.b[2]);
       doc.setFillColor(c.f[0], c.f[1], c.f[2]);
-      doc.setLineWidth(kind === "ACTION REQUIRED" || text === "FAIL" || text === "PASS" ? 1.4 : 0.8);
-      doc.roundedRect(x, baseline - h + 3, w, h, 2, 2, "FD");
+      doc.setLineWidth(0.8);
+      doc.roundedRect(x, top, w, h, 2, 2, "FD");
       doc.setTextColor(c.t[0], c.t[1], c.t[2]);
       doc.text(text, x + 5, baseline);
       doc.setLineWidth(0.6);
       return w;
+    }
+
+    function solidBadge(text, fill, x, y0, rowH) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      const w = doc.getTextWidth(text) + 14;
+      const h = 20;
+      const top = y0 + (rowH - h) / 2;
+      doc.setFillColor(fill[0], fill[1], fill[2]);
+      doc.roundedRect(x, top, w, h, 2, 2, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.text(text, x + 7, top + 14);
+      return w;
+    }
+
+    function dash(x, y0, rowH, cellW) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      const tw = doc.getTextWidth("—");
+      doc.text("—", x + Math.max(2, (cellW - tw) / 2), y0 + (rowH + 7.5) / 2 - 1);
     }
 
     function mic(x, y0) {
@@ -187,7 +244,10 @@
     const ins = state.inspector || {};
     const sign = state.sign || {};
     const badge = L().overall(state, now);
-    const smokeYes = L().propertyCompliant(state, now);
+    const smokeOn = L().inScope(state, "smoke");
+    const boardOn = L().inScope(state, "switchboard");
+    const elecOn = !!(sign.elecSignoff);
+    const smokeYes = smokeOn && L().propertyCompliant(state, now);
 
     section("A. INSTALLATION & INSPECTION DETAILS");
     const addr = [job.unit, job.address].filter(Boolean).join(", ") || "—";
@@ -198,11 +258,17 @@
       [{ k: "Property address", v: addr, span: 3 }],
       [{ k: "Inspection date", v: L().fmtWhen(job.inspectedAt) }, { k: "Previous check", v: job.previousCheck ? L().fmtDate(job.previousCheck) : "Not recorded" }],
       [{ k: "Technician", v: ins.techName || "—" }, { k: "Managing agent", v: job.agency || "—" }],
-      [{ k: "Property manager", v: [job.pmName, job.pmEmail].filter(Boolean).join(" · ") || "—" }, { k: "Occupancy", v: job.occupancy === "vacant" ? "Vacant" : job.occupancy === "tenanted" ? "Tenanted" : "—" }],
-      [{ k: "Supervision", v: sup, span: 3 }],
-      [{ k: "Build / approval", v: L().ERA_LABEL[job.buildEra] || "—" }, { k: "Storeys", v: job.storeys || "—" }],
-      [{ k: "Renter written information", v: job.renterInfo === "yes" ? "Yes — provided" : job.renterInfo === "no" ? "No" : "—" }, { k: "Tenant", v: job.tenantPresent === "yes" ? ("Present" + (job.tenantName ? " — " + job.tenantName : "")) : job.tenantPresent === "no" ? "Not present" : "—" }]
+      [{ k: "Property manager", v: [job.pmName, job.pmEmail].filter(Boolean).join(" · ") || "—" }, { k: "Occupancy", v: job.occupancy === "vacant" ? "Vacant" : job.occupancy === "tenanted" ? "Tenanted" : "—" }]
     ];
+    if (elecOn && ins.supName) kv.push([{ k: "Supervision", v: sup, span: 3 }]);
+    if (smokeOn && (job.buildEra || job.storeys)) kv.push([{ k: "Build / approval", v: L().ERA_LABEL[job.buildEra] || "—" }, { k: "Storeys", v: job.storeys || "—" }]);
+    if (smokeOn && job.renterInfo && job.renterInfo !== "na") {
+      const tenant = job.tenantPresent === "na" ? "" : (job.tenantPresent === "yes" ? ("Present" + (job.tenantName ? " — " + job.tenantName : "")) : job.tenantPresent === "no" ? "Not present" : "");
+      const row = [{ k: "Renter written information", v: job.renterInfo === "yes" ? "Yes — provided" : "No" }];
+      if (tenant) row.push({ k: "Tenant", v: tenant });
+      else row[0].span = 3;
+      kv.push(row);
+    }
     const col = [CW * 0.22, CW * 0.28, CW * 0.22, CW * 0.28];
     kv.forEach(function (pair) {
       const cells = [];
@@ -220,29 +286,30 @@
       drawRow(cells, y, h, false);
       y += h;
     });
-    const badgeH = 22;
+    const badgeH = 28;
     need(badgeH);
-    drawRow([
-      { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8 },
-      { text: "", w: col[1], size: 8 },
-      { text: "Property smoke alarms compliant", w: col[2], bold: true, fill: WASH, size: 8 },
-      { text: "", w: col[3], size: 8 }
-    ], y, badgeH, false);
-    pill(badge, badge === "PASS" ? "PASS" : badge === "FAIL" ? "FAIL" : "ACTION REQUIRED", M + col[0] + 4, y + 15);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(smokeYes ? GREEN[0] : RED[0], smokeYes ? GREEN[1] : RED[1], smokeYes ? GREEN[2] : RED[2]);
-    const ynX = M + col[0] + col[1] + col[2] + 6;
-    doc.text(smokeYes ? "YES" : "NO", ynX, y + 15);
-    doc.setLineWidth(1.3);
-    doc.setDrawColor(smokeYes ? GREEN[0] : RED[0], smokeYes ? GREEN[1] : RED[1], smokeYes ? GREEN[2] : RED[2]);
-    doc.roundedRect(ynX + doc.getTextWidth(smokeYes ? "YES" : "NO") + 4, y + 4, 16, 14, 2, 2, "S");
-    doc.setFontSize(10);
-    doc.text(smokeYes ? "Y" : "X", ynX + doc.getTextWidth(smokeYes ? "YES" : "NO") + 8, y + 14.5);
-    doc.setLineWidth(0.6);
+    const resultFill = badge === "FAIL" ? RED : badge === "PASS" ? [21, 128, 61] : AMBER_B;
+    const resultText = badge === "PASS" ? "PASS" : badge === "FAIL" ? "FAIL" : "ACTION REQUIRED";
+    if (smokeOn) {
+      drawRow([
+        { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: col[1], size: 8 },
+        { text: "Property smoke alarms compliant", w: col[2], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: col[3], size: 8 }
+      ], y, badgeH, false);
+      solidBadge(resultText, resultFill, M + col[0] + 4, y, badgeH);
+      solidBadge(smokeYes ? "YES: COMPLIANT" : "NO: NOT COMPLIANT", smokeYes ? [21, 128, 61] : RED, M + col[0] + col[1] + col[2] + 4, y, badgeH);
+    } else {
+      drawRow([
+        { text: "Overall result", w: col[0], bold: true, fill: WASH, size: 8, center: true },
+        { text: "", w: CW - col[0], size: 8 }
+      ], y, badgeH, false);
+      solidBadge(resultText, resultFill, M + col[0] + 4, y, badgeH);
+    }
     y += badgeH;
 
-    section("B. SMOKE ALARMS");
+    if (smokeOn) section("B. SMOKE ALARMS");
+    if (smokeOn) {
     const widths = [22, 108, 72, 86, 78, 52, 58, 63];
     const sum = widths.reduce(function (a, b) { return a + b; }, 0);
     const scale = CW / sum;
@@ -256,7 +323,7 @@
         return String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
       })();
       const power = a.power === "240V with 10-yr lithium backup" ? "240V + backup" : a.power === "10-yr sealed lithium" ? "10yr lithium" : (a.power || "—");
-      const h = expired ? 32 : 28;
+      const h = expired ? 48 : 28;
       need(h);
       const cells = [
         { text: String(i + 1), w: sw[0] },
@@ -275,23 +342,29 @@
       x = M + sw[0] + sw[1] + sw[2] + sw[3];
       if (expired) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.5);
+        doc.setFontSize(7.5);
+        const flag = doc.splitTextToSize("Over 10 years: replace", sw[4] - 18);
+        const flagTop = y + h - 6 - flag.length * 9;
+        doc.setFillColor(RED[0], RED[1], RED[2]);
+        doc.triangle(x + 4, flagTop + 1, x + 10, flagTop + 1, x + 7, flagTop - 5, "F");
         doc.setTextColor(RED[0], RED[1], RED[2]);
-        doc.text("Over 10 years: replace", x + 4, y + 24);
+        doc.text(flag, x + 13, flagTop + 2);
       }
-      pill(testLabel, testKind, M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + 4, y + (expired ? 12 : 16));
-      if (a.photo) {
-        try { doc.addImage(a.photo, fmtImg(a.photo), M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + sw[5] + 4, y + 4, 28, 18); }
-        catch (e) { /* leave blank */ }
-      }
+      const testX = M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4];
+      if (a.testButton === "na") dash(testX, y, h, sw[5]);
+      else pill(testLabel, testKind, testX + 4, y, h);
+      const photoX = M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + sw[5];
+      if (a.photo && fitImage(a.photo, photoX + 3, y + (h - 22) / 2, 30, 22)) { /* fitted */ }
+      else dash(photoX, y, h, sw[6]);
+      const ax = photoX + sw[6];
       if (a.audio && a.audio.dataUrl) {
-        const ax = M + sw[0] + sw[1] + sw[2] + sw[3] + sw[4] + sw[5] + sw[6] + 4;
-        mic(ax, y + 16);
+        const mid = y + h / 2;
+        mic(ax + 4, mid + 2);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
         doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-        doc.text("Audio", ax + 10, y + 16);
-      }
+        doc.text("Audio", ax + 14, mid + 3);
+      } else dash(ax, y, h, sw[7]);
       y += h;
     });
     const audioNotes = (state.alarms || []).map(function (a, i) {
@@ -306,22 +379,31 @@
       doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
       audioNotes.forEach(function (line) { need(11); doc.text(line, M, y + 8); y += 11; });
     }
-    y += 4;
-    const detail = (state.alarms || []).map(function (a, i) {
-      return [
-        String(i + 1),
-        L().displayResult(a, now),
-        a.mounting === "yes" ? "Compliant" : a.mounting === "no" ? "Not compliant" : "—",
-        a.interconnected === "yes" ? "Yes" : a.interconnected === "no" ? "No" : a.interconnected === "na" ? "N/A" : "—",
-        a.as3786 === "yes" ? "Present" : a.as3786 === "no" ? "Not seen" : "—",
-        [a.batteryReplaced === "yes" ? "Replaced" : a.batteryReplaced === "no" ? "Not replaced" : "", a.batteryType || ""].filter(Boolean).join(" ") || "—",
-        a.notes || "—"
-      ];
-    });
-    if (detail.length) {
-      const dw = [22, 90, 70, 58, 58, 70, CW - 368];
-      const dscale = CW / dw.reduce(function (a, b) { return a + b; }, 0);
-      table(["#", "RESULT", "MOUNTING", "LINKED", "AS 3786", "BATTERY", "NOTES"], detail, dw.map(function (w) { return w * dscale; }), { size: 7.5 });
+    y += 6;
+    const shown = function (v, yes, no) { if (!v || v === "na") return null; return v === "yes" ? yes : v === "no" ? no : null; };
+    const detailSpecs = [
+      { h: "MOUNTING", w: 78, get: function (a) { return shown(a.mounting, "Compliant", "Not compliant"); } },
+      { h: "LINKED", w: 58, get: function (a) { return shown(a.interconnected, "Yes", "No"); } },
+      { h: "AS 3786", w: 62, get: function (a) { return shown(a.as3786, "Present", "Not seen"); } },
+      { h: "BATTERY", w: 72, get: function (a) { if (!a.batteryReplaced || a.batteryReplaced === "na") return a.batteryType || null; return (a.batteryReplaced === "yes" ? "Replaced" : "Not replaced") + (a.batteryType ? " " + a.batteryType : ""); } },
+      { h: "NOTES", w: 0, get: function (a) { return a.notes || null; } }
+    ].filter(function (spec) { return (state.alarms || []).some(function (a) { return spec.get(a); }); });
+    if ((state.alarms || []).length && detailSpecs.length) {
+      need(14);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(INK[0], INK[1], INK[2]);
+      doc.text("Alarm details", M, y + 11);
+      y += 16;
+      const fixed = detailSpecs.filter(function (s) { return s.h !== "NOTES"; });
+      const used = sw[0] + sw[1] + fixed.reduce(function (n, s) { return n + s.w; }, 0);
+      const widthsD = [sw[0], sw[1]].concat(fixed.map(function (s) { return s.w; }));
+      if (detailSpecs.some(function (s) { return s.h === "NOTES"; })) widthsD.push(Math.max(60, CW - used));
+      const headers = ["#", "LOCATION"].concat(detailSpecs.map(function (s) { return s.h; }));
+      const detail = (state.alarms || []).map(function (a, i) {
+        return [String(i + 1), L().locationText(a, i)].concat(detailSpecs.map(function (s) { return s.get(a) || ""; }));
+      });
+      table(headers, detail, widthsD, { size: 8 });
     }
     const prop = state.property || {};
     if (prop.recommendations) {
@@ -334,14 +416,11 @@
       need(rec.length * 10);
       doc.text(rec, M, y + 8); y += rec.length * 10 + 4;
     }
-
-    section("C. SWITCHBOARD — SAFETY CHECK (VISUAL INSPECTION & TESTING)");
-    if ((state.switchboard || {}).location) {
-      need(12);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]);
-      doc.text("Location: " + state.switchboard.location, M, y + 10); y += 14;
     }
-    const sRows = L().switchboardRows(state).filter(function (r) { return r.item !== "Switchboard location"; });
+
+    const sRows = boardOn ? L().switchboardRows(state) : [];
+    if (sRows.length) {
+    section("C. SWITCHBOARD — SAFETY CHECK (VISUAL INSPECTION & TESTING)");
     const iw = CW * 0.30, rw = 52, ow = CW - iw - rw;
     need(16);
     drawRow([{ text: "ITEM", w: iw }, { text: "OBSERVATION", w: ow }, { text: "RESULT", w: rw }], y, 16, true);
@@ -351,7 +430,7 @@
       const h = Math.max(rowH(cells, 8), 18);
       need(h);
       drawRow(cells, y, h, false);
-      pill(r.result, r.result, M + iw + ow + 4, y + 13);
+      if (r.result && r.result !== "N/A") pill(r.result, r.result, M + iw + ow + 4, y, h);
       y += h;
     });
     y += 6;
@@ -363,6 +442,7 @@
       const n = doc.splitTextToSize("Notes: " + state.switchboard.notes, CW);
       need(n.length * 10);
       doc.text(n, M, y + 8); y += n.length * 10;
+    }
     }
 
     section("D. DEFECTS & RECOMMENDED ACTIONS");
@@ -386,11 +466,11 @@
         const h = Math.max(rowH(cells, 8), 16);
         need(h);
         drawRow(cells, y, h, false);
-        doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(8);
         const pri = String(d.priority || "Routine").toUpperCase();
         const pc = pri === "URGENT" ? RED : pri === "HIGH" ? AMBER : MUTED;
         doc.setTextColor(pc[0], pc[1], pc[2]);
-        doc.text(pri, M + dws[0] + 4, y + 12);
+        doc.text(pri, M + dws[0] + 4, y + (h + 8) / 2 - 1);
         y += h;
       });
     }
@@ -408,24 +488,32 @@
 
     section("F. DECLARATION & SIGNATURES");
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]);
-    const dec = doc.splitTextToSize("I confirm that the smoke alarm safety check and the visual switchboard inspection described in this report were carried out at the property on the date shown. Inspected by " + (ins.techName || "—") + ". Under supervision of " + (ins.supName || "—") + ", REC " + (ins.supRec || "—") + ", Licence " + (ins.supLic || "—") + ".", CW);
+    const decLead = "I confirm that the inspection described in this report was carried out at the property on the date shown. Inspected by " + (ins.techName || "—") + "."
+      + (elecOn ? " Under supervision of " + (ins.supName || "—") + ", REC " + (ins.supRec || "—") + ", Licence " + (ins.supLic || "—") + "." : " " + L().VISUAL_NOTE);
+    const dec = doc.splitTextToSize(decLead, CW);
     need(dec.length * 11 + 70);
     doc.text(dec, M, y + 12); y += dec.length * 11 + 6;
-    const half = CW / 2;
+    const half = elecOn ? CW / 2 : CW;
     need(78);
-    drawRow([{ text: "TECHNICIAN", w: half }, { text: "SUPERVISING LICENSED ELECTRICIAN", w: half }], y, 16, true);
+    const sigHeads = elecOn
+      ? [{ text: "TECHNICIAN", w: half }, { text: "SUPERVISING LICENSED ELECTRICIAN", w: half }]
+      : [{ text: "TECHNICIAN", w: CW }];
+    drawRow(sigHeads, y, 16, true);
     y += 16;
     doc.setFillColor(255, 255, 255); doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-    doc.rect(M, y, half, 72, "FD"); doc.rect(M + half, y, half, 72, "FD");
-    if (sign.signature) { try { doc.addImage(sign.signature, "PNG", M + 8, y + 4, 120, 28); } catch (e) {} }
-    if (sign.elecSignature) { try { doc.addImage(sign.elecSignature, "PNG", M + half + 8, y + 4, 120, 28); } catch (e) {} }
+    doc.rect(M, y, half, 72, "FD");
+    if (elecOn) doc.rect(M + half, y, half, 72, "FD");
+    if (sign.signature) fitImage(sign.signature, M + 8, y + 4, Math.min(120, half - 16), 28);
+    if (elecOn && sign.supSignature) fitImage(sign.supSignature, M + half + 8, y + 4, 120, 28);
     doc.setFontSize(8); doc.setTextColor(INK[0], INK[1], INK[2]); doc.setFont("helvetica", "normal");
     doc.text("Name: " + (sign.printedName || ins.techName || "—"), M + 8, y + 44);
     doc.text("Phone: " + (ins.techPhone || "—"), M + 8, y + 56);
     doc.text("Date: " + L().fmtDate(sign.date), M + 8, y + 68);
-    doc.text("Name: " + (ins.supName || "—"), M + half + 8, y + 44);
-    doc.text("REC " + (ins.supRec || "—") + "   Licence " + (ins.supLic || "—"), M + half + 8, y + 56);
-    doc.text("Date: " + L().fmtDate(sign.date), M + half + 8, y + 68);
+    if (elecOn) {
+      doc.text("Name: " + (ins.supName || "—"), M + half + 8, y + 44);
+      doc.text("REC " + (ins.supRec || "—") + "   Licence " + (ins.supLic || "—"), M + half + 8, y + 56);
+      doc.text((ins.supBusiness || "") + (ins.supBusiness ? "  " : "") + "Date: " + L().fmtDate(sign.date), M + half + 8, y + 68);
+    }
     y += 78;
     const dueCells = [
       { text: "Next smoke alarm check due", w: col[0] + 20, bold: true, fill: WASH, size: 8 },
@@ -439,50 +527,86 @@
     y += dh;
 
     const photos = [];
-    (state.alarms || []).forEach(function (a, i) {
+    if (smokeOn) (state.alarms || []).forEach(function (a, i) {
       if (a.photo) photos.push({ src: a.photo, title: "Alarm " + (i + 1) + " — " + L().locationText(a, i), sub: [a.type, a.power, (a.dateKind === "expiry" ? "Exp " : "Mfd ") + (a.dateValue || "")].filter(Boolean).join(", "), test: a.testButton === "fail" ? "FAIL" : a.testButton === "pass" ? "PASS" : "", audio: a.audio && a.audio.dataUrl ? L().audioFilename(state, a, i) : "", seconds: a.audio && a.audio.seconds });
     });
-    ((state.switchboard || {}).photos || []).forEach(function (p, i) {
+    if (boardOn) ((state.switchboard || {}).photos || []).forEach(function (p, i) {
       photos.push({ src: p.dataUrl || p, title: "Switchboard — photo " + (i + 1), sub: p.caption || (state.switchboard.location || ""), test: "" });
     });
     if (photos.length) {
+      const cardW = 254, cardH = 78, gap = 10;
+      need(10 + 16 + 4 + cardH);
       section("G. PHOTO RECORD");
+      let col = 0;
+      let continued = false;
       photos.forEach(function (p) {
-        const h = 78;
-        need(h);
-        doc.setDrawColor(LINE[0], LINE[1], LINE[2]); doc.setFillColor(255, 255, 255);
-        doc.rect(M, y, CW, h, "FD");
-        try { doc.addImage(p.src, fmtImg(p.src), M + 6, y + 6, 96, 66); } catch (e) {}
-        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(INK[0], INK[1], INK[2]);
-        doc.text(p.title, M + 112, y + 18);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-        const sub = doc.splitTextToSize(p.sub || "", CW - 124);
-        doc.text(sub, M + 112, y + 32);
-        if (p.test) pill(p.test, p.test, M + 112, y + 52);
-        if (p.audio) {
-          doc.setFontSize(7.5); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-          doc.text("Audio evidence recorded: " + p.audio + (p.seconds ? " (" + p.seconds + "s)" : ""), M + 160, y + 50);
+        if (col === 0 && y + cardH > bottom) {
+          doc.addPage();
+          y = chrome();
+          section("G. PHOTO RECORD (continued)");
+          continued = true;
         }
-        y += h;
+        const x = M + col * (cardW + gap);
+        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+        doc.setFillColor(255, 255, 255);
+        doc.setLineWidth(0.6);
+        doc.rect(x, y, cardW, cardH, "FD");
+        fitImage(p.src, x + 4, y + 6, 70, 66);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(INK[0], INK[1], INK[2]);
+        const title = doc.splitTextToSize(p.title, cardW - 86);
+        doc.text(title, x + 80, y + 16);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        const sub = doc.splitTextToSize(p.sub || "", cardW - 86);
+        doc.text(sub.slice(0, 2), x + 80, y + 30);
+        if (p.test) pill(p.test, p.test, x + 80, y + 40, 24);
+        if (p.audio) {
+          doc.setFontSize(7.5);
+          doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+          const note = doc.splitTextToSize("Audio evidence recorded: " + p.audio + (p.seconds ? " (" + p.seconds + "s)" : ""), cardW - 86);
+          doc.text(note.slice(0, 2), x + 80, y + 66);
+        }
+        col += 1;
+        if (col === 2) { col = 0; y += cardH + gap; }
       });
+      if (col === 1) y += cardH;
+      if (continued) { /* heading already repeated */ }
     }
 
     if (sign.onBehalf) {
       doc.addPage();
       y = chrome();
       const c = sign.contractor || {};
+      const tagY = y + 12;
+      if (c.logo) fitImage(c.logo, W - M - 110, tagY, 110, 34);
+      else if (c.name) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        const nameLines = doc.splitTextToSize(c.name, 128).slice(0, 2);
+        const boxH = Math.min(34, 12 + nameLines.length * 11);
+        const boxW = Math.min(140, Math.max(80, doc.getTextWidth(nameLines[0] || "") + 12));
+        const bx = W - M - boxW;
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.8);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(bx, tagY, boxW, boxH, 2, 2, "S");
+        doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+        doc.text(nameLines, bx + 6, tagY + 13);
+        doc.setLineWidth(0.6);
+      }
       doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-      doc.text("Report Preparation & Authorisation", M, y + 8);
+      doc.text("Report Preparation & Authorisation", M, y + 24);
       doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
-      doc.rect(M, y + 14, 46, 2.5, "F");
-      y += 32;
+      doc.rect(M, y + 30, 46, 2.5, "F");
+      y += 56;
       doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(INK[0], INK[1], INK[2]);
       const paras = [
         "This report was prepared by " + (sign.preparer || "Neill Data") + " (technician " + (ins.techName || "—") + ") on behalf of " + (c.name || "—") + ", REC " + (c.rec || "—") + ".",
         "The inspection was carried out under the supervision and authority of " + (c.electrician || ins.supName || "—") + ", licence " + (c.licence || ins.supLic || "—") + ", who is responsible for compliance of any electrical work.",
-        "Neill Data compiles and formats the report and does not perform or certify electrical work.",
-        (sign.preparer || "Neill Data") + " provides inspection recording and reporting services only and does not hold an electrical contractor registration. Any repairs must be carried out by a licensed electrician employed by a Registered Electrical Contractor.",
+        "Neill Data compiles and formats the report and does not perform or certify electrical work. " + (sign.preparer || "Neill Data") + " provides inspection recording and reporting services only and does not hold an electrical contractor registration. Any repairs must be carried out by a licensed electrician employed by a Registered Electrical Contractor.",
         "The scope and limitations are as stated in this report. The report reflects conditions observed on the inspection date only."
       ];
       paras.forEach(function (p) {
@@ -494,22 +618,25 @@
       y += 10;
       const colW = CW / 3;
       const heads = ["PREPARED BY", "INSPECTED BY", "AUTHORISED (CONTRACTOR)"];
-      const names = [sign.preparer || "Neill Data", sign.printedName || ins.techName || "—", c.electrician || "—"];
-      const subs = ["Report preparation", ins.techPhone || "", "REC " + (c.rec || "—") + "  Lic " + (c.licence || "—")];
       const sigs = [null, sign.signature, sign.elecSignature];
       need(90);
       heads.forEach(function (h, i) {
         const x = M + i * colW;
         doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
         doc.text(h, x, y);
+        if (i === 0) {
+          doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+          doc.text("Neill Data, report preparation", x, y + 16);
+        } else if (sigs[i]) fitImage(sigs[i], x, y + 8, 90, 26);
         doc.setDrawColor(51, 65, 85); doc.setLineWidth(0.7);
         doc.line(x, y + 36, x + colW - 16, y + 36);
-        if (sigs[i]) { try { doc.addImage(sigs[i], "PNG", x, y + 6, 90, 26); } catch (e) {} }
         doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(INK[0], INK[1], INK[2]);
-        doc.text(names[i], x, y + 50);
+        if (i === 1) doc.text(sign.printedName || ins.techName || "—", x, y + 50);
+        if (i === 2) doc.text(c.electrician || "—", x, y + 50);
         doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-        doc.text(subs[i], x, y + 62);
-        doc.text("Date: " + L().fmtDate(sign.date), x, y + 74);
+        if (i === 1) doc.text(ins.techPhone || "", x, y + 62);
+        if (i === 2) doc.text("REC " + (c.rec || "—") + "  Lic " + (c.licence || "—"), x, y + 62);
+        doc.text("Date: " + L().fmtDate(sign.date), x, y + (i === 0 ? 50 : 74));
       });
       y += 96;
       doc.setFontSize(8);
@@ -532,15 +659,6 @@
       doc.text(left, M, H - 20);
       doc.text("Report " + (state.reportNo || ""), W / 2, H - 20, { align: "center" });
       doc.text("Page " + i + " of " + pages, W - M, H - 20, { align: "right" });
-      if (state.example) {
-        doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(AMBER_B[0], AMBER_B[1], AMBER_B[2]);
-        const label = "EXAMPLE DATA";
-        const lw = doc.getTextWidth(label) + 10;
-        doc.setFillColor(255, 255, 255);
-        doc.setDrawColor(AMBER_B[0], AMBER_B[1], AMBER_B[2]);
-        doc.roundedRect((W - lw) / 2, 4, lw, 11, 2, 2, "FD");
-        doc.text(label, W / 2, 12, { align: "center" });
-      }
     }
     doc.setProperties({ title: L().TITLE, subject: state.reportNo || "", creator: "Neill Inspect" });
     return doc;
