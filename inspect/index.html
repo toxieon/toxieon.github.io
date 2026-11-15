@@ -105,14 +105,17 @@ footer.ver { text-align: center; color: var(--muted); font-size: 12px; padding-b
     <button type="button" class="btn btn-danger" id="btn-new-report" data-action="new-report">New report</button>
     <label class="btn btn-utility" for="import-pdf">Import PDF</label>
     <input id="import-pdf" type="file" accept="application/pdf,.pdf" aria-label="Import PDF">
+    <button type="button" class="btn" data-action="automatic">Automatic</button>
+    <button type="button" class="btn btn-primary" data-action="automatic-bn">Automatic as BN</button>
   </div>
   <div class="progress" aria-hidden="true"><span id="bar"></span></div>
   <div class="container"><p class="step-label" id="step-label"></p></div>
 </header>
 <div id="banner" class="banner" hidden>Example data — not a real inspection</div>
 <div id="import-banner" class="banner import-banner" hidden></div>
+<div id="auto-banner" class="banner" hidden></div>
 <main class="container" id="app"></main>
-<footer class="ver container">Neill Inspect v0.2.0</footer>
+<footer class="ver container">Neill Inspect v0.3.0</footer>
 <nav class="dock">
   <button type="button" class="btn" id="btn-back" data-action="back">Back</button>
   <button type="button" class="btn btn-primary" id="btn-next" data-action="next">Next</button>
@@ -121,11 +124,11 @@ footer.ver { text-align: center; color: var(--muted); font-size: 12px; padding-b
 <div id="toast" class="toast" role="status"></div>
 <script src="../shared/vendor/jspdf/jspdf.umd.min.js"></script>
 <script src="../assets/here.js"></script>
-<script src="logic.js?v=0.2.0"></script>
-<script src="pdf.js?v=0.2.0"></script>
-<script src="import.js?v=0.2.0"></script>
-<script src="../shared/nd-pdf.js?v=0.2.0"></script>
-<script src="app.js?v=0.2.0"></script>
+<script src="logic.js?v=0.3.0"></script>
+<script src="pdf.js?v=0.3.0"></script>
+<script src="import.js?v=0.3.0"></script>
+<script src="../shared/nd-pdf.js?v=0.3.0"></script>
+<script src="app.js?v=0.3.0"></script>
 <script src="../shared/nd-pwa.js" defer></script>
 </body>
 </html>
