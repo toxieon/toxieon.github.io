@@ -1,10 +1,14 @@
 /* Neill Inspect — on-device smoke alarm and switchboard report. No login. */
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.3.0";
 (function () {
   "use strict";
   const L = window.NILogic;
   const DRAFT_KEY = "nd:inspect:draft:v1";
   const PROFILE_KEY = "nd:inspect:profile:v1";
+  const BN_KEY = "nd:inspect:bn:v1";
+  const BN_NAME = "Brandon Neill";
+  const BN_PREPARER = "Neill Data";
+  const BN_COMPANY = "Arcon";
   const DB_NAME = "nd-inspect";
   const STORE = "reports";
   const MAPS_KEY = "AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w";
@@ -50,7 +54,7 @@ const APP_VERSION = "0.2.0";
       id: uid(), location: "", locationDetail: "", storey: "", type: "", power: "", interconnected: "",
       dateKind: "manufacture", dateValue: "", mounting: "", as3786: "", testButton: "", interconnectTest: "",
       smokeTest: "", batteryReplaced: "", batteryType: "", cleaned: "", secure: "", hush: "", result: "",
-      photo: "", notes: "", audio: null
+      photo: "", locationPhoto: "", notes: "", audio: null
     };
   }
   function loadProfile() {
@@ -94,8 +98,14 @@ const APP_VERSION = "0.2.0";
     };
   }
 
+  function loadBn() {
+    try { return JSON.parse(localStorage.getItem(BN_KEY) || "null"); } catch (e) { return null; }
+  }
+  function saveBn(settings) {
+    try { localStorage.setItem(BN_KEY, JSON.stringify(settings)); } catch (e) { toast("These details could not be saved on this device."); }
+  }
   function saveProfile() {
-    if (!state || state.example) return;
+    if (!state || state.example || state.bn) return;
     try {
       localStorage.setItem(PROFILE_KEY, JSON.stringify({
         inspector: state.inspector,
@@ -191,12 +201,21 @@ const APP_VERSION = "0.2.0";
   const PF = [["pass", "Pass"], ["fail", "Fail"], ["na", "N/A"]];
 
   function steps() {
+    if (state && state.automatic) {
+      return [
+        { id: "auto-job", title: "Property" },
+        { id: "auto-alarms", title: "Alarm locations" },
+        { id: "auto-sign", title: "Inspector" },
+        { id: "report", title: "Report" }
+      ];
+    }
     const list = [
       { id: "scope", title: "Scope" },
       { id: "job", title: "Job details" },
       { id: "inspector", title: "Inspector" }
     ];
     if (state.scope && state.scope.smoke) list.push({ id: "alarms", title: "Smoke alarms" });
+    if (state.scope && state.scope.smoke) list.push({ id: "locations", title: "Where they are" });
     if (state.scope && state.scope.switchboard) list.push({ id: "board", title: "Switchboard" });
     list.push({ id: "defects", title: "Defects" });
     list.push({ id: "sign", title: "Sign-off" });
@@ -212,6 +231,63 @@ const APP_VERSION = "0.2.0";
       box("smoke", "Smoke alarms", "Each alarm, where they are fitted, and the written information for the renter.") +
       box("switchboard", "Switchboard (visual)", "A visual look at the switchboard. Not a full electrical safety check.") +
       "</section>";
+  }
+  function locPhotoBlock(a, i) {
+    const path = "alarms." + i + ".locationPhoto";
+    return '<div class="' + reviewClass(path).trim() + '" data-review="' + esc(path) + '">' +
+      '<p class="lbl">Photo of where it is mounted</p>' +
+      '<button type="button" class="btn" data-action="pick" data-for="loc-photo-' + i + '">Take location photo</button>' +
+      '<input id="loc-photo-' + i + '" hidden type="file" accept="image/*" capture="environment" data-loc-photo="' + i + '">' +
+      (a.locationPhoto && a.locationPhoto.indexOf("data:image/") === 0 ? '<img class="thumb" alt="Where the alarm is mounted" src="' + a.locationPhoto + '">' : '<p class="help">Stand back so the photo shows the alarm in the room.</p>') +
+      "</div>";
+  }
+  function locationsHtml() {
+    const cards = (state.alarms || []).map((a, i) => '<section class="card"><h2>Alarm ' + (i + 1) + '</h2><p class="help">' + esc(L.locationText(a, i)) + '</p>' + locPhotoBlock(a, i) + "</section>").join("");
+    return cards || '<section class="card"><p class="help">Add a smoke alarm first. Then come back for a photo of where each one is mounted.</p></section>';
+  }
+  function autoJobHtml() {
+    return '<section class="card"><h2>Property</h2><p class="help">Every check is marked passed. This step is only the address and the time.</p>' +
+      field("Inspection date and time", "job.inspectedAt", "datetime-local") +
+      '<div class="addr"><label class="field" style="flex:1"><span>Property address</span><input id="job-address" data-bind="job.address" value="' + esc(state.job.address || "") + '" placeholder="Type the address, or use Here"></label>' +
+      '<button type="button" class="btn btn-utility" id="use-location-btn" title="Use my current location">Here</button></div></section>';
+  }
+  function autoAlarmsHtml() {
+    const cards = (state.alarms || []).map((a, i) => {
+      const p = "alarms." + i;
+      return '<section class="card"><h2>Alarm ' + (i + 1) + '</h2>' +
+        select("Location", p + ".location", [["" , "Select location"]].concat(L.LOCATIONS.map((x) => [x, x]))) +
+        field("Location detail (optional)", p + ".locationDetail") +
+        field("Storey", p + ".storey", "text", 'placeholder="Ground, 1, 2"') +
+        locPhotoBlock(a, i) +
+        '<p class="lbl">Date on the alarm</p>' + chips(p + ".dateKind", [["manufacture", "Manufacture date"], ["expiry", "Expiry date"]]) +
+        field("Manufacture or expiry date", p + ".dateValue", "date") +
+        '<p class="help">The date starts as the inspection date. Change it if the alarm shows another date.</p>' +
+        '<button type="button" class="btn btn-ghost" data-action="remove-alarm" data-i="' + i + '">Remove</button></section>';
+    }).join("");
+    return cards + '<button type="button" class="btn" data-action="add-alarm">Add smoke alarm</button>';
+  }
+  function autoSignHtml() {
+    ensureDates();
+    L.applyAutomaticDefaults(state, today());
+    const saved = state.bn ? loadBn() : null;
+    const who = state.bn
+      ? '<p class="help">Brandon Neill. Prepared by Neill Data on behalf of Arcon.' +
+        (saved && saved.supName ? " Supervising electrician: " + esc(saved.supName) + "." : "") + "</p>"
+      : field("Full name", "inspector.techName") + field("Phone", "inspector.techPhone", "tel");
+    return '<section class="card"><h2>Sign</h2>' + who +
+      field("Printed name", "sign.printedName") +
+      '<div class="' + reviewClass("sign.signature").trim() + '" data-review="sign.signature"><p class="lbl">Signature</p><canvas class="sig" data-sign="sign.signature"></canvas></div>' +
+      '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.signature">Clear signature</button></section>';
+  }
+  function bnFormHtml() {
+    const cur = loadBn() || {};
+    return '<section class="card"><h2>Automatic as BN</h2><p class="help">Brandon Neill. Prepared by Neill Data on behalf of Arcon. The phone, supervising electrician, REC number and licence are saved on this phone only, the first time. They are not written into the app.</p>' +
+      '<label class="field"><span>Phone</span><input id="bn-phone" value="' + esc(cur.phone || "") + '" type="tel"></label>' +
+      '<label class="field"><span>Supervising electrician</span><input id="bn-sup" value="' + esc(cur.supName || "") + '"></label>' +
+      '<label class="field"><span>REC number</span><input id="bn-rec" value="' + esc(cur.rec || "") + '"></label>' +
+      '<label class="field"><span>Licence number</span><input id="bn-lic" value="' + esc(cur.licence || "") + '"></label>' +
+      '<button type="button" class="btn btn-primary" data-action="save-bn">Save and start</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="cancel-bn">Cancel</button></section>';
   }
   function jobHtml() {
     const j = "job";
@@ -421,14 +497,31 @@ const APP_VERSION = "0.2.0";
       "</section>";
   }
 
+  let bnForm = false;
   function render() {
     const root = document.getElementById("app");
     const scroll = document.scrollingElement ? document.scrollingElement.scrollTop : 0;
+    if (bnForm) {
+      root.innerHTML = bnFormHtml();
+      document.getElementById("step-label").textContent = "Automatic as BN";
+      document.getElementById("bar").style.width = "0";
+      document.getElementById("banner").hidden = true;
+      document.getElementById("btn-back").style.display = "none";
+      document.getElementById("btn-next").style.display = "none";
+      paintAutoBanner();
+      paintImportBanner();
+      return;
+    }
+    document.getElementById("btn-next").style.display = "";
     const list = steps();
     if (state.step >= list.length) state.step = list.length - 1;
     if (state.step < 0) state.step = 0;
     const id = list[state.step].id;
-    const pages = { scope: scopeHtml, job: jobHtml, inspector: inspectorHtml, alarms: alarmsHtml, board: boardHtml, defects: defectsHtml, sign: signHtml, report: reportHtml };
+    const pages = {
+      scope: scopeHtml, job: jobHtml, inspector: inspectorHtml, alarms: alarmsHtml, locations: locationsHtml,
+      board: boardHtml, defects: defectsHtml, sign: signHtml, report: reportHtml,
+      "auto-job": autoJobHtml, "auto-alarms": autoAlarmsHtml, "auto-sign": autoSignHtml, "bn-form": bnFormHtml
+    };
     root.innerHTML = pages[id]();
     document.getElementById("step-label").textContent = "Step " + (state.step + 1) + " of " + list.length + " — " + list[state.step].title;
     document.getElementById("bar").style.width = ((state.step + 1) / list.length * 100) + "%";
@@ -438,6 +531,7 @@ const APP_VERSION = "0.2.0";
     bindPads();
     wireHere();
     paintImportBanner();
+    paintAutoBanner();
     if (document.scrollingElement) document.scrollingElement.scrollTop = scroll;
   }
   function wireHere() {
@@ -606,10 +700,12 @@ const APP_VERSION = "0.2.0";
 
   async function produce(open) {
     ensureDates();
+    if (state.automatic) L.applyAutomaticDefaults(state, today());
     const blocks = L.pdfBlockers(state);
     if (blocks.length) {
       toast(blocks[0]);
-      if (state.step !== 6) { state.step = 6; }
+      const reportAt = steps().findIndex((s) => s.id === "report");
+      if (reportAt >= 0) state.step = reportAt;
       render();
       return null;
     }
@@ -788,6 +884,10 @@ const APP_VERSION = "0.2.0";
         const i = Number(input.getAttribute("data-photo"));
         state.alarms[i].photo = await compress(file, 1280, 0.7);
         clearReview("alarms." + i + ".photo");
+      } else if (input.hasAttribute("data-loc-photo")) {
+        const i = Number(input.getAttribute("data-loc-photo"));
+        state.alarms[i].locationPhoto = await compress(file, 1280, 0.7);
+        clearReview("alarms." + i + ".locationPhoto");
       } else if (input.hasAttribute("data-sb-photo")) {
         state.switchboard.photos.push({ dataUrl: await compress(file, 1280, 0.7), caption: "" });
       } else if (input.getAttribute("data-logo") === "inspector") {
@@ -804,6 +904,15 @@ const APP_VERSION = "0.2.0";
     }
   }
 
+  function paintAutoBanner() {
+    const el = document.getElementById("auto-banner");
+    if (!el) return;
+    if (!state || !state.automatic) { el.hidden = true; el.textContent = ""; return; }
+    el.hidden = false;
+    el.textContent = state.bn
+      ? "Automatic report for Brandon Neill. Prepared by Neill Data on behalf of Arcon. Every check is marked passed."
+      : "Automatic report. Every check is marked passed. Add where each alarm is, then sign.";
+  }
   function paintImportBanner() {
     const el = document.getElementById("import-banner");
     if (!el) return;
@@ -854,6 +963,7 @@ const APP_VERSION = "0.2.0";
     s.alarms = (src.alarms || []).map((a) => {
       const alarm = Object.assign(blankAlarm(), a, { id: (a && a.id) || uid() });
       alarm.photo = imageOrBlank(alarm.photo);
+      alarm.locationPhoto = imageOrBlank(alarm.locationPhoto);
       if (alarm.locationPhoto) alarm.locationPhoto = imageOrBlank(alarm.locationPhoto);
       if (alarm.audio && alarm.audio.dataUrl && String(alarm.audio.dataUrl).indexOf("data:audio/") !== 0) alarm.audio.dataUrl = "";
       return alarm;
@@ -948,6 +1058,52 @@ const APP_VERSION = "0.2.0";
     }
     if (el.type === "file") onFile(el);
   });
+  function applyBn(s, settings) {
+    const saved = settings || {};
+    s.bn = true;
+    s.inspector.techName = BN_NAME;
+    s.inspector.techPhone = saved.phone || "";
+    s.inspector.supName = saved.supName || "";
+    s.inspector.supRec = saved.rec || "";
+    s.inspector.supLic = saved.licence || "";
+    s.inspector.supBusiness = BN_COMPANY;
+    s.sign.printedName = BN_NAME;
+    s.sign.onBehalf = true;
+    s.sign.preparer = BN_PREPARER;
+    s.sign.elecSignoff = true;
+    s.sign.contractor.name = BN_COMPANY;
+    s.sign.contractor.rec = saved.rec || "";
+    s.sign.contractor.electrician = saved.supName || "";
+    s.sign.contractor.licence = saved.licence || "";
+    s.sign.signature = "";
+    s.sign.elecSignature = "";
+    s.sign.supSignature = "";
+  }
+  function launchAutomatic(bn) {
+    bnForm = false;
+    const s = blank();
+    s.automatic = true;
+    s.bn = !!bn;
+    s.example = false;
+    s.scope = { smoke: true, switchboard: false };
+    s.alarms = [blankAlarm()];
+    s.step = 0;
+    if (bn) applyBn(s, loadBn() || {});
+    L.applyAutomaticDefaults(s, today());
+    if (s.inspector.techName && !s.sign.printedName) s.sign.printedName = s.inspector.techName;
+    state = s;
+    alarmOpen = 0;
+    const panel = document.getElementById("saved-panel");
+    if (panel) panel.classList.remove("open");
+    saveDraft();
+    render();
+  }
+  function openAutomatic(bn) {
+    if (draftDirty() && !confirm("Replace the current inspection with an automatic report?")) return;
+    if (bn && L.bnGaps(loadBn()).length) { bnForm = true; render(); return; }
+    launchAutomatic(!!bn);
+  }
+
   document.body.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-action], [data-chip], [data-scope]");
     if (!t) return;
@@ -987,7 +1143,27 @@ const APP_VERSION = "0.2.0";
     else if (act === "new" || act === "new-report") startNew();
     else if (act === "saved") showSaved();
     else if (act === "close-saved") document.getElementById("saved-panel").classList.remove("open");
-    else if (act === "add-alarm") { state.alarms.push(blankAlarm()); alarmOpen = state.alarms.length - 1; saveSoon(); render(); }
+    else if (act === "add-alarm") {
+      state.alarms.push(blankAlarm());
+      if (state.automatic) L.applyAutomaticDefaults(state, today());
+      alarmOpen = state.alarms.length - 1;
+      saveSoon();
+      render();
+    }
+    else if (act === "automatic") openAutomatic(false);
+    else if (act === "automatic-bn") openAutomatic(true);
+    else if (act === "cancel-bn") { bnForm = false; render(); }
+    else if (act === "save-bn") {
+      const settings = {
+        phone: (document.getElementById("bn-phone") || {}).value || "",
+        supName: (document.getElementById("bn-sup") || {}).value || "",
+        rec: (document.getElementById("bn-rec") || {}).value || "",
+        licence: (document.getElementById("bn-lic") || {}).value || ""
+      };
+      if (L.bnGaps(settings).length) { toast("Fill in the phone, supervising electrician, REC number and licence."); return; }
+      saveBn(settings);
+      launchAutomatic(true);
+    }
     else if (act === "toggle-alarm") { alarmOpen = alarmOpen === i ? -1 : i; render(); }
     else if (act === "remove-alarm") { state.alarms.splice(i, 1); alarmOpen = 0; saveSoon(); render(); }
     else if (act === "finish-alarm") {

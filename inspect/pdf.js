@@ -366,6 +366,19 @@
         doc.text("Audio", ax + 14, mid + 3);
       } else dash(ax, y, h, sw[7]);
       y += h;
+      if (a.locationPhoto) {
+        need(78);
+        if (fitImage(a.locationPhoto, M, y + 4, 96, 64)) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(INK[0], INK[1], INK[2]);
+          doc.text("Where it is mounted", M + 104, y + 18);
+          doc.setFont("helvetica", "normal");
+          const cap = doc.splitTextToSize(L().locationText(a, i), CW - 110);
+          doc.text(cap.slice(0, 2), M + 104, y + 32);
+          y += 74;
+        }
+      }
     });
     const audioNotes = (state.alarms || []).map(function (a, i) {
       if (!a.audio || !a.audio.dataUrl) return "";

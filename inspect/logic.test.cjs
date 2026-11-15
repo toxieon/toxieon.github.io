@@ -136,6 +136,46 @@ test("audio and pdf file names", () => {
   assert.equal(L.pdfFilename(s), "NI-20261113-0900_12-Example-Street-Melbourne-VIC.pdf");
 });
 
+test("automatic mode is a passing report when the location photo stands in for the alarm photo", () => {
+  const s = base();
+  s.scope = { smoke: true, switchboard: false };
+  s.alarms[0].photo = "";
+  s.alarms[0].locationPhoto = "data:image/jpeg;base64,xx";
+  s.alarms[0].type = "";
+  s.alarms[0].result = "";
+  s.alarms[0].dateValue = "";
+  s.job.renterInfo = "";
+  L.applyAutomaticDefaults(s, "2026-11-15");
+  assert.equal(s.alarms[0].result, "Pass");
+  assert.equal(s.alarms[0].testButton, "pass");
+  assert.equal(s.alarms[0].type, "Photoelectric");
+  assert.equal(s.job.renterInfo, "yes");
+  assert.equal(s.alarms[0].dateValue, "2026-11-13");
+  assert.deepEqual(L.pdfBlockers(s, NOW), []);
+  assert.equal(L.overall(s, NOW), "PASS");
+  assert.equal(L.propertyCompliant(s, NOW), true);
+});
+
+test("a normal report still needs the alarm photo when a location photo is present", () => {
+  const s = base({ alarms: [alarm({ photo: "", locationPhoto: "data:image/jpeg;base64,xx" })] });
+  assert.ok(L.pdfBlockers(s, NOW).some((line) => /photo/.test(line) && !/where it is mounted/.test(line)));
+});
+
+test("an automatic on-behalf report does not ask for a second signature", () => {
+  const s = base();
+  s.automatic = true;
+  s.sign.onBehalf = true;
+  s.sign.elecSignature = "";
+  s.sign.preparer = "Neill Data";
+  s.sign.contractor = { name: "Arcon", rec: "1", electrician: "A Person", licence: "L1" };
+  assert.equal(L.pdfBlockers(s, NOW).some((line) => /Authorising electrician signature/.test(line)), false);
+});
+
+test("BN settings are missing until phone, electrician, REC and licence are stored", () => {
+  assert.deepEqual(L.bnGaps({}), ["phone", "supName", "rec", "licence"]);
+  assert.deepEqual(L.bnGaps({ phone: "0400", supName: "A Person", rec: "1", licence: "L1" }), []);
+});
+
 test("pre-1990 board is a CHECK item and the badge is not a pass", () => {
   const s = base({ switchboard: { location: "Kitchen", protection: "breakers", minStandard: "yes", rcdFitted: "yes", pre1990: "yes", mainSwitch: "yes", labelling: "yes", earth: "yes" } });
   assert.ok(L.collectDefects(s, NOW).some((d) => d.text === "Suspected asbestos backing, do not drill or disturb" && d.priority === "High"));

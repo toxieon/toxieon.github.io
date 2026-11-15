@@ -338,7 +338,10 @@ function recommendation(text) {
       if (!job.renterInfo) b.push("Answer whether the renter was given written smoke alarm information");
       if (!alarms.length) b.push("Add at least one smoke alarm");
       alarms.forEach(function (a, i) {
-        const miss = alarmMissing(a);
+        const miss = alarmMissing(a).filter(function (item) {
+          return !(state.automatic && item === "a photo" && String(a.locationPhoto || "").indexOf("data:image/") === 0);
+        });
+        if (state.automatic && String(a.locationPhoto || "").indexOf("data:image/") !== 0) miss.push("a photo of where it is mounted");
         if (miss.length) b.push("Alarm " + (i + 1) + " (" + locationText(a, i) + "): add " + miss.join(", "));
       });
       if (!prop.everyStorey) b.push("Answer whether an alarm is installed on every storey");
@@ -363,9 +366,51 @@ function recommendation(text) {
       if (!c.name || !c.rec || !c.electrician || !c.licence) {
         b.push("Contractor authorisation needs the business name, REC number, authorising electrician name and licence number");
       }
-      if (!sign.elecSignature) b.push("Authorising electrician signature is required");
+      if (!sign.elecSignature && !state.automatic) b.push("Authorising electrician signature is required");
     }
     return b;
+  }
+
+  /* Prefill a passing report. Empty answers become the pass value. Anything already chosen is left as it is. */
+  function applyAutomaticDefaults(state, todayIso) {
+    if (!state) return state;
+    state.automatic = true;
+    if (!state.scope) state.scope = { smoke: true, switchboard: false };
+    state.scope.smoke = true;
+    const job = state.job || (state.job = {});
+    const prop = state.property || (state.property = {});
+    const day = String(job.inspectedAt || todayIso || "").slice(0, 10);
+    if (!job.buildEra) job.buildEra = "unknown";
+    if (!job.storeys) job.storeys = "1";
+    if (!job.renterInfo) job.renterInfo = "yes";
+    if (!prop.everyStorey) prop.everyStorey = "yes";
+    if (!prop.sleeping) prop.sleeping = "yes";
+    (state.alarms || []).forEach(function (a) {
+      if (!a.type) a.type = "Photoelectric";
+      if (!a.power) a.power = "240V with 10-yr lithium backup";
+      if (!a.interconnected) a.interconnected = "yes";
+      if (!a.dateKind) a.dateKind = "manufacture";
+      if (!a.dateValue && day) a.dateValue = day;
+      if (!a.mounting) a.mounting = "yes";
+      if (!a.as3786) a.as3786 = "yes";
+      if (!a.testButton) a.testButton = "pass";
+      if (!a.secure) a.secure = "yes";
+      if (!a.cleaned) a.cleaned = "yes";
+      if (!a.hush) a.hush = "yes";
+      if (!a.result) a.result = "Pass";
+    });
+    return state;
+  }
+
+  /* Phone, supervising electrician, REC and licence are collected once on the device. */
+  function bnGaps(settings) {
+    const s = settings || {};
+    const gaps = [];
+    if (!String(s.phone || "").trim()) gaps.push("phone");
+    if (!String(s.supName || "").trim()) gaps.push("supName");
+    if (!String(s.rec || "").trim()) gaps.push("rec");
+    if (!String(s.licence || "").trim()) gaps.push("licence");
+    return gaps;
   }
 
   function yn(v, yesText, noText) {
@@ -463,6 +508,8 @@ function recommendation(text) {
     overall: overall,
     displayResult: displayResult,
     pdfBlockers: pdfBlockers,
+    applyAutomaticDefaults: applyAutomaticDefaults,
+    bnGaps: bnGaps,
     switchboardRows: switchboardRows,
     recommendation: recommendation
   };

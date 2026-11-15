@@ -1,17 +1,17 @@
 /* Offline shell for Neill Inspect. */
-const CACHE_VERSION = 'inspect-0.2.0';
+const CACHE_VERSION = 'inspect-0.3.0';
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './app.js?v=0.2.0',
-  './logic.js?v=0.2.0',
-  './pdf.js?v=0.2.0',
-  './import.js?v=0.2.0',
+  './app.js?v=0.3.0',
+  './logic.js?v=0.3.0',
+  './pdf.js?v=0.3.0',
+  './import.js?v=0.3.0',
   '../assets/here.js',
   './manifest.json',
   './favicon.svg',
   '../shared/vendor/jspdf/jspdf.umd.min.js',
-  '../shared/nd-pdf.js?v=0.2.0',
+  '../shared/nd-pdf.js?v=0.3.0',
   '../shared/vendor/pdfjs/pdf.min.mjs',
   '../shared/vendor/pdfjs/pdf.worker.min.mjs',
   '../shared/nd-pwa.js'
