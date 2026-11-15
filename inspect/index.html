@@ -79,6 +79,11 @@ audio { width: 100%; margin-top: 8px; }
 .addr { display: flex; gap: 8px; align-items: flex-end; }
 .addr .field { flex: 1; margin-bottom: 12px; }
 .addr .btn { margin-bottom: 12px; flex-shrink: 0; }
+.new-report-bar { display: grid; gap: 8px; }
+label.btn { display: flex; align-items: center; justify-content: center; text-align: center; }
+#import-pdf { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.import-banner ul { margin: 6px 0 0; padding-left: 18px; }
+.need-review { box-shadow: inset 0 0 0 2px var(--warning); background: rgba(255, 209, 102, 0.16); border-radius: 12px; }
 @media (hover: hover) and (pointer: fine) {
   #use-location-btn { display: none !important; }
 }
@@ -96,13 +101,18 @@ footer.ver { text-align: center; color: var(--muted); font-size: 12px; padding-b
       <button type="button" class="btn btn-utility" id="btn-example" data-action="example">Example data</button>
     </div>
   </div>
-  <div class="container new-report-bar"><button type="button" class="btn btn-danger" id="btn-new-report" data-action="new-report">New report</button></div>
+  <div class="container new-report-bar">
+    <button type="button" class="btn btn-danger" id="btn-new-report" data-action="new-report">New report</button>
+    <label class="btn btn-utility" for="import-pdf">Import PDF</label>
+    <input id="import-pdf" type="file" accept="application/pdf,.pdf" aria-label="Import PDF">
+  </div>
   <div class="progress" aria-hidden="true"><span id="bar"></span></div>
   <div class="container"><p class="step-label" id="step-label"></p></div>
 </header>
 <div id="banner" class="banner" hidden>Example data — not a real inspection</div>
+<div id="import-banner" class="banner import-banner" hidden></div>
 <main class="container" id="app"></main>
-<footer class="ver container">Neill Inspect v0.1.3</footer>
+<footer class="ver container">Neill Inspect v0.2.0</footer>
 <nav class="dock">
   <button type="button" class="btn" id="btn-back" data-action="back">Back</button>
   <button type="button" class="btn btn-primary" id="btn-next" data-action="next">Next</button>
@@ -111,9 +121,11 @@ footer.ver { text-align: center; color: var(--muted); font-size: 12px; padding-b
 <div id="toast" class="toast" role="status"></div>
 <script src="../shared/vendor/jspdf/jspdf.umd.min.js"></script>
 <script src="../assets/here.js"></script>
-<script src="logic.js?v=0.1.3"></script>
-<script src="pdf.js?v=0.1.3"></script>
-<script src="app.js?v=0.1.3"></script>
+<script src="logic.js?v=0.2.0"></script>
+<script src="pdf.js?v=0.2.0"></script>
+<script src="import.js?v=0.2.0"></script>
+<script src="../shared/nd-pdf.js?v=0.2.0"></script>
+<script src="app.js?v=0.2.0"></script>
 <script src="../shared/nd-pwa.js" defer></script>
 </body>
 </html>

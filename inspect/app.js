@@ -1,5 +1,5 @@
 /* Neill Inspect — on-device smoke alarm and switchboard report. No login. */
-const APP_VERSION = "0.1.3";
+const APP_VERSION = "0.2.0";
 (function () {
   "use strict";
   const L = window.NILogic;
@@ -162,21 +162,30 @@ const APP_VERSION = "0.1.3";
     }));
   }
 
+  function reviewClass(path) {
+    const list = (state && state.importReview && state.importReview.missing) || [];
+    return list.some((m) => m.path === path) ? " need-review" : "";
+  }
+  function alarmFlagged(i) {
+    const list = (state && state.importReview && state.importReview.missing) || [];
+    const prefix = "alarms." + i + ".";
+    return list.some((m) => m.path.indexOf(prefix) === 0);
+  }
   function field(label, path, type, extra) {
     const v = getPath(state, path);
-    return '<label class="field"><span>' + label + '</span><input data-bind="' + esc(path) + '" type="' + (type || "text") + '" value="' + esc(v || "") + '" ' + (extra || "") + '></label>';
+    return '<label class="field' + reviewClass(path) + '" data-review="' + esc(path) + '"><span>' + label + '</span><input data-bind="' + esc(path) + '" type="' + (type || "text") + '" value="' + esc(v || "") + '" ' + (extra || "") + '></label>';
   }
   function area(label, path) {
-    return '<label class="field"><span>' + label + '</span><textarea data-bind="' + esc(path) + '">' + esc(getPath(state, path) || "") + '</textarea></label>';
+    return '<label class="field' + reviewClass(path) + '" data-review="' + esc(path) + '"><span>' + label + '</span><textarea data-bind="' + esc(path) + '">' + esc(getPath(state, path) || "") + '</textarea></label>';
   }
   function select(label, path, options) {
     const cur = getPath(state, path) || "";
     const opts = options.map((o) => '<option value="' + esc(o[0]) + '"' + (cur === o[0] ? " selected" : "") + '>' + esc(o[1]) + '</option>').join("");
-    return '<label class="field"><span>' + label + '</span><select data-bind="' + esc(path) + '">' + opts + '</select></label>';
+    return '<label class="field' + reviewClass(path) + '" data-review="' + esc(path) + '"><span>' + label + '</span><select data-bind="' + esc(path) + '">' + opts + '</select></label>';
   }
   function chips(path, options) {
     const cur = getPath(state, path) || "";
-    return '<div class="chips">' + options.map((o) => '<button type="button" class="chip' + (cur === o[0] ? " on" : "") + '" data-chip="' + esc(path) + '" data-val="' + esc(o[0]) + '">' + esc(o[1]) + '</button>').join("") + '</div>';
+    return '<div class="chips' + reviewClass(path) + '" data-review="' + esc(path) + '">' + options.map((o) => '<button type="button" class="chip' + (cur === o[0] ? " on" : "") + '" data-chip="' + esc(path) + '" data-val="' + esc(o[0]) + '">' + esc(o[1]) + '</button>').join("") + '</div>';
   }
   const YN = [["yes", "Yes"], ["no", "No"], ["na", "N/A"]];
   const PF = [["pass", "Pass"], ["fail", "Fail"], ["na", "N/A"]];
@@ -197,7 +206,9 @@ const APP_VERSION = "0.1.3";
   function scopeHtml() {
     const on = (k) => !!(state.scope && state.scope[k]);
     const box = (k, label, help) => '<button type="button" class="chip' + (on(k) ? " on" : "") + '" data-scope="' + k + '">' + label + '</button><p class="help">' + help + '</p>';
-    return '<section class="card"><h2>What is being inspected?</h2><p class="help">Tick at least one. Only the ticked parts are asked later and printed on the PDF.</p>' +
+    return '<section class="card"><h2>Edit an existing report</h2><p class="help">Import a PDF made by this app. A new PDF opens the full report. An older PDF fills in what can be read and marks anything still missing.</p>' +
+      '<label class="btn" for="import-pdf">Import PDF</label></section>' +
+      '<section class="card"><h2>What is being inspected?</h2><p class="help">Tick at least one. Only the ticked parts are asked later and printed on the PDF.</p>' +
       box("smoke", "Smoke alarms", "Each alarm, where they are fitted, and the written information for the renter.") +
       box("switchboard", "Switchboard (visual)", "A visual look at the switchboard. Not a full electrical safety check.") +
       "</section>";
@@ -238,7 +249,7 @@ const APP_VERSION = "0.1.3";
   function alarmCard(a, i) {
     const open = alarmOpen === i;
     const miss = L.alarmMissing(a);
-    const head = '<div class="alarm-sum"><div><strong>Alarm ' + (i + 1) + '</strong><div class="muted">' + esc(L.locationText(a, i)) + '</div></div>' +
+    const head = '<div class="alarm-sum"><div><strong>Alarm ' + (i + 1) + '</strong>' + (alarmFlagged(i) ? ' <span class="badge warn">Check</span>' : '') + '<div class="muted">' + esc(L.locationText(a, i)) + '</div></div>' +
       '<button type="button" class="btn" data-action="toggle-alarm" data-i="' + i + '">' + (open ? "Close" : "Edit") + '</button></div>';
     if (!open) return head;
     const p = "alarms." + i;
@@ -267,10 +278,12 @@ const APP_VERSION = "0.1.3";
       '<p class="lbl">Secure, no damage, paint or cover</p>' + chips(p + ".secure", [["yes", "Yes"], ["no", "No"]]) +
       '<p class="lbl">Hush works</p><p class="help">Press hush/silence button; alarm should quieten then re-arm.</p>' + chips(p + ".hush", YN) +
       select("Result", p + ".result", [["", "Select"], ["Pass", "Pass"], ["Fail", "Fail"], ["Replaced", "Replaced"], ["Requires electrician", "Requires electrician"], ["na", "N/A"]]) +
+      '<div class="' + reviewClass(p + ".photo").trim() + '" data-review="' + esc(p + ".photo") + '">' +
       '<p class="lbl">Photo of this alarm <span class="req">required</span></p>' +
       '<button type="button" class="btn" data-action="pick" data-for="photo-' + i + '">Take photo</button>' +
       '<input id="photo-' + i + '" hidden type="file" accept="image/*" capture="environment" data-photo="' + i + '">' +
       (a.photo && a.photo.indexOf("data:image/") === 0 ? '<img class="thumb" alt="Alarm photo" src="' + a.photo + '">' : '<p class="help">Use the camera. The photo is compressed and stored on this device.</p>') +
+      '</div>' +
       '<p class="lbl">Record alarm sounding (optional, about 8 seconds)</p>' +
       (recCtl && recCtl.i === i ? '<button type="button" class="btn btn-danger" data-action="stop-rec">Stop</button><p class="help">Recording…</p>' :
         '<button type="button" class="btn" data-action="record" data-i="' + i + '">Record alarm sounding</button>') +
@@ -356,7 +369,7 @@ const APP_VERSION = "0.1.3";
       field("Date", "sign.date", "date") +
       field("Next smoke alarm check due", "sign.nextDue", "date") +
       field("Next electrical check due", "sign.nextElectrical", "date") +
-      '<p class="lbl">Technician signature</p><canvas class="sig" data-sign="sign.signature"></canvas>' +
+      '<div class="' + reviewClass("sign.signature").trim() + '" data-review="sign.signature"><p class="lbl">Technician signature</p><canvas class="sig" data-sign="sign.signature"></canvas></div>' +
       '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.signature">Clear signature</button>' +
       "</section><section class=\"card\"><h2>On behalf of a contractor</h2>" +
       '<p class="lbl">Prepared on behalf of an electrical contractor</p><div class="chips">' +
@@ -373,7 +386,7 @@ const APP_VERSION = "0.1.3";
         '<button type="button" class="btn" data-action="pick" data-for="logo-con">Upload contractor logo</button>' +
         '<input id="logo-con" hidden type="file" accept="image/*" data-logo="contractor">' +
         (state.sign.contractor.logo ? '<img class="thumb" alt="Contractor logo" src="' + state.sign.contractor.logo + '">' : "") +
-        '<p class="lbl">Authorising electrician signature</p><canvas class="sig" data-sign="sign.elecSignature"></canvas>' +
+        '<div class="' + reviewClass("sign.elecSignature").trim() + '" data-review="sign.elecSignature"><p class="lbl">Authorising electrician signature</p><canvas class="sig" data-sign="sign.elecSignature"></canvas></div>' +
         '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.elecSignature">Clear signature</button>'
         : "") +
       "</section>" + elecHtml();
@@ -385,7 +398,7 @@ const APP_VERSION = "0.1.3";
       '<button type="button" class="chip' + (on ? " on" : "") + '" data-chip="sign.elecSignoff" data-val="yes">Yes</button>' +
       '<button type="button" class="chip' + (on ? "" : " on") + '" data-chip="sign.elecSignoff" data-val="no">No</button></div>' +
       (on ? field("Name", "inspector.supName") + field("REC number", "inspector.supRec") + field("Licence number", "inspector.supLic") + field("Business name", "inspector.supBusiness") +
-        '<p class="lbl">Supervising electrician signature</p><canvas class="sig" data-sign="sign.supSignature"></canvas>' +
+        '<div class="' + reviewClass("sign.supSignature").trim() + '" data-review="sign.supSignature"><p class="lbl">Supervising electrician signature</p><canvas class="sig" data-sign="sign.supSignature"></canvas></div>' +
         '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.supSignature">Clear signature</button>'
         : '<p class="help">The PDF will be labelled as a visual inspection by the technician. It will not say the mains alarms or the switchboard were certified.</p>') +
       "</section>";
@@ -424,6 +437,7 @@ const APP_VERSION = "0.1.3";
     document.getElementById("btn-next").textContent = state.step === list.length - 1 ? "Done" : "Next";
     bindPads();
     wireHere();
+    paintImportBanner();
     if (document.scrollingElement) document.scrollingElement.scrollTop = scroll;
   }
   function wireHere() {
@@ -489,6 +503,7 @@ const APP_VERSION = "0.1.3";
         if (!drawing) return;
         drawing = false;
         setPath(state, path, canvas.toDataURL("image/png"));
+        clearReview(path);
         saveSoon();
       });
     });
@@ -772,6 +787,7 @@ const APP_VERSION = "0.1.3";
       if (input.hasAttribute("data-photo")) {
         const i = Number(input.getAttribute("data-photo"));
         state.alarms[i].photo = await compress(file, 1280, 0.7);
+        clearReview("alarms." + i + ".photo");
       } else if (input.hasAttribute("data-sb-photo")) {
         state.switchboard.photos.push({ dataUrl: await compress(file, 1280, 0.7), caption: "" });
       } else if (input.getAttribute("data-logo") === "inspector") {
@@ -788,16 +804,144 @@ const APP_VERSION = "0.1.3";
     }
   }
 
+  function paintImportBanner() {
+    const el = document.getElementById("import-banner");
+    if (!el) return;
+    const rev = state && state.importReview;
+    const missing = (rev && rev.missing) || [];
+    if (!missing.length) { el.hidden = true; el.innerHTML = ""; return; }
+    const shown = missing.slice(0, 8);
+    el.hidden = false;
+    el.innerHTML = "<strong>" + esc(rev.summary || "Check the marked fields.") + "</strong><ul>" +
+      shown.map((m) => "<li>" + esc(m.label) + ": " + esc(m.reason) + "</li>").join("") +
+      (missing.length > shown.length ? "<li>" + (missing.length - shown.length) + " more, marked in yellow.</li>" : "") +
+      "</ul>";
+  }
+  function clearReview(path) {
+    if (!state || !state.importReview || !path) return;
+    const next = state.importReview.missing.filter((m) => m.path !== path);
+    if (next.length === state.importReview.missing.length) return;
+    state.importReview.missing = next;
+    if (!next.length) state.importReview = null;
+    document.querySelectorAll("[data-review]").forEach((node) => {
+      if (node.getAttribute("data-review") === path) node.classList.remove("need-review");
+    });
+    paintImportBanner();
+  }
+  function imageOrBlank(value) {
+    return typeof value === "string" && /^data:image\/(?:png|jpeg|jpg|webp);base64,/i.test(value) ? value : "";
+  }
+  function adoptImported(incoming) {
+    const b = blank();
+    const src = incoming || {};
+    const s = Object.assign(b, src);
+    s.job = Object.assign(b.job, src.job || {});
+    s.inspector = Object.assign(b.inspector, src.inspector || {});
+    s.inspector.logo = imageOrBlank(s.inspector.logo);
+    s.property = Object.assign(b.property, src.property || {});
+    s.switchboard = Object.assign(b.switchboard, src.switchboard || {});
+    s.switchboard.rcdTests = (src.switchboard && src.switchboard.rcdTests) || [];
+    s.switchboard.photos = ((src.switchboard && src.switchboard.photos) || []).map((p) => ({
+      dataUrl: imageOrBlank(p && (p.dataUrl || p)),
+      caption: (p && p.caption) || ""
+    })).filter((p) => p.dataUrl);
+    s.sign = Object.assign(b.sign, src.sign || {});
+    s.sign.signature = imageOrBlank(s.sign.signature);
+    s.sign.elecSignature = imageOrBlank(s.sign.elecSignature);
+    s.sign.supSignature = imageOrBlank(s.sign.supSignature);
+    s.sign.contractor = Object.assign(b.sign.contractor, (src.sign && src.sign.contractor) || {});
+    s.sign.contractor.logo = imageOrBlank(s.sign.contractor.logo);
+    s.alarms = (src.alarms || []).map((a) => {
+      const alarm = Object.assign(blankAlarm(), a, { id: (a && a.id) || uid() });
+      alarm.photo = imageOrBlank(alarm.photo);
+      if (alarm.locationPhoto) alarm.locationPhoto = imageOrBlank(alarm.locationPhoto);
+      if (alarm.audio && alarm.audio.dataUrl && String(alarm.audio.dataUrl).indexOf("data:audio/") !== 0) alarm.audio.dataUrl = "";
+      return alarm;
+    });
+    s.extraDefects = src.extraDefects || [];
+    s.scope = Object.assign({ smoke: false, switchboard: false }, src.scope || {});
+    s.example = !!src.example;
+    s.importReview = null;
+    return s;
+  }
+  function draftDirty() {
+    return !!(state && (state.example || (state.job && state.job.address) || (state.alarms && state.alarms.length) || (state.sign && state.sign.signature)));
+  }
+  async function readEmbedded(pdf) {
+    const at = await pdf.getAttachments();
+    if (!at) return null;
+    const entries = at instanceof Map ? Array.from(at.keys()) : Object.keys(at);
+    entries.sort((a, b) => (a === window.NIImport.FILE_NAME ? -1 : b === window.NIImport.FILE_NAME ? 1 : 0));
+    for (let i = 0; i < entries.length; i++) {
+      try {
+        const bytes = await pdf.getAttachmentContent(entries[i]);
+        const obj = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+        if (obj && obj.schema === 1 && obj.state) return obj;
+      } catch (e) { /* not this attachment */ }
+    }
+    return null;
+  }
+  function applyImported(result) {
+    state = adoptImported(result.state);
+    if (result.missing && result.missing.length) {
+      state.importReview = { missing: result.missing, summary: result.summary, source: result.source };
+    }
+    if (result.source === "text") state.step = 0;
+    alarmOpen = 0;
+    const panel = document.getElementById("saved-panel");
+    if (panel) panel.classList.remove("open");
+    saveDraft();
+    render();
+    toast(result.source === "json" && !(result.missing || []).length ? "Report loaded from the PDF." : "Report loaded. Check the marked fields.");
+  }
+  async function importPdfFile(file) {
+    if (!file) return;
+    if (!window.NIImport || !window.NDPdf) { toast("The PDF reader did not load. Reload the page and try again."); return; }
+    if (draftDirty() && !confirm("Replace the current inspection with this PDF?")) return;
+    toast("Reading the PDF…");
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const lib = await window.NDPdf.load();
+      const pdf = await lib.getDocument(window.NDPdf.docOptions({ data: bytes })).promise;
+      const payload = await readEmbedded(pdf);
+      if (payload) { applyImported(window.NIImport.fromPayload(payload)); return; }
+      const pages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        const view = page.view;
+        pages.push({
+          width: view[2] - view[0],
+          height: view[3] - view[1],
+          items: tc.items.filter((it) => it && it.str).map((it) => ({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0 }))
+        });
+      }
+      const result = window.NIImport.fromTextItems(pages);
+      if (!result.ok) { toast("That PDF does not look like a Neill Inspect report."); return; }
+      applyImported(result);
+    } catch (e) {
+      toast("That PDF could not be read. " + (e && e.message ? e.message : "Try another file."));
+    }
+  }
+
   document.body.addEventListener("input", (e) => {
     const el = e.target;
     if (!el.dataset || !el.dataset.bind) return;
     setPath(state, el.dataset.bind, el.type === "checkbox" ? el.checked : el.value);
+    clearReview(el.dataset.bind);
     saveSoon();
   });
   document.body.addEventListener("change", (e) => {
     const el = e.target;
+    if (el && el.id === "import-pdf") {
+      const file = el.files && el.files[0];
+      el.value = "";
+      if (file) importPdfFile(file);
+      return;
+    }
     if (el.dataset && el.dataset.bind) {
       setPath(state, el.dataset.bind, el.value);
+      clearReview(el.dataset.bind);
       if (/^inspector\.|^sign\.preparer$/.test(el.dataset.bind)) saveProfile();
       saveSoon();
       if (el.tagName === "SELECT") render();
@@ -813,6 +957,7 @@ const APP_VERSION = "0.1.3";
       if (path === "sign.onBehalf") state.sign.onBehalf = val === "yes";
       else if (path === "sign.elecSignoff") state.sign.elecSignoff = val === "yes";
       else setPath(state, path, val);
+      clearReview(path);
       if (/^inspector\.|^sign\.preparer$/.test(path)) saveProfile();
       saveSoon();
       render();
