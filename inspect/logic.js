@@ -402,15 +402,53 @@ function recommendation(text) {
     return state;
   }
 
-  /* Phone, supervising electrician, REC and licence are collected once on the device. */
+  /* Phone, supervising electrician, contractor business name, REC and licence are collected once on the device.
+     A profile saved before the contractor name existed is incomplete, so the setup form is shown again. */
+  function bnSettings(saved) {
+    const s = saved || {};
+    return {
+      phone: String(s.phone || ""),
+      supName: String(s.supName || ""),
+      contractor: String(s.contractor || ""),
+      rec: String(s.rec || ""),
+      licence: String(s.licence || "")
+    };
+  }
+
   function bnGaps(settings) {
-    const s = settings || {};
+    const s = bnSettings(settings);
     const gaps = [];
-    if (!String(s.phone || "").trim()) gaps.push("phone");
-    if (!String(s.supName || "").trim()) gaps.push("supName");
-    if (!String(s.rec || "").trim()) gaps.push("rec");
-    if (!String(s.licence || "").trim()) gaps.push("licence");
+    if (!s.phone.trim()) gaps.push("phone");
+    if (!s.supName.trim()) gaps.push("supName");
+    if (!s.rec.trim()) gaps.push("rec");
+    if (!s.licence.trim()) gaps.push("licence");
+    if (!s.contractor.trim()) gaps.push("contractor");
     return gaps;
+  }
+
+  /* Copy the on-device profile onto a report. The contractor name comes only from that profile. */
+  function applyBnProfile(state, settings) {
+    if (!state) return state;
+    const saved = bnSettings(settings);
+    const contractor = saved.contractor.trim();
+    if (!state.inspector) state.inspector = {};
+    if (!state.sign) state.sign = {};
+    if (!state.sign.contractor) state.sign.contractor = {};
+    const ins = state.inspector;
+    const sign = state.sign;
+    const c = sign.contractor;
+    ins.techPhone = saved.phone;
+    ins.supName = saved.supName;
+    ins.supRec = saved.rec;
+    ins.supLic = saved.licence;
+    ins.supBusiness = contractor;
+    sign.onBehalf = true;
+    sign.elecSignoff = true;
+    c.name = contractor;
+    c.rec = saved.rec;
+    c.electrician = saved.supName;
+    c.licence = saved.licence;
+    return state;
   }
 
   function yn(v, yesText, noText) {
@@ -509,7 +547,9 @@ function recommendation(text) {
     displayResult: displayResult,
     pdfBlockers: pdfBlockers,
     applyAutomaticDefaults: applyAutomaticDefaults,
+    bnSettings: bnSettings,
     bnGaps: bnGaps,
+    applyBnProfile: applyBnProfile,
     switchboardRows: switchboardRows,
     recommendation: recommendation
   };
