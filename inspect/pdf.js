@@ -660,7 +660,16 @@
       doc.text("Report " + (state.reportNo || ""), W / 2, H - 20, { align: "center" });
       doc.text("Page " + i + " of " + pages, W - M, H - 20, { align: "right" });
     }
-    doc.setProperties({ title: L().TITLE, subject: state.reportNo || "", creator: "Neill Inspect" });
+    doc.setProperties({
+      title: L().TITLE,
+      subject: state.reportNo || "",
+      creator: "Neill Inspect",
+      keywords: "neill-inspect-schema-1"
+    });
+    if (root.NIImport && root.NIImport.embedInPdf) {
+      const version = root.NI && root.NI.version || "";
+      root.NIImport.embedInPdf(doc, root.NIImport.payloadFromState(state, { version: version }));
+    }
     return doc;
   }
 
