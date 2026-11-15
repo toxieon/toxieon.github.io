@@ -1,5 +1,5 @@
 /* Neill Inspect — on-device smoke alarm and switchboard report. No login. */
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.3.1";
 (function () {
   "use strict";
   const L = window.NILogic;
@@ -8,7 +8,6 @@ const APP_VERSION = "0.3.0";
   const BN_KEY = "nd:inspect:bn:v1";
   const BN_NAME = "Brandon Neill";
   const BN_PREPARER = "Neill Data";
-  const BN_COMPANY = "Arcon";
   const DB_NAME = "nd-inspect";
   const STORE = "reports";
   const MAPS_KEY = "AIzaSyDlf9uWhJl1yXwDq8GU8V4p9DDoC1zNn0w";
@@ -100,6 +99,10 @@ const APP_VERSION = "0.3.0";
 
   function loadBn() {
     try { return JSON.parse(localStorage.getItem(BN_KEY) || "null"); } catch (e) { return null; }
+  }
+  function bnBehalfSentence(settings) {
+    const company = L.bnSettings(settings).contractor.trim();
+    return company ? "Prepared by " + BN_PREPARER + " on behalf of " + company + "." : "";
   }
   function saveBn(settings) {
     try { localStorage.setItem(BN_KEY, JSON.stringify(settings)); } catch (e) { toast("These details could not be saved on this device."); }
@@ -270,9 +273,11 @@ const APP_VERSION = "0.3.0";
     ensureDates();
     L.applyAutomaticDefaults(state, today());
     const saved = state.bn ? loadBn() : null;
+    const behalf = state.bn ? bnBehalfSentence(saved) : "";
     const who = state.bn
-      ? '<p class="help">Brandon Neill. Prepared by Neill Data on behalf of Arcon.' +
-        (saved && saved.supName ? " Supervising electrician: " + esc(saved.supName) + "." : "") + "</p>"
+      ? '<p class="help">' + esc(BN_NAME) + ". " +
+        (behalf ? esc(behalf) : "Enter the contractor business name. It is saved on this phone only.") +
+        (saved && String(saved.supName || "").trim() ? " Supervising electrician: " + esc(saved.supName) + "." : "") + "</p>"
       : field("Full name", "inspector.techName") + field("Phone", "inspector.techPhone", "tel");
     return '<section class="card"><h2>Sign</h2>' + who +
       field("Printed name", "sign.printedName") +
@@ -280,12 +285,16 @@ const APP_VERSION = "0.3.0";
       '<button type="button" class="btn btn-ghost" data-action="clear-sign" data-path="sign.signature">Clear signature</button></section>';
   }
   function bnFormHtml() {
-    const cur = loadBn() || {};
-    return '<section class="card"><h2>Automatic as BN</h2><p class="help">Brandon Neill. Prepared by Neill Data on behalf of Arcon. The phone, supervising electrician, REC number and licence are saved on this phone only, the first time. They are not written into the app.</p>' +
-      '<label class="field"><span>Phone</span><input id="bn-phone" value="' + esc(cur.phone || "") + '" type="tel"></label>' +
-      '<label class="field"><span>Supervising electrician</span><input id="bn-sup" value="' + esc(cur.supName || "") + '"></label>' +
-      '<label class="field"><span>REC number</span><input id="bn-rec" value="' + esc(cur.rec || "") + '"></label>' +
-      '<label class="field"><span>Licence number</span><input id="bn-lic" value="' + esc(cur.licence || "") + '"></label>' +
+    const cur = L.bnSettings(loadBn());
+    const behalf = bnBehalfSentence(cur);
+    return '<section class="card"><h2>Automatic as BN</h2><p class="help">' + esc(BN_NAME) + ". " +
+      (behalf ? esc(behalf) + " " : "") +
+      "The phone, supervising electrician, contractor business name, REC number and licence are saved on this phone only, the first time. They are not written into the app.</p>" +
+      '<label class="field"><span>Phone</span><input id="bn-phone" value="' + esc(cur.phone) + '" type="tel"></label>' +
+      '<label class="field"><span>Supervising electrician</span><input id="bn-sup" value="' + esc(cur.supName) + '"></label>' +
+      '<label class="field"><span>Contractor business name</span><input id="bn-contractor" value="' + esc(cur.contractor) + '"></label>' +
+      '<label class="field"><span>REC number</span><input id="bn-rec" value="' + esc(cur.rec) + '"></label>' +
+      '<label class="field"><span>Licence number</span><input id="bn-lic" value="' + esc(cur.licence) + '"></label>' +
       '<button type="button" class="btn btn-primary" data-action="save-bn">Save and start</button>' +
       '<button type="button" class="btn btn-ghost" data-action="cancel-bn">Cancel</button></section>';
   }
@@ -909,9 +918,12 @@ const APP_VERSION = "0.3.0";
     if (!el) return;
     if (!state || !state.automatic) { el.hidden = true; el.textContent = ""; return; }
     el.hidden = false;
-    el.textContent = state.bn
-      ? "Automatic report for Brandon Neill. Prepared by Neill Data on behalf of Arcon. Every check is marked passed."
-      : "Automatic report. Every check is marked passed. Add where each alarm is, then sign.";
+    if (!state.bn) {
+      el.textContent = "Automatic report. Every check is marked passed. Add where each alarm is, then sign.";
+      return;
+    }
+    const behalf = bnBehalfSentence(loadBn());
+    el.textContent = "Automatic report for " + BN_NAME + "." + (behalf ? " " + behalf : "") + " Every check is marked passed.";
   }
   function paintImportBanner() {
     const el = document.getElementById("import-banner");
@@ -1059,22 +1071,11 @@ const APP_VERSION = "0.3.0";
     if (el.type === "file") onFile(el);
   });
   function applyBn(s, settings) {
-    const saved = settings || {};
+    L.applyBnProfile(s, settings);
     s.bn = true;
     s.inspector.techName = BN_NAME;
-    s.inspector.techPhone = saved.phone || "";
-    s.inspector.supName = saved.supName || "";
-    s.inspector.supRec = saved.rec || "";
-    s.inspector.supLic = saved.licence || "";
-    s.inspector.supBusiness = BN_COMPANY;
     s.sign.printedName = BN_NAME;
-    s.sign.onBehalf = true;
     s.sign.preparer = BN_PREPARER;
-    s.sign.elecSignoff = true;
-    s.sign.contractor.name = BN_COMPANY;
-    s.sign.contractor.rec = saved.rec || "";
-    s.sign.contractor.electrician = saved.supName || "";
-    s.sign.contractor.licence = saved.licence || "";
     s.sign.signature = "";
     s.sign.elecSignature = "";
     s.sign.supSignature = "";
@@ -1157,10 +1158,11 @@ const APP_VERSION = "0.3.0";
       const settings = {
         phone: (document.getElementById("bn-phone") || {}).value || "",
         supName: (document.getElementById("bn-sup") || {}).value || "",
+        contractor: (document.getElementById("bn-contractor") || {}).value || "",
         rec: (document.getElementById("bn-rec") || {}).value || "",
         licence: (document.getElementById("bn-lic") || {}).value || ""
       };
-      if (L.bnGaps(settings).length) { toast("Fill in the phone, supervising electrician, REC number and licence."); return; }
+      if (L.bnGaps(settings).length) { toast("Fill in the phone, supervising electrician, contractor business name, REC number and licence."); return; }
       saveBn(settings);
       launchAutomatic(true);
     }

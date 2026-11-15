@@ -167,13 +167,37 @@ test("an automatic on-behalf report does not ask for a second signature", () => 
   s.sign.onBehalf = true;
   s.sign.elecSignature = "";
   s.sign.preparer = "Neill Data";
-  s.sign.contractor = { name: "Arcon", rec: "1", electrician: "A Person", licence: "L1" };
+  s.sign.contractor = { name: "Example Electrical Pty Ltd", rec: "1", electrician: "Example Electrician", licence: "L1" };
   assert.equal(L.pdfBlockers(s, NOW).some((line) => /Authorising electrician signature/.test(line)), false);
 });
 
-test("BN settings are missing until phone, electrician, REC and licence are stored", () => {
-  assert.deepEqual(L.bnGaps({}), ["phone", "supName", "rec", "licence"]);
-  assert.deepEqual(L.bnGaps({ phone: "0400", supName: "A Person", rec: "1", licence: "L1" }), []);
+test("BN settings are missing until phone, electrician, contractor, REC and licence are stored", () => {
+  assert.deepEqual(L.bnGaps({}), ["phone", "supName", "rec", "licence", "contractor"]);
+  assert.deepEqual(L.bnGaps({
+    phone: "0400", supName: "Example Electrician", rec: "1", licence: "L1", contractor: "Example Electrical Pty Ltd"
+  }), []);
+});
+
+test("a BN profile saved without a contractor name asks for that name only", () => {
+  const saved = { phone: "0400 000 000", supName: "Example Electrician", rec: "REC1", licence: "L1" };
+  assert.deepEqual(L.bnGaps(saved), ["contractor"]);
+  assert.deepEqual(L.bnSettings(saved), {
+    phone: "0400 000 000",
+    supName: "Example Electrician",
+    contractor: "",
+    rec: "REC1",
+    licence: "L1"
+  });
+  assert.deepEqual(L.bnGaps({
+    phone: "0400 000 000", supName: "Example Electrician", rec: "REC1", licence: "L1", contractor: "   "
+  }), ["contractor"]);
+  const report = base();
+  report.sign.contractor.name = "";
+  report.inspector.supBusiness = "";
+  L.applyBnProfile(report, saved);
+  assert.equal(report.sign.contractor.name, "");
+  assert.equal(report.inspector.supBusiness, "");
+  assert.equal(report.sign.contractor.electrician, "Example Electrician");
 });
 
 test("pre-1990 board is a CHECK item and the badge is not a pass", () => {

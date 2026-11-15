@@ -317,6 +317,32 @@ test("0.1.3 example PDF text import recovers the same main fields", async () => 
   assert.match(s.property.recommendations || "", /living room/);
 });
 
+test("the contractor name from a BN profile is printed on the PDF", async () => {
+  const Logic = require("./logic.js");
+  const state = exampleState();
+  const profile = {
+    phone: "0400 000 000",
+    supName: "Example Electrician",
+    rec: "12345",
+    licence: "L1",
+    contractor: "Example Electrical Pty Ltd"
+  };
+  Logic.applyBnProfile(state, profile);
+  state.sign.preparer = "Neill Data";
+  const bytes = buildPdf(
+    fs.readFileSync(path.join(__dirname, "logic.js"), "utf8"),
+    fs.readFileSync(path.join(__dirname, "pdf.js"), "utf8"),
+    state,
+    false
+  );
+  const { pages } = await textPages(bytes);
+  const joined = pages.map(function (p) { return p.items.map(function (it) { return it.str; }).join(" "); }).join(" ");
+  assert.match(joined, /Prepared by Neill Data on behalf of Example Electrical Pty Ltd/);
+  assert.match(joined, /on behalf of Example Electrical Pty Ltd, REC 12345/);
+  assert.match(joined, /Example Electrician/);
+  assert.equal(joined.includes("Example Electrical Pty Ltd"), true);
+});
+
 test("a new PDF embeds the report JSON and round-trips the same state", async () => {
   const state = exampleState();
   state.job.address = "12 Example Street — café";
