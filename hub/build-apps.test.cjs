@@ -12,7 +12,7 @@ test('committed hub/apps.json matches the generator (run: node hub/build-apps.cj
 
 test('hub keeps its pre-discovery tiles in the same order, plus discovered apps', () => {
   const visible = JSON.parse(gen.build()).apps.filter(a => !a.hidden).map(a => a.id);
-  assert.deepEqual(visible, ['planner', 'upload', 'search', 'quote', 'timesheet', 'swb', 'fitoff', 'assets', 'company', 'ico', 'reelreader', 'inspect']);
+  assert.deepEqual(visible, ['planner', 'upload', 'search', 'quote', 'timesheet', 'swb', 'fitoff', 'assets', 'company', 'ico', 'reelreader', 'inspect', 'chess-lab']);
   const ico = JSON.parse(gen.build()).apps.find(a => a.id === 'ico');
   assert.equal(ico.name, 'ICO Generator');
   assert.equal(ico.version, fs.readFileSync(path.join(__dirname, '../ico/VERSION'), 'utf8').trim());
@@ -23,6 +23,15 @@ test('hub keeps its pre-discovery tiles in the same order, plus discovered apps'
   assert.equal(inspect.name, 'Neill Inspect');
   assert.equal(inspect.path, '/inspect/');
   assert.equal(inspect.version, fs.readFileSync(path.join(__dirname, '../inspect/VERSION'), 'utf8').trim());
+  const chess = JSON.parse(gen.build()).apps.find(a => a.id === 'chess-lab');
+  assert.equal(chess.name, 'Chess Lab');
+  assert.equal(chess.path, '/chess-lab/');
+  assert.equal(chess.order, 14);
+  assert.equal(chess.hidden, false);
+  assert.equal(chess.icon, '/hub/icons/chess-lab.svg');
+  assert.equal(chess.description, 'Replay your games, puzzles from your own mistakes, and opening stats');
+  assert.equal(fs.existsSync(path.join(__dirname, 'icons/chess-lab.svg')), true);
+  assert.equal(JSON.parse(gen.build()).apps.some(a => a.id === 'chess' || a.path === '/chess/'), false);
 });
 
 test('parsePage reads title, favicon and nd:* meta in any attribute order / quoting', () => {
@@ -73,6 +82,23 @@ test('discovery: defaults, exclude list, meta tags, overrides and app.json prece
   assert.equal(by.both.hidden, true);
   assert.equal(by.secret.hidden, true);
   assert.deepEqual(apps.map(a => a.id), ['legacy', 'both', 'meta-app', 'newtool', 'secret']);
+});
+
+test('extra apps are kept when they have no folder in this repo', () => {
+  const root = site({
+    'hub/discover.json': JSON.stringify({
+      extra: [{ id: 'pinned-app', name: 'Pinned', path: '/pinned-app/', icon: '/hub/icons/pinned.svg', color: '#112233', order: 2, hidden: false, description: 'External' }],
+    }),
+    'local/index.html': '<title>Local</title>',
+  });
+  const apps = gen.discover(root);
+  const pinned = apps.find(a => a.id === 'pinned-app');
+  assert.ok(pinned);
+  assert.equal(pinned.name, 'Pinned');
+  assert.equal(pinned.path, '/pinned-app/');
+  assert.equal(pinned.hidden, false);
+  assert.equal(pinned.description, 'External');
+  assert.deepEqual(apps.map(a => a.id), ['pinned-app', 'local']);
 });
 
 test('discovery: suite icon fallback and invalid values fail loudly', () => {

@@ -1,3 +1,5 @@
+## 1.2.6 · 2026-11-16 · chess-lab-icon · Visual library catalogue includes the Chess Lab hub tile icon, and the Inspect favicon that was already on disk. Service worker `assets-1.2.6`
+
 ## 1.2.5 · 2026-10-20 · planner-split · Planner icons and palette are now read live from planner/js/state.js (Planner split app.js into planner/js). Service worker `assets-1.2.5`
 
 ## 1.2.4 · 2026-10-19 · 3d-venues · Visual library adds a **3D Venues** section: eight procedural stadium demos (three.js, pinned CDN) plus oval stadium and athlete figure GLB downloads (web meshopt builds and full-quality files). Service worker `assets-1.2.4`

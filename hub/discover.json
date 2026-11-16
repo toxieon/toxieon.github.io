@@ -1,6 +1,6 @@
 {
-  "_readme": "Config for hub/build-apps.cjs. Every top-level folder with an index.html becomes a hub tile unless listed in exclude or marked hidden. Per-app settings: nd:* meta tags in the folder's index.html (preferred) or <folder>/app.json. 'overrides' keeps the tiles that existed before auto-discovery looking the same; nd:* meta tags and app.json win over it. See hub/README.md.",
-  "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive", "mathbuilder"],
+  "_readme": "Config for hub/build-apps.cjs. Every top-level folder with an index.html becomes a hub tile unless listed in exclude or marked hidden. Per-app settings: nd:* meta tags in the folder's index.html (preferred) or <folder>/app.json. 'overrides' keeps the tiles that existed before auto-discovery looking the same; nd:* meta tags and app.json win over it. 'extra' pins apps that are not folders in this repo: the generator copies them through and does not drop them or look for a folder. 'chess' is only a redirect to Chess Lab. See hub/README.md.",
+  "exclude": ["hub", "checklist", "M2C", "battleship", "timesheetlive", "mathbuilder", "chess"],
   "defaults": { "color": "#94a3b8", "order": 99 },
   "overrides": {
     "planner":    { "name": "Planner",   "icon": "/assets/suite-icons/apps/planner.svg?v=1.2.0",   "color": "#ff5252", "order": 1 },
@@ -15,6 +15,7 @@
     "reelreader": { "name": "Reel Reader", "icon": "/assets/suite-icons/apps/reelreader.svg?v=1.3.0", "color": "#f472b6", "order": 12 }
   },
   "extra": [
-    { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true }
+    { "id": "site", "name": "Website", "path": "/", "icon": "/favicon.svg", "color": "#2563eb", "order": 11, "hidden": true },
+    { "id": "chess-lab", "name": "Chess Lab", "path": "/chess-lab/", "icon": "/hub/icons/chess-lab.svg", "color": "#e8e6e3", "order": 14, "hidden": false, "description": "Replay your games, puzzles from your own mistakes, and opening stats" }
   ]
 }

@@ -19,6 +19,17 @@ test('hub apple-touch-icon and maskables are opaque RGB at the right sizes', () 
   }
 });
 
+test('chess lab tile icon is a local suite-style svg', () => {
+  const svg = read('icons/chess-lab.svg').toString();
+  assert.match(svg, /<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(svg, /fill="#101922"/);
+  assert.match(svg, /aria-label="Chess Lab"/);
+  assert.doesNotMatch(svg, /<text\b|font-family|href=/);
+  const apps = JSON.parse(read('apps.json').toString());
+  const chess = apps.apps.find((a) => a.id === 'chess-lab');
+  assert.equal(chess.icon.split('?')[0], '/hub/icons/chess-lab.svg');
+});
+
 test('hub page, manifest and service worker reference the Suite hub icons', () => {
   const html = read('index.html').toString();
   assert.match(html, /<link rel="icon" href="favicon\.svg\?v=[\d.]+" type="image\/svg\+xml">/);
