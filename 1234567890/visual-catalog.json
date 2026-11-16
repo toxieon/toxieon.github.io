@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-04",
-  "count": 244,
+  "generatedAt": "2026-11-16",
+  "count": 246,
   "categories": [
     {
       "id": "1234567890/favicon.svg",
@@ -1812,6 +1812,15 @@
       "subcategory": "Favicon"
     },
     {
+      "id": "hub/icons/chess-lab.svg",
+      "name": "Chess Lab",
+      "href": "/hub/icons/chess-lab.svg",
+      "preview": "/hub/icons/chess-lab.svg",
+      "source": "Hub",
+      "category": "Hub",
+      "subcategory": "PWA / home-screen icons"
+    },
+    {
       "id": "hub/icons/icon-180.png",
       "name": "Icon 180",
       "href": "/hub/icons/icon-180.png",
@@ -1891,6 +1900,15 @@
       "source": "ICO",
       "category": "ICO",
       "subcategory": "PWA / home-screen icons"
+    },
+    {
+      "id": "inspect/favicon.svg",
+      "name": "Favicon",
+      "href": "/inspect/favicon.svg",
+      "preview": "/inspect/favicon.svg",
+      "source": "inspect",
+      "category": "inspect",
+      "subcategory": "Favicon"
     },
     {
       "id": "logo.png",
