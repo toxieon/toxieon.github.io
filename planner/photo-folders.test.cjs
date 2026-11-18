@@ -116,7 +116,7 @@ test("photos group by level and apartment, including a file dropped straight int
 });
 
 test("folder links accept a Drive url or a bare id", () => {
-  const id = "1WtxT07n40jqFg2uxHKC_yS4iBdxizPKh";
+  const id = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456";
   assert.equal(PF.parseDriveFolderId("https://drive.google.com/drive/folders/" + id + "?usp=sharing"), id);
   assert.equal(PF.parseDriveFolderId("https://drive.google.com/open?id=" + id), id);
   assert.equal(PF.parseDriveFolderId(id), id);
