@@ -29,14 +29,23 @@
     };
   }
 
+  function pickField(x, primary, fallback) {
+    if (x[primary] != null && x[primary] !== "") return num(x[primary]);
+    if (fallback && x[fallback] != null && x[fallback] !== "") return num(x[fallback]);
+    return 0;
+  }
+
   function normDaily(d) {
     const x = d && typeof d === "object" ? d : {};
     return {
       date: x.date != null ? String(x.date) : "",
+      picks: num(x.picks),
       bets: num(x.bets),
       wins: num(x.wins),
       pl_units: num(x.pl_units),
-      cum_units: num(x.cum_units),
+      hyp_pl_units: num(x.hyp_pl_units),
+      cum_units: pickField(x, "cum_units", "cum"),
+      hyp_cum_units: pickField(x, "hyp_cum_units", "hyp_cum"),
     };
   }
 
@@ -146,6 +155,7 @@
     normalizeStatsPayload,
     normSummary,
     normDaily,
+    pickField,
     normBreakdownRow,
     sortPriceBands,
     normRecent,

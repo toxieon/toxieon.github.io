@@ -27,6 +27,21 @@ test("monthOverlapsRange respects selected range", () => {
   assert.equal(C.monthOverlapsRange("2026-10", "2026-11-05", "2026-11-20"), false);
 });
 
+test("normDailySlice prefers cum_units and hyp_cum_units", () => {
+  const row = C.normDailySlice({
+    bets: 1,
+    cum_units: 2,
+    cum: 9,
+    hyp_cum_units: 3,
+    hyp_cum: 8,
+  });
+  assert.equal(row.cum_units, 2);
+  assert.equal(row.hyp_cum_units, 3);
+  const legacy = C.normDailySlice({ cum: 4, hyp_cum: 5 });
+  assert.equal(legacy.cum_units, 4);
+  assert.equal(legacy.hyp_cum_units, 5);
+});
+
 test("plTone uses bets and sign", () => {
   assert.equal(C.plTone(2, 1), "pos");
   assert.equal(C.plTone(-1, 2), "neg");

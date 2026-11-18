@@ -47,6 +47,45 @@ test("empty breakdown arrays stay empty", () => {
   assert.deepEqual(m.models.with_price.by_price_band, []);
 });
 
+test("staked-only partial payload: models with summary and daily only", () => {
+  const out = N.normalizeStatsPayload({
+    range: { from: "2026-11-12", to: "2026-11-18" },
+    models: {
+      without_price: {
+        summary: { bets: 12, wins: 4, strike_pct: 33.3, staked_units: 20, pl_units: 3.5, roi_pct: 17.5 },
+        daily: [{ date: "2026-11-12", bets: 2, wins: 1, pl_units: 1, cum_units: 1 }],
+      },
+    },
+  });
+  assert.equal(out.models.without_price.summary.bets, 12);
+  assert.equal(out.models.without_price.daily.length, 1);
+  assert.equal(out.models.with_price.summary.bets, 0);
+  assert.deepEqual(out.models.agree.by_track, []);
+  assert.deepEqual(out.head_to_head.days, []);
+});
+
+test("demo daily rows emit cum_units and hyp_cum_units (not legacy cum keys)", () => {
+  const D = require("./demo.js");
+  const stats = D.generateDemoStats("2026-11-01", "2026-11-07");
+  for (const id of ["with_price", "without_price", "agree"]) {
+    const day = stats.models[id].daily[0];
+    assert.ok(Object.prototype.hasOwnProperty.call(day, "cum_units"));
+    assert.ok(Object.prototype.hasOwnProperty.call(day, "hyp_cum_units"));
+    assert.equal(Object.prototype.hasOwnProperty.call(day, "cum"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(day, "hyp_cum"), false);
+  }
+  const staked = D.generateStakedDemoStats("2026-11-18");
+  const stakedDay = staked.models.without_price.daily[0];
+  assert.ok(Object.prototype.hasOwnProperty.call(stakedDay, "hyp_cum_units"));
+});
+
+test("normDaily prefers cum_units and hyp_cum_units over legacy cum keys", () => {
+  assert.equal(N.normDaily({ cum_units: 3, cum: 99 }).cum_units, 3);
+  assert.equal(N.normDaily({ cum: 2 }).cum_units, 2);
+  assert.equal(N.normDaily({ hyp_cum_units: 5, hyp_cum: 1 }).hyp_cum_units, 5);
+  assert.equal(N.normDaily({ hyp_cum: 4 }).hyp_cum_units, 4);
+});
+
 test("head_to_head daily pl units are numeric", () => {
   const h = N.normHeadToHead({
     days: [{ date: "2026-11-01", with_price: "1.5", without_price: null, agree: -2 }],

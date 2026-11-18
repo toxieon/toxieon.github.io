@@ -2,12 +2,17 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.1.2";
+  const APP_VERSION = "0.1.3";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
   const CAL = window.NDModelsCalendar;
   const DATES = window.NDModelsDates;
+  const API = window.NDModelsApi;
+
+  const UNAVAILABLE_MSG =
+    "Not available: either the stats API isn't live yet, or this token isn't the owner's.";
+  const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
 
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d) => (Number.isFinite(n) ? n.toFixed(d ?? 1) : "—");
@@ -31,6 +36,11 @@
     apiNotLive: false,
     calendarMonth: "",
     joinedByDate: null,
+    stakedData: null,
+    stakedModel: "without_price",
+    stakedLoading: false,
+    stakedNotLive: false,
+    stakedError: "",
   };
 
   function isDemoMode() {
@@ -86,12 +96,13 @@
     }
   }
 
-  async function fetchStats(from, to) {
+  async function fetchModelStats(from, to, options) {
+    const opts = options && typeof options === "object" ? options : {};
     if (isDemoMode()) {
-      const raw = DEMO.generateDemoStats(from, to);
+      const raw = opts.stakedOnly ? DEMO.generateStakedDemoStats(to) : DEMO.generateDemoStats(from, to);
       return { ok: true, data: N.normalizeStatsPayload(raw), demo: true };
     }
-    const url = CFG.API_BASE.replace(/\/+$/, "") + "/api/owner/model-stats?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
+    const url = API.buildModelStatsUrl(CFG.API_BASE, from, to, opts);
     const res = await fetch(url, {
       method: "GET",
       headers: { Authorization: "Bearer " + state.token },
@@ -139,7 +150,8 @@
     $("dashboard").hidden = true;
     $("load-state").hidden = false;
     $("load-state").textContent = "Loading stats…";
-    const result = await fetchStats(from, to);
+    loadStakedOnly();
+    const result = await fetchModelStats(from, to, {});
     $("load-state").hidden = true;
     if (result.auth) return;
     if (result.notLive) {
@@ -167,6 +179,9 @@
     setToken("");
     state.token = "";
     state.data = null;
+    state.stakedData = null;
+    state.stakedNotLive = false;
+    state.stakedError = "";
     state.gateMessage = "";
     state.apiNotLive = false;
     state.loadError = "";
@@ -186,8 +201,7 @@
     if (state.apiNotLive) {
       wrap.hidden = false;
       wrap.classList.add("info");
-      text.textContent =
-        "Not available: either the stats API isn't live yet, or this token isn't the owner's.";
+      text.textContent = UNAVAILABLE_MSG;
       changeBtn.hidden = false;
     } else if (state.loadError) {
       wrap.hidden = false;
@@ -236,14 +250,27 @@
     return span;
   }
 
-  function renderBankrollChart() {
-    const svg = $("bankroll-chart");
+  function modelStrokeColor(id) {
+    if (id === "with_price") return "var(--m-with)";
+    if (id === "without_price") return "var(--m-without)";
+    return "var(--m-agree)";
+  }
+
+  function renderCumUnitsChart(svg, modelsRoot, options) {
     while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const primary = options && options.primary;
+    const faintOthers = !!(options && options.faintOthers);
+    const valueField =
+      options && options.valueField === "hyp_cum_units" ? "hyp_cum_units" : "cum_units";
     const series = CFG.MODELS.map((id) => ({
       id,
-      label: CFG.MODEL_LABELS[id],
-      color: id === "with_price" ? "var(--m-with)" : id === "without_price" ? "var(--m-without)" : "var(--m-agree)",
-      points: state.data.models[id].daily.filter((d) => d.date),
+      color: modelStrokeColor(id),
+      points: (modelsRoot[id].daily || [])
+        .filter((d) => d.date)
+        .map((d) => ({
+          date: d.date,
+          cum_units: Number.isFinite(d[valueField]) ? d[valueField] : 0,
+        })),
     }));
     const allDates = [];
     const dateSet = new Set();
@@ -292,8 +319,10 @@
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", pathStr.trim());
       path.setAttribute("fill", "none");
+      const isPrimary = !primary || primary === s.id;
       path.setAttribute("stroke", s.color);
-      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-width", isPrimary ? "2.5" : "1.2");
+      path.setAttribute("opacity", faintOthers && primary && !isPrimary ? "0.35" : "1");
       svg.appendChild(path);
     });
     const y0 = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -308,6 +337,89 @@
     y1.setAttribute("class", "chart-label");
     y1.textContent = fmt(ymin, 0);
     svg.appendChild(y1);
+  }
+
+  function renderBankrollChart() {
+    renderCumUnitsChart($("bankroll-chart"), state.data.models, {});
+  }
+
+  async function loadStakedOnly() {
+    if (!signedIn()) return;
+    state.stakedLoading = true;
+    state.stakedNotLive = false;
+    state.stakedError = "";
+    renderStakedSection();
+    const to = DATES.todayMelbourneIso();
+    const from = CFG.STAKED_ONLY_FROM;
+    const result = await fetchModelStats(from, to, { stakedOnly: true });
+    state.stakedLoading = false;
+    if (result.auth) return;
+    if (result.notLive) {
+      state.stakedNotLive = true;
+      state.stakedData = null;
+      renderStakedSection();
+      return;
+    }
+    if (!result.ok) {
+      state.stakedError = result.error || "Could not load staked stats.";
+      state.stakedData = null;
+      renderStakedSection();
+      return;
+    }
+    state.stakedData = result.data;
+    state.stakedNotLive = false;
+    state.stakedError = "";
+    renderStakedSection();
+  }
+
+  function renderStakedSection() {
+    const wrap = $("staked-section");
+    if (!wrap) return;
+    $("staked-load").hidden = !state.stakedLoading;
+    const err = $("staked-error");
+    const errText = $("staked-error-text");
+    err.hidden = true;
+    errText.textContent = "";
+    if (state.stakedNotLive) {
+      err.hidden = false;
+      err.classList.add("info");
+      errText.textContent = UNAVAILABLE_MSG;
+    } else if (state.stakedError) {
+      err.hidden = false;
+      err.classList.remove("info");
+      errText.textContent = state.stakedError;
+    }
+    const body = $("staked-panel-body");
+    const hasData = state.stakedData && !state.stakedNotLive && !state.stakedError;
+    body.hidden = !hasData || state.stakedLoading;
+    if (!hasData) {
+      $("staked-empty").hidden = true;
+      $("staked-chart").replaceChildren();
+      return;
+    }
+    const model = state.stakedModel;
+    const summary = state.stakedData.models[model].summary;
+    document.querySelectorAll("[data-staked-model]").forEach((btn) => {
+      btn.classList.toggle("on", btn.getAttribute("data-staked-model") === model);
+    });
+    const stats = $("staked-stats");
+    stats.replaceChildren();
+    const pl = document.createElement("strong");
+    pl.className = plClass(summary.pl_units);
+    pl.textContent = fmtPl(summary.pl_units) + " u";
+    stats.append("P&L ", pl, " · ROI " + fmtPct(summary.roi_pct) + " · Bets " + summary.bets);
+    if (summary.bets > 0) stats.append(" · Strike " + fmtPct(summary.strike_pct));
+    const empty = $("staked-empty");
+    const chart = $("staked-chart");
+    if (!summary.bets) {
+      empty.hidden = false;
+      chart.hidden = true;
+      chart.replaceChildren();
+      return;
+    }
+    empty.hidden = true;
+    chart.hidden = false;
+    renderCumUnitsChart(chart, state.stakedData.models, { primary: model, faintOthers: true });
   }
 
   function renderBreakdown() {
@@ -636,6 +748,12 @@
       btn.addEventListener("click", () => {
         state.breakdownModel = btn.getAttribute("data-break-model");
         renderBreakdown();
+      });
+    });
+    document.querySelectorAll("[data-staked-model]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.stakedModel = btn.getAttribute("data-staked-model");
+        renderStakedSection();
       });
     });
     $("recent-model").addEventListener("change", renderRecent);
