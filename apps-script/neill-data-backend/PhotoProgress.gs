@@ -2,8 +2,6 @@
  * Config: Script Property PHOTO_PROGRESS_JOBS — JSON array of jobs (see README).
  * Optional: PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID to resolve rootFolderId from Projects. */
 
-var PP_PROP_JOBS = 'PHOTO_PROGRESS_JOBS';
-var PP_PROP_PLANNER_MASTER = 'PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID';
 var PP_HANDLER = 'runPhotoProgressJobs_';
 var PP_MELBOURNE = 'Australia/Melbourne';
 var PP_MAX_DEPTH = 4;
@@ -246,21 +244,33 @@ function ppFormatMelbourneTimestamp_(date) {
   return Utilities.formatDate(date || new Date(), PP_MELBOURNE, 'd MMM yyyy h:mm a') + ' Melbourne';
 }
 
+/* ── Script Property keys (standalone or Neill Data Config.gs) ───── */
+
+function ppJobsPropertyKey_() {
+  return (typeof PROP !== 'undefined' && PROP && PROP.photoProgressJobs) ? PROP.photoProgressJobs : 'PHOTO_PROGRESS_JOBS';
+}
+
+function ppPlannerMasterPropertyKey_() {
+  return (typeof PROP !== 'undefined' && PROP && PROP.photoProgressPlannerMaster)
+    ? PROP.photoProgressPlannerMaster : 'PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID';
+}
+
 /* ── job list ────────────────────────────────────────────────────── */
 
 function ppParseJobsProperty_() {
-  var raw = PropertiesService.getScriptProperties().getProperty(PP_PROP_JOBS) || '[]';
+  var key = ppJobsPropertyKey_();
+  var raw = PropertiesService.getScriptProperties().getProperty(key) || '[]';
   try {
     var list = JSON.parse(raw);
     return Array.isArray(list) ? list : [];
   } catch (e) {
-    console.error('Photo progress: invalid ' + PP_PROP_JOBS + ' JSON');
+    console.error('Photo progress: invalid ' + key + ' JSON');
     return [];
   }
 }
 
 function ppPlannerMasterId_() {
-  return String(PropertiesService.getScriptProperties().getProperty(PP_PROP_PLANNER_MASTER) || '').trim();
+  return String(PropertiesService.getScriptProperties().getProperty(ppPlannerMasterPropertyKey_()) || '').trim();
 }
 
 /** Merge explicit jobs with sheet rows that have projectId + reportFileId. */

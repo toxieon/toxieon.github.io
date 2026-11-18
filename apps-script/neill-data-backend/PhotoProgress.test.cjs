@@ -132,3 +132,27 @@ test('apartment codes parse from folder names', () => {
   assert.equal(ctx.ppApartmentFromName_('1.01').levelKey, '1');
   assert.equal(ctx.ppApartmentFromName_('APT# GROUND'), null);
 });
+
+test('standalone: property keys work without Config PROP', () => {
+  assert.equal(ctx.ppJobsPropertyKey_(), 'PHOTO_PROGRESS_JOBS');
+  assert.equal(ctx.ppPlannerMasterPropertyKey_(), 'PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID');
+});
+
+test('standalone: reads PHOTO_PROGRESS_JOBS from Script Properties', () => {
+  const soloCtx = vm.createContext({
+    console, JSON, Math, Object, String, Number, Array, Date, RegExp,
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => (k === 'PHOTO_PROGRESS_JOBS' ? '[{"rootFolderId":"r","reportFileId":"t"}]' : null)
+      })
+    },
+    Utilities: { formatDate: () => '1 Jan 2026' },
+    DriveApp: {}, SpreadsheetApp: {}, LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyMinutes: () => ({ create() {} }) }) }), deleteTrigger() {} }
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'PhotoProgress.gs'), 'utf8'), soloCtx, { filename: 'PhotoProgress.gs' });
+  const jobs = soloCtx.ppResolveJobList_();
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].rootFolderId, 'r');
+  assert.equal(jobs[0].reportFileId, 't');
+});

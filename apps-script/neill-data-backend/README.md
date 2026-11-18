@@ -106,29 +106,59 @@ Where to edit prices after the switch: the **price sheet** (Quote reads prices
 only from there), unless you install the hourly sync — then keep editing the
 Quote spreadsheet and don't edit the price sheet.
 
-## Photo progress reports (time-driven, Drive read-only)
+## Photo progress reports (time-driven, Drive read-only in code)
 
-About every 15 minutes (as the script owner), the backend walks each configured
-**photo root** folder on Drive (levels → apartments), counts photos per apartment
-(including **Rough-in**, **Fit-off**, and **Unsorted** stage folders), and
-rewrites a plain-text **report file** in place (`setContent` only — same file ID
-and link). It never moves, renames, copies, edits or trashes photos or folders.
+About every 15 minutes (as the script owner), `PhotoProgress.gs` walks each
+configured **photo root** folder on Drive (levels → apartments), counts photos
+per apartment (including **Rough-in**, **Fit-off**, and **Unsorted** stage
+folders), and rewrites a plain-text **report file** in place (`setContent` only
+— same file ID and link). The script never moves, renames, copies, edits or
+trashes photos or folders; the **only** write is `setContent` on `reportFileId`.
+
+**OAuth scope:** `https://www.googleapis.com/auth/drive` (full Drive). Narrower
+scopes such as `drive.file` cannot update a report file you created outside the
+script; full Drive is required for `setContent` on that existing file. Photo
+folders are still read-only in code.
 
 **Script Properties** (Project Settings → Script Properties):
 
 | Property | Value |
 | --- | --- |
-| `PHOTO_PROGRESS_JOBS` | JSON array (required). Example shape: `[{"rootFolderId":"<DRIVE_FOLDER_ID>","reportFileId":"<GOOGLE_DOC_OR_TEXT_FILE_ID>","stages":[{"key":"roughIn","label":"Rough-in","match":["rough in","rough-in","roughin"]},{"key":"fitOff","label":"Fit-off","match":["fit off","fit-off","fitoff"]}]}]`. Omit `stages` to use the default Rough-in / Fit-off labels. You can use `projectId` instead of `rootFolderId` when the optional master sheet property is set. |
-| `PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID` | (Optional) Spreadsheet ID for the master **Projects** sheet. Rows with **Photo Folder ID** are included only when the same job entry already has a `reportFileId` (match by `rootFolderId` or `projectId`). |
+| `PHOTO_PROGRESS_JOBS` | JSON array (required). Example: `[{"rootFolderId":"<DRIVE_FOLDER_ID>","reportFileId":"<REPORT_TEXT_FILE_ID>"}]`. Optional `stages` override Rough-in / Fit-off matching; optional `projectId` instead of `rootFolderId` when the master sheet property is set. |
+| `PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID` | (Optional) Master spreadsheet **Projects** tab — **Photo Folder ID** rows are used only when a job entry already has a `reportFileId` (match by `rootFolderId` or `projectId`). |
 
-**One-time setup after pasting `PhotoProgress.gs`:** Run **`runPhotoProgressNow()`** once
-to approve Drive read access, confirm the report file updates, then Run
-**`installPhotoProgressTrigger()`**. No web-app redeploy is required for the
-time trigger (only if you change `appsscript.json` scopes — add this file, then
-Deploy → Manage deployments → Edit → New version → Deploy).
+### Photo progress only (new Apps Script project)
 
-**Verify:** Open the report file link; title line is `<root folder name> Photo progress`,
-then Melbourne timestamp, summary counts, per-level apartment lines, and MISSING lists.
+Use this when **Neill Data Backend** is not deployed yet — no web app, no other
+`.gs` files. `PhotoProgress.gs` is self-contained (it does not need `Config.gs`).
+
+1. https://script.google.com → **New project** → name it e.g. **Photo progress**.
+2. Project Settings (gear) → tick **Show "appsscript.json" manifest file** →
+   replace with `appsscript-photo-progress.json` from this folder.
+3. Replace the default `Code.gs` with a single file **`PhotoProgress`** pasted
+   from `PhotoProgress.gs` here → **Save**.
+4. Script Properties → add `PHOTO_PROGRESS_JOBS` (JSON with your placeholder IDs).
+5. Select **`runPhotoProgressNow`** → **Run** → approve Drive access → check the
+   report file.
+6. Select **`installPhotoProgressTrigger`** → **Run** once.
+
+No web-app deployment is required (time-driven triggers run the project’s saved
+code as you, the script owner).
+
+### Photo progress in Neill Data Backend (existing project)
+
+If the full backend already exists: add **`PhotoProgress.gs`**, update the main
+`appsscript.json` (add the `drive` scope if not present), **Save**, then the same
+Script Property + **`runPhotoProgressNow`** + **`installPhotoProgressTrigger`**
+steps as above.
+
+Web-app **Deploy → New version** is **optional** — only if you also want the
+`/exec` web app serving the latest backend code; the 15-minute photo trigger
+does not need it.
+
+**Verify:** Report title `<root folder name> Photo progress`, Melbourne
+timestamp, stage summary lines, per-apartment counts, MISSING lists; photo
+folders unchanged on Drive.
 
 
 ## Stable Google login (iPhone home-screen apps stop asking to sign in)
