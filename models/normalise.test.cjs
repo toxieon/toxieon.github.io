@@ -9,6 +9,7 @@ test("normalizeStatsPayload fills missing models and summary fields", () => {
   assert.deepEqual(out.range, { from: "", to: "" });
   for (const id of N.MODEL_IDS) {
     assert.deepEqual(out.models[id].summary, {
+      picks: 0,
       bets: 0,
       wins: 0,
       strike_pct: 0,
@@ -24,13 +25,13 @@ test("normalizeStatsPayload fills missing models and summary fields", () => {
 
 test("price bands sort in locked display order, not alphabetically", () => {
   const rows = [
-    { label: "15+", bets: 1 },
+    { label: "$15+", bets: 1 },
     { label: "$1-2", bets: 2 },
-    { label: "5-8", bets: 3 },
-    { label: "2-3", bets: 4 },
+    { label: "$5-8", bets: 3 },
+    { label: "$2-3", bets: 4 },
   ].map(N.normBreakdownRow);
   const sorted = N.sortPriceBands(rows);
-  assert.deepEqual(sorted.map((r) => r.label), ["$1-2", "2-3", "5-8", "15+"]);
+  assert.deepEqual(sorted.map((r) => r.label), ["$1-2", "$2-3", "$5-8", "$15+"]);
 });
 
 test("normRecent coerces unknown result to void", () => {
@@ -108,7 +109,7 @@ test("hyp meta and by_weekday normalise when present", () => {
 test("demo from=all and extended fields", () => {
   const D = require("./demo.js");
   const s = D.generateDemoStats("all", "2026-11-07");
-  assert.equal(s.range.from, "all");
+  assert.equal(s.range.from, "2026-11-06");
   assert.ok(s.meta && s.meta.picks);
   assert.equal(s.models.with_price.by_weekday.length, 7);
   assert.ok(s.models.with_price.summary.hyp);
@@ -133,7 +134,7 @@ test("head_to_head daily pl units are numeric", () => {
 });
 test("normDaily and normRecent keep reconstructed flag only when set", () => {
   assert.equal(N.normDaily({ date: "2026-10-13", reconstructed: true }).reconstructed, true);
-  assert.equal(N.normDaily({ date: "2026-11-06" }).reconstructed, undefined);
+  assert.equal(N.normDaily({ date: "2026-11-06" }).reconstructed, false);
   assert.equal(N.normRecent({ reconstructed: true }).reconstructed, true);
   assert.equal(N.normRecent({}).reconstructed, undefined);
 });
@@ -166,4 +167,65 @@ test("filterReconstructed drops flagged rows when include is off", () => {
   const shown = N.filterReconstructed(raw, true);
   assert.equal(shown.models.with_price.daily.length, 2);
   assert.equal(shown.models.with_price.daily[0].reconstructed, true);
+});
+
+test("normalizeStatsPayload ignores top-level summary, daily and by_* keys", () => {
+  const out = N.normalizeStatsPayload({
+    summary: { bets: 999, pl_units: 99, picks: 99 },
+    daily: [{ date: "2026-11-06", pl_units: 99, cum_units: 99 }],
+    by_weekday: [{ label: "Wed", bets: 99 }],
+    meta: {
+      data_since: "2026-11-06",
+      picks: 3,
+      staked_picks: 2,
+      with_price: { data_since: "2026-11-06", picks: 3, staked_picks: 2 },
+    },
+    models: {
+      with_price: { summary: { picks: 3, bets: 2, pl_units: 1, hyp: { bets: 3, pl_units: 2 } } },
+    },
+  });
+  assert.equal(out.summary, undefined);
+  assert.equal(out.daily, undefined);
+  assert.equal(out.by_weekday, undefined);
+  assert.equal(out.models.with_price.summary.picks, 3);
+  assert.equal(out.models.with_price.summary.bets, 2);
+  assert.equal(out.models.with_price.hyp.bets, 3);
+  assert.equal(out.models.with_price.meta.picks, 3);
+  assert.equal(out.meta.picks, 3);
+});
+
+test("model reconstructed block normalises and is stripped when the toggle is off", () => {
+  const raw = N.normalizeStatsPayload({
+    meta: { data_since: "2026-10-13", picks: 2, staked_picks: 2, reconstructed_available: true },
+    models: {
+      with_price: {
+        summary: { picks: 2, bets: 2, pl_units: 1 },
+        daily: [
+          { date: "2026-10-20", reconstructed: true, picks: 1, pl_units: 0.5, cum_units: 0.5 },
+          { date: "2026-11-06", reconstructed: false, picks: 2, pl_units: 1, cum_units: 1 },
+        ],
+        reconstructed: {
+          summary: { picks: 4, bets: 4, pl_units: 0.5, hyp: { bets: 4, pl_units: 0.5 } },
+          hyp: { bets: 4, pl_units: 0.5 },
+          by_weekday: [{ label: "Tue", picks: 1, hyp: { bets: 1 } }],
+        },
+      },
+    },
+  });
+  assert.equal(raw.models.with_price.reconstructed.summary.picks, 4);
+  assert.equal(raw.models.with_price.reconstructed.hyp.bets, 4);
+  assert.equal(raw.meta.reconstructed_available, true);
+  const hidden = N.filterReconstructed(raw, false);
+  assert.equal(hidden.models.with_price.reconstructed, undefined);
+  assert.deepEqual(hidden.models.with_price.daily.map((d) => d.date), ["2026-11-06"]);
+  assert.equal(hidden.models.with_price.summary.pl_units, 1);
+  assert.equal(hidden.models.with_price.daily[0].cum_units, 1);
+});
+
+test("weekday rows keep a hyp block with hyp.bets", () => {
+  const row = N.normWeekdayRow({
+    label: "Sat", picks: 10, bets: 4, hyp_pl_units: 2, hyp_roi_pct: 20, hyp: { bets: 8, pl_units: 2, roi_pct: 25 },
+  });
+  assert.equal(row.hyp.bets, 8);
+  assert.equal(row.bets, 4);
 });

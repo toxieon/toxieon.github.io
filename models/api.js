@@ -18,5 +18,18 @@
     return base + "/api/owner/model-stats?" + params.toString();
   }
 
-  return { buildModelStatsUrl };
+  /** Human message for a failed model-stats response. Body is {ok:false, error}. */
+  function describeApiError(status, body) {
+    const code = body && body.error != null ? String(body.error) : "";
+    if (status === 400 && code === "bad_flag") {
+      return "The stats API rejected a flag (bad_flag). This page only sends 1 for optional flags.";
+    }
+    if (status === 400) {
+      return "The stats request was rejected" + (code ? " (" + code + ")." : ".");
+    }
+    if (status) return "Request failed (" + status + ").";
+    return "Request failed.";
+  }
+
+  return { buildModelStatsUrl, describeApiError };
 });

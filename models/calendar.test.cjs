@@ -70,3 +70,14 @@ test("joinDailyByDate marks a day reconstructed if any model row is", () => {
   assert.equal(rec.with_price.reconstructed, true);
   assert.equal(live.reconstructed, undefined);
 });
+
+test("partitionDailyByReconstructed keeps frozen and reconstructed lines apart", () => {
+  const { frozen, reconstructed } = C.partitionDailyByReconstructed([
+    { date: "2026-10-20", reconstructed: true, cum_units: 1.5 },
+    { date: "2026-11-06", reconstructed: false, cum_units: 2 },
+    { date: "2026-11-07", cum_units: 3 },
+  ]);
+  assert.deepEqual(frozen.map((d) => d.date), ["2026-11-06", "2026-11-07"]);
+  assert.deepEqual(reconstructed.map((d) => d.date), ["2026-10-20"]);
+  assert.equal(frozen[0].cum_units, 2);
+});

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.1.4";
+  const APP_VERSION = "0.1.5";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -47,6 +47,7 @@
     stakedNotLive: false,
     stakedError: "",
     includeReconstructed: false,
+    reconstructedAvailable: null,
   };
 
   function isDemoMode() {
@@ -120,19 +121,16 @@
   async function fetchModelStats(from, to, options) {
     const opts = options && typeof options === "object" ? options : {};
     if (isDemoMode()) {
+      const wantRecon = shouldRequestReconstructed(opts);
       const raw = opts.stakedOnly
         ? DEMO.generateStakedDemoStats(to)
-        : DEMO.generateDemoStats(from, to, { includeReconstructed: state.includeReconstructed });
+        : DEMO.generateDemoStats(from, to, { includeReconstructed: wantRecon });
       const data = N.normalizeStatsPayload(raw);
-      return {
-        ok: true,
-        data: opts.stakedOnly ? data : N.filterReconstructed(data, state.includeReconstructed),
-        demo: true,
-      };
+      return { ok: true, data: finishMainPayload(data, opts), demo: true };
     }
     const url = API.buildModelStatsUrl(CFG.API_BASE, from, to, {
       stakedOnly: !!opts.stakedOnly,
-      includeReconstructed: !opts.stakedOnly && state.includeReconstructed,
+      includeReconstructed: shouldRequestReconstructed(opts),
     });
     const res = await fetch(url, {
       method: "GET",
@@ -150,15 +148,57 @@
     if (res.status === 404) {
       return { ok: false, notLive: true };
     }
+    if (res.status === 400) {
+      let body = {};
+      try { body = await res.json(); } catch (e) { body = {}; }
+      return { ok: false, error: API.describeApiError(400, body) };
+    }
     if (!res.ok) {
-      return { ok: false, error: "Request failed (" + res.status + ")." };
+      return { ok: false, error: API.describeApiError(res.status, {}) };
     }
     const json = await res.json();
     const data = N.normalizeStatsPayload(json);
-    return {
-      ok: true,
-      data: opts.stakedOnly ? data : N.filterReconstructed(data, state.includeReconstructed),
-    };
+    return { ok: true, data: finishMainPayload(data, opts) };
+  }
+
+  function shouldRequestReconstructed(opts) {
+    if (opts && opts.stakedOnly) return false;
+    if (state.includeReconstructed) return true;
+    return state.reconstructedAvailable == null;
+  }
+
+  function finishMainPayload(data, opts) {
+    if (opts && opts.stakedOnly) return data;
+    rememberReconstructedAvailability(data);
+    return N.filterReconstructed(data, state.includeReconstructed);
+  }
+
+  function rememberReconstructedAvailability(data) {
+    const visible = FMT.reconstructedToggleVisible(data && data.meta, data && data.models);
+    const flag = data && data.meta && Object.prototype.hasOwnProperty.call(data.meta, "reconstructed_available");
+    if (visible) {
+      state.reconstructedAvailable = true;
+    } else if (flag && !data.meta.reconstructed_available) {
+      state.reconstructedAvailable = false;
+      if (state.includeReconstructed) {
+        state.includeReconstructed = false;
+        setIncludeReconstructed(false);
+      }
+    } else if (flag) {
+      state.reconstructedAvailable = visible;
+    }
+    syncReconToggle();
+  }
+
+  function syncReconToggle() {
+    const wrap = $("recon-toggle-wrap");
+    const box = $("toggle-reconstructed");
+    const visible = state.reconstructedAvailable === true;
+    if (wrap) wrap.hidden = !visible;
+    if (box) {
+      box.checked = visible && state.includeReconstructed;
+      box.disabled = !visible;
+    }
   }
 
   function validateRange(from, to) {
@@ -252,8 +292,7 @@
     state.apiNotLive = false;
     state.joinedByDate = new Map(CAL.joinDailyByDate(state.data.models).map((d) => [d.date, d]));
     state.calendarMonth = state.rangeTo.slice(0, 7);
-    if (state.data.range && state.data.range.from) {
-      state.allTime = state.data.range.from === "all";
+    if (!state.allTime && state.data.range && state.data.range.from) {
       state.rangeFrom = state.data.range.from;
     }
     $("dashboard").hidden = false;
@@ -270,6 +309,7 @@
     state.gateMessage = "";
     state.apiNotLive = false;
     state.loadError = "";
+    state.reconstructedAvailable = null;
     setView();
     renderStatus();
     $("dashboard").hidden = true;
@@ -303,7 +343,7 @@
       $("range-label").textContent = "";
       return;
     }
-    const fromLbl = state.data.range.from === "all" ? "All time" : state.data.range.from;
+    const fromLbl = state.allTime ? "All time" : state.data.range.from;
     $("range-label").textContent = fromLbl + " → " + state.data.range.to;
   }
 
@@ -334,14 +374,10 @@
           FMT.formatPctWithN(s.hyp.roi_pct, FMT.hypSampleN(s.hyp, s.bets), { signed: true });
         card.append(hyp);
       }
-      const mmeta = state.data.models[id].meta;
-      const metaLine = formatMetaBlock(mmeta);
-      if (metaLine) {
-        const cm = document.createElement("p");
-        cm.className = "card-meta";
-        cm.textContent = metaLine;
-        card.append(cm);
-      }
+      const counts = document.createElement("p");
+      counts.className = "card-meta";
+      counts.textContent = FMT.formatPicksStaked(s.picks, s.bets);
+      card.append(counts);
       const row = document.createElement("div");
       row.className = "stats-row";
       row.append(
@@ -374,16 +410,28 @@
     const faintOthers = !!(options && options.faintOthers);
     const valueField =
       options && options.valueField === "hyp_cum_units" ? "hyp_cum_units" : "cum_units";
-    const series = CFG.MODELS.map((id) => ({
-      id,
-      color: modelStrokeColor(id),
-      points: (modelsRoot[id].daily || [])
+    const pointMap = (rows) =>
+      (rows || [])
         .filter((d) => d.date)
         .map((d) => ({
           date: d.date,
           cum_units: Number.isFinite(d[valueField]) ? d[valueField] : 0,
-        })),
-    }));
+        }));
+    const series = CFG.MODELS.map((id) => {
+      const parts = CAL.partitionDailyByReconstructed((modelsRoot[id] && modelsRoot[id].daily) || []);
+      return { id, color: modelStrokeColor(id), points: pointMap(parts.frozen) };
+    });
+    if (options && options.includeReconstructed) {
+      CFG.MODELS.forEach((id) => {
+        const parts = CAL.partitionDailyByReconstructed((modelsRoot[id] && modelsRoot[id].daily) || []);
+        series.push({
+          id: id + "-recon",
+          color: modelStrokeColor(id),
+          dashed: true,
+          points: pointMap(parts.reconstructed),
+        });
+      });
+    }
     const allDates = [];
     const dateSet = new Set();
     series.forEach((s) => s.points.forEach((p) => { if (!dateSet.has(p.date)) { dateSet.add(p.date); allDates.push(p.date); } }));
@@ -433,8 +481,9 @@
       path.setAttribute("fill", "none");
       const isPrimary = !primary || primary === s.id;
       path.setAttribute("stroke", s.color);
-      path.setAttribute("stroke-width", isPrimary ? "2.5" : "1.2");
-      path.setAttribute("opacity", faintOthers && primary && !isPrimary ? "0.35" : "1");
+      path.setAttribute("stroke-width", isPrimary && !s.dashed ? "2.5" : "1.2");
+      path.setAttribute("opacity", s.dashed ? "0.7" : faintOthers && primary && !isPrimary ? "0.35" : "1");
+      if (s.dashed) path.setAttribute("stroke-dasharray", "5 4");
       svg.appendChild(path);
     });
     const y0 = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -453,9 +502,17 @@
 
   function renderBankrollChart() {
     const flat = state.bankrollMode === "flat";
+    const showRecon = state.includeReconstructed && state.reconstructedAvailable === true;
     renderCumUnitsChart($("bankroll-chart"), state.data.models, {
       valueField: flat ? "hyp_cum_units" : "cum_units",
+      includeReconstructed: showRecon,
     });
+    const reconLegend = $("recon-chart-legend");
+    if (reconLegend) {
+      reconLegend.hidden = !showRecon;
+      const text = $("recon-chart-legend-text");
+      if (text) text.textContent = FMT.RECON_CHART_LABEL;
+    }
   }
 
   async function loadStakedOnly() {
@@ -1156,6 +1213,7 @@
     state.includeReconstructed = getIncludeReconstructed();
     const reconToggle = $("toggle-reconstructed");
     if (reconToggle) reconToggle.checked = state.includeReconstructed;
+    syncReconToggle();
     if (isDemoMode() && !state.token) {
       state.token = "demo-local";
       setToken("demo-local");

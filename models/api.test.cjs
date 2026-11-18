@@ -41,3 +41,25 @@ test("buildModelStatsUrl adds include_reconstructed only when requested", () => 
   assert.equal(q.get("staked_only"), "1");
   assert.equal(q.get("include_reconstructed"), "1");
 });
+
+test("boolean flags are sent as 1 and omitted when off", () => {
+  const off = new URL(A.buildModelStatsUrl("https://example.com", "all", "2026-11-18")).searchParams;
+  assert.equal(off.get("staked_only"), null);
+  assert.equal(off.get("include_reconstructed"), null);
+  const on = new URL(A.buildModelStatsUrl("https://example.com", "all", "2026-11-18", {
+    stakedOnly: true,
+    includeReconstructed: true,
+  })).searchParams;
+  assert.equal(on.get("staked_only"), "1");
+  assert.equal(on.get("include_reconstructed"), "1");
+  assert.notEqual(on.get("staked_only"), "true");
+  assert.notEqual(on.get("include_reconstructed"), "true");
+});
+
+test("describeApiError explains a 400 bad_flag body", () => {
+  const msg = A.describeApiError(400, { ok: false, error: "bad_flag" });
+  assert.match(msg, /bad_flag/);
+  assert.match(msg, /only sends 1/);
+  assert.match(A.describeApiError(400, { ok: false, error: "bad_date" }), /bad_date/);
+  assert.match(A.describeApiError(404, {}), /404/);
+});

@@ -10,6 +10,8 @@
   const TRACKS = ["Demo Park", "Sample Oval", "Fake Track West"];
   const HORSES = ["Demo Runner One", "Fake Horse Alpha", "Sample Steed", "Test Nag Four"];
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const PRICE_BANDS = ["$1-2", "$2-3", "$3-5", "$5-8", "$8-15", "$15+"];
+  const STAKE_BRACKETS = ["2u", "1u", "0.5u", "no bet"];
   const HEADLINE_SINCE = "2026-11-06";
   const STAKED_FROM = "2026-11-12";
   const RECON_FROM = "2026-10-13";
@@ -102,14 +104,28 @@
     return Math.round(n * 10) / 10;
   }
 
-  function buildModel(modelId, dayList) {
+  function hypBlock(bets, wins, pl) {
+    const hBets = bets;
+    return {
+      bets: hBets,
+      wins: wins,
+      strike_pct: hBets ? Math.round((wins / hBets) * 1000) / 10 : 0,
+      pl_units: pl,
+      roi_pct: hBets ? Math.round((pl / hBets) * 1000) / 10 : 0,
+    };
+  }
+
+  function accumulate(modelId, dayList) {
     let cum = 0;
     let hypCum = 0;
     const daily = [];
     const recentPool = [];
     const wd = {};
     for (const label of WEEKDAYS) {
-      wd[label] = { label: label, picks: 0, bets: 0, wins: 0, pl_units: 0, hyp_pl_units: 0 };
+      wd[label] = {
+        label: label, picks: 0, bets: 0, wins: 0, pl_units: 0,
+        hyp_pl_units: 0, hyp_bets: 0, hyp_wins: 0,
+      };
     }
     const stakedResults = ["won", "lost", "lost", "placed", "scratched"];
     const noBetResults = ["won", "lost", "lost", "void"];
@@ -122,12 +138,15 @@
       let dayWins = 0;
       let dayPl = 0;
       let dayHypPl = 0;
+      let dayHypBets = 0;
+      let dayHypWins = 0;
       for (let i = 0; i < plan.picks; i++) {
         const isStaked = i < plan.bets;
         const price = Math.round((1.8 + rand() * 12) * 10) / 10;
         const result = pick(rand, isStaked ? stakedResults : noBetResults);
         const stake = isStaked ? 1 : 0;
         const hypPl = flatHypPl(result, price);
+        const hypCounts = result !== "void" && result !== "scratched";
         let pl = 0;
         if (isStaked) {
           if (result === "won") pl = round1(price - 1);
@@ -137,6 +156,10 @@
         if (isStaked && result === "won") dayWins += 1;
         dayPl += pl;
         dayHypPl += hypPl;
+        if (hypCounts) {
+          dayHypBets += 1;
+          if (result === "won") dayHypWins += 1;
+        }
         const row = {
           date: date,
           track: pick(rand, TRACKS),
@@ -147,8 +170,8 @@
           result: result,
           pl_units: round1(pl),
           hyp_pl_units: hypPl,
+          reconstructed: reconstructed,
         };
-        if (reconstructed) row.reconstructed = true;
         recentPool.push(row);
         const w = wd[weekdayLabel(date)];
         w.picks += 1;
@@ -158,13 +181,18 @@
           w.pl_units += pl;
         }
         w.hyp_pl_units += hypPl;
+        if (hypCounts) {
+          w.hyp_bets += 1;
+          if (result === "won") w.hyp_wins += 1;
+        }
       }
       dayPl = round1(dayPl);
       dayHypPl = round1(dayHypPl);
       cum = round1(cum + dayPl);
       hypCum = round1(hypCum + dayHypPl);
-      const dailyRow = {
+      daily.push({
         date: date,
+        reconstructed: reconstructed,
         picks: plan.picks,
         bets: plan.bets,
         wins: dayWins,
@@ -172,9 +200,7 @@
         hyp_pl_units: dayHypPl,
         cum_units: cum,
         hyp_cum_units: hypCum,
-      };
-      if (reconstructed) dailyRow.reconstructed = true;
-      daily.push(dailyRow);
+      });
     }
 
     const bets = daily.reduce((s, d) => s + d.bets, 0);
@@ -183,21 +209,17 @@
     const pl_units = round1(daily.reduce((s, d) => s + d.pl_units, 0));
     const staked_units = bets;
     const hypPl = round1(daily.reduce((s, d) => s + d.hyp_pl_units, 0));
-    const hypBets = picks;
+    const hypBets = recentPool.filter((r) => r.result !== "void" && r.result !== "scratched").length;
+    const hypWins = recentPool.filter((r) => r.result === "won").length;
     const summary = {
+      picks: picks,
       bets: bets,
       wins: wins,
       strike_pct: bets ? Math.round((wins / bets) * 1000) / 10 : 0,
       staked_units: staked_units,
       pl_units: pl_units,
       roi_pct: staked_units ? Math.round((pl_units / staked_units) * 1000) / 10 : 0,
-      hyp: {
-        bets: hypBets,
-        wins: recentPool.filter((r) => r.result === "won").length,
-        strike_pct: hypBets ? Math.round((recentPool.filter((r) => r.result === "won").length / hypBets) * 1000) / 10 : 0,
-        pl_units: hypPl,
-        roi_pct: hypBets ? Math.round((hypPl / hypBets) * 1000) / 10 : 0,
-      },
+      hyp: hypBlock(hypBets, hypWins, hypPl),
     };
 
     const mkRows = (labels, seedExtra) => {
@@ -216,13 +238,7 @@
           strike_pct: Math.round((w / b) * 1000) / 10,
           pl_units: pl,
           roi_pct: Math.round((pl / st) * 1000) / 10,
-          hyp: {
-            bets: hb,
-            wins: w,
-            strike_pct: hb ? Math.round((w / hb) * 1000) / 10 : 0,
-            pl_units: hpl,
-            roi_pct: Math.round((hpl / hb) * 1000) / 10,
-          },
+          hyp: hypBlock(hb, w, hpl),
         };
       });
     };
@@ -231,6 +247,7 @@
       const w = wd[label];
       const pl = round1(w.pl_units);
       const hpl = round1(w.hyp_pl_units);
+      const hyp = hypBlock(w.hyp_bets, w.hyp_wins, hpl);
       return {
         label: label,
         picks: w.picks,
@@ -240,23 +257,20 @@
         pl_units: pl,
         roi_pct: w.bets ? Math.round((pl / w.bets) * 1000) / 10 : 0,
         hyp_pl_units: hpl,
-        hyp_roi_pct: w.picks ? Math.round((hpl / w.picks) * 1000) / 10 : 0,
+        hyp_roi_pct: hyp.roi_pct,
+        hyp: hyp,
       };
     });
-
-    const liveRecent = recentPool.filter((r) => !r.reconstructed);
-    const recRecent = recentPool.filter((r) => r.reconstructed);
-    const recent = recRecent.slice(-8).concat(liveRecent.slice(-22));
 
     const firstDate = dayList.length ? dayList[0].date : HEADLINE_SINCE;
     return {
       summary: summary,
       daily: daily,
-      by_price_band: mkRows(["$1-2", "2-3", "3-5", "5-8", "8-15", "15+"], 11),
+      by_price_band: mkRows(PRICE_BANDS, 11),
       by_track: mkRows(TRACKS, 23),
-      by_stake_bracket: mkRows(["0-1", "1-2", "2-5", "5+"], 37),
+      by_stake_bracket: mkRows(STAKE_BRACKETS, 37),
       by_weekday: by_weekday,
-      recent: recent,
+      recent: recentPool,
       meta: {
         data_since: firstDate,
         picks: picks,
@@ -265,13 +279,57 @@
     };
   }
 
-  function resolveDayList(from, to, includeReconstructed) {
+  function emptyReconstructedBlock() {
+    const zeroHyp = hypBlock(0, 0, 0);
+    return {
+      summary: {
+        picks: 0, bets: 0, wins: 0, strike_pct: 0,
+        staked_units: 0, pl_units: 0, roi_pct: 0, hyp: zeroHyp,
+      },
+      hyp: zeroHyp,
+      by_weekday: WEEKDAYS.map((label) => ({
+        label: label, picks: 0, bets: 0, wins: 0, strike_pct: 0,
+        pl_units: 0, roi_pct: 0, hyp_pl_units: 0, hyp_roi_pct: 0, hyp: zeroHyp,
+      })),
+    };
+  }
+
+  function buildModel(modelId, dayList, includeReconstructed, reconAvailable) {
+    const frozenDays = dayList.filter((d) => !d.reconstructed);
+    const reconDays = includeReconstructed && reconAvailable ? dayList.filter((d) => d.reconstructed) : [];
+    const frozen = accumulate(modelId, frozenDays);
+    const recon = reconDays.length ? accumulate(modelId, reconDays) : null;
+    const liveRecent = frozen.recent.filter((r) => !r.reconstructed);
+    const recRecent = recon ? recon.recent : [];
+    const recent = includeReconstructed && recon
+      ? recRecent.slice(-8).concat(liveRecent.slice(-22))
+      : liveRecent.slice(-30);
+    const out = {
+      summary: frozen.summary,
+      hyp: frozen.summary.hyp,
+      daily: (recon ? recon.daily : []).concat(frozen.daily),
+      by_price_band: frozen.by_price_band,
+      by_track: frozen.by_track,
+      by_stake_bracket: frozen.by_stake_bracket,
+      by_weekday: frozen.by_weekday,
+      recent: recent,
+    };
+    if (includeReconstructed) {
+      out.reconstructed = recon
+        ? { summary: recon.summary, hyp: recon.summary.hyp, by_weekday: recon.by_weekday }
+        : emptyReconstructedBlock();
+    }
+    return { block: out, frozenMeta: frozen.meta, reconMeta: recon ? recon.meta : null };
+  }
+
+  function resolveDayList(from, to, includeReconstructed, reconAvailable) {
     const end = to;
+    const wantRecon = !!(includeReconstructed && reconAvailable);
     let start;
     if (from === "all") {
-      start = includeReconstructed ? RECON_FROM : HEADLINE_SINCE;
+      start = wantRecon ? RECON_FROM : HEADLINE_SINCE;
     } else {
-      const floor = includeReconstructed ? RECON_FROM : HEADLINE_SINCE;
+      const floor = wantRecon ? RECON_FROM : HEADLINE_SINCE;
       start = maxIso(from, floor);
     }
     if (start > end) return [];
@@ -281,48 +339,70 @@
     }));
   }
 
+  function packMeta(dataSince, picks, staked) {
+    return { data_since: dataSince, picks: picks, staked_picks: staked };
+  }
+
   function generateDemoStats(from, to, options) {
     const opts = options && typeof options === "object" ? options : {};
     const includeReconstructed = !!opts.includeReconstructed;
-    const dayList = resolveDayList(from, to, includeReconstructed);
-    const models = {
-      with_price: buildModel("with_price", dayList),
-      without_price: buildModel("without_price", dayList),
-      agree: buildModel("agree", dayList),
+    const reconAvailable = opts.reconstructedAvailable !== false;
+    const dayList = resolveDayList(from, to, includeReconstructed, reconAvailable);
+    const built = {};
+    const models = {};
+    for (const id of MODEL_IDS) {
+      built[id] = buildModel(id, dayList, includeReconstructed, reconAvailable);
+      models[id] = built[id].block;
+    }
+    const h2hDays = dayList
+      .filter((item) => !item.reconstructed || (includeReconstructed && reconAvailable))
+      .map((item) => {
+        const rand = dayRand("h2h", item.date);
+        const row = {
+          date: item.date,
+          with_price: round1((rand() - 0.5) * 6),
+          without_price: round1((rand() - 0.5) * 6),
+          agree: round1((rand() - 0.5) * 4),
+        };
+        if (item.reconstructed) row.reconstructed = true;
+        return row;
+      });
+    const frozenStart = HEADLINE_SINCE;
+    const resolvedFrom = from === "all"
+      ? (includeReconstructed && reconAvailable && dayList.some((d) => d.reconstructed) ? RECON_FROM : frozenStart)
+      : (dayList.length ? dayList[0].date : from);
+    const publishedPicks = built.with_price.frozenMeta.picks + built.without_price.frozenMeta.picks;
+    const publishedStaked = built.with_price.frozenMeta.staked_picks + built.without_price.frozenMeta.staked_picks;
+    const meta = {
+      data_since: frozenStart,
+      picks: publishedPicks,
+      staked_picks: publishedStaked,
+      with_price: packMeta(frozenStart, built.with_price.frozenMeta.picks, built.with_price.frozenMeta.staked_picks),
+      without_price: packMeta(frozenStart, built.without_price.frozenMeta.picks, built.without_price.frozenMeta.staked_picks),
+      agree: packMeta(frozenStart, built.agree.frozenMeta.picks, built.agree.frozenMeta.staked_picks),
     };
-    const h2hDays = dayList.map((item) => {
-      const rand = dayRand("h2h", item.date);
-      const row = {
-        date: item.date,
-        with_price: round1((rand() - 0.5) * 6),
-        without_price: round1((rand() - 0.5) * 6),
-        agree: round1((rand() - 0.5) * 4),
+    if (includeReconstructed) {
+      const reconPicks = reconAvailable
+        ? (built.with_price.reconMeta ? built.with_price.reconMeta.picks : 0) +
+          (built.without_price.reconMeta ? built.without_price.reconMeta.picks : 0)
+        : 0;
+      meta.reconstructed_available = !!(reconAvailable && reconPicks > 0);
+      meta.reconstructed = {
+        from: RECON_FROM,
+        to: RECON_TO,
+        data_since: reconAvailable && reconPicks ? RECON_FROM : "",
+        picks: reconPicks,
       };
-      if (item.reconstructed) row.reconstructed = true;
-      return row;
-    });
-    const count = 11;
-    const rangeFrom = from === "all" ? "all" : from;
-    const dataSince = includeReconstructed && dayList.some((d) => d.reconstructed) ? RECON_FROM : HEADLINE_SINCE;
+      if (meta.reconstructed_available) meta.data_since = RECON_FROM;
+    }
     return {
       generated_at: new Date().toISOString(),
-      range: { from: rangeFrom, to: to },
-      meta: {
-        data_since: dataSince,
-        picks: models.with_price.meta.picks + models.without_price.meta.picks + models.agree.meta.picks,
-        staked_picks:
-          models.with_price.meta.staked_picks +
-          models.without_price.meta.staked_picks +
-          models.agree.meta.staked_picks,
-      },
+      range: { from: resolvedFrom, to: to },
+      meta: meta,
       models: models,
       head_to_head: {
         days: h2hDays,
-        disagree_races: {
-          count: count,
-          with_wins: 5,
-          without_wins: 4,
-        },
+        disagree_races: { count: 11, with_wins: 5, without_wins: 4 },
       },
     };
   }
@@ -339,12 +419,19 @@
       const block = full.models[id];
       models[id] = {
         summary: block.summary,
+        hyp: block.hyp,
         daily: block.daily,
+        by_weekday: block.by_weekday,
+        by_price_band: block.by_price_band,
+        by_track: block.by_track,
+        by_stake_bracket: block.by_stake_bracket,
+        recent: block.recent,
       };
     }
     return {
       generated_at: full.generated_at,
       range: { from: STAKED_FROM, to: to },
+      meta: full.meta,
       models: models,
     };
   }
