@@ -44,7 +44,7 @@ Script Properties (created by `setup()`, never in the repo): `ND_PEPPER`,
 2. Project Settings (gear) → tick **Show "appsscript.json" manifest file**. Replace
    its contents with `appsscript.json` from this folder.
 3. Create script files named exactly like the `.gs` files here (`Config`, `Main`,
-   `Auth`, `Quote`, `TimesheetLive`, `GateCodes`, `Admin`, `PlannerOAuth`) and paste each one in
+   `Auth`, `Quote`, `TimesheetLive`, `GateCodes`, `Admin`, `PlannerOAuth`, `PhotoProgress`) and paste each one in
    (delete the default `Code.gs`). **Save**.
 4. In `Config.gs`, in the editor only, fill `SEED_TSL_CODES` with the Timesheet
    Live viewers: `[['Label', 'code'], ['Label', 'code']]`.
@@ -96,6 +96,7 @@ Checklist keep calling the old script and keep working.
 | `migrateAllUsers()` | Upgrades every remaining old-format Quote login. Run only after the new URL is live. |
 | `syncPriceSheet()` | Re-copies price tabs from the Quote spreadsheet to the price sheet (**overwrites** the price sheet). |
 | `installHourlyPriceSync()` / `removeHourlyPriceSync()` | Optional: keep editing prices in the Quote spreadsheet and mirror them hourly. |
+| `runPhotoProgressNow()` / `installPhotoProgressTrigger()` / `removePhotoProgressTrigger()` | Manual run and 15-minute photo progress reports (see below). |
 | `resetLoginLimits()` / `signOutEveryone()` / `status()` | Housekeeping. |
 
 Quote passcodes can also be changed in Quote itself: **Staff** tab → open the
@@ -104,6 +105,30 @@ user → **New passcode** (master only).
 Where to edit prices after the switch: the **price sheet** (Quote reads prices
 only from there), unless you install the hourly sync — then keep editing the
 Quote spreadsheet and don't edit the price sheet.
+
+## Photo progress reports (time-driven, Drive read-only)
+
+About every 15 minutes (as the script owner), the backend walks each configured
+**photo root** folder on Drive (levels → apartments), counts photos per apartment
+(including **Rough-in**, **Fit-off**, and **Unsorted** stage folders), and
+rewrites a plain-text **report file** in place (`setContent` only — same file ID
+and link). It never moves, renames, copies, edits or trashes photos or folders.
+
+**Script Properties** (Project Settings → Script Properties):
+
+| Property | Value |
+| --- | --- |
+| `PHOTO_PROGRESS_JOBS` | JSON array (required). Example shape: `[{"rootFolderId":"<DRIVE_FOLDER_ID>","reportFileId":"<GOOGLE_DOC_OR_TEXT_FILE_ID>","stages":[{"key":"roughIn","label":"Rough-in","match":["rough in","rough-in","roughin"]},{"key":"fitOff","label":"Fit-off","match":["fit off","fit-off","fitoff"]}]}]`. Omit `stages` to use the default Rough-in / Fit-off labels. You can use `projectId` instead of `rootFolderId` when the optional master sheet property is set. |
+| `PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID` | (Optional) Spreadsheet ID for the master **Projects** sheet. Rows with **Photo Folder ID** are included only when the same job entry already has a `reportFileId` (match by `rootFolderId` or `projectId`). |
+
+**One-time setup after pasting `PhotoProgress.gs`:** Run **`runPhotoProgressNow()`** once
+to approve Drive read access, confirm the report file updates, then Run
+**`installPhotoProgressTrigger()`**. No web-app redeploy is required for the
+time trigger (only if you change `appsscript.json` scopes — add this file, then
+Deploy → Manage deployments → Edit → New version → Deploy).
+
+**Verify:** Open the report file link; title line is `<root folder name> Photo progress`,
+then Melbourne timestamp, summary counts, per-level apartment lines, and MISSING lists.
 
 
 ## Stable Google login (iPhone home-screen apps stop asking to sign in)
