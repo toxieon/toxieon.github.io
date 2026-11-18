@@ -214,6 +214,7 @@ async function handleNodeForm(event) {
     customTitle,
     status: (form.get("status") || "Not Started").toString(),
     roomId: (form.get("roomId") || "").toString() || null,
+    apartment: (form.get("apartment") || "").toString().trim(),
     assignedTo: (form.get("assignedTo") || "").toString(),
     tags: (form.get("tags") || "").toString().split(",").map((t) => t.trim()).filter(Boolean),
     description: (form.get("description") || "").toString().trim(),
@@ -352,7 +353,10 @@ async function handleProjectForm(event) {
   const name = (form.get("name") || "").toString().trim(); if (!name) return;
   const folderId = (form.get("folderId") || "").toString() || null;
   const firstFloor = (form.get("firstFloor") || "Ground floor").toString().trim() || "Ground floor";
-  const payload = { name, folderId, address: (form.get("address") || "").toString(), description: (form.get("description") || "").toString(), protected: form.get("protected") === "on" };
+  const photoRaw = (form.get("photoFolder") || "").toString().trim();
+  const photoFolderId = photoRaw && window.NDPhotoFolders ? NDPhotoFolders.parseDriveFolderId(photoRaw) : "";
+  if (photoRaw && !photoFolderId) { toast("Paste a Drive folder link or the folder id"); return; }
+  const payload = { name, folderId, address: (form.get("address") || "").toString(), description: (form.get("description") || "").toString(), protected: form.get("protected") === "on", photoFolderId };
   if (state.modal.mode === "edit-project") {
     const proj = project(); if (!proj) return;
     const folderChanged = proj.folderId !== folderId, nameChanged = proj.name !== name;
@@ -667,7 +671,7 @@ async function formatPlannerData() {
       await ensureMasterTabsExist();
       await gapi.client.sheets.spreadsheets.values.batchClear({
         spreadsheetId: state.drive.masterSheetId,
-        resource: { ranges: Object.keys(MASTER_TABS).map((t) => `${t}!A2:AD`) }
+        resource: { ranges: Object.keys(MASTER_TABS).map((t) => masterValuesRange(t)) }
       });
     }
     if (state.drive.photoAllocationSheetId) {

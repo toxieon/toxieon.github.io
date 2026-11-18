@@ -947,6 +947,9 @@ body.np-overlay .nd-sync-tube, body.np-overlay .nd-sync-label { display: none !i
 .summary-panel.is-collapsed .node-list {
   display: none;
 }
+.summary-panel.is-collapsed .photo-tray .summary-hint {
+  display: block;
+}
 
 .node-summary {
   display: grid;
@@ -1528,7 +1531,14 @@ body.np-overlay .nd-sync-tube, body.np-overlay .nd-sync-label { display: none !i
   cursor: pointer;
 }
 
-.image-tile span {
+.image-tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.image-tile > span {
   position: absolute;
   left: 6px;
   right: 6px;
@@ -3576,3 +3586,50 @@ body.report-fullscreen { overflow:hidden; }
 .plan-stage.is-osd .node-marker, .plan-stage.is-osd .room-vertex-handle { pointer-events:auto; }
 
 .empty-plan-hint { font-size:12px; opacity:.7; margin-top:6px; }
+
+/* Drive photo tray, drag ghost and the attribute watermark (overlay only). */
+.node-marker.is-photo svg {
+  width: 14px; height: 14px; color: #fff; position: absolute; z-index: 2; pointer-events: none;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.photo-tray { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.photo-tray-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.photo-tray-actions .ghost-button { min-height: 34px; padding: 0 8px; font-size: 12px; }
+.photo-level { display: flex; flex-direction: column; gap: 6px; }
+.photo-level h4 { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 13px; }
+.photo-level h4 svg { width: 14px; height: 14px; }
+.photo-apt-name { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.photo-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.photo-thumb {
+  position: relative; flex: 0 0 76px; width: 76px; height: 76px; padding: 0; border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden; background: #1e293b; touch-action: manipulation;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; cursor: grab;
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.photo-thumb-name {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 4px; background: rgba(15, 17, 23, 0.72);
+  color: #e2e8f0; font-size: 9px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.photo-thumb.is-placed { outline: 2px solid #22c55e; }
+.photo-link-form { display: flex; gap: 8px; }
+.photo-link-form input { flex: 1; min-width: 0; }
+.photo-ghost {
+  position: fixed; z-index: 80; width: 72px; height: 72px; border-radius: 8px; overflow: hidden;
+  pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); border: 2px solid #fff;
+}
+.photo-ghost img { width: 100%; height: 100%; object-fit: cover; }
+body.is-photo-drag { touch-action: none; }
+.photo-frame { position: relative; display: block; }
+.photo-watermark {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; flex-direction: column; gap: 1px;
+  padding: 3px 6px 4px; background: rgba(17, 24, 39, 0.84); color: #fff;
+  font: 600 10px/1.25 system-ui, sans-serif; pointer-events: none;
+}
+.photo-watermark span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-tile .photo-watermark { left: 0; right: 0; bottom: 0; border-radius: 0; background: rgba(17, 24, 39, 0.84); }
+.image-tile .photo-watermark span { position: static; padding: 0; background: none; font-size: 10px; font-weight: 700; }
+.lightbox-photo { position: relative; display: inline-block; max-width: min(920px, 100%); max-height: 100%; }
+.lightbox-photo img { display: block; max-width: 100%; max-height: 72vh; object-fit: contain; border-radius: 8px; }
+.lightbox-photo .photo-watermark { font-size: 14px; padding: 8px 12px; border-radius: 0 0 8px 8px; }
+.print-photo .photo-watermark { font-size: 9px; }
+.photo-place-banner { z-index: 30; }

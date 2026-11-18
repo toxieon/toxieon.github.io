@@ -60,7 +60,7 @@ function buildMasterRows() {
   const out = { Projects: new Map(), Floors: new Map(), Nodes: new Map(), Photos: new Map(), Folders: new Map(), Rooms: new Map() };
   state.projects.forEach((p) => {
     const nodes = state.nodes.filter((n) => n.projectId === p.id);
-    out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", p.updatedAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : ""]);
+    out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", p.updatedAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : "", p.photoFolderId || ""]);
     (p.floors || []).forEach((f) => {
       const count = state.nodes.filter((n) => n.floorId === f.id).length;
       out.Floors.set(f.id, [f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || "", f.planPngFileId || ""]);
@@ -70,7 +70,7 @@ function buildMasterRows() {
     const proj = projectById(n.projectId);
     const floor = proj?.floors?.find((f) => f.id === n.floorId);
     const photoIds = (n.imageRefs || []).map((img) => img.driveFileId || img.id).filter(Boolean).join(", ");
-    out.Nodes.set(n.id, [n.id, n.projectId, proj?.name || "", n.floorId || "", floor?.name || "", n.type || "marker", nodeDisplayTitle(n), n.customTitle || "", n.category || "", n.lineItem || "", n.status || "", n.assignedTo || "", (n.tags || []).join(", "), n.position?.x ?? "", n.position?.y ?? "", n.size ?? 1, n.description || "", (n.imageRefs || []).length, (n.comments || []).length, n.createdBy || "", n.createdAt || "", n.updatedAt || "", state.drive.nodeFolderMap[n.id] || "", n.linkedProjectId || "", n.linkedFloorId || "", n.linkedNodeId || "", photoIds, n.roomId || "", roomName(n.roomId), n.linkedRoomId || "", n.circuit || "", n.cableRunM ?? "", n.boardLabel || "", n.phaseConfig || "", n.mainBreakerA ?? "", n.swbProjectId || "", n.swbSchemaVersion || ""]);
+    out.Nodes.set(n.id, [n.id, n.projectId, proj?.name || "", n.floorId || "", floor?.name || "", n.type || "marker", nodeDisplayTitle(n), n.customTitle || "", n.category || "", n.lineItem || "", n.status || "", n.assignedTo || "", (n.tags || []).join(", "), n.position?.x ?? "", n.position?.y ?? "", n.size ?? 1, n.description || "", (n.imageRefs || []).length, (n.comments || []).length, n.createdBy || "", n.createdAt || "", n.updatedAt || "", state.drive.nodeFolderMap[n.id] || "", n.linkedProjectId || "", n.linkedFloorId || "", n.linkedNodeId || "", photoIds, n.roomId || "", roomName(n.roomId), n.linkedRoomId || "", n.circuit || "", n.cableRunM ?? "", n.boardLabel || "", n.phaseConfig || "", n.mainBreakerA ?? "", n.swbProjectId || "", n.swbSchemaVersion || "", n.apartment || ""]);
     (n.imageRefs || []).forEach((img) => {
       const pid = img.id || img.driveFileId || "";
       if (!pid) return;
@@ -129,7 +129,7 @@ async function seedSnapshotFromSheet() {
   const tabs = Object.keys(MASTER_TABS);
   const r = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
     spreadsheetId: state.drive.masterSheetId,
-    ranges: tabs.map((t) => `${t}!A2:AK`)
+    ranges: tabs.map((t) => masterValuesRange(t))
   }));
   const snap = {};
   tabs.forEach((tab, i) => {
@@ -269,7 +269,7 @@ async function rebuildMasterSheet(opts = {}) {
     const rows = buildMasterRows();
     await googleCall(() => gapi.client.sheets.spreadsheets.values.batchClear({
       spreadsheetId: state.drive.masterSheetId,
-      resource: { ranges: Object.keys(MASTER_TABS).map((t) => t === "Nodes" ? "Nodes!A2:AK" : `${t}!A2:AD`) }
+      resource: { ranges: Object.keys(MASTER_TABS).map((t) => masterValuesRange(t)) }
     }));
     const data = [];
     Object.keys(MASTER_TABS).forEach((tab) => {

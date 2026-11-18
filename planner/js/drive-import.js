@@ -97,7 +97,7 @@ async function hydrateFromMasterSheet(opts = {}) {
     if (!silent) toast("Loading from cloud...");
     const resp = await googleCall(() => gapi.client.sheets.spreadsheets.values.batchGet({
       spreadsheetId: state.drive.masterSheetId,
-      ranges: ["Projects!A2:Z", "Floors!A2:Z", "Nodes!A2:AD", "Photos!A2:Z", "Folders!A2:Z", "Rooms!A2:Z"]
+      ranges: ["Projects!A2:Z", "Floors!A2:Z", masterValuesRange("Nodes"), "Photos!A2:Z", "Folders!A2:Z", "Rooms!A2:Z"]
     }));
     // An upload can finish while Sheets is in flight (for example during token renewal).
     // Capture again before replacing objects so its new association cannot be dropped.
@@ -147,7 +147,7 @@ async function hydrateFromMasterSheet(opts = {}) {
     // Preserve device-local project fields (colour / completed / rooms toggle)
     // across a cloud rebuild — they're not columns in the sheet (yet).
     const localExtras = {};
-    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms }; });
+    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms, photoFolderId: p.photoFolderId || "" }; });
     const projectMap = {};
     for (const r of projRows) {
       if (!r[0]) continue;
@@ -159,7 +159,7 @@ async function hydrateFromMasterSheet(opts = {}) {
         id: r[0], name: r[1] || "Untitled", folderId,
         address: r[3] || "", description: r[4] || "",
         createdBy: r[5] || "", createdAt: r[6] || nowStamp(), updatedAt: r[7] || nowStamp(),
-        floors: [], team: [], protected: parseBool(r[11])
+        floors: [], team: [], protected: parseBool(r[11]), photoFolderId: r[12] || ""
       };
       if (r[8]) state.drive.projectFolderMap[p.id] = r[8];
       projectMap[p.id] = p;
@@ -170,6 +170,7 @@ async function hydrateFromMasterSheet(opts = {}) {
       if (e.color != null) p.color = e.color;
       if (typeof e.completed === "boolean") p.completed = e.completed;
       if (e.showRooms != null) p.showRooms = e.showRooms;
+      if (!p.photoFolderId && e.photoFolderId) p.photoFolderId = e.photoFolderId;
     });
     for (const r of floorRows) {
       if (!r[0]) continue;
@@ -220,7 +221,8 @@ async function hydrateFromMasterSheet(opts = {}) {
         circuit: r[30] || "", cableRunM: r[31] ? Number(r[31]) : null,
         boardLabel: r[32] || "", phaseConfig: r[33] || "",
         mainBreakerA: r[34] ? Number(r[34]) : null,
-        swbProjectId: r[35] || null, swbSchemaVersion: r[36] || null
+        swbProjectId: r[35] || null, swbSchemaVersion: r[36] || null,
+        apartment: r[37] || ""
       };
       if (r[22]) state.drive.nodeFolderMap[node.id] = r[22];
       return node;

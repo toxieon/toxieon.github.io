@@ -17,7 +17,7 @@ function render() {
       <main class="main">${renderTopbar()}<div class="content">${renderView()}</div></main>
       ${renderBottomNav()}
     </div>
-    ${state.massMode.active ? renderMassBanner() : ""}${state.roomDraw?.mode ? renderRoomDrawBanner() : ""}
+    ${state.massMode.active ? renderMassBanner() : ""}${state.roomDraw?.mode ? renderRoomDrawBanner() : ""}${state.photoPlace ? renderPhotoPlaceBanner() : ""}
     ${state.bulkSelection.length ? renderBulkBar() : ""}
     ${state.drawerOpen && selectedNode() ? renderDrawer(selectedNode()) : ""}
     ${state.modal ? renderModal() : ""}
@@ -36,6 +36,7 @@ function render() {
   mountOsd();
   applyCanvasTransform();
   hydrateDriveImages();   // #37 — swap Drive photo tiles in with authenticated bytes
+  if (typeof syncPhotoPoll === "function") syncPhotoPoll();
   if (window.NDUI && NDUI.skeletonOverlay) {
     NDUI.skeletonOverlay(!!(state.googleAuth.signedIn && (state.googleAuth.bootstrapping || state.googleAuth.hydrating)));
   }
@@ -264,7 +265,7 @@ function renderMapView() {
           </div>
         </div>
         <div class="canvas-shell">
-          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing ? "is-placing" : ""} ${osdFloorReady(floor) ? "is-osd" : ""}" id="canvasViewport">
+          <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing || state.photoPlace ? "is-placing" : ""} ${osdFloorReady(floor) ? "is-osd" : ""}" id="canvasViewport">
             <div class="plan-stage ${osdFloorReady(floor) ? "is-osd" : ""}" id="planStage" style="--plan-ar:${planAspect}">
               ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.modal?.mode === "auto-rooms" && state.modal.candidates?.length ? renderAutoRoomPreview(state.modal.candidates) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
               <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
@@ -282,9 +283,10 @@ function renderMapView() {
         <div class="summary-grid"><div class="metric"><span>${state.selectedRoomId === "all" ? "Floor nodes" : "Room nodes"}</span><strong>${nodes.length}</strong></div><div class="metric"><span>Shown</span><strong>${matched.length}</strong></div><div class="metric"><span>Complete</span><strong>${stats(nodes).completePercent}%</strong></div><div class="metric"><span>Issues</span><strong>${stats(nodes).issue}</strong></div></div>
         <div class="right-tabs">
           <button class="right-tab ${rightTab === "nodes" ? "is-active" : ""}" data-right-tab="nodes">${icon("map")}Nodes</button>
+          <button class="right-tab ${rightTab === "photos" ? "is-active" : ""}" data-right-tab="photos">${icon("camera")}Photos</button>
           <button class="right-tab ${rightTab === "plan" ? "is-active" : ""}" data-right-tab="plan">${icon("settings")}Plan</button>
         </div>
-        ${rightTab === "plan" ? renderPlanSettings(floor) : `
+        ${rightTab === "plan" ? renderPlanSettings(floor) : rightTab === "photos" ? renderPhotoTray(proj) : `
         <div class="size-control"><label>All floor nodes size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.floorSizePercent ?? 100}" data-floor-size /></label><button class="ghost-button" data-action="floor-size">Apply to floor</button></div><div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
         <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>
@@ -429,9 +431,10 @@ function renderMarker(node) {
   const isPortal = node.type === "portal";
   const isSwitchboard = node.type === "switchboard";
   const isSubboard = node.type === "subboard";
+  const isPhoto = node.type === "photo";
   const catColor = nodeColor(node);
-  const extraClass = isPortal ? "is-portal" : isSwitchboard ? "is-switchboard" : isSubboard ? "is-subboard" : "";
-  const innerIcon = isPortal ? icon("portal") : isSwitchboard ? icon("switchboard") : isSubboard ? icon("subboard") : "";
+  const extraClass = isPortal ? "is-portal" : isSwitchboard ? "is-switchboard" : isSubboard ? "is-subboard" : isPhoto ? "is-photo" : "";
+  const innerIcon = isPortal ? icon("portal") : isSwitchboard ? icon("switchboard") : isSubboard ? icon("subboard") : isPhoto ? icon("camera") : "";
   const swbBadge = (isSwitchboard || isSubboard) && node.swbProjectId
     ? `<span class="swb-linked-dot" title="Linked to SWB project"></span>` : "";
   return `<button class="node-marker ${extraClass} ${isSelected ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${isDim ? "is-dim" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" style="--x:${node.position.x};--y:${node.position.y};--cat:${catColor};--size:${node.size || 1};${statusStyle(node.status)}" data-node="${node.id}" aria-label="${escapeHtml(nodeDisplayTitle(node))}"><span class="node-hit-area" aria-hidden="true"></span>${innerIcon}${node.comments?.length ? `<span class="comment-count">${node.comments.length}</span>` : ""}${swbBadge}</button>`;
@@ -442,5 +445,5 @@ function renderNodeSummary(node) {
   const catColor = nodeColor(node);
   const linkedTarget = isPortal ? projectById(node.linkedProjectId)?.name : null;
   const isBulk = state.bulkSelection.includes(node.id);
-  return `<button class="node-summary ${node.id === state.selectedNodeId ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" data-node="${node.id}"><span class="status-dot" style="${statusStyle(node.status)}"></span><span class="category-dot" style="--cat:${catColor}"></span><span><strong>${escapeHtml(nodeDisplayTitle(node))}</strong><span>${isPortal ? `${icon("portal")} -> ${escapeHtml(linkedTarget || roomLabel(node.linkedRoomId) || "(unlinked)")}` : `${escapeHtml(node.category || "-")} / ${escapeHtml(roomLabel(node.roomId))} / ${escapeHtml(node.assignedTo || "Unassigned")}`}</span></span></button>`;
+  return `<button class="node-summary ${node.id === state.selectedNodeId ? "is-selected" : ""} ${isBulk ? "is-bulk" : ""} ${nodeMissingPhoto(node) ? "no-photo" : ""}" data-node="${node.id}"><span class="status-dot" style="${statusStyle(node.status)}"></span><span class="category-dot" style="--cat:${catColor}"></span><span><strong>${escapeHtml(nodeDisplayTitle(node))}</strong><span>${isPortal ? `${icon("portal")} -> ${escapeHtml(linkedTarget || roomLabel(node.linkedRoomId) || "(unlinked)")}` : `${node.apartment ? escapeHtml(node.apartment) + " / " : ""}${escapeHtml(node.category || "-")} / ${escapeHtml(roomLabel(node.roomId))} / ${escapeHtml(node.assignedTo || "Unassigned")}`}</span></span></button>`;
 }
