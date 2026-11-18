@@ -135,6 +135,17 @@
     return Math.round((wins / bets) * 1000) / 10;
   }
 
+  /** Frozen and reconstructed days keep separate running lines. */
+  function partitionDailyByReconstructed(daily) {
+    const frozen = [];
+    const reconstructed = [];
+    for (const row of Array.isArray(daily) ? daily : []) {
+      if (row && row.reconstructed) reconstructed.push(row);
+      else frozen.push(row);
+    }
+    return { frozen, reconstructed };
+  }
+
   return {
     MODEL_IDS,
     joinDailyByDate,
@@ -150,5 +161,6 @@
     effectiveRangeFrom,
     isRacingWeekdayHighlight,
     WEEKDAY_LABELS,
+    partitionDailyByReconstructed,
   };
 });

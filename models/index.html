@@ -10,17 +10,17 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<script src="handoff.js?v=0.1.4"></script>
-<link rel="stylesheet" href="styles.css?v=0.1.4" />
-<script src="config.js?v=0.1.4"></script>
-<script src="api.js?v=0.1.4"></script>
-<script src="normalise.js?v=0.1.4"></script>
-<script src="calendar.js?v=0.1.4"></script>
-<script src="dates.js?v=0.1.4"></script>
-<script src="format.js?v=0.1.4"></script>
-<script src="demo.js?v=0.1.4"></script>
+<script src="handoff.js?v=0.1.5"></script>
+<link rel="stylesheet" href="styles.css?v=0.1.5" />
+<script src="config.js?v=0.1.5"></script>
+<script src="api.js?v=0.1.5"></script>
+<script src="normalise.js?v=0.1.5"></script>
+<script src="calendar.js?v=0.1.5"></script>
+<script src="dates.js?v=0.1.5"></script>
+<script src="format.js?v=0.1.5"></script>
+<script src="demo.js?v=0.1.5"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.1.4" defer></script>
+<script src="app.js?v=0.1.5" defer></script>
 </head>
 <body>
 <div class="app">
@@ -62,7 +62,7 @@
       <input type="date" id="date-to" aria-label="To date" />
       <button type="button" class="btn" id="btn-apply-range">Apply</button>
     </div>
-    <label class="recon-toggle" for="toggle-reconstructed">
+    <label class="recon-toggle" id="recon-toggle-wrap" for="toggle-reconstructed" hidden>
       <input type="checkbox" id="toggle-reconstructed" />
       Show reconstructed 13 Oct to 5 Nov
     </label>
@@ -124,6 +124,10 @@
           <li><span class="swatch" style="background:var(--m-with)"></span>With price</li>
           <li><span class="swatch" style="background:var(--m-without)"></span>Without price</li>
           <li><span class="swatch" style="background:var(--m-agree)"></span>Agree</li>
+          <li id="recon-chart-legend" hidden>
+            <span class="swatch recon-swatch"></span>
+            <span id="recon-chart-legend-text">Reconstructed estimate (fair price 1/market_p), 13 Oct to 5 Nov, not live results</span>
+          </li>
         </ul>
       </section>
 

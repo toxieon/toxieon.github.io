@@ -52,3 +52,26 @@ test("formatDataSince keeps 6 Nov headline and optional reconstructed note", () 
   );
   assert.equal(F.formatDataSince(null), "");
 });
+
+test("formatPicksStaked uses pick and staked counts", () => {
+  assert.equal(F.formatPicksStaked(100, 40), "100 picks · 40 staked");
+  assert.equal(F.formatPicksStaked(0, 0), "0 picks · 0 staked");
+});
+
+test("reconstructed toggle is hidden when unavailable or the block is empty", () => {
+  assert.equal(F.reconstructedToggleVisible(undefined, {}), false);
+  assert.equal(F.reconstructedToggleVisible({ reconstructed_available: false }, {
+    with_price: { reconstructed: { summary: { picks: 4 } } },
+  }), false);
+  assert.equal(F.reconstructedToggleVisible({}, {
+    with_price: { reconstructed: { summary: { picks: 4 } } },
+  }), false);
+  assert.equal(F.reconstructedToggleVisible({ reconstructed_available: true }, {
+    with_price: { reconstructed: { summary: { picks: 0 } } },
+    without_price: { reconstructed: { summary: { picks: 0 } } },
+    agree: { reconstructed: { summary: { picks: 0 } } },
+  }), false);
+  assert.equal(F.reconstructedToggleVisible({ reconstructed_available: true }, {
+    with_price: { reconstructed: { summary: { picks: 2 } } },
+  }), true);
+});

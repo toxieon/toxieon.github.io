@@ -78,16 +78,46 @@
     return line;
   }
 
+  function formatPicksStaked(picks, staked) {
+    const p = Number.isFinite(Number(picks)) ? Number(picks) : 0;
+    const s = Number.isFinite(Number(staked)) ? Number(staked) : 0;
+    return p.toLocaleString("en-AU") + " picks · " + s.toLocaleString("en-AU") + " staked";
+  }
+
+  /**
+   * Show the reconstructed toggle only when this payload says the estimate is
+   * available and at least one model has a non-empty reconstructed block.
+   * Absence of reconstructed_available (flag not requested) is not enough.
+   */
+  function reconstructedToggleVisible(meta, models) {
+    if (!meta || meta.reconstructed_available !== true) return false;
+    const src = models && typeof models === "object" ? models : {};
+    const ids = ["with_price", "without_price", "agree"];
+    return ids.some((id) => {
+      const block = src[id] && src[id].reconstructed;
+      if (!block || typeof block !== "object") return false;
+      const picks = block.summary && Number(block.summary.picks);
+      const daily = Array.isArray(block.daily) ? block.daily.length : 0;
+      return (Number.isFinite(picks) && picks > 0) || daily > 0;
+    });
+  }
+
+  const RECON_CHART_LABEL =
+    "Reconstructed estimate (fair price 1/market_p), 13 Oct to 5 Nov, not live results";
+
   return {
     HEADLINE_SINCE,
     RECONSTRUCTED_FROM,
     RECONSTRUCTED_TO,
     SMALL_SAMPLE_N,
+    RECON_CHART_LABEL,
     formatPct,
     formatPctWithN,
     isSmallSample,
     hypSampleN,
     formatIsoShort,
     formatDataSince,
+    formatPicksStaked,
+    reconstructedToggleVisible,
   };
 });

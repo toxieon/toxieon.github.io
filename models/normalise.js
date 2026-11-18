@@ -8,7 +8,7 @@
   "use strict";
 
   const MODEL_IDS = ["with_price", "without_price", "agree"];
-  const PRICE_BAND_ORDER = ["$1-2", "2-3", "3-5", "5-8", "8-15", "15+"];
+  const PRICE_BAND_ORDER = ["$1-2", "$2-3", "$3-5", "$5-8", "$8-15", "$15+"];
   const VALID_RESULTS = new Set(["won", "lost", "placed", "scratched", "void"]);
 
   function num(v, fallback) {
@@ -35,6 +35,7 @@
   function normSummary(s) {
     const x = s && typeof s === "object" ? s : {};
     const summary = {
+      picks: num(x.picks),
       bets: num(x.bets),
       wins: num(x.wins),
       strike_pct: num(x.strike_pct),
@@ -65,7 +66,7 @@
       cum_units: pickField(x, "cum_units", "cum"),
       hyp_cum_units: pickField(x, "hyp_cum_units", "hyp_cum"),
     };
-    if (x.reconstructed) out.reconstructed = true;
+    out.reconstructed = !!x.reconstructed;
     return out;
   }
 
@@ -102,7 +103,7 @@
 
   function normWeekdayRow(row) {
     const x = row && typeof row === "object" ? row : {};
-    return {
+    const out = {
       label: x.label != null ? String(x.label) : "",
       picks: num(x.picks),
       bets: num(x.bets),
@@ -113,6 +114,9 @@
       hyp_pl_units: num(x.hyp_pl_units),
       hyp_roi_pct: num(x.hyp_roi_pct),
     };
+    const hyp = normHypBlock(x.hyp);
+    if (hyp) out.hyp = hyp;
+    return out;
   }
 
   function normMeta(m) {
@@ -120,14 +124,39 @@
     const dataSince = m.data_since != null ? String(m.data_since) : "";
     const picks = num(m.picks);
     const staked = num(m.staked_picks);
-    if (!dataSince && !picks && !staked && m.data_since == null && m.picks == null && m.staked_picks == null) {
+    const hasFlag = Object.prototype.hasOwnProperty.call(m, "reconstructed_available");
+    const hasWindow = m.reconstructed && typeof m.reconstructed === "object";
+    if (!dataSince && !picks && !staked && m.data_since == null && m.picks == null && m.staked_picks == null && !hasFlag && !hasWindow) {
       return null;
     }
-    return {
+    const out = {
       data_since: dataSince,
       picks,
       staked_picks: staked,
     };
+    if (hasFlag) out.reconstructed_available = !!m.reconstructed_available;
+    if (hasWindow) {
+      out.reconstructed = {
+        from: m.reconstructed.from != null ? String(m.reconstructed.from) : "",
+        to: m.reconstructed.to != null ? String(m.reconstructed.to) : "",
+        data_since: m.reconstructed.data_since != null ? String(m.reconstructed.data_since) : "",
+        picks: num(m.reconstructed.picks),
+      };
+    }
+    return out;
+  }
+
+  function normReconstructedBlock(block) {
+    if (!block || typeof block !== "object") return null;
+    const summary = normSummary(block.summary);
+    const hyp = normHypBlock(block.hyp) || summary.hyp || null;
+    if (hyp && !summary.hyp) summary.hyp = hyp;
+    const out = {
+      summary,
+      by_weekday: Array.isArray(block.by_weekday) ? block.by_weekday.map(normWeekdayRow) : [],
+    };
+    if (hyp) out.hyp = hyp;
+    return out;
   }
 
   function normRecent(r) {
@@ -152,9 +181,12 @@
   function normModelBlock(block) {
     const m = block && typeof block === "object" ? block : {};
     const weekday = Array.isArray(m.by_weekday) ? m.by_weekday.map(normWeekdayRow) : [];
+    const summary = normSummary(m.summary);
+    const hyp = normHypBlock(m.hyp) || summary.hyp || null;
+    if (hyp && !summary.hyp) summary.hyp = hyp;
     const meta = normMeta(m.meta);
     const out = {
-      summary: normSummary(m.summary),
+      summary,
       daily: Array.isArray(m.daily) ? m.daily.map(normDaily) : [],
       by_price_band: normBreakdown(m.by_price_band, "price_band"),
       by_track: normBreakdown(m.by_track, "track"),
@@ -162,7 +194,10 @@
       by_weekday: weekday,
       recent: Array.isArray(m.recent) ? m.recent.map(normRecent) : [],
     };
+    if (hyp) out.hyp = hyp;
     if (meta) out.meta = meta;
+    const recon = normReconstructedBlock(m.reconstructed);
+    if (recon) out.reconstructed = recon;
     return out;
   }
 
@@ -201,6 +236,14 @@
       models[id] = normModelBlock(modelsIn[id]);
     }
     const topMeta = normMeta(data.meta);
+    if (data.meta && typeof data.meta === "object") {
+      for (const id of MODEL_IDS) {
+        if (!models[id].meta) {
+          const pack = normMeta(data.meta[id]);
+          if (pack) models[id].meta = pack;
+        }
+      }
+    }
     const out = {
       generated_at: data.generated_at != null ? String(data.generated_at) : "",
       range: {
@@ -226,10 +269,12 @@
     const models = {};
     for (const id of MODEL_IDS) {
       const m = modelsIn[id] && typeof modelsIn[id] === "object" ? modelsIn[id] : {};
-      models[id] = Object.assign({}, m, {
+      const next = Object.assign({}, m, {
         daily: Array.isArray(m.daily) ? m.daily.filter(notReconstructed) : [],
         recent: Array.isArray(m.recent) ? m.recent.filter(notReconstructed) : [],
       });
+      delete next.reconstructed;
+      models[id] = next;
     }
     const h = payload.head_to_head && typeof payload.head_to_head === "object" ? payload.head_to_head : {};
     return Object.assign({}, payload, {
@@ -256,5 +301,6 @@
     normHypBlock,
     normHeadToHead,
     filterReconstructed,
+    normReconstructedBlock,
   };
 });
