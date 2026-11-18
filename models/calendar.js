@@ -27,7 +27,7 @@
 
   function normDailySlice(row) {
     if (!row) return null;
-    return {
+    const out = {
       picks: Number(row.picks) || 0,
       bets: Number(row.bets) || 0,
       wins: Number(row.wins) || 0,
@@ -36,6 +36,8 @@
       cum_units: pickField(row, "cum_units", "cum"),
       hyp_cum_units: pickField(row, "hyp_cum_units", "hyp_cum"),
     };
+    if (row.reconstructed) out.reconstructed = true;
+    return out;
   }
 
   /** Join models.*.daily by ISO date (YYYY-MM-DD). */
@@ -48,7 +50,9 @@
         const date = row && row.date != null ? String(row.date) : "";
         if (!date) continue;
         if (!map.has(date)) map.set(date, emptyDay(date));
-        map.get(date)[id] = normDailySlice(row);
+        const slice = normDailySlice(row);
+        map.get(date)[id] = slice;
+        if (slice && slice.reconstructed) map.get(date).reconstructed = true;
       }
     }
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));

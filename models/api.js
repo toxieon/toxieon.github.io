@@ -14,6 +14,7 @@
     params.set("to", to);
     const opts = options && typeof options === "object" ? options : {};
     if (opts.stakedOnly) params.set("staked_only", "1");
+    if (opts.includeReconstructed) params.set("include_reconstructed", "1");
     return base + "/api/owner/model-stats?" + params.toString();
   }
 

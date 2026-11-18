@@ -131,3 +131,39 @@ test("head_to_head daily pl units are numeric", () => {
   assert.equal(h.days[0].agree, -2);
   assert.equal(h.disagree_races.count, 3);
 });
+test("normDaily and normRecent keep reconstructed flag only when set", () => {
+  assert.equal(N.normDaily({ date: "2026-10-13", reconstructed: true }).reconstructed, true);
+  assert.equal(N.normDaily({ date: "2026-11-06" }).reconstructed, undefined);
+  assert.equal(N.normRecent({ reconstructed: true }).reconstructed, true);
+  assert.equal(N.normRecent({}).reconstructed, undefined);
+});
+
+test("filterReconstructed drops flagged rows when include is off", () => {
+  const raw = N.normalizeStatsPayload({
+    models: {
+      with_price: {
+        daily: [
+          { date: "2026-10-13", bets: 1, reconstructed: true },
+          { date: "2026-11-06", bets: 2 },
+        ],
+        recent: [
+          { date: "2026-10-14", horse: "Demo Runner One", reconstructed: true },
+          { date: "2026-11-07", horse: "Fake Horse Alpha" },
+        ],
+      },
+    },
+    head_to_head: {
+      days: [
+        { date: "2026-10-13", with_price: 1, reconstructed: true },
+        { date: "2026-11-06", with_price: 2 },
+      ],
+    },
+  });
+  const hidden = N.filterReconstructed(raw, false);
+  assert.deepEqual(hidden.models.with_price.daily.map((d) => d.date), ["2026-11-06"]);
+  assert.deepEqual(hidden.models.with_price.recent.map((d) => d.date), ["2026-11-07"]);
+  assert.deepEqual(hidden.head_to_head.days.map((d) => d.date), ["2026-11-06"]);
+  const shown = N.filterReconstructed(raw, true);
+  assert.equal(shown.models.with_price.daily.length, 2);
+  assert.equal(shown.models.with_price.daily[0].reconstructed, true);
+});

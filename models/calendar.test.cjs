@@ -58,3 +58,15 @@ test("plTone uses bets and sign", () => {
   assert.equal(C.plTone(-1, 2), "neg");
   assert.equal(C.plTone(0, 0), "neutral");
 });
+test("joinDailyByDate marks a day reconstructed if any model row is", () => {
+  const joined = C.joinDailyByDate({
+    with_price: { daily: [{ date: "2026-10-20", bets: 2, wins: 1, pl_units: 1, reconstructed: true }] },
+    without_price: { daily: [{ date: "2026-10-20", bets: 1, wins: 0, pl_units: -1, reconstructed: true }] },
+    agree: { daily: [{ date: "2026-11-06", bets: 1, wins: 1, pl_units: 2 }] },
+  });
+  const rec = joined.find((d) => d.date === "2026-10-20");
+  const live = joined.find((d) => d.date === "2026-11-06");
+  assert.equal(rec.reconstructed, true);
+  assert.equal(rec.with_price.reconstructed, true);
+  assert.equal(live.reconstructed, undefined);
+});

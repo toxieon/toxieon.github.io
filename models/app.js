@@ -2,17 +2,19 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.1.3";
+  const APP_VERSION = "0.1.4";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
   const CAL = window.NDModelsCalendar;
   const DATES = window.NDModelsDates;
   const API = window.NDModelsApi;
+  const FMT = window.NDModelsFormat;
 
   const UNAVAILABLE_MSG =
     "Not available: either the stats API isn't live yet, or this token isn't the owner's.";
   const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
+  const RECON_KEY = "nd_models_include_reconstructed";
 
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d) => (Number.isFinite(n) ? n.toFixed(d ?? 1) : "—");
@@ -44,6 +46,7 @@
     stakedLoading: false,
     stakedNotLive: false,
     stakedError: "",
+    includeReconstructed: false,
   };
 
   function isDemoMode() {
@@ -84,6 +87,21 @@
     } catch (e) { /* ignore */ }
   }
 
+  function getIncludeReconstructed() {
+    try {
+      return localStorage.getItem(RECON_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setIncludeReconstructed(on) {
+    try {
+      if (on) localStorage.setItem(RECON_KEY, "1");
+      else localStorage.removeItem(RECON_KEY);
+    } catch (e) { /* ignore */ }
+  }
+
   function signedIn() {
     return Boolean(state.token);
   }
@@ -102,10 +120,20 @@
   async function fetchModelStats(from, to, options) {
     const opts = options && typeof options === "object" ? options : {};
     if (isDemoMode()) {
-      const raw = opts.stakedOnly ? DEMO.generateStakedDemoStats(to) : DEMO.generateDemoStats(from, to);
-      return { ok: true, data: N.normalizeStatsPayload(raw), demo: true };
+      const raw = opts.stakedOnly
+        ? DEMO.generateStakedDemoStats(to)
+        : DEMO.generateDemoStats(from, to, { includeReconstructed: state.includeReconstructed });
+      const data = N.normalizeStatsPayload(raw);
+      return {
+        ok: true,
+        data: opts.stakedOnly ? data : N.filterReconstructed(data, state.includeReconstructed),
+        demo: true,
+      };
     }
-    const url = API.buildModelStatsUrl(CFG.API_BASE, from, to, opts);
+    const url = API.buildModelStatsUrl(CFG.API_BASE, from, to, {
+      stakedOnly: !!opts.stakedOnly,
+      includeReconstructed: !opts.stakedOnly && state.includeReconstructed,
+    });
     const res = await fetch(url, {
       method: "GET",
       headers: { Authorization: "Bearer " + state.token },
@@ -126,7 +154,11 @@
       return { ok: false, error: "Request failed (" + res.status + ")." };
     }
     const json = await res.json();
-    return { ok: true, data: N.normalizeStatsPayload(json) };
+    const data = N.normalizeStatsPayload(json);
+    return {
+      ok: true,
+      data: opts.stakedOnly ? data : N.filterReconstructed(data, state.includeReconstructed),
+    };
   }
 
   function validateRange(from, to) {
@@ -157,22 +189,14 @@
   }
 
   function formatMetaBlock(meta) {
-    if (!meta) return "";
-    const parts = [];
-    if (meta.data_since) {
-      try {
-        const d = new Date(meta.data_since + "T12:00:00Z");
-        parts.push(
-          "Data since " +
-            new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(d)
-        );
-      } catch (e) {
-        parts.push("Data since " + meta.data_since);
-      }
-    }
-    if (meta.picks) parts.push(meta.picks.toLocaleString("en-AU") + " picks");
-    if (meta.staked_picks) parts.push("(" + meta.staked_picks.toLocaleString("en-AU") + " staked)");
-    return parts.join(" · ");
+    return FMT.formatDataSince(meta, { includeReconstructed: state.includeReconstructed });
+  }
+
+  function smallSampleTag() {
+    const tag = document.createElement("span");
+    tag.className = "small-sample";
+    tag.textContent = "small sample";
+    return tag;
   }
 
   function modelShowsHyp(m) {
@@ -304,7 +328,10 @@
         const hyp = document.createElement("p");
         hyp.className = "summary-hyp";
         hyp.textContent =
-          "Flat 1u: " + fmtPl(s.hyp.pl_units) + "u · ROI " + fmtPct(s.hyp.roi_pct);
+          "Flat 1u: " +
+          fmtPl(s.hyp.pl_units) +
+          "u · ROI " +
+          FMT.formatPctWithN(s.hyp.roi_pct, FMT.hypSampleN(s.hyp, s.bets), { signed: true });
         card.append(hyp);
       }
       const mmeta = state.data.models[id].meta;
@@ -318,12 +345,13 @@
       const row = document.createElement("div");
       row.className = "stats-row";
       row.append(
-        textStat("Strike", fmtPct(s.strike_pct)),
-        textStat("ROI", fmtPct(s.roi_pct)),
+        textStat("Strike", FMT.formatPctWithN(s.strike_pct, s.bets)),
+        textStat("ROI", FMT.formatPctWithN(s.roi_pct, s.bets, { signed: true })),
         textStat("Bets", String(s.bets)),
         textStat("Staked", fmt(s.staked_units) + " u")
       );
       card.append(row);
+      if (FMT.isSmallSample(s.bets)) card.append(smallSampleTag());
       root.appendChild(card);
     }
   }
@@ -494,8 +522,18 @@
     const pl = document.createElement("strong");
     pl.className = plClass(summary.pl_units);
     pl.textContent = fmtPl(summary.pl_units) + " u";
-    stats.append("P&L ", pl, " · ROI " + fmtPct(summary.roi_pct) + " · Bets " + summary.bets);
-    if (summary.bets > 0) stats.append(" · Strike " + fmtPct(summary.strike_pct));
+    stats.append(
+      "P&L ",
+      pl,
+      " · ROI " + FMT.formatPctWithN(summary.roi_pct, summary.bets, { signed: true }) + " · Bets " + summary.bets
+    );
+    if (summary.bets > 0) {
+      stats.append(" · Strike " + FMT.formatPctWithN(summary.strike_pct, summary.bets));
+    }
+    if (FMT.isSmallSample(summary.bets)) {
+      stats.append(" ");
+      stats.append(smallSampleTag());
+    }
     const empty = $("staked-empty");
     const chart = $("staked-chart");
     if (!summary.bets) {
@@ -543,7 +581,8 @@
       const tr = document.createElement("tr");
       ["label", "bets", "wins", "strike_pct", "pl_units", "roi_pct"].forEach((col) => {
         const td = document.createElement("td");
-        if (col === "strike_pct" || col === "roi_pct") td.textContent = fmtPct(r[col]);
+        if (col === "strike_pct") td.textContent = FMT.formatPctWithN(r[col], r.bets);
+        else if (col === "roi_pct") td.textContent = FMT.formatPctWithN(r[col], r.bets, { signed: true });
         else if (col === "pl_units") {
           td.textContent = fmtPl(r[col]);
           td.className = plClass(r[col]);
@@ -557,7 +596,7 @@
         tdPl.className = plClass(hp.pl_units);
         tr.append(tdPl);
         const tdRoi = document.createElement("td");
-        tdRoi.textContent = fmtPct(hp.roi_pct);
+        tdRoi.textContent = FMT.formatPctWithN(hp.roi_pct, FMT.hypSampleN(hp, r.bets), { signed: true });
         tr.append(tdRoi);
       }
       tbody.appendChild(tr);
@@ -618,7 +657,7 @@
       plTd.className = plClass(r.pl_units);
       tr.append(plTd);
       const roiTd = document.createElement("td");
-      roiTd.textContent = fmtPct(r.roi_pct);
+      roiTd.textContent = FMT.formatPctWithN(r.roi_pct, r.bets, { signed: true });
       tr.append(roiTd);
       if (showFlat) {
         const hTd = document.createElement("td");
@@ -626,7 +665,11 @@
         hTd.className = plClass(r.hyp_pl_units);
         tr.append(hTd);
         const hrTd = document.createElement("td");
-        hrTd.textContent = fmtPct(r.hyp_roi_pct);
+        hrTd.textContent = FMT.formatPctWithN(
+          r.hyp_roi_pct,
+          FMT.hypSampleN(r.hyp, r.picks || r.bets),
+          { signed: true }
+        );
         tr.append(hrTd);
       }
       tbody.appendChild(tr);
@@ -669,8 +712,17 @@
       const noBet = !r.stake_units;
       const tr = document.createElement("tr");
       if (noBet) tr.classList.add("no-bet");
+      if (r.reconstructed) tr.classList.add("reconstructed");
+      const dateTd = document.createElement("td");
+      dateTd.append(r.date);
+      if (r.reconstructed) {
+        const tag = document.createElement("span");
+        tag.className = "recon-tag";
+        tag.textContent = "reconstructed";
+        dateTd.append(tag);
+      }
+      tr.appendChild(dateTd);
       const cols = [
-        r.date,
         r.track,
         String(r.race_no),
         r.horse,
@@ -680,7 +732,7 @@
       cols.forEach((c, i) => {
         const td = document.createElement("td");
         td.textContent = c;
-        if (i === 5 && noBet) td.classList.add("stake-zero");
+        if (i === 4 && noBet) td.classList.add("stake-zero");
         tr.appendChild(td);
       });
       const resTd = document.createElement("td");
@@ -757,6 +809,13 @@
       num.textContent = dayNum;
       cell.appendChild(num);
       const day = state.joinedByDate.get(iso);
+      if (day && day.reconstructed && inRange) {
+        cell.classList.add("cal-reconstructed");
+        const rec = document.createElement("span");
+        rec.className = "cal-recon-tag";
+        rec.textContent = "reconstructed";
+        cell.appendChild(rec);
+      }
       if (day && inRange) {
         const hasAny = CFG.MODELS.some((id) => day[id] && (day[id].bets || day[id].picks));
         if (hasAny) {
@@ -799,6 +858,13 @@
       }
       grid.appendChild(cell);
     });
+    const legend = $("cal-recon-legend");
+    if (legend) {
+      const show = CFG.MODELS && state.joinedByDate
+        ? [...state.joinedByDate.values()].some((d) => d.reconstructed && String(d.date).slice(0, 7) === ym)
+        : false;
+      legend.hidden = !show;
+    }
   }
 
   function openDaySheet(date) {
@@ -811,6 +877,12 @@
     $("day-sheet-title").textContent = date;
     const body = $("day-sheet-body");
     body.replaceChildren();
+    if (day.reconstructed) {
+      const rec = document.createElement("p");
+      rec.className = "hint recon-label";
+      rec.textContent = "Reconstructed";
+      body.appendChild(rec);
+    }
     CFG.MODELS.forEach((id) => {
       const slice = day[id];
       const card = document.createElement("div");
@@ -872,7 +944,8 @@
             r.result +
             " · " +
             fmtPl(r.pl_units) +
-            "u";
+            "u" +
+            (r.reconstructed ? " · reconstructed" : "");
           list.appendChild(li);
         });
         card.appendChild(list);
@@ -894,9 +967,18 @@
     tbody.replaceChildren();
     hh.days.forEach((d) => {
       const tr = document.createElement("tr");
+      if (d.reconstructed) tr.classList.add("reconstructed");
       [d.date, fmtPl(d.with_price), fmtPl(d.without_price), fmtPl(d.agree)].forEach((c, i) => {
         const td = document.createElement("td");
-        td.textContent = c;
+        if (i === 0 && d.reconstructed) {
+          td.append(c);
+          const tag = document.createElement("span");
+          tag.className = "recon-tag";
+          tag.textContent = "reconstructed";
+          td.append(tag);
+        } else {
+          td.textContent = c;
+        }
         if (i > 0) td.className = plClass([d.with_price, d.without_price, d.agree][i - 1]);
         tr.appendChild(td);
       });
@@ -995,6 +1077,15 @@
       state.rangeTo = $("date-to").value;
       reload();
     });
+    const reconToggle = $("toggle-reconstructed");
+    if (reconToggle) {
+      reconToggle.checked = state.includeReconstructed;
+      reconToggle.addEventListener("change", () => {
+        state.includeReconstructed = reconToggle.checked;
+        setIncludeReconstructed(state.includeReconstructed);
+        reload();
+      });
+    }
     $("date-from").addEventListener("change", () => {
       state.allTime = false;
       syncRangeInputs();
@@ -1062,6 +1153,9 @@
   function init() {
     $("ver").textContent = "v" + APP_VERSION;
     state.token = getToken();
+    state.includeReconstructed = getIncludeReconstructed();
+    const reconToggle = $("toggle-reconstructed");
+    if (reconToggle) reconToggle.checked = state.includeReconstructed;
     if (isDemoMode() && !state.token) {
       state.token = "demo-local";
       setToken("demo-local");
