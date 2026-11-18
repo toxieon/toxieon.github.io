@@ -80,10 +80,24 @@
     return ymKey(y, m) + "-" + String(last).padStart(2, "0");
   }
 
+  function effectiveRangeFrom(rangeFrom) {
+    return rangeFrom === "all" ? "1970-01-01" : String(rangeFrom || "1970-01-01");
+  }
+
   function monthOverlapsRange(ym, rangeFrom, rangeTo) {
     const start = ym + "-01";
     const end = monthEndIso(ym);
-    return end >= rangeFrom && start <= rangeTo;
+    const effFrom = effectiveRangeFrom(rangeFrom);
+    return end >= effFrom && start <= rangeTo;
+  }
+
+  const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  /** Wed/Sat racing meet highlight for by_weekday tables. */
+  function isRacingWeekdayHighlight(label) {
+    const s = String(label || "").trim();
+    const short = s.length <= 3 ? s : s.slice(0, 3);
+    return short === "Wed" || short === "Sat";
   }
 
   /** Mon-first month grid; null pads leading blanks; trailing nulls omitted. */
@@ -101,7 +115,8 @@
   }
 
   function dateInRange(iso, from, to) {
-    return iso >= from && iso <= to;
+    const effFrom = effectiveRangeFrom(from);
+    return iso >= effFrom && iso <= to;
   }
 
   function plTone(pl, bets) {
@@ -128,5 +143,8 @@
     plTone,
     dailyStrikePct,
     normDailySlice,
+    effectiveRangeFrom,
+    isRacingWeekdayHighlight,
+    WEEKDAY_LABELS,
   };
 });

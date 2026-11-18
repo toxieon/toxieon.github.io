@@ -79,6 +79,41 @@ test("demo daily rows emit cum_units and hyp_cum_units (not legacy cum keys)", (
   assert.ok(Object.prototype.hasOwnProperty.call(stakedDay, "hyp_cum_units"));
 });
 
+test("absent hyp meta and by_weekday tolerated", () => {
+  const out = N.normalizeStatsPayload({
+    models: { with_price: { summary: { bets: 2, pl_units: 1 }, daily: [] } },
+  });
+  assert.equal(out.models.with_price.summary.hyp, undefined);
+  assert.equal(out.models.with_price.meta, undefined);
+  assert.deepEqual(out.models.with_price.by_weekday, []);
+  assert.equal(out.meta, undefined);
+});
+
+test("hyp meta and by_weekday normalise when present", () => {
+  const out = N.normalizeStatsPayload({
+    meta: { data_since: "2026-10-03", picks: 100, staked_picks: 40 },
+    models: {
+      with_price: {
+        summary: { bets: 1, hyp: { pl_units: 2, roi_pct: 10, bets: 1 } },
+        by_weekday: [{ label: "Wed", picks: 5, hyp_pl_units: 1, hyp_roi_pct: 5 }],
+      },
+    },
+  });
+  assert.equal(out.meta.picks, 100);
+  assert.equal(out.models.with_price.summary.hyp.pl_units, 2);
+  assert.equal(out.models.with_price.by_weekday[0].label, "Wed");
+  assert.equal(N.normRecent({ hyp_pl_units: -1 }).hyp_pl_units, -1);
+});
+
+test("demo from=all and extended fields", () => {
+  const D = require("./demo.js");
+  const s = D.generateDemoStats("all", "2026-11-07");
+  assert.equal(s.range.from, "all");
+  assert.ok(s.meta && s.meta.picks);
+  assert.equal(s.models.with_price.by_weekday.length, 7);
+  assert.ok(s.models.with_price.summary.hyp);
+});
+
 test("normDaily prefers cum_units and hyp_cum_units over legacy cum keys", () => {
   assert.equal(N.normDaily({ cum_units: 3, cum: 99 }).cum_units, 3);
   assert.equal(N.normDaily({ cum: 2 }).cum_units, 2);

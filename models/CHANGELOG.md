@@ -1,5 +1,6 @@
 # TipBot Models changelog
 
+## 0.1.3 · 2026-11-18 · staked-flat-alltime · Staked-only section (parallel fetch since 12 Nov). Flat 1u (hyp) on summary, breakdowns, recent, bankroll toggle, day sheet, and by-weekday (Wed/Sat highlight). All-time default preset (`from=all`). Top-level and per-model meta line. Demo + normaliser tolerate missing fields; daily `cum_units` / `hyp_cum_units`.
 ## 0.1.2 · 2026-11-18 · review-fixes · Melbourne timezone presets (dates.js + tests), auth token form submit on Enter, tighter 390px calendar cells, sheet markup fix, Back to Hub link, exact 404 unavailable copy with sign-out/change-token (token kept on 404), tipdash session token gate hint, tipdash #t= fragment handoff (handoff.js + tests).
 ## 0.1.1 · 2026-11-18 · calendar · Mon-first month grid comparing all three models per day (P&L + W/L), range-aware prev/next, day detail sheet with recent rows; joinDailyByDate helper + tests.
 ## 0.1.0 · 2026-11-18 · initial · Owner-only TipBot with_price / without_price / agree comparison at /models/: auth gate, live API to afl-tipster-bot.onrender.com, localhost ?demo=1, Chess Lab–style dark UI, normaliser tests.

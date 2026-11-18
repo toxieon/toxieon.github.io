@@ -25,9 +25,13 @@
     return d.toISOString().slice(0, 10);
   }
 
+  const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const DEMO_DATA_SINCE = "2026-10-03";
+
   function eachDay(from, to) {
     const out = [];
-    const start = new Date(from + "T12:00:00Z");
+    const effFrom = from === "all" ? DEMO_DATA_SINCE : from;
+    const start = new Date(effFrom + "T12:00:00Z");
     const end = new Date(to + "T12:00:00Z");
     for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
       out.push(isoDate(d));
@@ -74,6 +78,9 @@
     const wins = daily.reduce((s, d) => s + d.wins, 0);
     const pl_units = Math.round(daily.reduce((s, d) => s + d.pl_units, 0) * 10) / 10;
     const staked_units = Math.round(bets * (1.2 + rand()) * 10) / 10;
+    const picks = daily.reduce((s, d) => s + d.picks, 0);
+    const hypPl = Math.round(daily.reduce((s, d) => s + d.hyp_pl_units, 0) * 10) / 10;
+    const hypStaked = Math.max(bets, 1);
     const summary = {
       bets,
       wins,
@@ -81,6 +88,13 @@
       staked_units,
       pl_units,
       roi_pct: staked_units ? Math.round((pl_units / staked_units) * 1000) / 10 : 0,
+      hyp: {
+        bets,
+        wins,
+        strike_pct: bets ? Math.round((wins / bets) * 1000) / 10 : 0,
+        pl_units: hypPl,
+        roi_pct: Math.round((hypPl / hypStaked) * 1000) / 10,
+      },
     };
     const mkRows = (labels) =>
       labels.map((label) => {
@@ -88,6 +102,7 @@
         const w = Math.floor(rand() * b);
         const pl = Math.round((rand() - 0.45) * 20 * 10) / 10;
         const st = b * (1 + rand());
+        const hpl = Math.round((rand() - 0.45) * 14 * 10) / 10;
         return {
           label,
           bets: b,
@@ -95,8 +110,34 @@
           strike_pct: Math.round((w / b) * 1000) / 10,
           pl_units: pl,
           roi_pct: Math.round((pl / st) * 1000) / 10,
+          hyp: {
+            bets: b,
+            wins: w,
+            strike_pct: Math.round((w / b) * 1000) / 10,
+            pl_units: hpl,
+            roi_pct: Math.round((hpl / st) * 1000) / 10,
+          },
         };
       });
+    const by_weekday = WEEKDAYS.map((label) => {
+      const p = Math.floor(rand() * 40) + 5;
+      const b = Math.floor(p * (0.3 + rand() * 0.5));
+      const w = Math.floor(b * (0.2 + rand() * 0.4));
+      const pl = Math.round((rand() - 0.45) * 18 * 10) / 10;
+      const hpl = Math.round((rand() - 0.45) * 12 * 10) / 10;
+      const st = Math.max(b, 1) * (1 + rand());
+      return {
+        label,
+        picks: p,
+        bets: b,
+        wins: w,
+        strike_pct: b ? Math.round((w / b) * 1000) / 10 : 0,
+        pl_units: pl,
+        roi_pct: Math.round((pl / st) * 1000) / 10,
+        hyp_pl_units: hpl,
+        hyp_roi_pct: Math.round((hpl / st) * 1000) / 10,
+      };
+    });
     const results = ["won", "lost", "placed", "scratched", "void"];
     const recent = [];
     for (let i = 0; i < 30; i++) {
@@ -121,8 +162,21 @@
       by_price_band: mkRows(bandLabels),
       by_track: mkRows(TRACKS),
       by_stake_bracket: mkRows(["0-1", "1-2", "2-5", "5+"]),
+      by_weekday,
       recent,
+      meta: {
+        data_since: DEMO_DATA_SINCE,
+        picks,
+        staked_picks: bets,
+      },
     };
+  }
+
+  function CFG_PICK_SUM(models) {
+    const id = models.without_price ? "without_price" : "with_price";
+    const m = models[id];
+    if (!m || !m.meta) return { picks: 0, staked: 0 };
+    return { picks: m.meta.picks || 0, staked: m.meta.staked_picks || 0 };
   }
 
   function generateDemoStats(from, to) {
@@ -141,10 +195,17 @@
       without_price: Math.round((rand() - 0.5) * 6 * 10) / 10,
       agree: Math.round((rand() - 0.5) * 4 * 10) / 10,
     }));
-  const count = Math.floor(rand() * 40) + 5;
+    const count = Math.floor(rand() * 40) + 5;
+    const pickSum = CFG_PICK_SUM(models);
+    const rangeFrom = from === "all" ? "all" : from;
     return {
       generated_at: new Date().toISOString(),
-      range: { from, to },
+      range: { from: rangeFrom, to },
+      meta: {
+        data_since: DEMO_DATA_SINCE,
+        picks: pickSum.picks,
+        staked_picks: pickSum.staked,
+      },
       models,
       head_to_head: {
         days: h2hDays,

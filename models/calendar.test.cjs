@@ -27,6 +27,17 @@ test("monthOverlapsRange respects selected range", () => {
   assert.equal(C.monthOverlapsRange("2026-10", "2026-11-05", "2026-11-20"), false);
 });
 
+test("isRacingWeekdayHighlight marks Wed and Sat", () => {
+  assert.equal(C.isRacingWeekdayHighlight("Wed"), true);
+  assert.equal(C.isRacingWeekdayHighlight("Wednesday"), true);
+  assert.equal(C.isRacingWeekdayHighlight("Sat"), true);
+  assert.equal(C.isRacingWeekdayHighlight("Mon"), false);
+});
+
+test("monthOverlapsRange with from=all", () => {
+  assert.equal(C.monthOverlapsRange("2026-11", "all", "2026-11-30"), true);
+});
+
 test("normDailySlice prefers cum_units and hyp_cum_units", () => {
   const row = C.normDailySlice({
     bets: 1,
