@@ -10,13 +10,15 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<link rel="stylesheet" href="styles.css?v=0.1.1" />
-<script src="config.js?v=0.1.1"></script>
-<script src="normalise.js?v=0.1.1"></script>
-<script src="calendar.js?v=0.1.1"></script>
-<script src="demo.js?v=0.1.1"></script>
+<script src="handoff.js?v=0.1.2"></script>
+<link rel="stylesheet" href="styles.css?v=0.1.2" />
+<script src="config.js?v=0.1.2"></script>
+<script src="normalise.js?v=0.1.2"></script>
+<script src="calendar.js?v=0.1.2"></script>
+<script src="dates.js?v=0.1.2"></script>
+<script src="demo.js?v=0.1.2"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.1.1" defer></script>
+<script src="app.js?v=0.1.2" defer></script>
 </head>
 <body>
 <div class="app">
@@ -26,16 +28,21 @@
       <h1>TipBot model stats</h1>
       <p id="demo-badge" class="hint" hidden>Demo data (?demo=1 on localhost)</p>
     </div>
-    <button type="button" class="btn btn-ghost" id="btn-signout" hidden>Sign out</button>
+    <div class="head-actions">
+      <a href="/hub/" class="btn btn-ghost hub-link">Back to Hub</a>
+      <button type="button" class="btn btn-ghost" id="btn-signout" hidden>Sign out</button>
+    </div>
   </header>
 
   <section id="auth-gate" class="card gate" aria-labelledby="gate-title">
     <h2 id="gate-title">Owner token</h2>
-    <p class="muted">Paste your owner token once. It stays on this device only (localStorage). Never share it or put it in a URL.</p>
-    <label for="token-input" class="muted">Bearer token</label>
-    <input id="token-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
-    <p id="gate-message" class="hint" role="alert"></p>
-    <button type="button" class="btn btn-primary" id="btn-save-token">Save token</button>
+    <p class="muted">Paste your tipdash session token (sign in to tipdash, it's saved there as tipbot_token). It expires if you sign out of tipdash. This page stores it on this device only — never in a URL.</p>
+    <form id="auth-form" autocomplete="off">
+      <label for="token-input" class="muted">Bearer token</label>
+      <input id="token-input" name="owner_token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <p id="gate-message" class="hint" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="btn-save-token">Save token</button>
+    </form>
   </section>
 
   <main id="app-main" hidden>
@@ -52,7 +59,10 @@
       <button type="button" class="btn" id="btn-apply-range">Apply</button>
     </div>
 
-    <p id="status-banner" class="banner info" hidden></p>
+    <div id="status-banner" class="banner info status-banner" hidden>
+      <p id="status-banner-text"></p>
+      <button type="button" class="btn btn-ghost" id="btn-banner-change-token" hidden>Sign out / change token</button>
+    </div>
     <p id="load-state" class="loading" hidden></p>
 
     <div id="dashboard" hidden>
@@ -149,13 +159,13 @@
 
   <div id="day-sheet" class="day-sheet" hidden>
     <button type="button" class="day-sheet-backdrop" id="day-sheet-backdrop" aria-label="Close"></button>
-    <hgroup class="sheet-card">
+    <div class="sheet-card">
       <div class="sheet-head">
         <h2 id="day-sheet-title">Day</h2>
         <button type="button" class="btn btn-ghost" id="day-sheet-close">Close</button>
       </div>
       <div id="day-sheet-body" class="sheet-body"></div>
-    </hgroup>
+    </div>
   </div>
 </div>
 </body>
