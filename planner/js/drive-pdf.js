@@ -308,6 +308,7 @@ function hydrateFromHash() {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     if (state.modal) { dismissModal(); render(); }
+    else if (state.photoPlace) { state.photoPlace = null; render(); }
     else if (state.roomDraw?.mode) { clearRoomDraw(); render(); }
     else if (state.massMode.active) { stopMassMode(); }
     else if (state.drawerOpen) { state.drawerOpen = false; render(); }

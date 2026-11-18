@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.21.5";
+const APP_VERSION = "0.22.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -64,13 +64,20 @@ const DEFAULT_CATEGORY_TABS = [
 const CATEGORIES_HEADER = ["Item", "Code", "Description", "Color", "Shorthand"];
 const MASTER_SHEET_NAME = "NeillPlanner-Master";
 const MASTER_TABS = {
-  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected"],
+  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected", "Photo Folder ID"],
   Floors:   ["Floor ID", "Project ID", "Project Name", "Floor Name", "Order", "Plan Drive File ID", "Drive Folder ID", "Node Count", "Created At", "Plan Aspect Ratio", "Plan PNG File ID"],
-  Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version"],
+  Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version", "Apartment"],
   Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link"],
   Folders:  ["Folder ID", "Name", "Color", "Project Count", "Drive Folder ID"],
   Rooms:    ["Room ID", "Project ID", "Floor ID", "Name", "Created At", "Updated At", "Sort Order", "Shape"]
 };
+/* Data rows of a master tab, wide enough for every header including ones added later. */
+function masterValuesRange(tab) {
+  const width = (MASTER_TABS[tab] || []).length || 1;
+  const kit = (typeof ND !== "undefined" && ND.sheetsKit) ? ND.sheetsKit : null;
+  const end = kit ? kit.colLetter(Math.max(0, width - 1)) : "AZ";
+  return `${tab}!A2:${end}`;
+}
 const USERS_SHEET_NAME = "NeillPlanner-Users";
 const USERS_TAB = "Users";
 const USERS_HEADER = ["Email", "Role", "Display Name", "Added At", "Added By"];
@@ -141,7 +148,7 @@ function freshState() {
     selectedFloorId: null,
     selectedRoomId: "all",
     selectedNodeId: null,
-    drawerOpen: false, modal: null, lightbox: null, toast: "",
+    drawerOpen: false, modal: null, lightbox: null, toast: "", photoPlace: null,
     selectedFolderId: "all",
     filters: { query: "", status: "All", category: "All", assignee: "All" },
     canvas: { zoom: 1, panX: 0, panY: 0 },
@@ -175,7 +182,7 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(localStorage.getItem("neillplanner-state-v3"));
     if (saved && typeof saved === "object") {
       const fresh = freshState();
-      const merged = { ...fresh, ...saved, modal: null, lightbox: null, toast: "", massMode: fresh.massMode, bulkSelection: [], roomDraw: fresh.roomDraw };
+      const merged = { ...fresh, ...saved, modal: null, lightbox: null, toast: "", photoPlace: null, massMode: fresh.massMode, bulkSelection: [], roomDraw: fresh.roomDraw };
       merged.googleAuth = { ...fresh.googleAuth, bootstrapped: saved.googleAuth?.bootstrapped || false, profile: saved.googleAuth?.profile || null };
       merged.drive = { ...fresh.drive, ...(saved.drive || {}) };
       merged.auditView = { ...fresh.auditView, filters: { ...fresh.auditView.filters, ...(saved.auditView?.filters || {}) } };
@@ -236,7 +243,7 @@ function migrateState(s) {
 
 function persist(opts = {}) {
   const saveable = {
-    ...state, modal: null, lightbox: null, toast: "", planUpload: null, titlePlacing: false,
+    ...state, modal: null, lightbox: null, toast: "", photoPlace: null, planUpload: null, titlePlacing: false,
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
     roomDraw: { mode: null, points: [], roomId: null },
     bulkSelection: [],

@@ -73,7 +73,11 @@ function bindEvents() {
       window._plannerSyncFillSub = NDQueue.onStatus((st) => document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, st)));
     }
   }
-  document.querySelectorAll("[data-right-tab]").forEach((b) => b.addEventListener("click", () => { state.ui.rightTab = b.dataset.rightTab; persist(); render(); }));
+  document.querySelectorAll("[data-right-tab]").forEach((b) => b.addEventListener("click", () => {
+    state.ui.rightTab = b.dataset.rightTab;
+    if (b.dataset.rightTab === "photos") state.ui.nodesCollapsed = false;
+    persist(); render();
+  }));
   document.querySelectorAll("[data-plan-set]").forEach((el) => {
     const fl = currentFloor(); if (!fl) return;
     function live() {
@@ -198,6 +202,7 @@ function bindEvents() {
   }
   bindCanvasEvents();
   bindMarkerDrag();
+  bindPhotoTray();
 }
 
 function loadPlannerPlacesLibrary() {
@@ -338,6 +343,12 @@ function handleAction(event) {
     case "toggle-plan-lock": state.ui.planLocked = !state.ui.planLocked; persist(); return render();
     case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
     case "refresh-batch": toast("Refreshing batch nodes…"); refreshInbox({ silent: false }).then(() => toast("Batch nodes refreshed")).catch(() => {}); return;
+    case "refresh-photo-folder": refreshPhotoLibrary({ silent: false }); return;
+    case "open-photo-folder": return openPhotoFolder();
+    case "sync-photo-structure": return syncPhotoStructure();
+    case "push-photo-folders": return pushPhotoFolders();
+    case "photo-list": return openPhotoList();
+    case "cancel-photo-place": state.photoPlace = null; return render();
     case "open-batch-folder": {
       // Open the raw Batch folder in Drive (all uploads). The batch-nodes panel
       // itself already filters to this job by address.
@@ -469,7 +480,7 @@ function bindCanvasEvents() {
   }, { passive: false });
   viewport.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".node-marker")) return;
-    if (e.target.closest(".empty-plan")) return;
+    if (e.target.closest(".empty-plan") && !state.photoPlace) return;
     if (e.target.closest("button")) return;
     // Do not capture touch pointers — setPointerCapture on the first finger
     // prevents iOS from delivering a second finger for pinch.
@@ -546,7 +557,7 @@ function bindCanvasEvents() {
     const wasMoved = dragState.moved;
     dragState = null;
     persist();
-    if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest(".empty-plan") && !e.target.closest("button")) {
+    if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest("button") && (state.photoPlace || !e.target.closest(".empty-plan"))) {
       const pos = pointerToPlanPosition(e); if (!pos) return;
       planTapAt(pos);
     }
@@ -563,6 +574,11 @@ function bindCanvasEvents() {
 
 // Shared plan-tap action (custom stage gestures and the OpenSeadragon viewer).
 function planTapAt(pos) {
+  if (state.photoPlace) {
+    const file = photoFileById(state.photoPlace.fileId);
+    if (!file) { state.photoPlace = null; toast("That photo is no longer in the list"); return render(); }
+    return placeLinkedPhoto(file, pos);
+  }
   if (state.titlePlacing) { state.titlePlacing = false; state.modal = { mode: "create", nodeType: "title", position: pos }; return render(); }
   if (state.roomDraw?.mode) return handleRoomDrawPoint(pos);
   if (state.massMode.active) return placeMassNode(pos);
@@ -639,8 +655,12 @@ function bindMarkerDrag() {
 }
 
 function pointerToPlanPosition(event) {
-  const plan = document.querySelector(".floor-plan"); if (!plan) return null;
-  const rect = plan.getBoundingClientRect();
+  const plan = document.querySelector(".floor-plan");
+  const stage = document.getElementById("planStage");
+  const planRect = plan ? plan.getBoundingClientRect() : null;
+  const el = planRect && planRect.width > 2 ? plan : stage;
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * 100;
   const y = ((event.clientY - rect.top) / rect.height) * 100;
   if (x < 0 || x > 100 || y < 0 || y > 100) return null;

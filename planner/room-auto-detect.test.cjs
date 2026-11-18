@@ -89,7 +89,7 @@ test("0.21.3: detection uses a 720px canvas and releases it; auto rooms is butto
   const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
   const version = read("VERSION").trim();
   const app = require("./test-utils.cjs").loadPlannerSource(), html = read("index.html"), sw = read("sw.js");
-  assert.equal(version, "0.21.5");
+  assert.equal(version, "0.22.1");
   assert.match(app, new RegExp(`APP_VERSION = "${version}"`));
   assert.match(sw, new RegExp(`CACHE_VERSION = 'planner-${version}'`));
   for (const file of [html, sw]) {
