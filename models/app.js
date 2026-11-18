@@ -2,11 +2,12 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.1.1";
+  const APP_VERSION = "0.1.2";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
   const CAL = window.NDModelsCalendar;
+  const DATES = window.NDModelsDates;
 
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d) => (Number.isFinite(n) ? n.toFixed(d ?? 1) : "—");
@@ -39,16 +40,6 @@
     } catch (e) {
       return false;
     }
-  }
-
-  function todayIso() {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  function addDays(iso, delta) {
-    const d = new Date(iso + "T12:00:00Z");
-    d.setUTCDate(d.getUTCDate() + delta);
-    return d.toISOString().slice(0, 10);
   }
 
   function melbourneTime(iso) {
@@ -172,18 +163,35 @@
     renderAll();
   }
 
+  function signOutAndShowGate() {
+    setToken("");
+    state.token = "";
+    state.data = null;
+    state.gateMessage = "";
+    state.apiNotLive = false;
+    state.loadError = "";
+    setView();
+    renderStatus();
+    $("dashboard").hidden = true;
+  }
+
   function renderStatus() {
-    const el = $("status-banner");
-    el.hidden = true;
-    el.className = "banner";
-    el.textContent = "";
+    const wrap = $("status-banner");
+    const text = $("status-banner-text");
+    const changeBtn = $("btn-banner-change-token");
+    wrap.hidden = true;
+    wrap.className = "banner status-banner";
+    text.textContent = "";
+    changeBtn.hidden = true;
     if (state.apiNotLive) {
-      el.hidden = false;
-      el.classList.add("info");
-      el.textContent = "Stats API is not live yet on this host (404). Demo mode: add ?demo=1 on localhost.";
+      wrap.hidden = false;
+      wrap.classList.add("info");
+      text.textContent =
+        "Not available: either the stats API isn't live yet, or this token isn't the owner's.";
+      changeBtn.hidden = false;
     } else if (state.loadError) {
-      el.hidden = false;
-      el.textContent = state.loadError;
+      wrap.hidden = false;
+      text.textContent = state.loadError;
     }
   }
 
@@ -396,7 +404,7 @@
 
   function miniCellText(slice) {
     if (!slice || !slice.bets) return "";
-    return fmtPl(slice.pl_units) + "u · " + slice.wins + "/" + slice.bets;
+    return fmtPl(slice.pl_units) + " " + slice.wins + "/" + slice.bets;
   }
 
   function renderCalendar() {
@@ -448,12 +456,24 @@
             row.className = "cal-mini";
             if (!slice || !slice.bets) {
               row.classList.add("neutral");
-              row.textContent = modelMiniLabel(id) + " —";
+              const lab = document.createElement("span");
+              lab.className = "cal-lab";
+              lab.textContent = modelMiniLabel(id);
+              const val = document.createElement("span");
+              val.className = "cal-val";
+              val.textContent = "—";
+              row.append(lab, val);
               models.appendChild(row);
               return;
             }
             row.classList.add(CAL.plTone(slice.pl_units, slice.bets));
-            row.textContent = modelMiniLabel(id) + " " + miniCellText(slice);
+            const lab = document.createElement("span");
+            lab.className = "cal-lab";
+            lab.textContent = modelMiniLabel(id);
+            const val = document.createElement("span");
+            val.className = "cal-val";
+            val.textContent = miniCellText(slice);
+            row.append(lab, val);
             models.appendChild(row);
           });
           cell.appendChild(models);
@@ -570,8 +590,8 @@
   }
 
   function applyPreset(days) {
-    const to = todayIso();
-    const from = addDays(to, -(days - 1));
+    const to = DATES.todayMelbourneIso();
+    const from = DATES.addCalendarDays(to, -(days - 1));
     $("date-from").value = from;
     $("date-to").value = to;
     document.querySelectorAll("[data-preset]").forEach((btn) => {
@@ -580,28 +600,28 @@
     reload();
   }
 
+  function saveTokenFromGate() {
+    const t = ($("token-input").value || "").trim();
+    if (!t) {
+      state.gateMessage = "Enter your owner token.";
+      $("gate-message").textContent = state.gateMessage;
+      return;
+    }
+    state.token = t;
+    setToken(t);
+    state.gateMessage = "";
+    $("token-input").value = "";
+    setView();
+    applyPreset(30);
+  }
+
   function bindEvents() {
-    $("btn-save-token").addEventListener("click", () => {
-      const t = ($("token-input").value || "").trim();
-      if (!t) {
-        state.gateMessage = "Enter your owner token.";
-        $("gate-message").textContent = state.gateMessage;
-        return;
-      }
-      state.token = t;
-      setToken(t);
-      state.gateMessage = "";
-      $("token-input").value = "";
-      setView();
-      applyPreset(30);
+    $("auth-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      saveTokenFromGate();
     });
-    $("btn-signout").addEventListener("click", () => {
-      setToken("");
-      state.token = "";
-      state.data = null;
-      state.gateMessage = "";
-      setView();
-    });
+    $("btn-signout").addEventListener("click", signOutAndShowGate);
+    $("btn-banner-change-token").addEventListener("click", signOutAndShowGate);
     $("btn-apply-range").addEventListener("click", () => reload());
     document.querySelectorAll("[data-preset]").forEach((btn) => {
       btn.addEventListener("click", () => applyPreset(Number(btn.getAttribute("data-preset"))));
@@ -647,9 +667,9 @@
     bindEvents();
     setView();
     if (signedIn()) {
-      const to = todayIso();
+      const to = DATES.todayMelbourneIso();
       $("date-to").value = to;
-      $("date-from").value = addDays(to, -29);
+      $("date-from").value = DATES.addCalendarDays(to, -29);
       applyPreset(30);
     }
   }
