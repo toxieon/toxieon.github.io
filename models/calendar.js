@@ -1,0 +1,117 @@
+/* Join model daily rows by date; month grid helpers. No DOM. */
+(function (root, factory) {
+  "use strict";
+  const api = factory();
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.NDModelsCalendar = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const MODEL_IDS = ["with_price", "without_price", "agree"];
+
+  function emptyDay(date) {
+    return { date, with_price: null, without_price: null, agree: null };
+  }
+
+  function normDailySlice(row) {
+    if (!row) return null;
+    return {
+      bets: Number(row.bets) || 0,
+      wins: Number(row.wins) || 0,
+      pl_units: Number(row.pl_units) || 0,
+      cum_units: Number(row.cum_units) || 0,
+    };
+  }
+
+  /** Join models.*.daily by ISO date (YYYY-MM-DD). */
+  function joinDailyByDate(models) {
+    const map = new Map();
+    const src = models && typeof models === "object" ? models : {};
+    for (const id of MODEL_IDS) {
+      const daily = Array.isArray(src[id] && src[id].daily) ? src[id].daily : [];
+      for (const row of daily) {
+        const date = row && row.date != null ? String(row.date) : "";
+        if (!date) continue;
+        if (!map.has(date)) map.set(date, emptyDay(date));
+        map.get(date)[id] = normDailySlice(row);
+      }
+    }
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function parseYm(ym) {
+    const p = String(ym || "").split("-");
+    return { y: Number(p[0]) || 0, m: Number(p[1]) || 1 };
+  }
+
+  function ymKey(y, m) {
+    return y + "-" + String(m).padStart(2, "0");
+  }
+
+  function ymAdd(ym, deltaMonths) {
+    const { y, m } = parseYm(ym);
+    const d = new Date(Date.UTC(y, m - 1 + deltaMonths, 1));
+    return ymKey(d.getUTCFullYear(), d.getUTCMonth() + 1);
+  }
+
+  function daysInMonth(ym) {
+    const { y, m } = parseYm(ym);
+    return new Date(Date.UTC(y, m, 0)).getUTCDate();
+  }
+
+  function monthEndIso(ym) {
+    const { y, m } = parseYm(ym);
+    const last = daysInMonth(ym);
+    return ymKey(y, m) + "-" + String(last).padStart(2, "0");
+  }
+
+  function monthOverlapsRange(ym, rangeFrom, rangeTo) {
+    const start = ym + "-01";
+    const end = monthEndIso(ym);
+    return end >= rangeFrom && start <= rangeTo;
+  }
+
+  /** Mon-first month grid; null pads leading blanks; trailing nulls omitted. */
+  function buildMonthGrid(ym) {
+    const { y, m } = parseYm(ym);
+    const first = new Date(Date.UTC(y, m - 1, 1));
+    const lead = (first.getUTCDay() + 6) % 7;
+    const last = daysInMonth(ym);
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push(null);
+    for (let d = 1; d <= last; d++) {
+      cells.push(ymKey(y, m) + "-" + String(d).padStart(2, "0"));
+    }
+    return cells;
+  }
+
+  function dateInRange(iso, from, to) {
+    return iso >= from && iso <= to;
+  }
+
+  function plTone(pl, bets) {
+    if (!bets) return "neutral";
+    if (pl > 0) return "pos";
+    if (pl < 0) return "neg";
+    return "neutral";
+  }
+
+  function dailyStrikePct(bets, wins) {
+    if (!bets) return 0;
+    return Math.round((wins / bets) * 1000) / 10;
+  }
+
+  return {
+    MODEL_IDS,
+    joinDailyByDate,
+    parseYm,
+    ymAdd,
+    buildMonthGrid,
+    monthOverlapsRange,
+    monthEndIso,
+    dateInRange,
+    plTone,
+    dailyStrikePct,
+    normDailySlice,
+  };
+});
