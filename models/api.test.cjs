@@ -26,3 +26,18 @@ test("buildModelStatsUrl passes from=all for all-time range", () => {
   assert.equal(new URL(url).searchParams.get("to"), "2026-11-19");
   assert.equal(new URL(url).searchParams.get("staked_only"), null);
 });
+test("buildModelStatsUrl adds include_reconstructed only when requested", () => {
+  const off = A.buildModelStatsUrl("https://example.com", "all", "2026-11-18");
+  assert.equal(new URL(off).searchParams.get("include_reconstructed"), null);
+  const on = A.buildModelStatsUrl("https://example.com", "all", "2026-11-18", {
+    includeReconstructed: true,
+  });
+  assert.equal(new URL(on).searchParams.get("include_reconstructed"), "1");
+  const staked = A.buildModelStatsUrl("https://example.com", "2026-11-12", "2026-11-18", {
+    stakedOnly: true,
+    includeReconstructed: true,
+  });
+  const q = new URL(staked).searchParams;
+  assert.equal(q.get("staked_only"), "1");
+  assert.equal(q.get("include_reconstructed"), "1");
+});

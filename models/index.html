@@ -10,16 +10,17 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<script src="handoff.js?v=0.1.3"></script>
-<link rel="stylesheet" href="styles.css?v=0.1.3" />
-<script src="config.js?v=0.1.3"></script>
-<script src="api.js?v=0.1.3"></script>
-<script src="normalise.js?v=0.1.3"></script>
-<script src="calendar.js?v=0.1.3"></script>
-<script src="dates.js?v=0.1.3"></script>
-<script src="demo.js?v=0.1.3"></script>
+<script src="handoff.js?v=0.1.4"></script>
+<link rel="stylesheet" href="styles.css?v=0.1.4" />
+<script src="config.js?v=0.1.4"></script>
+<script src="api.js?v=0.1.4"></script>
+<script src="normalise.js?v=0.1.4"></script>
+<script src="calendar.js?v=0.1.4"></script>
+<script src="dates.js?v=0.1.4"></script>
+<script src="format.js?v=0.1.4"></script>
+<script src="demo.js?v=0.1.4"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.1.3" defer></script>
+<script src="app.js?v=0.1.4" defer></script>
 </head>
 <body>
 <div class="app">
@@ -61,6 +62,10 @@
       <input type="date" id="date-to" aria-label="To date" />
       <button type="button" class="btn" id="btn-apply-range">Apply</button>
     </div>
+    <label class="recon-toggle" for="toggle-reconstructed">
+      <input type="checkbox" id="toggle-reconstructed" />
+      Show reconstructed 13 Oct to 5 Nov
+    </label>
 
     <div id="status-banner" class="banner info status-banner" hidden>
       <p id="status-banner-text"></p>
@@ -103,6 +108,7 @@
           <button type="button" class="btn calnav" id="cal-next" aria-label="Next month">›</button>
         </div>
         <div id="cal-grid" class="cal-grid" role="grid" aria-label="Daily model comparison"></div>
+        <p id="cal-recon-legend" class="hint" hidden>Hatched days are reconstructed (13 Oct to 5 Nov).</p>
       </section>
 
       <section class="chart-card" aria-labelledby="bank-h">

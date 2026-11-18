@@ -55,7 +55,7 @@
 
   function normDaily(d) {
     const x = d && typeof d === "object" ? d : {};
-    return {
+    const out = {
       date: x.date != null ? String(x.date) : "",
       picks: num(x.picks),
       bets: num(x.bets),
@@ -65,6 +65,8 @@
       cum_units: pickField(x, "cum_units", "cum"),
       hyp_cum_units: pickField(x, "hyp_cum_units", "hyp_cum"),
     };
+    if (x.reconstructed) out.reconstructed = true;
+    return out;
   }
 
   function normBreakdownRow(row) {
@@ -132,7 +134,7 @@
     const x = r && typeof r === "object" ? r : {};
     const raw = x.result != null ? String(x.result).toLowerCase() : "";
     const result = VALID_RESULTS.has(raw) ? raw : "void";
-    return {
+    const out = {
       date: x.date != null ? String(x.date) : "",
       track: x.track != null ? String(x.track) : "",
       race_no: num(x.race_no),
@@ -143,6 +145,8 @@
       pl_units: num(x.pl_units),
       hyp_pl_units: num(x.hyp_pl_units),
     };
+    if (x.reconstructed) out.reconstructed = true;
+    return out;
   }
 
   function normModelBlock(block) {
@@ -167,12 +171,14 @@
     const days = Array.isArray(x.days)
       ? x.days.map((d) => {
           const row = d && typeof d === "object" ? d : {};
-          return {
+          const out = {
             date: row.date != null ? String(row.date) : "",
             with_price: num(row.with_price),
             without_price: num(row.without_price),
             agree: num(row.agree),
           };
+          if (row.reconstructed) out.reconstructed = true;
+          return out;
         })
       : [];
     const dr = x.disagree_races && typeof x.disagree_races === "object" ? x.disagree_races : {};
@@ -208,6 +214,32 @@
     return out;
   }
 
+  function notReconstructed(row) {
+    return !(row && row.reconstructed);
+  }
+
+  /** Drop reconstructed rows when the toggle is off. Summaries are left as sent. */
+  function filterReconstructed(payload, include) {
+    if (!payload || typeof payload !== "object") return payload;
+    if (include) return payload;
+    const modelsIn = payload.models && typeof payload.models === "object" ? payload.models : {};
+    const models = {};
+    for (const id of MODEL_IDS) {
+      const m = modelsIn[id] && typeof modelsIn[id] === "object" ? modelsIn[id] : {};
+      models[id] = Object.assign({}, m, {
+        daily: Array.isArray(m.daily) ? m.daily.filter(notReconstructed) : [],
+        recent: Array.isArray(m.recent) ? m.recent.filter(notReconstructed) : [],
+      });
+    }
+    const h = payload.head_to_head && typeof payload.head_to_head === "object" ? payload.head_to_head : {};
+    return Object.assign({}, payload, {
+      models,
+      head_to_head: Object.assign({}, h, {
+        days: Array.isArray(h.days) ? h.days.filter(notReconstructed) : [],
+      }),
+    });
+  }
+
   return {
     MODEL_IDS,
     PRICE_BAND_ORDER,
@@ -223,5 +255,6 @@
     normMeta,
     normHypBlock,
     normHeadToHead,
+    filterReconstructed,
   };
 });

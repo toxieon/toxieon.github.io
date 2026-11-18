@@ -1,17 +1,18 @@
 /* Offline shell — owner stats UI only (live fetch when online). */
-const CACHE_VERSION = "models-0.1.3";
+const CACHE_VERSION = "models-0.1.4";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./handoff.js?v=0.1.3",
-  "./styles.css?v=0.1.3",
-  "./config.js?v=0.1.3",
-  "./api.js?v=0.1.3",
-  "./normalise.js?v=0.1.3",
-  "./calendar.js?v=0.1.3",
-  "./dates.js?v=0.1.3",
-  "./demo.js?v=0.1.3",
-  "./app.js?v=0.1.3",
+  "./handoff.js?v=0.1.4",
+  "./styles.css?v=0.1.4",
+  "./config.js?v=0.1.4",
+  "./api.js?v=0.1.4",
+  "./normalise.js?v=0.1.4",
+  "./calendar.js?v=0.1.4",
+  "./dates.js?v=0.1.4",
+  "./format.js?v=0.1.4",
+  "./demo.js?v=0.1.4",
+  "./app.js?v=0.1.4",
   "./manifest.json",
   "./favicon.svg",
   "../shared/nd-pwa.js",
