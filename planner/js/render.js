@@ -282,9 +282,10 @@ function renderMapView() {
         <div class="summary-grid"><div class="metric"><span>${state.selectedRoomId === "all" ? "Floor nodes" : "Room nodes"}</span><strong>${nodes.length}</strong></div><div class="metric"><span>Shown</span><strong>${matched.length}</strong></div><div class="metric"><span>Complete</span><strong>${stats(nodes).completePercent}%</strong></div><div class="metric"><span>Issues</span><strong>${stats(nodes).issue}</strong></div></div>
         <div class="right-tabs">
           <button class="right-tab ${rightTab === "nodes" ? "is-active" : ""}" data-right-tab="nodes">${icon("map")}Nodes</button>
+          <button class="right-tab ${rightTab === "photos" ? "is-active" : ""}" data-right-tab="photos">${icon("upload")}Photos</button>
           <button class="right-tab ${rightTab === "plan" ? "is-active" : ""}" data-right-tab="plan">${icon("settings")}Plan</button>
         </div>
-        ${rightTab === "plan" ? renderPlanSettings(floor) : `
+        ${rightTab === "plan" ? renderPlanSettings(floor) : rightTab === "photos" ? `<div class="photo-source-panel">${renderPhotoSourcesPanel(proj)}</div>` : `
         <div class="size-control"><label>All floor nodes size (%) <input type="number" min="5" max="300" step="5" value="${state.ui.floorSizePercent ?? 100}" data-floor-size /></label><button class="ghost-button" data-action="floor-size">Apply to floor</button></div><div class="collapsible-heading"><h3 class="section-title">Nodes (${state.selectedRoomId === "all" ? "this floor" : escapeHtml(roomLabel(state.selectedRoomId))})</h3><button class="ghost-button compact-toggle" data-action="toggle-node-list">${nodesCollapsed ? "Show" : "Hide"}</button></div>
         <p class="summary-hint">Shift-click markers to multi-select.</p>
         <div class="node-list">${matched.length ? matched.map(renderNodeSummary).join("") : `<div class="empty-state">${nodes.length ? "No matching nodes" : (hasPlan ? "No nodes on this floor yet." : "Upload a plan to start.")}</div>`}</div>

@@ -147,21 +147,39 @@ async function hydrateFromMasterSheet(opts = {}) {
     // Preserve device-local project fields (colour / completed / rooms toggle)
     // across a cloud rebuild — they're not columns in the sheet (yet).
     const localExtras = {};
-    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms }; });
+    (state.projects || []).forEach((p) => {
+      localExtras[p.id] = {
+        color: p.color,
+        completed: p.completed,
+        showRooms: p.showRooms,
+        photoSourceFolderIds: Array.isArray(p.photoSourceFolderIds) ? p.photoSourceFolderIds.slice() : null
+      };
+    });
+    const projectsColMap = await fetchProjectsColumnIndex();
     const projectMap = {};
     for (const r of projRows) {
       if (!r[0]) continue;
-      const folderGroupName = r[2] || "";
+      const folderGroupName = projectRowValue(r, projectsColMap, "Folder Group", 2) || "";
       const folderId = folderGroupName && folderGroupName !== DRIVE_UNFILED_FOLDER
         ? (state.projectFolders.find((f) => f.name === folderGroupName) || {}).id || null
         : null;
+      const photoField = projectRowValue(r, projectsColMap, PROJECTS_PHOTO_SOURCES_COL);
       const p = {
-        id: r[0], name: r[1] || "Untitled", folderId,
-        address: r[3] || "", description: r[4] || "",
-        createdBy: r[5] || "", createdAt: r[6] || nowStamp(), updatedAt: r[7] || nowStamp(),
-        floors: [], team: [], protected: parseBool(r[11])
+        id: r[0],
+        name: projectRowValue(r, projectsColMap, "Name", 1) || "Untitled",
+        folderId,
+        address: projectRowValue(r, projectsColMap, "Address", 3) || "",
+        description: projectRowValue(r, projectsColMap, "Description", 4) || "",
+        createdBy: projectRowValue(r, projectsColMap, "Created By", 5) || "",
+        createdAt: projectRowValue(r, projectsColMap, "Created At", 6) || nowStamp(),
+        updatedAt: projectRowValue(r, projectsColMap, "Updated At", 7) || nowStamp(),
+        floors: [],
+        team: [],
+        protected: parseBool(projectRowValue(r, projectsColMap, "Protected", 11)),
+        photoSourceFolderIds: parsePhotoSourceFolderIdsField(photoField)
       };
-      if (r[8]) state.drive.projectFolderMap[p.id] = r[8];
+      const driveFolder = projectRowValue(r, projectsColMap, "Drive Folder ID", 8);
+      if (driveFolder) state.drive.projectFolderMap[p.id] = driveFolder;
       projectMap[p.id] = p;
     }
     state.projects = Object.values(projectMap);
@@ -170,6 +188,7 @@ async function hydrateFromMasterSheet(opts = {}) {
       if (e.color != null) p.color = e.color;
       if (typeof e.completed === "boolean") p.completed = e.completed;
       if (e.showRooms != null) p.showRooms = e.showRooms;
+      if (Array.isArray(e.photoSourceFolderIds) && !p.photoSourceFolderIds?.length) p.photoSourceFolderIds = e.photoSourceFolderIds;
     });
     for (const r of floorRows) {
       if (!r[0]) continue;

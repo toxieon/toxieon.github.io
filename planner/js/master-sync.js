@@ -60,7 +60,7 @@ function buildMasterRows() {
   const out = { Projects: new Map(), Floors: new Map(), Nodes: new Map(), Photos: new Map(), Folders: new Map(), Rooms: new Map() };
   state.projects.forEach((p) => {
     const nodes = state.nodes.filter((n) => n.projectId === p.id);
-    out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", p.updatedAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : ""]);
+    out.Projects.set(p.id, [p.id, p.name, projectFolder(p)?.name || DRIVE_UNFILED_FOLDER, p.address || "", p.description || "", p.createdBy || "", p.createdAt || "", p.updatedAt || "", state.drive.projectFolderMap[p.id] || "", (p.floors || []).length, nodes.length, p.protected ? "TRUE" : "", formatPhotoSourceFolderIdsField(p.photoSourceFolderIds)]);
     (p.floors || []).forEach((f) => {
       const count = state.nodes.filter((n) => n.floorId === f.id).length;
       out.Floors.set(f.id, [f.id, p.id, p.name, f.name, f.order || 0, f.planDriveFileId || "", state.drive.floorFolderMap[f.id] || "", count, f.createdAt || "", f.planAspectRatio || "", f.planPngFileId || ""]);

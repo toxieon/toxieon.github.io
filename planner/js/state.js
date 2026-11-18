@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.21.5";
+const APP_VERSION = "0.22.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -64,7 +64,7 @@ const DEFAULT_CATEGORY_TABS = [
 const CATEGORIES_HEADER = ["Item", "Code", "Description", "Color", "Shorthand"];
 const MASTER_SHEET_NAME = "NeillPlanner-Master";
 const MASTER_TABS = {
-  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected"],
+  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected", "Photo Source Folder IDs"],
   Floors:   ["Floor ID", "Project ID", "Project Name", "Floor Name", "Order", "Plan Drive File ID", "Drive Folder ID", "Node Count", "Created At", "Plan Aspect Ratio", "Plan PNG File ID"],
   Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version"],
   Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link"],
@@ -154,6 +154,7 @@ function freshState() {
     categoriesData: {}, categoriesLoadedAt: null,
     teamAccess: { permissions: [], loadedAt: null },
     ui: { nodesCollapsed: null, settingsSections: {}, categoryEditorTab: "", imageRepairRunning: false, rightTab: "nodes" },
+    photoSources: { loading: false, error: "", groups: [], refreshedAt: null },
     auditQueue: [],
     auditView: { loaded: false, loading: false, rows: [], lastFetchedAt: null,
       filters: { from: "", to: "", user: "All", action: "All", projectId: "All", nodeQuery: "", detailsQuery: "", query: "" } },
@@ -232,6 +233,15 @@ function migrateState(s) {
   if (s.selectedRoomId && s.selectedRoomId !== "all" && !s.rooms.some((r) => r.id === s.selectedRoomId)) s.selectedRoomId = "all";
   (s.rooms || []).forEach((r) => { if (!("shape" in r)) r.shape = null; });
   if (!s.roomDraw) s.roomDraw = { mode: null, points: [], roomId: null };
+  (s.projects || []).forEach((p) => {
+    if (!Array.isArray(p.photoSourceFolderIds)) {
+      const raw = p.photoSourceFolderIds;
+      p.photoSourceFolderIds = typeof raw === "string"
+        ? raw.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean)
+        : [];
+    }
+  });
+  if (!s.photoSources) s.photoSources = { loading: false, error: "", groups: [], refreshedAt: null };
 }
 
 function persist(opts = {}) {

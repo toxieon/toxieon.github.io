@@ -3576,3 +3576,22 @@ body.report-fullscreen { overflow:hidden; }
 .plan-stage.is-osd .node-marker, .plan-stage.is-osd .room-vertex-handle { pointer-events:auto; }
 
 .empty-plan-hint { font-size:12px; opacity:.7; margin-top:6px; }
+
+/* 0.22.1 linked Drive photo sources + watermark strip */
+.photo-source-panel { display:grid; gap:10px; max-height:min(52vh,480px); overflow:auto; padding:4px 2px 12px; }
+.photo-source-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.photo-source-level { border:1px solid var(--line); border-radius:10px; padding:6px 8px; background:rgba(255,255,255,.02); }
+.photo-source-level > summary { font-weight:600; cursor:pointer; padding:4px 2px; }
+.photo-source-apt { margin-top:8px; }
+.photo-source-apt-title { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px; }
+.photo-source-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; }
+.photo-source-tile { display:grid; gap:4px; padding:4px; border-radius:8px; border:1px solid var(--line); background:rgba(15,17,23,.65); cursor:grab; touch-action:pan-y; }
+.photo-source-tile.is-dragging { opacity:.6; }
+.photo-source-tile img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; pointer-events:none; }
+.photo-source-tile span { font-size:10px; line-height:1.2; text-align:left; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.photo-drag-ghost { position:fixed; left:0; top:0; z-index:9999; margin:0; padding:6px 10px; border-radius:8px; background:#111827; color:#fff; font-size:12px; pointer-events:none; transform:translate(-9999px,-9999px); }
+.lightbox-photo-wrap, .print-photo-frame { position:relative; display:inline-block; max-width:100%; }
+.lightbox-photo-wrap .lightbox-image { max-width:100%; max-height:70vh; object-fit:contain; border-radius:8px; display:block; }
+.photo-watermark-strip { position:absolute; left:0; right:0; bottom:0; padding:6px 8px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#f8fafc; font-size:11px; line-height:1.25; pointer-events:none; }
+.photo-watermark-strip span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.print-photo-frame .photo-watermark-strip { font-size:9px; padding:4px 6px; }

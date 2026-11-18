@@ -73,7 +73,13 @@ function bindEvents() {
       window._plannerSyncFillSub = NDQueue.onStatus((st) => document.querySelectorAll('[data-action="sync-master-sheet"]').forEach((b) => NDSyncFill.apply(b, st)));
     }
   }
-  document.querySelectorAll("[data-right-tab]").forEach((b) => b.addEventListener("click", () => { state.ui.rightTab = b.dataset.rightTab; persist(); render(); }));
+  document.querySelectorAll("[data-right-tab]").forEach((b) => b.addEventListener("click", () => {
+    state.ui.rightTab = b.dataset.rightTab;
+    persist();
+    render();
+    if (b.dataset.rightTab === "photos") refreshProjectPhotoSources({ silent: true }).catch((e) => console.warn("photo sources", e));
+  }));
+  if (typeof bindPhotoSourcePanel === "function") bindPhotoSourcePanel();
   document.querySelectorAll("[data-plan-set]").forEach((el) => {
     const fl = currentFloor(); if (!fl) return;
     function live() {
@@ -444,7 +450,17 @@ function bindCanvasEvents() {
   // Batch-node drop: drag a premade node from the panel onto the plan to place it.
   viewport.addEventListener("dragover", (e) => { if (e.dataTransfer) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
   viewport.addEventListener("drop", (e) => {
-    const key = e.dataTransfer && e.dataTransfer.getData("text/plain"); if (!key || !_batchGroups[key]) return;
+    if (!e.dataTransfer) return;
+    const photoRaw = e.dataTransfer.getData(PHOTO_SOURCE_DRAG_TYPE) || "";
+    const photo = parsePhotoSourceDragPayload(photoRaw);
+    if (photo) {
+      e.preventDefault();
+      const pos = pointerToPlanPosition(e) || { x: 50, y: 50 };
+      placePhotoSourceOnPlan(photo, pos);
+      return;
+    }
+    const key = e.dataTransfer.getData("text/plain");
+    if (!key || !_batchGroups[key]) return;
     e.preventDefault();
     const pos = pointerToPlanPosition(e) || { x: 50, y: 50 };
     placeBatchNode(key, pos);

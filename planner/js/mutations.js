@@ -20,6 +20,9 @@ function selectProject(projectId) {
   state.bulkSelection = [];
   persist(); render();
   maybeFetchPlanForCurrentFloor();
+  if (typeof refreshProjectPhotoSources === "function") {
+    refreshProjectPhotoSources({ silent: true }).catch((e) => console.warn("photo sources", e));
+  }
 }
 
 // 0.17.2 — a PDF plan stored on this device but never linked to Drive (upload happened while
@@ -352,7 +355,16 @@ async function handleProjectForm(event) {
   const name = (form.get("name") || "").toString().trim(); if (!name) return;
   const folderId = (form.get("folderId") || "").toString() || null;
   const firstFloor = (form.get("firstFloor") || "Ground floor").toString().trim() || "Ground floor";
-  const payload = { name, folderId, address: (form.get("address") || "").toString(), description: (form.get("description") || "").toString(), protected: form.get("protected") === "on" };
+  const photoSourcesRaw = (form.get("photoSourceFolders") || "").toString();
+  const photoSourceFolderIds = [...new Set(photoSourcesRaw.split(/\n/).flatMap((line) => parsePhotoSourceFolderIdsField(line)))];
+  const payload = {
+    name,
+    folderId,
+    address: (form.get("address") || "").toString(),
+    description: (form.get("description") || "").toString(),
+    protected: form.get("protected") === "on",
+    photoSourceFolderIds
+  };
   if (state.modal.mode === "edit-project") {
     const proj = project(); if (!proj) return;
     const folderChanged = proj.folderId !== folderId, nameChanged = proj.name !== name;
@@ -365,10 +377,11 @@ async function handleProjectForm(event) {
         .then(() => { if (nameChanged) return renameDriveFile(state.drive.projectFolderMap[proj.id], proj.name); })
         .catch((e) => console.warn(e));
     }
+    if (typeof refreshProjectPhotoSources === "function") refreshProjectPhotoSources({ silent: true }).catch(() => {});
     toast("Project updated");
   } else {
     const firstFloorObj = { id: uid("flr"), name: firstFloor, order: 0, planDriveFileId: null, planMimeType: null, planWebViewLink: null, planFileName: null, planAspectRatio: null, createdAt: nowStamp() };
-    const proj = { id: uid("prj"), ...payload, floors: [firstFloorObj], team: [], createdAt: nowStamp(), updatedAt: nowStamp() };
+    const proj = { id: uid("prj"), ...payload, photoSourceFolderIds: payload.photoSourceFolderIds || [], floors: [firstFloorObj], team: [], createdAt: nowStamp(), updatedAt: nowStamp() };
     state.projects.push(proj);
     state.selectedProjectId = proj.id;
     state.selectedFloorId = firstFloorObj.id;
