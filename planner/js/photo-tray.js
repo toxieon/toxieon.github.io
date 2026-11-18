@@ -59,20 +59,20 @@ async function loadPhotoTree(rootId) {
     children[id] = files;
     files.forEach((file) => { if (file.mimeType === PHOTO_FOLDER_MIME) apartments.push({ file: file, parentId: id }); });
   });
-  const aptLists = await mapPool(apartments, 4, async (entry) => [entry.file.id, entry.parentId, await listDriveChildren(entry.file.id)]);
+  const aptLists = await mapPool(apartments, 4, async (entry) => [entry.file.id, await listDriveChildren(entry.file.id)]);
   const nested = [];
-  aptLists.forEach(([id, parentId, files]) => {
+  aptLists.forEach(([id, files]) => {
     children[id] = files;
-    files.forEach((file) => { if (file.mimeType === PHOTO_FOLDER_MIME) nested.push({ file: file, parentId: id }); });
+    files.forEach((file) => { if (file.mimeType === PHOTO_FOLDER_MIME) nested.push(file); });
   });
   let trimmed = false;
-  const capped = nested.slice(0, 80);
+  const stageNamed = [];
+  const otherNamed = [];
+  nested.forEach((file) => { (api.stageFromName(file.name) ? stageNamed : otherNamed).push(file); });
+  const capped = stageNamed.concat(otherNamed).slice(0, 400);
   if (nested.length > capped.length) trimmed = true;
-  const nestedLists = await mapPool(capped, 4, async (entry) => [entry.parentId, await listDriveChildren(entry.file.id)]);
-  nestedLists.forEach(([parentId, files]) => {
-    const photos = files.filter((file) => api.isPhotoFile(file));
-    children[parentId] = (children[parentId] || []).concat(photos);
-  });
+  const nestedLists = await mapPool(capped, 4, async (file) => [file.id, await listDriveChildren(file.id)]);
+  nestedLists.forEach(([id, files]) => { children[id] = files; });
   const grouped = api.groupPhotoFiles(rootFiles, children);
   grouped.trimmed = trimmed;
   return grouped;
@@ -83,7 +83,7 @@ function photoSignature(lib) {
   const ids = [];
   (lib.levels || []).forEach((level) => {
     ids.push("L" + level.folderId);
-    (level.apartments || []).forEach((apt) => { ids.push("A" + apt.folderId); (apt.photos || []).forEach((photo) => ids.push(photo.id)); });
+    (level.apartments || []).forEach((apt) => { ids.push("A" + apt.folderId); (apt.photos || []).forEach((photo) => ids.push((photo.stage || "") + ":" + photo.id)); });
     (level.loose || []).forEach((photo) => ids.push(photo.id));
   });
   (lib.loose || []).forEach((photo) => ids.push(photo.id));
@@ -128,7 +128,8 @@ async function refreshPhotoLibrary(opts) {
     const next = Object.assign({ projectId: proj.id, folderId: folderId, error: "", fetchedAt: Date.now() }, tree);
     const same = photoLibrary && photoLibrary.folderId === folderId && photoSignature(photoLibrary) === photoSignature(next) && !photoLibrary.error;
     photoLibrary = next;
-    if (!same) render();
+    const stamped = rememberFolderStages(next);
+    if (!same || stamped) render();
     else if (manual) toast("Photo folder is up to date");
   } catch (e) {
     const message = describeError(e);
@@ -169,6 +170,58 @@ function renderPhotoGroup(title, photos, placed) {
   return `<div class="photo-apt"><div class="photo-apt-name">${escapeHtml(title)}<span>${photos.length}</span></div><div class="photo-row">${photos.map((file) => renderPhotoThumb(file, placed.has(file.id))).join("")}</div></div>`;
 }
 
+function renderStageGroups(apt, placed) {
+  const api = photoApi();
+  return (apt.stages || []).map((stage) => {
+    const photos = stage.photos || [];
+    if (!photos.length) return "";
+    const meta = api ? api.stageMeta(stage.key) : { label: stage.label || stage.key, tone: "plain" };
+    return `<div class="photo-stage is-${escapeHtml(meta.tone)}"><div class="photo-stage-name"><i aria-hidden="true"></i>${escapeHtml(meta.label)}<span>${photos.length}</span></div><div class="photo-row">${photos.map((file) => renderPhotoThumb(file, placed.has(file.id))).join("")}</div></div>`;
+  }).join("");
+}
+
+function renderApartmentBlock(apt, placed) {
+  const body = renderStageGroups(apt, placed);
+  if (!body) return "";
+  return `<div class="photo-apt"><div class="photo-apt-name">${escapeHtml(apt.name)}</div>${body}</div>`;
+}
+
+function photoStageOverrideMap() {
+  const api = photoApi();
+  const map = {};
+  state.nodes.forEach((node) => {
+    const stage = api ? api.normalizeStage(node.stage) : "";
+    if (!stage) return;
+    (node.imageRefs || []).forEach((image) => {
+      const id = image.driveFileId || image.id;
+      if (id) map[id] = stage;
+    });
+  });
+  return map;
+}
+
+function photoStageProgress(proj, lib) {
+  const api = photoApi();
+  if (!api || !proj) return null;
+  const collected = api.collectApartmentStages(lib || { levels: [] }, photoStageOverrideMap());
+  const keys = collected.keys.slice();
+  const seen = new Set(keys);
+  state.rooms.filter((room) => room.projectId === proj.id).forEach((room) => {
+    const apt = api.apartmentFromName(room.name);
+    if (!apt || seen.has(apt.key)) return;
+    seen.add(apt.key);
+    keys.push(apt.key);
+  });
+  const progress = api.stageProgress(keys, collected.present);
+  return progress.total ? progress : null;
+}
+
+function renderStageProgress(progress) {
+  if (!progress) return "";
+  const item = (tone, label, count, pct) => `<span class="is-${tone}"><i aria-hidden="true"></i>${label} <strong>${count} of ${progress.total}</strong> <em>${pct}%</em></span>`;
+  return `<p class="photo-progress" aria-label="Stage progress">${item("rough", "Rough-in", progress.roughIn, progress.roughPct)}${item("fit", "Fit-off", progress.fitOff, progress.fitPct)}</p>`;
+}
+
 function renderPhotoTray(proj) {
   if (!proj) return "";
   const linked = proj.photoFolderId || "";
@@ -181,17 +234,18 @@ function renderPhotoTray(proj) {
   const body = !lib ? `<p class="summary-hint">Loading the folder…</p>`
     : lib.error && !photoCount(lib) ? `<p class="summary-hint" role="alert">${escapeHtml(lib.error)}</p>`
     : `${lib.error ? `<p class="summary-hint" role="alert">${escapeHtml(lib.error)}</p>` : ""}
-      ${(lib.levels || []).map((level) => `<section class="photo-level"><h4>${icon("layers")}${escapeHtml(level.name)}</h4>${(level.apartments || []).map((apt) => renderPhotoGroup(apt.name, apt.photos || [], placed)).join("")}${renderPhotoGroup("In this level folder", level.loose || [], placed)}</section>`).join("")}
+      ${renderStageProgress(photoStageProgress(proj, lib))}
+      ${(lib.levels || []).map((level) => `<section class="photo-level"><h4>${icon("layers")}${escapeHtml(level.name)}</h4>${(level.apartments || []).map((apt) => renderApartmentBlock(apt, placed)).join("")}${renderPhotoGroup("In this level folder", level.loose || [], placed)}</section>`).join("")}
       ${renderPhotoGroup("In the photo folder", lib.loose || [], placed)}
       ${photoCount(lib) ? "" : `<p class="summary-hint">No photos in this folder yet. New uploads show up on refresh.</p>`}
       ${lib.trimmed ? `<p class="summary-hint">Some deeply nested folders were skipped.</p>` : ""}`;
   return `<section class="photo-tray" aria-label="Drive photos">
-    <div class="photo-tray-head"><h3 class="section-title">Drive photos</h3><p class="summary-hint">${photoCount(lib)} photo${photoCount(lib) === 1 ? "" : "s"}${when ? " · " + escapeHtml(when) : ""}. Long-press a thumbnail, then drag it onto the plan. A tap arms placement for the next tap on the plan.</p></div>
+    <div class="photo-tray-head"><h3 class="section-title">Drive photos</h3><p class="summary-hint">${photoCount(lib)} photo${photoCount(lib) === 1 ? "" : "s"}${when ? " · " + escapeHtml(when) : ""}. Grouped by level, apartment, then Rough-in or Fit-off. Long-press a thumbnail, then drag it onto the plan. A tap arms placement for the next tap on the plan.</p></div>
     <div class="photo-tray-actions">
       <button class="ghost-button" type="button" data-action="refresh-photo-folder">${icon("refresh")}Refresh</button>
       <button class="ghost-button" type="button" data-action="open-photo-folder">${icon("folder")}Drive</button>
       <button class="ghost-button" type="button" data-action="sync-photo-structure">${icon("layers")}Add floors</button>
-      <button class="ghost-button" type="button" data-action="push-photo-folders">${icon("upload")}Make folders</button>
+      <button class="ghost-button" type="button" data-action="push-photo-folders" title="Create level, apartment, Rough-in and Fit-off folders">${icon("upload")}Make folders</button>
       <button class="ghost-button" type="button" data-action="photo-list">${icon("edit")}From a list</button>
     </div>
     ${body}
@@ -208,24 +262,82 @@ function renderPhotoListModal() {
   return `<div class="modal-backdrop" data-action="close-modal"></div><form class="modal" id="photoListForm" role="dialog"><div class="modal-header"><div><h3>Apartments from a list</h3><p>Paste the apartment sheet (a heading such as APT# GROUND FLOOR, then one code per line) or choose the spreadsheet. Existing floors and apartments are left as they are.</p></div><button type="button" class="icon-button" data-action="close-modal">${icon("close")}</button></div><div class="modal-body"><div class="field full"><label for="photoListText">List</label><textarea id="photoListText" name="list" rows="8" placeholder="APT# GROUND FLOOR&#10;G.01&#10;G.02"></textarea></div><div class="field full"><label for="photoListFile">Spreadsheet</label><input id="photoListFile" name="file" type="file" accept=".xlsx,.xls,.csv,text/csv,text/plain" /></div></div><div class="modal-actions"><button type="button" class="ghost-button" data-action="close-modal">Cancel</button><button class="primary-button" type="submit">${icon("check")}Add missing</button></div></form>`;
 }
 
-function photoWatermarkFor(node) {
+function folderStageFor(image) {
+  if (!image) return "";
+  if (image.folderStage) return image.folderStage;
+  const id = image.driveFileId || image.id;
+  const file = id && photoFileById(id);
+  return file && file.stage || "";
+}
+
+/* The folder a Drive file sits in is remembered on the photo so the card still
+ * knows it after a reload. A manual node stage is left alone. Drive files are not moved. */
+function rememberFolderStages(lib) {
+  if (!lib) return false;
+  const byId = new Map();
+  (lib.levels || []).forEach((level) => {
+    (level.apartments || []).forEach((apt) => {
+      (apt.photos || []).forEach((photo) => { if (photo.id) byId.set(photo.id, photo.stage || "unsorted"); });
+    });
+  });
+  if (!byId.size) return false;
+  let changed = false;
+  state.nodes.forEach((node) => {
+    (node.imageRefs || []).forEach((image) => {
+      const id = image.driveFileId || image.id;
+      if (!id || !byId.has(id) || image.folderStage === byId.get(id)) return;
+      image.folderStage = byId.get(id);
+      changed = true;
+    });
+  });
+  if (changed) persist();
+  return changed;
+}
+
+function inheritStageLabel(node) {
+  const api = photoApi();
+  const keys = [];
+  ((node && node.imageRefs) || []).forEach((image) => {
+    const key = (api ? api.normalizeStage(folderStageFor(image)) : "") || "unsorted";
+    if (keys.indexOf(key) < 0) keys.push(key);
+  });
+  if (!keys.length) return "From the folder";
+  if (keys.length > 1) return "From the folder (mixed)";
+  const meta = api ? api.stageMeta(keys[0]) : null;
+  return "From the folder (" + (meta ? meta.label : "Unsorted") + ")";
+}
+
+function stageFieldOptions(node) {
+  const selected = (node && node.stage) || "";
+  return [["", inheritStageLabel(node)], ["rough-in", "Rough-in"], ["fit-off", "Fit-off"], ["unsorted", "Unsorted"]]
+    .map(([value, label]) => `<option value="${escapeHtml(value)}" ${selected === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+}
+
+function photoWatermarkFor(node, image) {
   const api = photoApi();
   if (!api || !node) return null;
+  const proj = typeof projectById === "function" ? projectById(node.projectId) : null;
   return api.watermarkModel({
     apartment: node.apartment || "",
     room: typeof roomName === "function" ? roomName(node.roomId) : "",
-    type: node.type || "",
-    status: node.status || "",
     notes: node.description || "",
-    category: node.category || "",
-    lineItem: node.lineItem || ""
+    photoStage: image && image.stage || "",
+    nodeStage: node.stage || "",
+    folderStage: folderStageFor(image),
+    branding: !!(proj && proj.watermarkBranding),
+    version: typeof APP_VERSION === "string" ? APP_VERSION : "",
+    date: (image && (image.uploadedAt || image.modifiedTime)) || ""
   });
 }
 
-function watermarkMarkup(node) {
-  const model = photoWatermarkFor(node);
+function watermarkMarkup(node, image) {
+  const model = photoWatermarkFor(node, image);
   if (!model) return "";
-  return `<span class="photo-watermark">${model.lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</span>`;
+  const place = [model.apartment, model.room].filter(Boolean).map((part) => `<b>${escapeHtml(part)}</b>`).join('<span class="wm-sep"> · </span>');
+  const note = model.note ? `<span class="wm-sep" aria-hidden="true">·</span><span class="wm-note">${escapeHtml(model.note)}</span>` : "";
+  const status = model.status ? `<span class="wm-status"><i class="wm-pip" aria-hidden="true"></i>${escapeHtml(model.status)}</span>` : "";
+  const foot = model.footer ? `<span class="wm-foot">${escapeHtml(model.footer)}</span>` : "";
+  return `<span class="photo-watermark is-${escapeHtml(model.tone)}"><span class="wm-accent" aria-hidden="true"></span><span class="wm-copy">${place ? `<span class="wm-title">${place}</span>` : ""}<span class="wm-meta"><span class="wm-stage">${escapeHtml(model.stageLabel)}</span>${status}${note}</span>${foot}</span></span>`;
 }
 
 function renderFramedPhoto(image, node, kind, index) {
@@ -233,7 +345,7 @@ function renderFramedPhoto(image, node, kind, index) {
   const thumb = image.thumbnailLink ? (kind === "lightbox" ? image.thumbnailLink.replace(/=s\d+(-c)?$/, "=s1600") : image.thumbnailLink) : "";
   const src = thumb || (did && typeof driveThumb === "function" ? driveThumb(did, kind === "lightbox" ? 1600 : 400) : "");
   const img = (src || did) ? `<img ${did ? `data-fileid="${escapeHtml(did)}"` : ""} src="${escapeHtml(src)}" alt="${escapeHtml(image.name || "Photo")}" loading="lazy" referrerpolicy="no-referrer" draggable="false" />` : "";
-  const mark = watermarkMarkup(node);
+  const mark = watermarkMarkup(node, image);
   if (kind === "tile") {
     return `<button type="button" class="image-tile" data-lightbox="${index}" aria-label="${escapeHtml(image.name || "Photo")}">${img}${mark || `<span>${escapeHtml(image.name || "")}</span>`}</button>`;
   }
@@ -330,10 +442,19 @@ async function pushPhotoFolders() {
       }
       const children = await listDriveChildren(folder.id);
       for (const apt of level.apartments) {
-        if (api.matchApartmentFolder(children, apt.key)) continue;
-        const made = await createDriveFolder(apt.label, folder.id);
-        children.push(made);
-        created++;
+        let aptFolder = api.matchApartmentFolder(children, apt.key);
+        if (!aptFolder) {
+          aptFolder = await createDriveFolder(apt.label, folder.id);
+          children.push(aptFolder);
+          created++;
+        }
+        const inner = await listDriveChildren(aptFolder.id);
+        for (const stage of (apt.stages || api.STAGE_FOLDERS)) {
+          if (api.matchStageFolder(inner, stage.key)) continue;
+          const made = await createDriveFolder(stage.name, aptFolder.id);
+          inner.push(made);
+          created++;
+        }
       }
     }
     toast(created ? `Created ${created} Drive folder${created === 1 ? "" : "s"}` : "Drive folders already match");
@@ -354,14 +475,14 @@ function placeLinkedPhoto(file, pos) {
   const node = {
     id: uid("node"), projectId: proj.id, floorId: floor.id, type: "photo",
     category: "", lineItem: "", customTitle: base, apartment: apt ? apt.label : "",
-    status: "Not Started", assignedTo: "", tags: [], description: "",
+    stage: "", status: "Not Started", assignedTo: "", tags: [], description: "",
     roomId: hit ? hit.id : null, linkedRoomId: null, position: pos, size: 1,
     createdBy: state.googleAuth.profile?.name || state.googleAuth.profile?.email || "local",
     createdAt: nowStamp(), updatedAt: nowStamp(), comments: [],
     imageRefs: [{
       id: file.id, driveFileId: file.id, name: file.name || base, mimeType: file.mimeType || "",
       webViewLink: file.webViewLink || "", thumbnailLink: file.thumbnailLink || "", uploader: owner,
-      uploadedAt: file.modifiedTime || nowStamp()
+      uploadedAt: file.modifiedTime || nowStamp(), folderStage: file.stage || "unsorted"
     }]
   };
   state.nodes.push(node);

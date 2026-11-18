@@ -83,6 +83,7 @@ test("drive folder names match what is already there", () => {
   );
   assert.deepEqual(plan.map((level) => level.driveName), ["Level G", "Level 1"]);
   assert.deepEqual(plan[0].apartments.map((apt) => apt.label), ["14A", "G.01"]);
+  assert.deepEqual(plan[0].apartments[0].stages.map((stage) => stage.name), ["Rough-in", "Fit-off"]);
   const existing = [{ id: "a", name: "Level G", mimeType: PF.FOLDER_MIME }, { id: "b", name: "Notes.pdf", mimeType: "application/pdf" }];
   assert.equal(PF.matchLevelFolder(existing, "g").id, "a");
   assert.equal(PF.matchLevelFolder(existing, "1"), null);
@@ -109,6 +110,7 @@ test("photos group by level and apartment, including a file dropped straight int
   assert.equal(tree.levels.length, 1);
   assert.equal(tree.levels[0].levelKey, "g");
   assert.equal(tree.levels[0].apartments[0].photos[0].id, "p1");
+  assert.equal(tree.levels[0].apartments[0].photos[0].stage, "unsorted");
   assert.equal(tree.levels[0].loose[0].id, "direct");
   assert.equal(tree.loose[0].id, "loose-root");
   assert.equal(PF.isPhotoFile({ name: "x.HEIC", mimeType: "" }), true);
@@ -123,16 +125,113 @@ test("folder links accept a Drive url or a bare id", () => {
   assert.equal(PF.parseDriveFolderId("not a folder"), "");
 });
 
-test("the watermark uses apartment, room and the other attributes, and skips an empty node", () => {
-  const full = PF.watermarkModel({
-    apartment: "G.01", room: "Living", type: "photo", status: "In Progress",
-    lineItem: "Indoor unit", notes: "Condensate pump on the left of the cupboard door frame"
+test("stage folder names match loosely, and a manual stage wins", () => {
+  assert.equal(PF.stageFromName("Rough-in"), "rough-in");
+  assert.equal(PF.stageFromName("ROUGH IN"), "rough-in");
+  assert.equal(PF.stageFromName("Roughin"), "rough-in");
+  assert.equal(PF.stageFromName("Fit-off"), "fit-off");
+  assert.equal(PF.stageFromName("Fit off"), "fit-off");
+  assert.equal(PF.stageFromName("FITOFF"), "fit-off");
+  assert.equal(PF.stageFromName("Rough-in extras"), "");
+  assert.equal(PF.stageFromName("G.01"), "");
+  assert.equal(PF.normalizeStage(""), "");
+  assert.equal(PF.normalizeStage("Unsorted"), "unsorted");
+  assert.equal(PF.effectiveStage({ folderStage: "rough-in" }), "rough-in");
+  assert.equal(PF.effectiveStage({ folderStage: "rough-in", nodeStage: "fit-off" }), "fit-off");
+  assert.equal(PF.effectiveStage({ folderStage: "fit-off", nodeStage: "unsorted" }), "unsorted");
+  assert.equal(PF.effectiveStage({ folderStage: "rough-in", nodeStage: "fit-off", photoStage: "unsorted" }), "unsorted");
+  assert.equal(PF.effectiveStage({}), "unsorted");
+  const files = [
+    { id: "a", name: "rough in", mimeType: PF.FOLDER_MIME },
+    { id: "b", name: "Fitoff", mimeType: PF.FOLDER_MIME }
+  ];
+  assert.equal(PF.matchStageFolder(files, "rough-in").id, "a");
+  assert.equal(PF.matchStageFolder(files, "fit-off").id, "b");
+  assert.equal(PF.matchStageFolder(files, "unsorted"), null);
+});
+
+test("photos inside an apartment group by stage subfolder", () => {
+  const folder = PF.FOLDER_MIME;
+  const tree = PF.groupPhotoFiles(
+    [{ id: "lg", name: "Level G", mimeType: folder }],
+    {
+      lg: [
+        { id: "g01", name: "G.01", mimeType: folder },
+        { id: "g02", name: "G.02", mimeType: folder }
+      ],
+      g01: [
+        { id: "ri", name: "Rough-in", mimeType: folder },
+        { id: "fo", name: "Fit off", mimeType: folder },
+        { id: "other", name: "Archive", mimeType: folder },
+        { id: "loose", name: "phone.jpg", mimeType: "image/jpeg" }
+      ],
+      ri: [{ id: "cables", name: "cables.jpg", mimeType: "image/jpeg" }],
+      fo: [{ id: "stat", name: "thermostat.jpg", mimeType: "image/jpeg" }],
+      other: [{ id: "old", name: "old.png", mimeType: "image/png" }],
+      g02: []
+    }
+  );
+  const apt = tree.levels[0].apartments[0];
+  assert.equal(apt.key, "g.01");
+  assert.deepEqual(apt.stages.map((stage) => stage.key), ["rough-in", "fit-off", "unsorted"]);
+  assert.deepEqual(apt.photos.map((photo) => photo.id + ":" + photo.stage), ["cables:rough-in", "stat:fit-off", "old:unsorted", "loose:unsorted"]);
+  assert.equal(tree.levels[0].apartments[1].photos.length, 0);
+});
+
+test("the watermark card uses apartment, room, stage and note, and skips an empty photo", () => {
+  const rough = PF.watermarkModel({
+    apartment: "G.01", room: "Living Room", folderStage: "rough-in",
+    notes: "Services in; linings not started", date: "2026-11-18T02:00:00Z", version: "0.23.1"
   });
-  assert.equal(full.lines[0], "G.01 · Living");
-  assert.match(full.lines[1], /^Photo · In Progress · Indoor unit · Condensate pump/);
-  assert.ok(full.lines[1].endsWith("…"));
-  const same = PF.watermarkModel({ apartment: "14A", room: "14A", type: "marker", status: "Not Started" });
-  assert.deepEqual(same.lines, ["14A", "Not Started"]);
-  assert.equal(PF.watermarkModel({ apartment: "", room: "", type: "marker", status: "", notes: "" }), null);
-  assert.equal(PF.watermarkModel({ room: "No room", type: "", status: "" }), null);
+  assert.equal(rough.apartment, "G.01");
+  assert.equal(rough.room, "Living Room");
+  assert.equal(rough.stageLabel, "Rough-in");
+  assert.equal(rough.status, "In progress");
+  assert.equal(rough.tone, "rough");
+  assert.equal(rough.note, "Services in; linings not started");
+  assert.equal(rough.footer, "18 Nov 2026");
+  assert.equal(rough.branding, false);
+  const branded = PF.watermarkModel({
+    apartment: "G.01", room: "Living Room", nodeStage: "fit-off", folderStage: "rough-in",
+    notes: "Controllers on", date: "2026-11-18 02:00", version: "0.23.1", branding: true
+  });
+  assert.equal(branded.stage, "fit-off");
+  assert.equal(branded.status, "Fit off");
+  assert.equal(branded.tone, "fit");
+  assert.equal(branded.footer, "Neill Planner 0.23.1 · 18 Nov 2026");
+  const plain = PF.watermarkModel({ apartment: "14A", room: "14A", folderStage: "" });
+  assert.equal(plain.room, "");
+  assert.equal(plain.stage, "unsorted");
+  assert.equal(plain.status, "");
+  assert.equal(plain.tone, "plain");
+  assert.equal(plain.footer, "");
+  assert.equal(PF.watermarkModel({ apartment: "", room: "", notes: "" }), null);
+  assert.equal(PF.watermarkModel({ room: "No room" }), null);
+  assert.equal(PF.watermarkDate(""), "");
+});
+
+test("stage progress counts apartments, not photos, and a missing stage stays out", () => {
+  const tree = PF.groupPhotoFiles(
+    [{ id: "lg", name: "Level G", mimeType: PF.FOLDER_MIME }],
+    {
+      lg: [
+        { id: "g01", name: "G.01", mimeType: PF.FOLDER_MIME },
+        { id: "g02", name: "G.02", mimeType: PF.FOLDER_MIME }
+      ],
+      g01: [{ id: "ri", name: "Rough-in", mimeType: PF.FOLDER_MIME }],
+      ri: [
+        { id: "a", name: "one.jpg", mimeType: "image/jpeg" },
+        { id: "b", name: "two.jpg", mimeType: "image/jpeg" }
+      ],
+      g02: [{ id: "direct", name: "snap.jpg", mimeType: "image/jpeg" }]
+    }
+  );
+  const collected = PF.collectApartmentStages(tree, { b: "fit-off" });
+  const progress = PF.stageProgress(["g.01", "g.02", "g.03", "g.01"], collected.present);
+  assert.equal(progress.total, 3);
+  assert.equal(progress.roughIn, 1);
+  assert.equal(progress.fitOff, 1);
+  assert.equal(progress.roughPct, 33);
+  assert.equal(progress.fitPct, 33);
+  assert.equal(collected.present["g.02"].includes("rough-in"), false);
 });

@@ -215,6 +215,7 @@ async function handleNodeForm(event) {
     status: (form.get("status") || "Not Started").toString(),
     roomId: (form.get("roomId") || "").toString() || null,
     apartment: (form.get("apartment") || "").toString().trim(),
+    stage: window.NDPhotoFolders ? NDPhotoFolders.normalizeStage(form.get("stage")) : "",
     assignedTo: (form.get("assignedTo") || "").toString(),
     tags: (form.get("tags") || "").toString().split(",").map((t) => t.trim()).filter(Boolean),
     description: (form.get("description") || "").toString().trim(),
@@ -356,7 +357,7 @@ async function handleProjectForm(event) {
   const photoRaw = (form.get("photoFolder") || "").toString().trim();
   const photoFolderId = photoRaw && window.NDPhotoFolders ? NDPhotoFolders.parseDriveFolderId(photoRaw) : "";
   if (photoRaw && !photoFolderId) { toast("Paste a Drive folder link or the folder id"); return; }
-  const payload = { name, folderId, address: (form.get("address") || "").toString(), description: (form.get("description") || "").toString(), protected: form.get("protected") === "on", photoFolderId };
+  const payload = { name, folderId, address: (form.get("address") || "").toString(), description: (form.get("description") || "").toString(), protected: form.get("protected") === "on", photoFolderId, watermarkBranding: form.get("watermarkBranding") === "on" };
   if (state.modal.mode === "edit-project") {
     const proj = project(); if (!proj) return;
     const folderChanged = proj.folderId !== folderId, nameChanged = proj.name !== name;
@@ -749,6 +750,18 @@ function cloneSelectedNode() {
   logAudit("Node Cloned", { nodeId: copy.id, details: `from ${node.id}` });
   if (isTokenValid()) ensureNodeDriveFolder(copy).catch((e) => console.warn(e));
   toast("Node duplicated");
+}
+
+function updateNodeStage(value) {
+  const node = selectedNode(); if (!node) return;
+  const stage = window.NDPhotoFolders ? NDPhotoFolders.normalizeStage(value) : "";
+  if ((node.stage || "") === stage) return;
+  const previous = node.stage || "folder";
+  node.stage = stage;
+  node.updatedAt = nowStamp();
+  persist();
+  render();
+  logAudit("Photo Stage", { nodeId: node.id, details: previous + " -> " + (stage || "folder") });
 }
 
 function updateNodeStatus(status) {

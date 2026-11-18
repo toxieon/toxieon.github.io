@@ -147,7 +147,7 @@ async function hydrateFromMasterSheet(opts = {}) {
     // Preserve device-local project fields (colour / completed / rooms toggle)
     // across a cloud rebuild — they're not columns in the sheet (yet).
     const localExtras = {};
-    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms, photoFolderId: p.photoFolderId || "" }; });
+    (state.projects || []).forEach((p) => { localExtras[p.id] = { color: p.color, completed: p.completed, showRooms: p.showRooms, photoFolderId: p.photoFolderId || "", watermarkBranding: !!p.watermarkBranding }; });
     const projectMap = {};
     for (const r of projRows) {
       if (!r[0]) continue;
@@ -159,7 +159,7 @@ async function hydrateFromMasterSheet(opts = {}) {
         id: r[0], name: r[1] || "Untitled", folderId,
         address: r[3] || "", description: r[4] || "",
         createdBy: r[5] || "", createdAt: r[6] || nowStamp(), updatedAt: r[7] || nowStamp(),
-        floors: [], team: [], protected: parseBool(r[11]), photoFolderId: r[12] || ""
+        floors: [], team: [], protected: parseBool(r[11]), photoFolderId: r[12] || "", watermarkBranding: parseBool(r[13])
       };
       if (r[8]) state.drive.projectFolderMap[p.id] = r[8];
       projectMap[p.id] = p;
@@ -171,6 +171,7 @@ async function hydrateFromMasterSheet(opts = {}) {
       if (typeof e.completed === "boolean") p.completed = e.completed;
       if (e.showRooms != null) p.showRooms = e.showRooms;
       if (!p.photoFolderId && e.photoFolderId) p.photoFolderId = e.photoFolderId;
+      if (!p.watermarkBranding && e.watermarkBranding) p.watermarkBranding = true;
     });
     for (const r of floorRows) {
       if (!r[0]) continue;
@@ -222,7 +223,8 @@ async function hydrateFromMasterSheet(opts = {}) {
         boardLabel: r[32] || "", phaseConfig: r[33] || "",
         mainBreakerA: r[34] ? Number(r[34]) : null,
         swbProjectId: r[35] || null, swbSchemaVersion: r[36] || null,
-        apartment: r[37] || ""
+        apartment: r[37] || "",
+        stage: window.NDPhotoFolders ? NDPhotoFolders.normalizeStage(r[38]) : (r[38] || "")
       };
       if (r[22]) state.drive.nodeFolderMap[node.id] = r[22];
       return node;
