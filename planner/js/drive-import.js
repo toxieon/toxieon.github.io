@@ -155,7 +155,8 @@ async function hydrateFromMasterSheet(opts = {}) {
         photoSourceFolderIds: Array.isArray(p.photoSourceFolderIds) ? p.photoSourceFolderIds.slice() : null
       };
     });
-    const projectsColMap = await fetchProjectsColumnIndex();
+    const { colMap: projectsColMap, sheetHeaders } = await fetchProjectsColumnIndex();
+    const hasPhotoSourcesCol = sheetHeaders.has(PROJECTS_PHOTO_SOURCES_COL);
     const projectMap = {};
     for (const r of projRows) {
       if (!r[0]) continue;
@@ -163,7 +164,6 @@ async function hydrateFromMasterSheet(opts = {}) {
       const folderId = folderGroupName && folderGroupName !== DRIVE_UNFILED_FOLDER
         ? (state.projectFolders.find((f) => f.name === folderGroupName) || {}).id || null
         : null;
-      const photoField = projectRowValue(r, projectsColMap, PROJECTS_PHOTO_SOURCES_COL);
       const p = {
         id: r[0],
         name: projectRowValue(r, projectsColMap, "Name", 1) || "Untitled",
@@ -176,7 +176,9 @@ async function hydrateFromMasterSheet(opts = {}) {
         floors: [],
         team: [],
         protected: parseBool(projectRowValue(r, projectsColMap, "Protected", 11)),
-        photoSourceFolderIds: parsePhotoSourceFolderIdsField(photoField)
+        photoSourceFolderIds: hasPhotoSourcesCol
+          ? parsePhotoSourceFolderIdsField(projectRowValue(r, projectsColMap, PROJECTS_PHOTO_SOURCES_COL))
+          : undefined
       };
       const driveFolder = projectRowValue(r, projectsColMap, "Drive Folder ID", 8);
       if (driveFolder) state.drive.projectFolderMap[p.id] = driveFolder;
@@ -188,7 +190,8 @@ async function hydrateFromMasterSheet(opts = {}) {
       if (e.color != null) p.color = e.color;
       if (typeof e.completed === "boolean") p.completed = e.completed;
       if (e.showRooms != null) p.showRooms = e.showRooms;
-      if (Array.isArray(e.photoSourceFolderIds) && !p.photoSourceFolderIds?.length) p.photoSourceFolderIds = e.photoSourceFolderIds;
+      if (!hasPhotoSourcesCol && Array.isArray(e.photoSourceFolderIds)) p.photoSourceFolderIds = e.photoSourceFolderIds;
+      else if (!Array.isArray(p.photoSourceFolderIds)) p.photoSourceFolderIds = [];
     });
     for (const r of floorRows) {
       if (!r[0]) continue;

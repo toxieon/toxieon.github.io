@@ -68,25 +68,30 @@ function inferLevelAndAptFromPath(pathNames) {
 }
 
 async function fetchProjectsColumnIndex() {
-  if (!state.drive.masterSheetId || !isTokenValid()) {
-    const map = {};
-    MASTER_TABS.Projects.forEach((h, i) => { map[h] = i; });
-    return map;
-  }
+  const fallbackTabs = () => {
+    const colMap = {};
+    MASTER_TABS.Projects.forEach((h, i) => { colMap[h] = i; });
+    return { colMap, sheetHeaders: new Set(MASTER_TABS.Projects) };
+  };
+  if (!state.drive.masterSheetId || !isTokenValid()) return fallbackTabs();
   try {
     const r = await googleCall(() => gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: state.drive.masterSheetId,
       range: "Projects!1:1"
     }));
-    const headers = (r.result.values && r.result.values[0]) || MASTER_TABS.Projects;
-    const map = {};
-    headers.forEach((h, i) => { if (h) map[String(h).trim()] = i; });
-    MASTER_TABS.Projects.forEach((h, i) => { if (map[h] === undefined) map[h] = i; });
-    return map;
+    const headerRow = (r.result.values && r.result.values[0]) || [];
+    const colMap = {};
+    const sheetHeaders = new Set();
+    headerRow.forEach((h, i) => {
+      const name = String(h || "").trim();
+      if (!name) return;
+      colMap[name] = i;
+      sheetHeaders.add(name);
+    });
+    MASTER_TABS.Projects.forEach((h, i) => { if (colMap[h] === undefined) colMap[h] = i; });
+    return { colMap, sheetHeaders };
   } catch (e) {
-    const map = {};
-    MASTER_TABS.Projects.forEach((h, i) => { map[h] = i; });
-    return map;
+    return fallbackTabs();
   }
 }
 
