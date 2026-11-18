@@ -27,10 +27,13 @@
   let state = {
     token: null,
     data: null,
-    rangeFrom: "",
+    rangeFrom: "all",
     rangeTo: "",
+    allTime: true,
+    bankrollMode: "real",
     breakdownTab: "price_band",
     breakdownModel: "with_price",
+    weekdayModel: "with_price",
     gateMessage: "",
     loadError: "",
     apiNotLive: false,
@@ -127,15 +130,67 @@
   }
 
   function validateRange(from, to) {
-    if (!from || !to || from > to) return "Choose a valid date range.";
+    if (!to) return "Choose a valid end date.";
+    if (state.allTime || from === "all") return "";
+    if (!from || from > to) return "Choose a valid date range.";
     const days = (new Date(to) - new Date(from)) / 86400000;
     if (days > 365) return "Maximum range is 365 days.";
     return "";
   }
 
+  function effectiveFrom() {
+    return state.allTime ? "all" : $("date-from").value || state.rangeFrom;
+  }
+
+  function syncRangeInputs() {
+    const fromInput = $("date-from");
+    const allLabel = $("from-all-label");
+    if (state.allTime) {
+      fromInput.disabled = true;
+      fromInput.value = "";
+      allLabel.hidden = false;
+    } else {
+      fromInput.disabled = false;
+      allLabel.hidden = true;
+      if (state.rangeFrom && state.rangeFrom !== "all") fromInput.value = state.rangeFrom;
+    }
+  }
+
+  function formatMetaBlock(meta) {
+    if (!meta) return "";
+    const parts = [];
+    if (meta.data_since) {
+      try {
+        const d = new Date(meta.data_since + "T12:00:00Z");
+        parts.push(
+          "Data since " +
+            new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(d)
+        );
+      } catch (e) {
+        parts.push("Data since " + meta.data_since);
+      }
+    }
+    if (meta.picks) parts.push(meta.picks.toLocaleString("en-AU") + " picks");
+    if (meta.staked_picks) parts.push("(" + meta.staked_picks.toLocaleString("en-AU") + " staked)");
+    return parts.join(" · ");
+  }
+
+  function modelShowsHyp(m) {
+    if (!m) return false;
+    if (m.summary && m.summary.hyp) return true;
+    if ((m.by_weekday || []).some((r) => r.hyp_pl_units || r.hyp_roi_pct)) return true;
+    if ((m.recent || []).some((r) => r.hyp_pl_units)) return true;
+    const keys = ["by_price_band", "by_track", "by_stake_bracket"];
+    return keys.some((k) => (m[k] || []).some((r) => r.hyp));
+  }
+
+  function breakdownRowsHaveHyp(rows) {
+    return (rows || []).some((r) => r.hyp);
+  }
+
   async function reload() {
     if (!signedIn()) return;
-    const from = $("date-from").value || state.rangeFrom;
+    const from = effectiveFrom();
     const to = $("date-to").value || state.rangeTo;
     const err = validateRange(from, to);
     if (err) {
@@ -145,6 +200,8 @@
     }
     state.rangeFrom = from;
     state.rangeTo = to;
+    syncRangeInputs();
+    updatePresetChips();
     state.loadError = "";
     state.apiNotLive = false;
     $("dashboard").hidden = true;
@@ -171,6 +228,10 @@
     state.apiNotLive = false;
     state.joinedByDate = new Map(CAL.joinDailyByDate(state.data.models).map((d) => [d.date, d]));
     state.calendarMonth = state.rangeTo.slice(0, 7);
+    if (state.data.range && state.data.range.from) {
+      state.allTime = state.data.range.from === "all";
+      state.rangeFrom = state.data.range.from;
+    }
     $("dashboard").hidden = false;
     renderAll();
   }
@@ -211,7 +272,15 @@
 
   function renderMeta() {
     $("generated-at").textContent = state.data ? "Generated " + melbourneTime(state.data.generated_at) + " (Melbourne)" : "";
-    $("range-label").textContent = state.data ? state.data.range.from + " → " + state.data.range.to : "";
+    const dm = $("data-meta");
+    dm.textContent = state.data && state.data.meta ? formatMetaBlock(state.data.meta) : "";
+    dm.hidden = !dm.textContent;
+    if (!state.data) {
+      $("range-label").textContent = "";
+      return;
+    }
+    const fromLbl = state.data.range.from === "all" ? "All time" : state.data.range.from;
+    $("range-label").textContent = fromLbl + " → " + state.data.range.to;
   }
 
   function renderSummary() {
@@ -231,6 +300,21 @@
       plStrong.textContent = fmtPl(s.pl_units) + " u";
       pl.append("P&L ", plStrong);
       card.append(name, pl);
+      if (s.hyp) {
+        const hyp = document.createElement("p");
+        hyp.className = "summary-hyp";
+        hyp.textContent =
+          "Flat 1u: " + fmtPl(s.hyp.pl_units) + "u · ROI " + fmtPct(s.hyp.roi_pct);
+        card.append(hyp);
+      }
+      const mmeta = state.data.models[id].meta;
+      const metaLine = formatMetaBlock(mmeta);
+      if (metaLine) {
+        const cm = document.createElement("p");
+        cm.className = "card-meta";
+        cm.textContent = metaLine;
+        card.append(cm);
+      }
       const row = document.createElement("div");
       row.className = "stats-row";
       row.append(
@@ -340,7 +424,10 @@
   }
 
   function renderBankrollChart() {
-    renderCumUnitsChart($("bankroll-chart"), state.data.models, {});
+    const flat = state.bankrollMode === "flat";
+    renderCumUnitsChart($("bankroll-chart"), state.data.models, {
+      valueField: flat ? "hyp_cum_units" : "cum_units",
+    });
   }
 
   async function loadStakedOnly() {
@@ -429,6 +516,23 @@
     const key = tab === "price_band" ? "by_price_band" : tab === "track" ? "by_track" : "by_stake_bracket";
     const rows = m[key];
     const tbody = $("breakdown-body");
+    const head = $("breakdown-head");
+    const showHyp = breakdownRowsHaveHyp(rows);
+    head.replaceChildren();
+    const headTr = document.createElement("tr");
+    ["Label", "Bets", "Wins", "Strike %", "P&L u", "ROI %"].forEach((h) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headTr.append(th);
+    });
+    if (showHyp) {
+      ["Flat P&L", "Flat ROI %"].forEach((h) => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headTr.append(th);
+      });
+    }
+    head.append(headTr);
     tbody.replaceChildren();
     if (!rows.length) {
       $("breakdown-empty").hidden = false;
@@ -437,7 +541,7 @@
     $("breakdown-empty").hidden = true;
     rows.forEach((r) => {
       const tr = document.createElement("tr");
-      ["label", "bets", "wins", "strike_pct", "pl_units", "roi_pct"].forEach((col, i) => {
+      ["label", "bets", "wins", "strike_pct", "pl_units", "roi_pct"].forEach((col) => {
         const td = document.createElement("td");
         if (col === "strike_pct" || col === "roi_pct") td.textContent = fmtPct(r[col]);
         else if (col === "pl_units") {
@@ -446,6 +550,16 @@
         } else td.textContent = String(r[col]);
         tr.appendChild(td);
       });
+      if (showHyp) {
+        const hp = r.hyp || {};
+        const tdPl = document.createElement("td");
+        tdPl.textContent = fmtPl(hp.pl_units);
+        tdPl.className = plClass(hp.pl_units);
+        tr.append(tdPl);
+        const tdRoi = document.createElement("td");
+        tdRoi.textContent = fmtPct(hp.roi_pct);
+        tr.append(tdRoi);
+      }
       tbody.appendChild(tr);
     });
     document.querySelectorAll("[data-break-tab]").forEach((btn) => {
@@ -456,9 +570,86 @@
     });
   }
 
+  function renderWeekday() {
+    const model = state.weekdayModel;
+    const rows = state.data.models[model].by_weekday || [];
+    const tbody = $("weekday-body");
+    const head = $("weekday-head");
+    const showFlat = rows.some((r) => r.hyp_pl_units || r.hyp_roi_pct);
+    head.replaceChildren();
+    const headTr = document.createElement("tr");
+    (showFlat
+      ? ["Day", "Picks", "Bets", "Wins", "P&L u", "ROI %", "Flat u", "Flat ROI %"]
+      : ["Day", "Picks", "Bets", "Wins", "P&L u", "ROI %"]
+    ).forEach((h) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headTr.append(th);
+    });
+    head.append(headTr);
+    tbody.replaceChildren();
+    document.querySelectorAll("[data-weekday-model]").forEach((btn) => {
+      btn.classList.toggle("on", btn.getAttribute("data-weekday-model") === model);
+    });
+    if (!rows.length) {
+      $("weekday-empty").hidden = false;
+      return;
+    }
+    $("weekday-empty").hidden = true;
+    rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      if (CAL.isRacingWeekdayHighlight(r.label)) tr.classList.add("weekday-highlight");
+      const labelTd = document.createElement("td");
+      labelTd.textContent = r.label;
+      if (CAL.isRacingWeekdayHighlight(r.label)) {
+        const tag = document.createElement("span");
+        tag.className = "meet-tag";
+        tag.textContent = "meet";
+        labelTd.append(tag);
+      }
+      tr.append(labelTd);
+      [r.picks, r.bets, r.wins].forEach((v) => {
+        const td = document.createElement("td");
+        td.textContent = String(v);
+        tr.append(td);
+      });
+      const plTd = document.createElement("td");
+      plTd.textContent = fmtPl(r.pl_units);
+      plTd.className = plClass(r.pl_units);
+      tr.append(plTd);
+      const roiTd = document.createElement("td");
+      roiTd.textContent = fmtPct(r.roi_pct);
+      tr.append(roiTd);
+      if (showFlat) {
+        const hTd = document.createElement("td");
+        hTd.textContent = fmtPl(r.hyp_pl_units);
+        hTd.className = plClass(r.hyp_pl_units);
+        tr.append(hTd);
+        const hrTd = document.createElement("td");
+        hrTd.textContent = fmtPct(r.hyp_roi_pct);
+        tr.append(hrTd);
+      }
+      tbody.appendChild(tr);
+    });
+  }
+
   function renderRecent() {
     const model = $("recent-model").value;
-    const recent = state.data.models[model].recent;
+    const mblock = state.data.models[model];
+    const recent = mblock.recent;
+    const showHyp = modelShowsHyp(mblock);
+    const head = $("recent-head");
+    head.replaceChildren();
+    const headTr = document.createElement("tr");
+    (showHyp
+      ? ["Date", "Track", "R", "Horse", "Price", "Stake", "Result", "P&L", "Flat 1u"]
+      : ["Date", "Track", "R", "Horse", "Price", "Stake", "Result", "P&L"]
+    ).forEach((h) => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headTr.append(th);
+    });
+    head.append(headTr);
     const strip = $("recent-strip");
     strip.replaceChildren();
     recent.forEach((r) => {
@@ -475,28 +666,37 @@
     }
     $("recent-empty").hidden = true;
     recent.forEach((r) => {
+      const noBet = !r.stake_units;
       const tr = document.createElement("tr");
+      if (noBet) tr.classList.add("no-bet");
       const cols = [
         r.date,
         r.track,
         String(r.race_no),
         r.horse,
         fmt(r.price, 2),
-        fmt(r.stake_units, 1),
+        noBet ? "0u" : fmt(r.stake_units, 1),
       ];
-      cols.forEach((c) => {
+      cols.forEach((c, i) => {
         const td = document.createElement("td");
         td.textContent = c;
+        if (i === 5 && noBet) td.classList.add("stake-zero");
         tr.appendChild(td);
       });
       const resTd = document.createElement("td");
-      resTd.textContent = r.result;
-      resTd.className = "result-" + r.result;
+      resTd.textContent = noBet ? "no bet" : r.result;
+      resTd.className = noBet ? "stake-zero" : "result-" + r.result;
       tr.appendChild(resTd);
       const plTd = document.createElement("td");
-      plTd.textContent = fmtPl(r.pl_units);
-      plTd.className = plClass(r.pl_units);
+      plTd.textContent = noBet ? "—" : fmtPl(r.pl_units);
+      if (!noBet) plTd.className = plClass(r.pl_units);
       tr.appendChild(plTd);
+      if (showHyp) {
+        const hTd = document.createElement("td");
+        hTd.textContent = fmtPl(r.hyp_pl_units);
+        hTd.className = plClass(r.hyp_pl_units);
+        tr.appendChild(hTd);
+      }
       tbody.appendChild(tr);
     });
   }
@@ -558,7 +758,7 @@
       cell.appendChild(num);
       const day = state.joinedByDate.get(iso);
       if (day && inRange) {
-        const hasAny = CFG.MODELS.some((id) => day[id] && day[id].bets);
+        const hasAny = CFG.MODELS.some((id) => day[id] && (day[id].bets || day[id].picks));
         if (hasAny) {
           const models = document.createElement("div");
           models.className = "cal-models";
@@ -618,21 +818,38 @@
       const h = document.createElement("h3");
       h.textContent = CFG.MODEL_LABELS[id];
       card.appendChild(h);
-      if (!slice || !slice.bets) {
+      if (!slice || (!slice.bets && !slice.picks)) {
         const p = document.createElement("p");
         p.className = "muted";
-        p.textContent = "No bets this day.";
+        p.textContent = "No picks this day.";
         card.appendChild(p);
       } else {
         const strike = CAL.dailyStrikePct(slice.bets, slice.wins);
         const stats = document.createElement("p");
-        stats.className = "stats-row";
-        stats.append("P&L ");
+        stats.className = "stats-row sheet-stats";
+        const parts = [
+          "Picks " + (slice.picks || 0),
+          "Bets " + slice.bets,
+          "Wins " + slice.wins,
+        ];
+        if (slice.bets) parts.push("Strike " + fmtPct(strike));
+        stats.append(parts.join(" · "));
+        card.appendChild(stats);
+        const plLine = document.createElement("p");
+        plLine.className = "stats-row";
+        plLine.append("Real ");
         const strong = document.createElement("strong");
         strong.className = plClass(slice.pl_units);
         strong.textContent = fmtPl(slice.pl_units) + "u";
-        stats.append(strong, " · Bets " + slice.bets + " · Wins " + slice.wins + " · Strike " + fmtPct(strike));
-        card.appendChild(stats);
+        plLine.append(strong);
+        if (slice.hyp_pl_units || slice.bets) {
+          plLine.append(" · Flat 1u ");
+          const hyp = document.createElement("strong");
+          hyp.className = plClass(slice.hyp_pl_units);
+          hyp.textContent = fmtPl(slice.hyp_pl_units) + "u";
+          plLine.append(hyp);
+        }
+        card.appendChild(plLine);
       }
       const recents = (state.data.models[id].recent || []).filter((r) => r.date === date);
       if (recents.length) {
@@ -697,18 +914,57 @@
     renderCalendar();
     renderBankrollChart();
     renderBreakdown();
+    renderWeekday();
     renderRecent();
     renderHeadToHead();
+    document.querySelectorAll("[data-bank-mode]").forEach((btn) => {
+      btn.classList.toggle("on", btn.getAttribute("data-bank-mode") === state.bankrollMode);
+    });
+  }
+
+  function updatePresetChips() {
+    document.querySelectorAll("[data-preset]").forEach((btn) => {
+      const p = btn.getAttribute("data-preset");
+      if (p === "all") {
+        btn.classList.toggle("on", state.allTime);
+        return;
+      }
+      if (state.allTime) {
+        btn.classList.toggle("on", false);
+        return;
+      }
+      const to = state.rangeTo;
+      const from = state.rangeFrom;
+      if (!to || !from || from === "all") {
+        btn.classList.toggle("on", false);
+        return;
+      }
+      const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+      btn.classList.toggle("on", Number(p) === days);
+    });
+  }
+
+  function applyAllTime() {
+    state.allTime = true;
+    state.rangeFrom = "all";
+    const to = DATES.todayMelbourneIso();
+    state.rangeTo = to;
+    $("date-to").value = to;
+    syncRangeInputs();
+    updatePresetChips();
+    reload();
   }
 
   function applyPreset(days) {
+    state.allTime = false;
     const to = DATES.todayMelbourneIso();
     const from = DATES.addCalendarDays(to, -(days - 1));
+    state.rangeFrom = from;
+    state.rangeTo = to;
     $("date-from").value = from;
     $("date-to").value = to;
-    document.querySelectorAll("[data-preset]").forEach((btn) => {
-      btn.classList.toggle("on", Number(btn.getAttribute("data-preset")) === days);
-    });
+    syncRangeInputs();
+    updatePresetChips();
     reload();
   }
 
@@ -724,7 +980,7 @@
     state.gateMessage = "";
     $("token-input").value = "";
     setView();
-    applyPreset(30);
+    applyAllTime();
   }
 
   function bindEvents() {
@@ -734,9 +990,37 @@
     });
     $("btn-signout").addEventListener("click", signOutAndShowGate);
     $("btn-banner-change-token").addEventListener("click", signOutAndShowGate);
-    $("btn-apply-range").addEventListener("click", () => reload());
+    $("btn-apply-range").addEventListener("click", () => {
+      if (!state.allTime) state.rangeFrom = $("date-from").value;
+      state.rangeTo = $("date-to").value;
+      reload();
+    });
+    $("date-from").addEventListener("change", () => {
+      state.allTime = false;
+      syncRangeInputs();
+      updatePresetChips();
+    });
     document.querySelectorAll("[data-preset]").forEach((btn) => {
-      btn.addEventListener("click", () => applyPreset(Number(btn.getAttribute("data-preset"))));
+      btn.addEventListener("click", () => {
+        const p = btn.getAttribute("data-preset");
+        if (p === "all") applyAllTime();
+        else applyPreset(Number(p));
+      });
+    });
+    document.querySelectorAll("[data-bank-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.bankrollMode = btn.getAttribute("data-bank-mode");
+        renderBankrollChart();
+        document.querySelectorAll("[data-bank-mode]").forEach((b) => {
+          b.classList.toggle("on", b.getAttribute("data-bank-mode") === state.bankrollMode);
+        });
+      });
+    });
+    document.querySelectorAll("[data-weekday-model]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.weekdayModel = btn.getAttribute("data-weekday-model");
+        renderWeekday();
+      });
     });
     document.querySelectorAll("[data-break-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -787,8 +1071,10 @@
     if (signedIn()) {
       const to = DATES.todayMelbourneIso();
       $("date-to").value = to;
-      $("date-from").value = DATES.addCalendarDays(to, -29);
-      applyPreset(30);
+      state.rangeTo = to;
+      state.allTime = true;
+      syncRangeInputs();
+      applyAllTime();
     }
   }
 

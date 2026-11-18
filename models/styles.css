@@ -202,6 +202,77 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 
 .chip.on { border-color: var(--accent); color: #fff; }
 
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.section-head h2 { margin: 0; }
+
+.seg {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seg .tab {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+#from-all-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+#date-from:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.summary-hyp {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.card-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.weekday-table tr.weekday-highlight td {
+  background: rgba(122, 162, 247, 0.12);
+}
+
+.weekday-table .meet-tag {
+  font-size: 0.65rem;
+  color: var(--accent);
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.no-bet {
+  opacity: 0.75;
+}
+
+.stake-zero {
+  color: var(--muted);
+  font-style: italic;
+}
+
+#staked-section .hint {
+  margin-top: 0;
+  font-size: 0.82rem;
+}
+
 .range-row {
   display: flex;
   gap: 8px;
@@ -536,6 +607,16 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   padding-left: 18px;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.sheet-stats {
+  font-size: 0.82rem;
+}
+
+@media (max-width: 420px) {
+  .sheet-stats { font-size: 0.78rem; }
+  .weekday-table { font-size: 0.78rem; }
+  .summary-hyp { font-size: 0.75rem; }
 }
 
 body.sheet-open { overflow: hidden; }

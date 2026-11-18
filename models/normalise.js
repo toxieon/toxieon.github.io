@@ -17,9 +17,24 @@
     return Number.isFinite(n) ? n : fallback;
   }
 
+  function normHypBlock(h) {
+    if (!h || typeof h !== "object") return null;
+    const o = {
+      bets: num(h.bets),
+      wins: num(h.wins),
+      strike_pct: num(h.strike_pct),
+      pl_units: num(h.pl_units),
+      roi_pct: num(h.roi_pct),
+    };
+    if (!o.bets && !o.wins && !o.pl_units && !o.roi_pct && !h.bets && !h.wins && !h.pl_units && !h.roi_pct) {
+      return null;
+    }
+    return o;
+  }
+
   function normSummary(s) {
     const x = s && typeof s === "object" ? s : {};
-    return {
+    const summary = {
       bets: num(x.bets),
       wins: num(x.wins),
       strike_pct: num(x.strike_pct),
@@ -27,6 +42,9 @@
       pl_units: num(x.pl_units),
       roi_pct: num(x.roi_pct),
     };
+    const hyp = normHypBlock(x.hyp);
+    if (hyp) summary.hyp = hyp;
+    return summary;
   }
 
   function pickField(x, primary, fallback) {
@@ -51,7 +69,7 @@
 
   function normBreakdownRow(row) {
     const x = row && typeof row === "object" ? row : {};
-    return {
+    const out = {
       label: x.label != null ? String(x.label) : "—",
       bets: num(x.bets),
       wins: num(x.wins),
@@ -59,6 +77,9 @@
       pl_units: num(x.pl_units),
       roi_pct: num(x.roi_pct),
     };
+    const hyp = normHypBlock(x.hyp);
+    if (hyp) out.hyp = hyp;
+    return out;
   }
 
   function sortPriceBands(rows) {
@@ -77,6 +98,36 @@
     return list;
   }
 
+  function normWeekdayRow(row) {
+    const x = row && typeof row === "object" ? row : {};
+    return {
+      label: x.label != null ? String(x.label) : "",
+      picks: num(x.picks),
+      bets: num(x.bets),
+      wins: num(x.wins),
+      strike_pct: num(x.strike_pct),
+      pl_units: num(x.pl_units),
+      roi_pct: num(x.roi_pct),
+      hyp_pl_units: num(x.hyp_pl_units),
+      hyp_roi_pct: num(x.hyp_roi_pct),
+    };
+  }
+
+  function normMeta(m) {
+    if (!m || typeof m !== "object") return null;
+    const dataSince = m.data_since != null ? String(m.data_since) : "";
+    const picks = num(m.picks);
+    const staked = num(m.staked_picks);
+    if (!dataSince && !picks && !staked && m.data_since == null && m.picks == null && m.staked_picks == null) {
+      return null;
+    }
+    return {
+      data_since: dataSince,
+      picks,
+      staked_picks: staked,
+    };
+  }
+
   function normRecent(r) {
     const x = r && typeof r === "object" ? r : {};
     const raw = x.result != null ? String(x.result).toLowerCase() : "";
@@ -90,19 +141,25 @@
       stake_units: num(x.stake_units),
       result,
       pl_units: num(x.pl_units),
+      hyp_pl_units: num(x.hyp_pl_units),
     };
   }
 
   function normModelBlock(block) {
     const m = block && typeof block === "object" ? block : {};
-    return {
+    const weekday = Array.isArray(m.by_weekday) ? m.by_weekday.map(normWeekdayRow) : [];
+    const meta = normMeta(m.meta);
+    const out = {
       summary: normSummary(m.summary),
       daily: Array.isArray(m.daily) ? m.daily.map(normDaily) : [],
       by_price_band: normBreakdown(m.by_price_band, "price_band"),
       by_track: normBreakdown(m.by_track, "track"),
       by_stake_bracket: normBreakdown(m.by_stake_bracket, "stake"),
+      by_weekday: weekday,
       recent: Array.isArray(m.recent) ? m.recent.map(normRecent) : [],
     };
+    if (meta) out.meta = meta;
+    return out;
   }
 
   function normHeadToHead(h) {
@@ -137,7 +194,8 @@
     for (const id of MODEL_IDS) {
       models[id] = normModelBlock(modelsIn[id]);
     }
-    return {
+    const topMeta = normMeta(data.meta);
+    const out = {
       generated_at: data.generated_at != null ? String(data.generated_at) : "",
       range: {
         from: range.from != null ? String(range.from) : "",
@@ -146,6 +204,8 @@
       models,
       head_to_head: normHeadToHead(data.head_to_head),
     };
+    if (topMeta) out.meta = topMeta;
+    return out;
   }
 
   return {
@@ -159,6 +219,9 @@
     normBreakdownRow,
     sortPriceBands,
     normRecent,
+    normWeekdayRow,
+    normMeta,
+    normHypBlock,
     normHeadToHead,
   };
 });
