@@ -566,7 +566,8 @@ function masterPhotoFromRow(row) {
       uploadedAt: row[10] || "",
       mimeType: row[11] || "",
       webViewLink: row[12] || "",
-      thumbnailLink: row[13] || ""
+      thumbnailLink: row[13] || "",
+      folderStage: window.NDPhotoFolders ? NDPhotoFolders.normalizeStage(row[14]) : (row[14] || "")
     }
   };
 }

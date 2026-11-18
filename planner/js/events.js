@@ -113,9 +113,14 @@ function bindEvents() {
   });
   const quickStatus = document.querySelector("[data-quick-status]");
   if (quickStatus) quickStatus.addEventListener("change", () => updateNodeStatus(quickStatus.value));
+  document.querySelectorAll("[data-photo-stage]").forEach((sel) => sel.addEventListener("change", () => updateNodeStage(sel.value)));
   document.querySelectorAll("[data-notes]").forEach((textarea) => textarea.addEventListener("change", () => {
     const node = state.nodes.find((n) => n.id === textarea.dataset.notes); if (!node) return;
-    node.description = textarea.value; node.updatedAt = nowStamp(); persist(); toast("Notes saved");
+    node.description = textarea.value; node.updatedAt = nowStamp(); persist();
+    toast("Notes saved");
+    render();
+    const fresh = document.querySelector(`[data-notes="${CSS.escape(node.id)}"]`);
+    if (fresh) fresh.focus();
     logAudit("Notes Updated", { nodeId: node.id, details: "Notes edited" });
   }));
   document.querySelectorAll("[data-lightbox]").forEach((b) => b.addEventListener("click", () => { state.lightbox = { index: Number(b.dataset.lightbox) }; render(); }));

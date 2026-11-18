@@ -1,7 +1,8 @@
 /* Drive photo folders for Neill Planner.
- * Pure helpers: level and apartment names, idempotent floor/room plans,
- * and the watermark text drawn over a photo. No Drive calls and no DOM.
- * Works in the page (window.NDPhotoFolders) and in Node tests. */
+ * Pure helpers: level and apartment names, Rough-in / Fit-off stage folders,
+ * idempotent floor/room plans, and the watermark card drawn over a photo.
+ * No Drive calls and no DOM. Works in the page (window.NDPhotoFolders) and in Node tests.
+ * Stage is never written by renaming a Drive file. A manual stage lives in Planner data. */
 (function (root) {
   "use strict";
 
@@ -162,7 +163,13 @@
       if (!map.has(level.key)) map.set(level.key, { levelKey: level.key, driveName: level.driveName, order: level.order, apartments: [] });
       const bucket = map.get(level.key);
       (byFloor.get(floor.id) || []).forEach((apt) => {
-        if (!bucket.apartments.some((item) => item.key === apt.key)) bucket.apartments.push({ key: apt.key, label: apt.label });
+        if (!bucket.apartments.some((item) => item.key === apt.key)) {
+          bucket.apartments.push({
+            key: apt.key,
+            label: apt.label,
+            stages: STAGE_FOLDERS.map((stage) => ({ key: stage.key, name: stage.name }))
+          });
+        }
       });
     });
     return [...map.values()].sort((a, b) => a.order - b.order);
@@ -180,14 +187,92 @@
     return (files || []).find((file) => isFolder(file) && apartmentFromName(file.name)?.key === key) || null;
   }
 
+  /* Optional folders inside an apartment. Names match case-insensitively,
+   * and "Rough in" / "Roughin" / "Fit off" / "Fitoff" count as the same stage. */
+  const STAGE_FOLDERS = [
+    { key: "rough-in", name: "Rough-in" },
+    { key: "fit-off", name: "Fit-off" }
+  ];
+  const STAGES = {
+    "rough-in": { key: "rough-in", label: "Rough-in", status: "In progress", tone: "rough" },
+    "fit-off": { key: "fit-off", label: "Fit-off", status: "Fit off", tone: "fit" },
+    unsorted: { key: "unsorted", label: "Unsorted", status: "", tone: "plain" }
+  };
+
+  function stageFromName(name) {
+    const compact = norm(name).replace(/[^a-z0-9]/g, "");
+    if (compact === "roughin") return "rough-in";
+    if (compact === "fitoff") return "fit-off";
+    if (compact === "unsorted") return "unsorted";
+    return "";
+  }
+
+  /* "" means "not set" (inherit). A known stage, including explicit Unsorted, is kept. */
+  function normalizeStage(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (STAGES[raw]) return raw;
+    return stageFromName(raw);
+  }
+
+  function stageMeta(key) {
+    return STAGES[normalizeStage(key) || "unsorted"];
+  }
+
+  /* Photo override, then the node's override, then the folder the file sits in. */
+  function effectiveStage(info) {
+    const src = info || {};
+    const photo = normalizeStage(src.photoStage);
+    if (photo) return photo;
+    const node = normalizeStage(src.nodeStage);
+    if (node) return node;
+    const folder = normalizeStage(src.folderStage);
+    if (folder) return folder;
+    return "unsorted";
+  }
+
+  function matchStageFolder(files, key) {
+    const wanted = normalizeStage(key);
+    if (!wanted || wanted === "unsorted") return null;
+    return (files || []).find((file) => isFolder(file) && stageFromName(file.name) === wanted) || null;
+  }
+
   function isPhotoFile(file) {
     if (!file || isFolder(file)) return false;
     if (/^image\//i.test(file.mimeType || "")) return true;
     return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name || "");
   }
 
-  /* rootFiles plus childrenById (folder id -> files) become the tray groups.
-   * Photos dropped straight into a level folder land in that level's loose list. */
+  function taggedPhoto(file, stage) {
+    return Object.assign({}, file, { stage: stage });
+  }
+
+  /* Photos directly in the apartment, and photos in any other subfolder, are Unsorted.
+   * Rough-in and Fit-off come only from a stage subfolder. */
+  function stageGroupsFor(children, kids) {
+    const buckets = { "rough-in": [], "fit-off": [], unsorted: [] };
+    (children || []).forEach((child) => {
+      if (isFolder(child)) {
+        const stage = stageFromName(child.name);
+        const inner = (kids[child.id] || []).filter(isPhotoFile);
+        const key = stage === "rough-in" || stage === "fit-off" ? stage : "unsorted";
+        inner.forEach((file) => buckets[key].push(taggedPhoto(file, key)));
+      } else if (isPhotoFile(child)) buckets.unsorted.push(taggedPhoto(child, "unsorted"));
+    });
+    const stages = ["rough-in", "fit-off", "unsorted"].map((key) => ({
+      key: key,
+      label: STAGES[key].label,
+      tone: STAGES[key].tone,
+      photos: buckets[key]
+    })).filter((item) => item.photos.length);
+    const photos = [];
+    stages.forEach((item) => photos.push(...item.photos));
+    return { stages: stages, photos: photos };
+  }
+
+  /* rootFiles plus childrenById (folder id -> direct children) become the tray groups.
+   * Photos dropped straight into a level folder land in that level's loose list.
+   * Photos inside an apartment are grouped by stage subfolder. */
   function groupPhotoFiles(rootFiles, childrenById) {
     const kids = childrenById || {};
     const levels = [];
@@ -200,8 +285,15 @@
         const levelLoose = [];
         nested.forEach((child) => {
           if (isFolder(child)) {
-            const photos = (kids[child.id] || []).filter(isPhotoFile);
-            apartments.push({ folderId: child.id, name: child.name, photos: photos });
+            const grouped = stageGroupsFor(kids[child.id] || [], kids);
+            const apt = apartmentFromName(child.name);
+            apartments.push({
+              folderId: child.id,
+              name: child.name,
+              key: apt ? apt.key : "",
+              stages: grouped.stages,
+              photos: grouped.photos
+            });
           } else if (isPhotoFile(child)) levelLoose.push(child);
         });
         apartments.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
@@ -219,27 +311,107 @@
     return { levels: levels, loose: loose };
   }
 
-  /* Overlay text. Nothing is written back to the file.
-   * Apartment and room share one line; type, status, line item and notes share the next. */
+  /* "18 Nov 2026" in Sydney. A date-only value stays on that calendar day. */
+  function watermarkDate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (/^\d{1,2} [A-Z][a-z]{2} \d{4}$/.test(raw)) return raw;
+    const stamp = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(raw);
+    let date = null;
+    if (stamp) {
+      if (stamp[7]) date = new Date(raw.replace(" ", "T"));
+      else if (stamp[4] != null) date = new Date(Date.UTC(+stamp[1], +stamp[2] - 1, +stamp[3], +stamp[4], +stamp[5], +(stamp[6] || 0)));
+      else date = new Date(Date.UTC(+stamp[1], +stamp[2] - 1, +stamp[3], 1, 0, 0));
+    } else {
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) date = parsed;
+    }
+    if (!date || Number.isNaN(date.getTime())) return "";
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Australia/Sydney", day: "numeric", month: "short", year: "numeric" }).formatToParts(date);
+      const part = (type) => (parts.find((item) => item.type === type) || {}).value || "";
+      const day = part("day"), month = part("month"), year = part("year");
+      return day && month && year ? day + " " + month + " " + year : "";
+    } catch (e) { return ""; }
+  }
+
+  /* Overlay card. Nothing is written back to the file.
+   * Line 1 is the apartment and the room. Line 2 is the stage, its status and the note.
+   * Branding is off unless asked: the footer is then the date alone, when one is known. */
   function watermarkModel(info) {
     const src = info || {};
     const apt = String(src.apartment || "").trim();
     const room = String(src.room || "").trim();
     const roomShow = room && room.toLowerCase() !== "no room" && room.toLowerCase() !== apt.toLowerCase() ? room : "";
-    const primary = [apt, roomShow].filter(Boolean).join(" · ");
-    const type = String(src.type || "").trim();
-    const extra = [];
-    if (type && type !== "marker") extra.push(type === "photo" ? "Photo" : type);
-    const status = String(src.status || "").trim();
-    if (status) extra.push(status);
-    const item = String(src.lineItem || src.category || "").trim();
-    if (item) extra.push(item);
-    const notes = String(src.notes || "").trim().replace(/\s+/g, " ");
-    if (notes) extra.push(notes.length > 42 ? notes.slice(0, 41) + "…" : notes);
-    const secondary = extra.join(" · ");
-    const lines = [primary, secondary].filter(Boolean);
-    if (!lines.length) return null;
-    return { lines: lines };
+    const stageKey = effectiveStage(src);
+    const stage = stageMeta(stageKey);
+    const note = String(src.notes || "").trim().replace(/\s+/g, " ");
+    if (!apt && !roomShow && !note && stageKey === "unsorted") return null;
+    const branding = src.branding === true;
+    const version = String(src.version || "").trim();
+    const date = watermarkDate(src.date);
+    let footer = "";
+    if (branding && version) footer = date ? "Neill Planner " + version + " · " + date : "Neill Planner " + version;
+    else if (date) footer = date;
+    return {
+      apartment: apt,
+      room: roomShow,
+      stage: stage.key,
+      stageLabel: stage.label,
+      status: stage.status,
+      tone: stage.tone,
+      note: note,
+      footer: footer,
+      branding: branding
+    };
+  }
+
+  /* Apartments that have at least one photo of a stage, for the progress line.
+   * overrides maps a Drive file id to a manual stage; that stage wins for that file. */
+  function collectApartmentStages(tree, overrides) {
+    const present = {};
+    const keys = [];
+    const ensure = (name) => {
+      const apt = apartmentFromName(name);
+      if (!apt) return "";
+      if (!Object.prototype.hasOwnProperty.call(present, apt.key)) {
+        present[apt.key] = [];
+        keys.push(apt.key);
+      }
+      return apt.key;
+    };
+    ((tree && tree.levels) || []).forEach((level) => {
+      (level.apartments || []).forEach((apt) => {
+        const key = ensure(apt.name || apt.label || "");
+        if (!key) return;
+        (apt.photos || []).forEach((photo) => {
+          const manual = overrides && (overrides[photo.id] || overrides[photo.driveFileId]) || "";
+          const stage = effectiveStage({ nodeStage: manual, folderStage: photo.stage || "" });
+          if (present[key].indexOf(stage) < 0) present[key].push(stage);
+        });
+      });
+    });
+    return { keys: keys, present: present };
+  }
+
+  function stageProgress(apartmentKeys, present) {
+    const keys = [];
+    const seen = {};
+    (apartmentKeys || []).forEach((key) => {
+      const id = String(key || "").trim().toLowerCase();
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      keys.push(id);
+    });
+    const has = (key, stage) => {
+      const list = present && present[key];
+      return Array.isArray(list) && list.indexOf(stage) >= 0;
+    };
+    const total = keys.length;
+    const roughIn = keys.filter((key) => has(key, "rough-in")).length;
+    const fitOff = keys.filter((key) => has(key, "fit-off")).length;
+    const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
+    return { total: total, roughIn: roughIn, fitOff: fitOff, roughPct: pct(roughIn), fitPct: pct(fitOff) };
   }
 
   const API = {
@@ -255,9 +427,18 @@
     isFolder: isFolder,
     matchLevelFolder: matchLevelFolder,
     matchApartmentFolder: matchApartmentFolder,
+    STAGE_FOLDERS: STAGE_FOLDERS,
+    stageFromName: stageFromName,
+    normalizeStage: normalizeStage,
+    stageMeta: stageMeta,
+    effectiveStage: effectiveStage,
+    matchStageFolder: matchStageFolder,
     isPhotoFile: isPhotoFile,
     groupPhotoFiles: groupPhotoFiles,
-    watermarkModel: watermarkModel
+    watermarkDate: watermarkDate,
+    watermarkModel: watermarkModel,
+    collectApartmentStages: collectApartmentStages,
+    stageProgress: stageProgress
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

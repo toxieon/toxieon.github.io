@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.22.1";
+const APP_VERSION = "0.23.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -64,10 +64,10 @@ const DEFAULT_CATEGORY_TABS = [
 const CATEGORIES_HEADER = ["Item", "Code", "Description", "Color", "Shorthand"];
 const MASTER_SHEET_NAME = "NeillPlanner-Master";
 const MASTER_TABS = {
-  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected", "Photo Folder ID"],
+  Projects: ["Project ID", "Name", "Folder Group", "Address", "Description", "Created By", "Created At", "Updated At", "Drive Folder ID", "Floor Count", "Node Count", "Protected", "Photo Folder ID", "Watermark Branding"],
   Floors:   ["Floor ID", "Project ID", "Project Name", "Floor Name", "Order", "Plan Drive File ID", "Drive Folder ID", "Node Count", "Created At", "Plan Aspect Ratio", "Plan PNG File ID"],
-  Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version", "Apartment"],
-  Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link"],
+  Nodes:    ["Node ID", "Project ID", "Project Name", "Floor ID", "Floor Name", "Type", "Title", "Custom Title", "Category", "Line Item", "Status", "Assigned To", "Tags", "Position X", "Position Y", "Size", "Description", "Image Count", "Comment Count", "Created By", "Created At", "Updated At", "Drive Folder ID", "Linked Project ID", "Linked Floor ID", "Linked Node ID", "Photo IDs", "Room ID", "Room Name", "Linked Room ID", "Circuit", "Cable Run (m)", "Board Label", "Phase Config", "Main Breaker (A)", "SWB Project ID", "SWB Schema Version", "Apartment", "Photo Stage"],
+  Photos:   ["Photo ID", "Drive File ID", "Name", "Node ID", "Node Name", "Floor ID", "Floor Name", "Project ID", "Project Name", "Uploader", "Uploaded At", "Mime Type", "Web View Link", "Thumbnail Link", "Folder Stage"],
   Folders:  ["Folder ID", "Name", "Color", "Project Count", "Drive Folder ID"],
   Rooms:    ["Room ID", "Project ID", "Floor ID", "Name", "Created At", "Updated At", "Sort Order", "Shape"]
 };
