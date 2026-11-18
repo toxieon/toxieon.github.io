@@ -13,13 +13,28 @@
     return { date, with_price: null, without_price: null, agree: null };
   }
 
+  function pickField(row, primary, fallback) {
+    if (row[primary] != null && row[primary] !== "") {
+      const n = Number(row[primary]);
+      return Number.isFinite(n) ? n : 0;
+    }
+    if (fallback && row[fallback] != null && row[fallback] !== "") {
+      const n = Number(row[fallback]);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  }
+
   function normDailySlice(row) {
     if (!row) return null;
     return {
+      picks: Number(row.picks) || 0,
       bets: Number(row.bets) || 0,
       wins: Number(row.wins) || 0,
       pl_units: Number(row.pl_units) || 0,
-      cum_units: Number(row.cum_units) || 0,
+      hyp_pl_units: Number(row.hyp_pl_units) || 0,
+      cum_units: pickField(row, "cum_units", "cum"),
+      hyp_cum_units: pickField(row, "hyp_cum_units", "hyp_cum"),
     };
   }
 
