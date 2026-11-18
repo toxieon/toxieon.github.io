@@ -9,6 +9,7 @@
  *   Quote.gs          ← every Quote action (users, quotes, status, photos, tags, activity)
  *   TimesheetLive.gs  ← the read-only live week view
  *   Admin.gs          ← setup(), code rotation, migration, price sheet — run from the editor
+ *   PhotoProgress.gs  ← time-driven photo folder progress reports (Drive read-only)
  *
  * Nothing secret lives in this repo. The pepper, the price-sheet ID and the
  * private-sheet ID are Script Properties that setup() creates; passcodes are
@@ -45,7 +46,9 @@ const SNAPSHOT_TAB  = 'live_snapshot';
 // Script Property names
 const PROP = {
   pepper: 'ND_PEPPER', priceSheet: 'PRICE_SHEET_ID', privateSheet: 'PRIVATE_SHEET_ID',
-  requireUsername: 'REQUIRE_USERNAME'
+  requireUsername: 'REQUIRE_USERNAME',
+  photoProgressJobs: 'PHOTO_PROGRESS_JOBS',
+  photoProgressPlannerMaster: 'PHOTO_PROGRESS_PLANNER_MASTER_SHEET_ID'
 };
 
 // Fill these IN THE EDITOR ONLY before running setup(), then empty them again and
