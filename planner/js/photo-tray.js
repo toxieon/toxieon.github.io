@@ -51,7 +51,7 @@ function mapPool(items, limit, fn) {
 async function loadPhotoTree(rootId) {
   const api = photoApi();
   const rootFiles = await listDriveChildren(rootId);
-  const folders = rootFiles.filter((file) => file.mimeType === PHOTO_FOLDER_MIME);
+  const folders = rootFiles.filter((file) => file.mimeType === PHOTO_FOLDER_MIME && !api.reservedFolderKind(file.name));
   const children = {};
   const levelLists = await mapPool(folders, 4, async (folder) => [folder.id, await listDriveChildren(folder.id)]);
   const apartments = [];
@@ -75,6 +75,7 @@ async function loadPhotoTree(rootId) {
   nestedLists.forEach(([id, files]) => { children[id] = files; });
   const grouped = api.groupPhotoFiles(rootFiles, children);
   grouped.trimmed = trimmed;
+  grouped.specials = api.jobSpecials(rootFiles);
   return grouped;
 }
 
@@ -243,6 +244,7 @@ function renderPhotoTray(proj) {
     <div class="photo-tray-head"><h3 class="section-title">Drive photos</h3><p class="summary-hint">${photoCount(lib)} photo${photoCount(lib) === 1 ? "" : "s"}${when ? " · " + escapeHtml(when) : ""}. Grouped by level, apartment, then Rough-in or Fit-off. Long-press a thumbnail, then drag it onto the plan. A tap arms placement for the next tap on the plan.</p></div>
     <div class="photo-tray-actions">
       <button class="ghost-button" type="button" data-action="refresh-photo-folder">${icon("refresh")}Refresh</button>
+      <button class="ghost-button" type="button" data-action="job-status">${icon("chart")}Job status</button>
       <button class="ghost-button" type="button" data-action="open-photo-folder">${icon("folder")}Drive</button>
       <button class="ghost-button" type="button" data-action="sync-photo-structure">${icon("layers")}Add floors</button>
       <button class="ghost-button" type="button" data-action="push-photo-folders" title="Create level, apartment, Rough-in and Fit-off folders">${icon("upload")}Make folders</button>

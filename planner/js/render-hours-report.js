@@ -588,6 +588,7 @@ function renderModal() {
   if (m.mode === "help") return renderHelpModal();
   if (m.mode === "camera") return renderPlannerCamera();
   if (m.mode === "photo-list") return renderPhotoListModal();
+  if (m.mode === "job-status") return renderJobStatusModal();
   if (m.mode === "print-preview") return renderPrintPreviewModal();
   return "";
 }
