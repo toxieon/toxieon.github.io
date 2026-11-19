@@ -83,6 +83,29 @@
     return { status: 0, data: {}, auth: "" };
   }
 
-  return { API_BASE: API_BASE, TOKEN_KEY: TOKEN_KEY, FALLBACK_TOKEN_KEYS: FALLBACK_TOKEN_KEYS, BASE: BASE,
+  var PRICE_MSG = "Your price should be a decimal price such as 4.20.";
+  /** User-facing text for a failed add. 409 (duplicate, cap) and 400 (invalid, empty) are normal answers, not crashes. */
+  function describeAddError(status, data) {
+    var d = data || {};
+    if (d.code === "duplicate") return "This horse is already in your Black Book.";
+    if (d.code === "cap") return d.limit ? "The Black Book is full (limit " + d.limit + ")." : "The Black Book is full.";
+    if (d.code === "unconfirmed") return "That horse could not be confirmed. Search again.";
+    if (d.field === "betPrice") return PRICE_MSG;
+    if (d.field === "priority") return "Pick Low, Med or High priority.";
+    if (d.code === "empty") return "Enter a horse name first.";
+    if (d.code === "invalid" || status === 400) return "That request was not valid. Check the fields and try again.";
+    return "The horse was not added. Try again.";
+  }
+  /** Text for a failed edit or restore. */
+  function describeEditError(status, data, kind) {
+    var d = data || {};
+    if (status === 409 && d.code === "cap") return "The Black Book is full.";
+    if (d.field === "betPrice") return PRICE_MSG;
+    if (d.field === "priority") return "Pick Low, Med or High priority.";
+    if (status === 404 || d.code === "missing") return "That horse is no longer in your Black Book.";
+    return kind === "restore" ? "Not restored. Try again." : "Not saved. Try again.";
+  }
+
+  return { describeAddError: describeAddError, describeEditError: describeEditError, API_BASE: API_BASE, TOKEN_KEY: TOKEN_KEY, FALLBACK_TOKEN_KEYS: FALLBACK_TOKEN_KEYS, BASE: BASE,
     readToken: readToken, saveToken: saveToken, clearToken: clearToken, paths: paths, classify: classify, request: request };
 });

@@ -84,7 +84,7 @@
         }) });
       }
       if (p === "/api/owner/horse/races" && method === "GET") {
-        return ok({ races: [1, 2, 3].map(function (n) { return { id: "demo-race-" + n, meeting: MEETINGS[n - 1], race_number: n, start_time: iso(t0 + n * 3600000) }; }) });
+        return ok({ races: [1, 2, 3].map(function (n) { return { id: "demo-race-" + n, label: MEETINGS[n - 1] + " R" + n + " (demo)", meeting: MEETINGS[n - 1], race_number: n, start_time: iso(t0 + n * 3600000) }; }) });
       }
       if (p === "/api/owner/blackbook/race-card" && method === "GET") {
         return ok({ race: { event_id: q.get("event_id"), meeting: "Demo Park", race_no: 4, name: "Fake Handicap", distance_m: 1400, track: "Good 4", jump_at: iso(t0 + 3600000) },
@@ -93,10 +93,14 @@
       }
       if (p === "/api/owner/blackbook/entries" && method === "POST") {
         var b = body || {};
-        var name = String(b.display || b.query || "Demo Added Horse").trim();
+        var name = String(b.display || b.query || "").trim();
+        if (!name) return { status: 400, data: { ok: false, code: "empty" }, auth: "" };
+        if (b.betPrice != null && !(b.betPrice >= 1.01 && b.betPrice <= 1001)) return { status: 400, data: { ok: false, code: "invalid", field: "betPrice" }, auth: "" };
+        var dup = entries.filter(function (x) { return !x.archived_at && x.horse_name.toLowerCase() === name.toLowerCase(); })[0];
+        if (dup) return { status: 409, data: { ok: false, code: "duplicate", entry: clone(dup) }, auth: "" };
         var pr = /^(low|med|high)$/.test(b.priority) ? b.priority : "low";
         var e = { id: nextId++, token: "demo-new-" + nextId, horse_name: name, horse_name_norm: name.toLowerCase(), horse_id: null, sire: null, dam: null, note: b.note || "",
-          priority: pr, priority_level: LEVEL[pr], dms_enabled: !!b.dms_enabled, jump_soon: !!b.jump_soon, archived_at: null, created_at: iso(Date.now()), updated_at: iso(Date.now()), last_activity_at: iso(Date.now()),
+          pending: !b.token && !b.horse_id, priority: pr, priority_level: LEVEL[pr], dms_enabled: !!b.dms_enabled, jump_soon: !!b.jump_soon, archived_at: null, created_at: iso(Date.now()), updated_at: iso(Date.now()), last_activity_at: iso(Date.now()),
           bet_price: b.betPrice || null, next: null, last_result: null, price: { status: "coming_soon" }, model: { status: "coming_soon" }, model_sees_more: { status: "coming_soon" } };
         entries.push(e);
         return { status: 200, data: { ok: true, code: "ok", entry: clone(e) }, auth: "" };
@@ -114,7 +118,7 @@
           if (d.betPrice != null) en.bet_price = d.betPrice;
           if (typeof d.dms_enabled === "boolean") en.dms_enabled = d.dms_enabled;
           if (typeof d.jump_soon === "boolean") en.jump_soon = d.jump_soon;
-          return ok({ entry: clone(en) });
+          return ok({ code: "saved", entry: clone(en) });
         }
         if (method === "DELETE") { entries.splice(entries.indexOf(en), 1); return ok({}); }
       }

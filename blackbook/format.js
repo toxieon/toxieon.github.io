@@ -69,5 +69,9 @@
     return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + needle.length)) + "</mark>" + esc(text.slice(i + needle.length));
   }
 
-  return { esc: esc, fmtPrice: fmtPrice, ordinal: ordinal, initials: initials, resultText: resultText, resultClass: resultClass, isComingSoon: isComingSoon, prioOf: prioOf, priceInput: priceInput, highlight: highlight, PRIO: PRIO, TIER_DEFAULTS: TIER_DEFAULTS, DISCLAIMER: DISCLAIMER, HELPLINE: HELPLINE };
+  var SILK_HOST = "https://cdn.prod.pricekinetics.com/";
+  /** Only silks from the one allowed https host are shown; anything else falls back to the monogram. */
+  function silkUrl(u) { return typeof u === "string" && u.indexOf(SILK_HOST) === 0 && u.length < 500 && !/["'<>\s]/.test(u) ? u : ""; }
+
+  return { silkUrl: silkUrl, SILK_HOST: SILK_HOST, esc: esc, fmtPrice: fmtPrice, ordinal: ordinal, initials: initials, resultText: resultText, resultClass: resultClass, isComingSoon: isComingSoon, prioOf: prioOf, priceInput: priceInput, highlight: highlight, PRIO: PRIO, TIER_DEFAULTS: TIER_DEFAULTS, DISCLAIMER: DISCLAIMER, HELPLINE: HELPLINE };
 });

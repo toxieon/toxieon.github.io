@@ -54,3 +54,9 @@ test("disclaimer, helpline and tier defaults (Ray's 18 Nov numbers)", () => {
   assert.deepEqual(rows["Jump soon"], ["", "", "15 min"]);
   assert.deepEqual(rows["Discord DM"], ["", "", "on"]);
 });
+
+test("silks: only https URLs on the one allowed host are used", () => {
+  assert.equal(F.silkUrl("https://cdn.prod.pricekinetics.com/silks/1.png"), "https://cdn.prod.pricekinetics.com/silks/1.png");
+  for (const bad of ["http://cdn.prod.pricekinetics.com/a.png", "https://evil.example/a.png", "https://cdn.prod.pricekinetics.com.evil.example/a", 'https://cdn.prod.pricekinetics.com/a"onerror=x', "", null, undefined, 5])
+    assert.equal(F.silkUrl(bad), "", String(bad));
+});

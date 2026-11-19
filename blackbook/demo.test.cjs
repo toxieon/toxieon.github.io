@@ -69,3 +69,14 @@ test("unknown routes look like the not-the-owner 404", () => {
   const r = Demo.createBackend(T0).request("GET", "/api/owner/other");
   assert.deepEqual([r.status, r.data.error, r.auth], [404, "not_found", "denied"]);
 });
+
+test("demo add answers like the live API: duplicate 409, empty 400, bad price 400, typed name is pending", () => {
+  const b = Demo.createBackend(T0);
+  const dup = b.request("POST", "/api/owner/blackbook/entries", { query: "Sample Steed", priority: "low" });
+  assert.deepEqual([dup.status, dup.data.code], [409, "duplicate"]);
+  assert.deepEqual([b.request("POST", "/api/owner/blackbook/entries", {}).status, b.request("POST", "/api/owner/blackbook/entries", {}).data.code], [400, "empty"]);
+  const bad = b.request("POST", "/api/owner/blackbook/entries", { query: "Stub Stallion", betPrice: 0.5 });
+  assert.deepEqual([bad.status, bad.data.field], [400, "betPrice"]);
+  assert.equal(b.request("POST", "/api/owner/blackbook/entries", { query: "Stub Stallion" }).data.entry.pending, true);
+  assert.match(b.request("GET", "/api/owner/horse/races").data.races[0].label, /\(demo\)$/);
+});

@@ -95,3 +95,31 @@ test("a non-JSON body yields an empty object, not a throw", async () => {
   const f = fakeFetch([{ status: 500, bad: true }]);
   assert.deepEqual(await A.request("GET", "/x", undefined, { fetch: f }), { status: 500, data: {}, auth: "" });
 });
+
+test("add errors: 409 and 400 come back as data (not thrown) and each has its own message", async () => {
+  const f = fakeFetch([{ status: 409, body: { ok: false, code: "duplicate" } }, { status: 409, body: { ok: false, code: "cap", limit: 50 } }, { status: 400, body: { ok: false, code: "invalid", field: "betPrice" } }]);
+  const r1 = await A.request("POST", A.paths.entries(), {}, { token: "t", fetch: f });
+  assert.deepEqual([r1.status, r1.auth, r1.data.code], [409, "", "duplicate"]);
+  assert.equal((await A.request("POST", "/x", {}, { fetch: f })).data.limit, 50);
+  assert.equal((await A.request("POST", "/x", {}, { fetch: f })).data.field, "betPrice");
+  const m = A.describeAddError;
+  assert.equal(m(409, { code: "duplicate" }), "This horse is already in your Black Book.");
+  assert.equal(m(409, { code: "cap", limit: 50 }), "The Black Book is full (limit 50).");
+  assert.equal(m(409, { code: "cap" }), "The Black Book is full.");
+  assert.equal(m(200, { ok: false, code: "unconfirmed" }), "That horse could not be confirmed. Search again.");
+  assert.equal(m(400, { code: "invalid", field: "betPrice" }), "Your price should be a decimal price such as 4.20.");
+  assert.equal(m(400, { code: "invalid", field: "priority" }), "Pick Low, Med or High priority.");
+  assert.equal(m(400, { code: "empty" }), "Enter a horse name first.");
+  assert.equal(m(400, { code: "invalid" }), "That request was not valid. Check the fields and try again.");
+  assert.equal(m(500, {}), "The horse was not added. Try again.");
+  assert.equal(m(0, undefined), "The horse was not added. Try again.");
+});
+
+test("edit and restore errors", () => {
+  const m = A.describeEditError;
+  assert.equal(m(409, { code: "cap" }, "restore"), "The Black Book is full.");
+  assert.equal(m(400, { code: "invalid", field: "betPrice" }), "Your price should be a decimal price such as 4.20.");
+  assert.equal(m(404, { ok: false, code: "missing" }), "That horse is no longer in your Black Book.");
+  assert.equal(m(500, {}, "restore"), "Not restored. Try again.");
+  assert.equal(m(500, {}), "Not saved. Try again.");
+});

@@ -10,7 +10,7 @@
  */
 (function (root) {
   "use strict";
-  var APP_VERSION = "0.1.0";
+  var APP_VERSION = "0.1.1";
   var F = root.BBFormat, D = root.BBDates, A = root.BBApi, DEMO = root.BBDemo;
   var esc = F.esc, fmtPrice = F.fmtPrice, ordinal = F.ordinal, initials = F.initials, resultText = F.resultText, resultClass = F.resultClass;
   var isComingSoon = F.isComingSoon, prioOf = F.prioOf, priceInput = F.priceInput, highlight = F.highlight;
@@ -51,9 +51,11 @@
     return '<span class="badge ' + key + (lg ? " lg" : "") + '">' + bars(p.bars) + p.label + "</span>";
   }
   function ownerChip(label) { return '<span class="chip-owner">' + svg("key") + esc(label || "Owner") + "</span>"; }
-  function mono(entry, lg) {
+  function mono(entry, lg, silk) {
     var key = prioOf(entry);
-    var inner = esc(initials(entry.horse_name || entry.horseName));
+    var url = F.silkUrl(silk);
+    var ini = initials(entry.horse_name || entry.horseName);
+    var inner = url ? '<img src="' + esc(url) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-ini="' + esc(ini) + '">' : esc(ini);
     return '<span class="mono ' + key + (lg ? " lg" : "") + '" aria-hidden="true">' + inner + "</span>";
   }
 
@@ -193,6 +195,8 @@
       '"></circle><circle class="fg" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + (circ * (1 - c.frac)).toFixed(1) +
       '"></circle></svg><b>' + esc(c.text) + "</b></span>";
   }
+  function hasNext(nx) { return !!(nx && (nx.state || nx.jump_at)); }
+  function pendingTag(e) { return e && e.pending ? ' <span class="tag pending" title="Saved by name. It is matched to a horse once it races.">Pending match</span>' : ""; }
   function raceLine(nx) {
     if (!nx) return "";
     return esc((nx.meeting || "Race") + (nx.race_no ? " · R" + nx.race_no : ""));
@@ -214,7 +218,7 @@
     return diff > 0 && diff <= JUMP_SOON_MIN * 60000;
   }
   function nextPanel(nx) {
-    if (!nx) {
+    if (!hasNext(nx)) {
       return '<div class="nextp none"><div class="t"><span class="bb-cap">Next start <span class="tag">Not entered</span></span><b>No entry on file</b>' +
         '<span class="d">A start shows here once its race is on file.</span></div><span class="glyph dash">' + svg("flag") + "</span></div>";
     }
@@ -259,7 +263,7 @@
     var key = prioOf(e);
     var soon = isSoon(e.next);
     var meta = pedigree(e);
-    var inner = '<div class="chead">' + mono(e) + '<div class="who"><h3 class="hname">' + esc(e.horse_name) + "</h3>" +
+    var inner = '<div class="chead">' + mono(e) + '<div class="who"><h3 class="hname">' + esc(e.horse_name) + "</h3>" + pendingTag(e) +
       (meta ? '<div class="hmeta">' + esc(meta) + "</div>" : "") + "</div>" + badge(key) + "</div>" +
       (e.note ? '<p class="note">' + esc(e.note) + "</p>" : '<p class="note empty">No note yet.</p>') +
       nextPanel(e.next) + pricePanel(e) + '<div class="cfoot">' + lastLine(e.last_result) + "</div>";
@@ -335,7 +339,7 @@
       esc(tzName()) + ".</p></div>" + '<div class="seg" role="group" aria-label="Priority"><button type="button" data-act="upf" data-v="all" aria-pressed="' + (S.upFilter === "all") +
       '">All</button><button type="button" data-act="upf" data-v="high" aria-pressed="' + (S.upFilter === "high") + '" style="color:var(--high)">High</button></div></div>';
     if (!u) return shell("upcoming", "Upcoming runs", head + '<div class="sk"></div>');
-    var rows = (u.entries || []).filter(function (e) { return S.upFilter === "all" || e.priority === "high"; });
+    var rows = (u.entries || []).filter(function (e) { return hasNext(e.next) && toDate(e.next.jump_at) && (S.upFilter === "all" || e.priority === "high"); });
     var t = now();
     var groups = {};
     rows.forEach(function (e) {
@@ -376,8 +380,8 @@
     var none = (u.noUpcoming || []).filter(function (e) { return S.upFilter === "all" || e.priority === "high"; });
     if (none.length) {
       html += '<section class="panel noup"><span class="bb-cap">No upcoming run</span><div class="list">' + none.map(function (e) {
-        var why = e.next && e.next.state === "scratched" ? "Scratched · " + raceLine(e.next) : "Not yet entered";
-        return '<a href="#/horse/' + esc(e.id) + '">' + mono(e) + "<div><b>" + esc(e.horse_name) + "</b><span>" + why + "</span></div>" + badge(prioOf(e)) + "</a>";
+        var why = e.next && e.next.state === "scratched" ? "Scratched · " + raceLine(e.next) : "Not entered";
+        return '<a href="#/horse/' + esc(e.id) + '">' + mono(e) + "<div><b>" + esc(e.horse_name) + pendingTag(e) + "</b><span>" + why + "</span></div>" + badge(prioOf(e)) + "</a>";
       }).join("") + "</div></section>";
     }
     return shell("upcoming", "Upcoming runs", head + html);
@@ -386,7 +390,7 @@
     var key = prioOf(e);
     var soon = isSoon(e.next);
     var c = fmtClock(d);
-    var tags = (soon ? '<span class="tag amber">Jump soon</span>' : "") + (past ? '<span class="tag">Awaiting result</span>' : "");
+    var tags = (e.pending ? '<span class="tag pending">Pending match</span>' : "") + (soon ? '<span class="tag amber">Jump soon</span>' : "") + (past ? '<span class="tag">Awaiting result</span>' : "");
     var raceBits = [];
     if (e.next.distance_m) raceBits.push(e.next.distance_m + "m");
     if (e.next.track) raceBits.push(e.next.track);
@@ -414,16 +418,16 @@
     var nx = e.next;
     var meta = pedigree(e);
     var nxHtml = "";
-    if (nx && nx.state !== "scratched") {
+    if (hasNext(nx) && nx.state !== "scratched") {
       nxHtml = '<div class="nx"><div><span class="bb-cap">Next start</span><b>' + raceLine(nx) + "</b><span>" + raceDetail(nx) + "</span></div>" + ringHtml(nx.jump_at) + "</div>";
-    } else if (nx) {
+    } else if (hasNext(nx)) {
       nxHtml = '<div class="nx"><div><span class="bb-cap">Next start</span><b>' + raceLine(nx) + '</b><span>Scratched</span></div><span class="glyph red">' + svg("x") + "</span></div>";
     } else {
       nxHtml = '<div class="nx"><div><span class="bb-cap">Next start</span><b>Not entered</b><span>No race on file yet</span></div><span class="glyph dash">' + svg("flag") + "</span></div>";
     }
     var arch = e.archived_at ? '<div class="banner">Archived after 120 days with no run. <button class="btn primary" type="button" data-act="restore" data-id="' + esc(e.id) +
       '" style="margin-left:10px;min-height:36px">Restore</button></div>' : "";
-    var head = '<section class="dhead ' + key + '">' + mono(e, true) + '<div class="who">' + badge(key, true) + "<h1>" + esc(e.horse_name) + "</h1>" +
+    var head = '<section class="dhead ' + key + '">' + mono(e, true) + '<div class="who">' + badge(key, true) + "<h1>" + esc(e.horse_name) + "</h1>" + pendingTag(e) +
       (meta ? '<div class="meta">' + esc(meta) + "</div>" : "") + '<div class="last">' + lastLine(e.last_result, "Last:") + "</div></div>" + nxHtml + "</section>";
     var msm = '<section class="msm">' + svg("diamond").replace("<svg", '<svg width="22" height="22" style="stroke:var(--gold);fill:none;stroke-width:2"') + "<b>Model sees more</b>" + ownerChip() +
       '<span class="chip-soon">Coming soon</span><span>Shows when the model expects a top-4 finish and the market has the horse at $15.00 or longer, before the jump.</span></section>';
@@ -557,10 +561,11 @@
       var info = [race.distance_m ? race.distance_m + "m" : "", race.name || "", jd ? fmtTime(jd) + " " + tzName(jd) : "", race.track || ""].filter(Boolean).join(" · ");
       return '<button class="btn" type="button" data-act="cards-back" style="min-height:36px;margin-bottom:10px">' + svg("back") + "All races</button><h3 style=\"margin:4px 0 2px\">" +
         esc((race.meeting || "") + (race.race_no ? " · R" + race.race_no : "")) + '</h3><p class="muted small" style="margin:0 0 8px">' + esc(info) + "</p>" +
+        (!(a.card.runners || []).length ? '<div class="msg" style="margin-top:8px"><h2>Not entered</h2><p>No runners on file for this race yet. Cards fill in after the morning build.</p></div>' : "") +
         (a.card.runners || []).map(function (rn, i) {
           var held = rn.inBlackBook && rn.inBlackBook !== "archived";
           var sub = [rn.trainerName, rn.barrier ? "Barrier " + rn.barrier : ""].filter(Boolean).join(" · ");
-          return '<div class="runner"><span class="no">' + esc(rn.no == null ? "" : rn.no) + "</span>" + mono({ horse_name: rn.horseName, priority: held ? rn.inBlackBook : "low" }, false) +
+          return '<div class="runner"><span class="no">' + esc(rn.no == null ? "" : rn.no) + "</span>" + mono({ horse_name: rn.horseName, priority: held ? rn.inBlackBook : "low" }, false, rn.silks || rn.silk_url_64x64) +
             '<div class="t"><b>' + esc(rn.horseName) + "</b><span>" + esc(sub) + "</span></div>" + (rn.price ? '<span class="pr">' + fmtPrice(rn.price) + "</span>" : "") +
             (held ? '<a class="addwide in" href="#/horse/' + esc(rn.entry_id) + '">' + "✓ In Black Book</a>" : '<button type="button" class="addwide" data-act="pick-runner" data-i="' + i + '">+ Black Book</button>') + "</div>";
         }).join("") + '<p class="muted small">Prices are the cached race card price when one is on file.</p>';
@@ -569,7 +574,7 @@
     if (!a.races.length) return '<p class="muted">' + esc(a.err || "No upcoming thoroughbred races are cached right now.") + "</p>";
     return '<div class="racepick">' + a.races.slice(0, 60).map(function (r) {
       var d = toDate(r.start_time);
-      return '<button type="button" data-act="pick-race" data-id="' + esc(r.id) + '"><b>' + esc((r.meeting || "") + " R" + (r.race_number || "")) + "</b><span>" + (d ? esc(fmtDay(d) + " · " + fmtTime(d)) : "") + "</span>" + svg("chev").replace("<svg", '<svg width="16" height="16" style="stroke:var(--muted);fill:none;stroke-width:2"') + "</button>";
+      return '<button type="button" data-act="pick-race" data-id="' + esc(r.id) + '"><b>' + esc(r.label || ((r.meeting || "") + " R" + (r.race_number || ""))) + "</b><span>" + (d ? esc(fmtDay(d) + " · " + fmtTime(d)) : "") + "</span>" + svg("chev").replace("<svg", '<svg width="16" height="16" style="stroke:var(--muted);fill:none;stroke-width:2"') + "</button>";
     }).join("") + "</div>";
   }
   function pickStep() {
@@ -588,7 +593,7 @@
       '<div class="trow2"><span class="ic">' + svg("clock") + '</span><div class="tx"><b>Jump soon</b><span>' + (key === "high" ? "15 minutes before the jump" : "High priority only") +
       '</span></div><button type="button" class="switch" role="switch" aria-label="Jump soon" aria-checked="' + (a.jump && key === "high") + '" data-act="add-toggle" data-field="jump"' + (key !== "high" ? " disabled" : "") + "></button></div>" +
       '<div class="trow2"><span class="ic">' + svg("bell") + '</span><div class="tx"><b>Discord DM</b><span>High priority pings go by DM</span></div><button type="button" class="switch" role="switch" aria-label="Discord DM" aria-checked="' + !!a.dms + '" data-act="add-toggle" data-field="dms"></button></div>';
-    return '<div class="sheet-b">' + amb + '<div class="chead">' + mono({ horse_name: p.name, priority: key }, false) + '<div class="who"><h3 class="hname">' + esc(p.name) + '</h3><div class="hmeta">' + esc(p.meta || "") + "</div></div></div>" +
+    return '<div class="sheet-b">' + amb + '<div class="chead">' + mono({ horse_name: p.name, priority: key }, false, p.silks) + '<div class="who"><h3 class="hname">' + esc(p.name) + '</h3><div class="hmeta">' + esc(p.meta || "") + "</div></div></div>" +
       '<div class="field"><label>Priority</label>' + prioPicker(key, "add-prio") + '<p class="tierline small">' + esc(PRIO[key].desc) + "</p></div>" +
       '<div class="pair" style="gap:12px"><div class="field"><label for="bb-add-note">Your note</label><textarea id="bb-add-note" maxlength="200" placeholder="Optional">' + esc(a.note) + "</textarea></div>" +
       '<div class="field"><label for="bb-add-price">Your price</label><div class="money"><span>$</span><input id="bb-add-price" inputmode="decimal" placeholder="Optional" value="' + esc(a.price) + '" autocomplete="off"></div></div></div>' +
@@ -638,18 +643,14 @@
     if (res.status === 200 && d.ok) {
       var name = d.entry && d.entry.horse_name;
       closeAdd();
-      toast((d.code === "restored" ? "Restored " : "Added ") + (name || "horse") + ".");
+      toast((d.code === "restored" ? "Restored " : "Added ") + (name || "horse") + "." + (d.priority_adjusted ? " Priority adjusted." : ""));
       S.book = null;
       location.hash = "#/";
       load();
       return;
     }
     if (d.code === "ambiguous") { a.ambiguous = d.horses || []; renderModal(); return; }
-    if (d.code === "duplicate") { a.err = "This horse is already in your Black Book."; }
-    else if (d.code === "unconfirmed") { a.err = "That horse could not be confirmed. Search again."; }
-    else if (d.code === "cap") { a.err = "The Black Book is full."; }
-    else if (d.field === "betPrice") { a.err = "Your price should be a decimal price such as 4.20."; }
-    else if (res.status !== 401 && res.status !== 404) a.err = "The horse was not added. Try again.";
+    if (res.status !== 401 && res.status !== 404) a.err = A.describeAddError(res.status, d);
     renderModal();
   }
 
@@ -665,8 +666,8 @@
       render();
       return true;
     }
-    if (res.data && res.data.field === "betPrice") toast("Your price should be a decimal price such as 4.20.");
-    else if (res.status !== 401 && res.status !== 404) toast("Not saved. Try again.");
+    if (res.status !== 401 && res.status !== 404) toast(A.describeEditError(res.status, res.data));
+    else if (res.status === 404 && res.data && res.data.code === "missing") toast(A.describeEditError(404, res.data));
     return false;
   }
   async function restore(id) {
@@ -676,7 +677,7 @@
       delete S.detail[id];
       S.book = null;
       load();
-    } else if (res.status !== 401) toast(res.data && res.data.code === "cap" ? "The Black Book is full." : "Not restored. Try again.");
+    } else if (res.status !== 401) toast(A.describeEditError(res.status, res.data, "restore"));
   }
   var toastTimer = null;
   function toast(text) {
@@ -781,7 +782,7 @@
       var rn = S.add.card.runners[+t.getAttribute("data-i")];
       var race = S.add.card.race || {};
       var jd = toDate(race.jump_at);
-      S.add.pick = { kind: "runner", name: rn.horseName, horse_id: rn.horseId,
+      S.add.pick = { kind: "runner", name: rn.horseName, horse_id: rn.horseId, silks: rn.silks || rn.silk_url_64x64,
         meta: [(race.meeting || "") + (race.race_no ? " R" + race.race_no : ""), jd ? fmtTime(jd) + " " + tzName(jd) : ""].filter(Boolean).join(" · ") };
       S.add.err = ""; renderModal(); return;
     }
@@ -803,6 +804,12 @@
     if (n) S.add.note = n.value;
     if (p) S.add.price = p.value;
   }
+  // A silk that fails to load (blocked, 404, offline) falls back to the monogram. Error events do not bubble, so capture.
+  document.addEventListener("error", function (ev) {
+    var im = ev.target;
+    if (!im || im.tagName !== "IMG" || !im.parentNode || !im.hasAttribute("data-ini")) return;
+    im.parentNode.textContent = im.getAttribute("data-ini");
+  }, true);
   document.addEventListener("click", onClick);
   document.addEventListener("submit", function (ev) {
     if (!ev.target || ev.target.id !== "bb-gate") return;

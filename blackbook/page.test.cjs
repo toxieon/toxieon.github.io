@@ -27,6 +27,7 @@ test("private page: noindex, own CSP limited to the TipBot host, robots Disallow
   const csp = /Content-Security-Policy" content="([^"]+)"/.exec(HTML)[1];
   assert.match(csp, /connect-src 'self' https:\/\/afl-tipster-bot\.onrender\.com;/);
   assert.match(csp, /script-src 'self';/);
+  assert.match(csp, /img-src 'self' data: https:\/\/cdn\.prod\.pricekinetics\.com;/);
   assert.doesNotMatch(csp, /unsafe-eval|script-src[^;]*unsafe-inline/);
   assert.match(fs.readFileSync(path.join(root, "robots.txt"), "utf8"), /^Disallow: \/blackbook\/$/m);
   assert.doesNotMatch(fs.readFileSync(path.join(root, "sitemap.xml"), "utf8"), /blackbook/i);
@@ -46,7 +47,7 @@ test("the only network call is api.js's fetch, to the TipBot host, Bearer only",
   assert.doesNotMatch(read("api.js"), /credentials:\s*["']include["']/);
   assert.match(read("api.js"), /credentials: "omit"/);
   const hosts = new Set([...ALL.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]));
-  for (const h of hosts) assert.ok(["afl-tipster-bot.onrender.com", "www.w3.org", "demo.invalid"].includes(h), "unexpected host " + h);
+  for (const h of hosts) assert.ok(["afl-tipster-bot.onrender.com", "www.w3.org", "demo.invalid", "cdn.prod.pricekinetics.com"].includes(h), "unexpected host " + h);
 });
 
 test("storage: only the owner token keys, in localStorage; no betting data is persisted or cached", () => {
@@ -113,4 +114,15 @@ test("no names, secrets or betting data in the folder", () => {
   assert.doesNotMatch(ALL, /\b1NMI5C|docs\.google\.com|drive\.google\.com/);
   const files = fs.readdirSync(dir).filter((f) => !f.startsWith("."));
   assert.deepEqual(files.filter((f) => /\.(json|csv|xlsx?|pdf|sqlite|db)$/i.test(f)), []);
+});
+
+test("pending entries get a tag; empty race cards and next starts say Not entered; silks fall back to the monogram", () => {
+  const app = read("app.js");
+  assert.ok((app.match(/Pending match/g) || []).length >= 2);
+  assert.match(app, /function hasNext\(nx\)/);
+  assert.match(app, /<h2>Not entered<\/h2>/);
+  assert.match(app, /r\.label \|\|/);
+  assert.match(app, /rn\.silks \|\| rn\.silk_url_64x64/);
+  assert.match(app, /document\.addEventListener\("error"[\s\S]*?, true\);/);
+  assert.doesNotMatch(read("index.html") + read("app.js"), /\bon(error|load|click)=/i);
 });
