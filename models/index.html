@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://afl-tipster-bot.onrender.com; frame-src 'none'; media-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#0e1116" />
+<title>TipBot Models</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-title" content="Models" />
+<script src="handoff.js?v=0.1.5"></script>
+<link rel="stylesheet" href="styles.css?v=0.1.5" />
+<script src="config.js?v=0.1.5"></script>
+<script src="api.js?v=0.1.5"></script>
+<script src="normalise.js?v=0.1.5"></script>
+<script src="calendar.js?v=0.1.5"></script>
+<script src="dates.js?v=0.1.5"></script>
+<script src="format.js?v=0.1.5"></script>
+<script src="demo.js?v=0.1.5"></script>
+<script src="../shared/nd-pwa.js" defer></script>
+<script src="app.js?v=0.1.5" defer></script>
+</head>
+<body>
+<div class="app">
+  <header class="sticky-nav top">
+    <div>
+      <p class="muted" style="margin:0">Neill Data · owner only</p>
+      <h1>TipBot model stats</h1>
+      <p id="demo-badge" class="hint" hidden>Demo data (?demo=1 on localhost)</p>
+    </div>
+    <div class="head-actions">
+      <a href="/hub/" class="btn btn-ghost hub-link">Back to Hub</a>
+      <button type="button" class="btn btn-ghost" id="btn-signout" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <section id="auth-gate" class="card gate" aria-labelledby="gate-title">
+    <h2 id="gate-title">Owner token</h2>
+    <p class="muted">Paste your tipdash session token (sign in to tipdash, it's saved there as tipbot_token). It expires if you sign out of tipdash. This page stores it on this device only — never in a URL.</p>
+    <form id="auth-form" autocomplete="off">
+      <label for="token-input" class="muted">Bearer token</label>
+      <input id="token-input" name="owner_token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <p id="gate-message" class="hint" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="btn-save-token">Save token</button>
+    </form>
+  </section>
+
+  <main id="app-main" hidden>
+    <div class="filters" role="group" aria-label="Date presets">
+      <button type="button" class="chip on" data-preset="all">All time</button>
+      <button type="button" class="chip" data-preset="7">7d</button>
+      <button type="button" class="chip" data-preset="30">30d</button>
+      <button type="button" class="chip" data-preset="90">90d</button>
+      <button type="button" class="chip" data-preset="365">365d</button>
+    </div>
+    <div class="range-row">
+      <input type="date" id="date-from" aria-label="From date" disabled title="All time uses from=all" />
+      <span class="muted" id="from-all-label">All time</span>
+      <span class="muted">to</span>
+      <input type="date" id="date-to" aria-label="To date" />
+      <button type="button" class="btn" id="btn-apply-range">Apply</button>
+    </div>
+    <label class="recon-toggle" id="recon-toggle-wrap" for="toggle-reconstructed" hidden>
+      <input type="checkbox" id="toggle-reconstructed" />
+      Show reconstructed 13 Oct to 5 Nov
+    </label>
+
+    <div id="status-banner" class="banner info status-banner" hidden>
+      <p id="status-banner-text"></p>
+      <button type="button" class="btn btn-ghost" id="btn-banner-change-token" hidden>Sign out / change token</button>
+    </div>
+    <p id="load-state" class="loading" hidden></p>
+
+    <section id="staked-section" class="card" aria-labelledby="staked-h">
+      <h2 id="staked-h">Staked only</h2>
+      <p class="muted" id="staked-range-label">Since 12 Nov 2026 (stake brackets start)</p>
+      <p class="hint">Judge after 2–3 weeks of data.</p>
+      <p id="staked-load" class="loading" hidden>Loading staked stats…</p>
+      <div id="staked-error" class="banner info" hidden><p id="staked-error-text"></p></div>
+      <div id="staked-panel-body" hidden>
+        <div class="model-pick" role="group" aria-label="Staked model">
+          <button type="button" class="tab on" data-staked-model="without_price">Without</button>
+          <button type="button" class="tab" data-staked-model="with_price">With</button>
+          <button type="button" class="tab" data-staked-model="agree">Agree</button>
+        </div>
+        <p id="staked-stats" class="stats-row"></p>
+        <p id="staked-empty" class="empty" hidden>Not enough staked data yet</p>
+        <svg id="staked-chart" class="chart-svg" role="img" aria-label="Staked running bankroll" height="160" hidden></svg>
+      </div>
+    </section>
+
+    <div id="dashboard" hidden>
+      <p id="generated-at" class="meta"></p>
+      <p id="data-meta" class="meta"></p>
+      <p id="range-label" class="meta"></p>
+
+      <section aria-labelledby="sum-h">
+        <h2 id="sum-h" class="muted" style="font-size:0.95rem;margin:12px 0 6px">Summary</h2>
+        <div id="summary-cards" class="summary-grid"></div>
+      </section>
+
+      <section class="card cal-panel" aria-labelledby="cal-h">
+        <div class="cal-head">
+          <button type="button" class="btn calnav" id="cal-prev" aria-label="Previous month">‹</button>
+          <h2 id="cal-h"><span id="cal-month-label">Month</span></h2>
+          <button type="button" class="btn calnav" id="cal-next" aria-label="Next month">›</button>
+        </div>
+        <div id="cal-grid" class="cal-grid" role="grid" aria-label="Daily model comparison"></div>
+        <p id="cal-recon-legend" class="hint" hidden>Hatched days are reconstructed (13 Oct to 5 Nov).</p>
+      </section>
+
+      <section class="chart-card" aria-labelledby="bank-h">
+        <div class="section-head">
+          <h2 id="bank-h">Running bankroll (cum. units)</h2>
+          <div class="seg" role="group" aria-label="Bankroll mode">
+            <button type="button" class="tab on" data-bank-mode="real">Real</button>
+            <button type="button" class="tab" data-bank-mode="flat">Flat 1u</button>
+          </div>
+        </div>
+        <svg id="bankroll-chart" class="chart-svg" role="img" aria-label="Bankroll chart" height="200"></svg>
+        <ul class="legend">
+          <li><span class="swatch" style="background:var(--m-with)"></span>With price</li>
+          <li><span class="swatch" style="background:var(--m-without)"></span>Without price</li>
+          <li><span class="swatch" style="background:var(--m-agree)"></span>Agree</li>
+          <li id="recon-chart-legend" hidden>
+            <span class="swatch recon-swatch"></span>
+            <span id="recon-chart-legend-text">Reconstructed estimate (fair price 1/market_p), 13 Oct to 5 Nov, not live results</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="break-h">
+        <h2 id="break-h">Breakdowns</h2>
+        <div class="model-pick" role="group" aria-label="Model">
+          <button type="button" class="tab on" data-break-model="with_price">With price</button>
+          <button type="button" class="tab" data-break-model="without_price">Without price</button>
+          <button type="button" class="tab" data-break-model="agree">Agree</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Breakdown type">
+          <button type="button" class="tab on" data-break-tab="price_band">Price band</button>
+          <button type="button" class="tab" data-break-tab="track">Track</button>
+          <button type="button" class="tab" data-break-tab="stake_bracket">Stake bracket</button>
+        </div>
+        <p id="breakdown-empty" class="empty" hidden>No rows in this breakdown.</p>
+        <div style="overflow-x:auto">
+          <table class="breakdown-table">
+            <thead id="breakdown-head">
+              <tr>
+                <th>Label</th><th>Bets</th><th>Wins</th><th>Strike %</th><th>P&L u</th><th>ROI %</th>
+              </tr>
+            </thead>
+            <tbody id="breakdown-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="weekday-h">
+        <h2 id="weekday-h">By weekday</h2>
+        <div class="model-pick" role="group" aria-label="Weekday model">
+          <button type="button" class="tab on" data-weekday-model="with_price">With price</button>
+          <button type="button" class="tab" data-weekday-model="without_price">Without price</button>
+          <button type="button" class="tab" data-weekday-model="agree">Agree</button>
+        </div>
+        <p id="weekday-empty" class="empty" hidden>No weekday breakdown in this range.</p>
+        <div style="overflow-x:auto">
+          <table class="breakdown-table weekday-table">
+            <thead id="weekday-head">
+              <tr>
+                <th>Day</th><th>Picks</th><th>Bets</th><th>Wins</th><th>P&L u</th><th>ROI %</th>
+              </tr>
+            </thead>
+            <tbody id="weekday-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="recent-h">
+        <h2 id="recent-h">Recent form (last 30)</h2>
+        <label for="recent-model" class="muted">Model</label>
+        <select id="recent-model" class="btn" style="width:100%;margin-bottom:8px">
+          <option value="with_price">With price</option>
+          <option value="without_price">Without price</option>
+          <option value="agree">Agree</option>
+        </select>
+        <div id="recent-strip" class="strip" aria-label="Win loss strip"></div>
+        <p id="recent-empty" class="empty" hidden>No recent picks in range.</p>
+        <div style="overflow-x:auto">
+          <table class="recent-table">
+            <thead id="recent-head">
+              <tr>
+                <th>Date</th><th>Track</th><th>R</th><th>Horse</th><th>Price</th><th>Stake</th><th>Result</th><th>P&L</th>
+              </tr>
+            </thead>
+            <tbody id="recent-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h2h-h">
+        <h2 id="h2h-h">Head to head</h2>
+        <p id="disagree-summary" class="meta"></p>
+        <div style="overflow-x:auto">
+          <table class="breakdown-table">
+            <thead>
+              <tr><th>Date</th><th>With price P&L</th><th>Without P&L</th><th>Agree P&L</th></tr>
+            </thead>
+            <tbody id="h2h-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <p id="ver" class="muted foot"></p>
+  </main>
+
+  <div id="day-sheet" class="day-sheet" hidden>
+    <button type="button" class="day-sheet-backdrop" id="day-sheet-backdrop" aria-label="Close"></button>
+    <div class="sheet-card">
+      <div class="sheet-head">
+        <h2 id="day-sheet-title">Day</h2>
+        <button type="button" class="btn btn-ghost" id="day-sheet-close">Close</button>
+      </div>
+      <div id="day-sheet-body" class="sheet-body"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

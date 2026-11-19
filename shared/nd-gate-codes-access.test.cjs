@@ -26,12 +26,16 @@ test('private app is kept out of hub discovery, the visual catalogue and public 
   const { discover } = require('../hub/build-apps.cjs');
   const apps = discover(root);
   const cat = fs.readFileSync(path.join(root, '1234567890/visual-catalog.json'), 'utf8');
-  const pub = ['hub/apps.json', 'hub/discover.json', 'robots.txt', 'sitemap.xml', 'hub/app.js', 'hub/index.html', 'assets/suite-icons.js', 'scripts/render-app-icons.cjs']
-    .map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const pubFiles = ['hub/apps.json', 'hub/discover.json', 'robots.txt', 'sitemap.xml', 'hub/index.html', 'assets/suite-icons.js', 'scripts/render-app-icons.cjs'];
+  const hubJs = fs.readFileSync(path.join(root, 'hub/app.js'), 'utf8');
+  const hubSansOwnerInject = hubJs.replace(/async function injectOwner[\s\S]*?^}/gm, '');
   for (const d of dirs) {
     assert.ok(!apps.some((a) => a.path === '/' + d.name + '/'), 'not discovered');
     assert.ok(!cat.includes(d.name), 'not in visual catalogue');
-    assert.ok(!pub.includes(d.name), 'slug not in public listing files');
+    const pub = pubFiles.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+    const pubScan = pub.replace(new RegExp('Disallow:\\s*/' + d.name + '/?\\s*\\n?', 'gi'), '');
+    assert.ok(!pubScan.includes(d.name), 'slug not in public listing files');
+    assert.ok(!hubSansOwnerInject.includes(d.name), 'slug not in hub shell outside owner inject helpers');
     const html = fs.readFileSync(path.join(root, d.name, 'index.html'), 'utf8');
     assert.doesNotMatch(html, /name="nd:/i, 'no nd:* meta (nd:color etc.)');
     assert.match(html, /noindex/);

@@ -1,3 +1,4 @@
+## 0.8.2 · 2026-11-18 · tipbot-models · Owner-only hub tile for private TipBot model stats at /models/ (same signed-in owner gate as Gate Codes; not in apps.json or discovery). Service worker hub-v17.
 ## 0.8.1 · 2026-11-16 · chess-lab · Chess Lab tile for the external app at /chess-lab/ (pinned in discover.json extra, so auto-discover keeps it). Icon is a local knight tile at hub/icons/chess-lab.svg. /chess/ redirects to /chess-lab/. Service worker hub-v16.
 ## 0.7.6 · 2026-10-27 · csp · Content-Security-Policy <meta> added to the page (script-src limited to this site plus the Google hosts it loads; inline scripts allowed by hash; object-src none, base-uri and form-action self). Service worker hub-v15.
 ## 0.7.5 · 2026-10-13 · sw-precache · Service worker hub-v14 precaches shared nd-backend.js, nd-config.js, nd-auth.js and nd-gate-codes.js?v=0.1.2 so the hub's sign-in scripts load offline.
