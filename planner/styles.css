@@ -3724,3 +3724,14 @@ body.is-photo-drag { touch-action: none; }
   .js-counts { grid-column: 1; }
   .js-thermo { grid-column: 2 / span 2; }
 }
+
+/* Move mode (0.25.1): nodes are locked unless this is on */
+.move-toggle.is-active { background: linear-gradient(135deg, var(--blue), var(--cyan)); border-color: rgba(37, 99, 235, 0.72); color: #fff; font-weight: 900; }
+.node-layer.is-moving .node-marker { cursor: grab; }
+
+/* Drive sync badge (0.25.1) */
+.drive-sync-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.drive-sync-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); }
+.drive-sync-badge.is-ok { color: #3dbe6e; border-color: #3dbe6e; }
+.drive-sync-badge.is-warn { color: #e07b2a; border-color: #e07b2a; }
+.drive-sync-row .ghost-button { min-height: 34px; padding: 0 10px; font-size: 12px; }

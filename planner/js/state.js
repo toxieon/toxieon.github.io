@@ -12,7 +12,7 @@
  * ========================================================================= */
 
 const STORAGE_KEY = "neillplanner-state-v4";
-const APP_VERSION = "0.24.1";
+const APP_VERSION = "0.25.1";
 const SWB_APP_URL = "https://neilldata.com/swb";
 
 /* Lean Drive PDF export caps (v0.9.2) — keep browser Print for full fidelity. */
@@ -150,6 +150,7 @@ function freshState() {
     selectedNodeId: null,
     drawerOpen: false, modal: null, lightbox: null, toast: "", photoPlace: null,
     selectedFolderId: "all",
+    moveMode: false,   // 0.25.1: nodes are locked until Move is switched on; never persisted
     filters: { query: "", status: "All", category: "All", assignee: "All" },
     canvas: { zoom: 1, panX: 0, panY: 0 },
     projectFolders: [], projects: [], rooms: [], nodes: [], floorPlans: {}, bulkPhotos: [],
@@ -172,6 +173,7 @@ function freshState() {
 let state = loadState();
 let dragState = null;
 let nodeDragState = null;
+let lastCanvasPanAt = 0;
 let canvasPointers = new Map();
 let pinchState = null;
 let lastPinchEndedAt = 0;
@@ -182,7 +184,7 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(localStorage.getItem("neillplanner-state-v3"));
     if (saved && typeof saved === "object") {
       const fresh = freshState();
-      const merged = { ...fresh, ...saved, modal: null, lightbox: null, toast: "", photoPlace: null, massMode: fresh.massMode, bulkSelection: [], roomDraw: fresh.roomDraw };
+      const merged = { ...fresh, ...saved, moveMode: false, modal: null, lightbox: null, toast: "", photoPlace: null, massMode: fresh.massMode, bulkSelection: [], roomDraw: fresh.roomDraw };
       merged.googleAuth = { ...fresh.googleAuth, bootstrapped: saved.googleAuth?.bootstrapped || false, profile: saved.googleAuth?.profile || null };
       merged.drive = { ...fresh.drive, ...(saved.drive || {}) };
       merged.auditView = { ...fresh.auditView, filters: { ...fresh.auditView.filters, ...(saved.auditView?.filters || {}) } };
@@ -243,7 +245,7 @@ function migrateState(s) {
 
 function persist(opts = {}) {
   const saveable = {
-    ...state, modal: null, lightbox: null, toast: "", photoPlace: null, planUpload: null, titlePlacing: false,
+    ...state, moveMode: false, modal: null, lightbox: null, toast: "", photoPlace: null, planUpload: null, titlePlacing: false,
     massMode: { active: false, category: null, lineItem: null, status: "Not Started", count: 0 },
     roomDraw: { mode: null, points: [], roomId: null },
     bulkSelection: [],
@@ -254,6 +256,7 @@ function persist(opts = {}) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(saveable)); }
   catch (e) { console.warn("Persist failed", e); }
   if (!opts.skipSync) scheduleMasterSync();
+  if (!opts.skipDriveSync && typeof scheduleDriveSave === "function") scheduleDriveSave();
 }
 
 /* ── §2.3 floor-plan store: IndexedDB via nd-cache ──────────────────────

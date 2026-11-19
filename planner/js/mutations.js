@@ -39,6 +39,7 @@ async function publishPlanLinks(floorId) {
 }
 
 async function linkLocalPlanOriginal(proj, fl) {
+  if (fl && fl.planFromJobFolder) return null;   // 0.25.1: the plan is an original in the job's Floor Plans folder; never upload over it
   if (!fl || !proj || _masterReloading || _planLinking[fl.id] || (fl.planDriveFileId && !fl.planPendingUpload)) return null;
   if (!isTokenValid()) { _planLinkStatus[fl.id] = "waiting for sign-in"; refreshPlanDebug(); return null; }
   _planLinking[fl.id] = true;

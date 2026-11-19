@@ -1,6 +1,9 @@
 /* ============================================================ RENDER */
 
+let _moveProjectId = null;
 function render() {
+  if (state.selectedProjectId !== _moveProjectId) { _moveProjectId = state.selectedProjectId; state.moveMode = false; }   // Move turns off when the project changes
+  if (typeof driveSyncMaybeOpen === "function") setTimeout(driveSyncMaybeOpen, 0);
   document.body.classList.toggle("report-fullscreen", !!(state.modal?.mode === "print-preview" && state.modal.fullscreen));
   const app = document.getElementById("app"); if (!app) return;
   if (_masterReloading) { app.innerHTML = renderLoadingOverlay("Reloading master records and floor-plan files from Drive…"); return; }
@@ -252,9 +255,11 @@ function renderMapView() {
           ${state.selectedRoomId !== "all" ? `<button class="room-chip" data-action="rename-room">${icon("edit")}Rename</button>${hasPlan ? `<button class="room-chip" data-action="edit-room-shape" title="Edit room shape on plan">${icon("layers")}Edit shape</button>` : ""}<button class="room-chip room-chip--danger" data-action="delete-room">${icon("trash")}Delete</button>` : ""}
         </div>` : ""}
         <div class="map-toolbar">
+          ${typeof renderDriveSyncBadge === "function" ? renderDriveSyncBadge() : ""}
           <div class="search-wrap">${icon("search")}<input data-filter="query" value="${escapeHtml(state.filters.query)}" placeholder="Search nodes, tags, users" aria-label="Search" /></div>
           <div class="filter-row">${renderSelect("status", ["All", ...Object.keys(statusMeta)], state.filters.status)}${renderSelect("category", cats, state.filters.category)}${renderSelect("assignee", ["All", ...teamNames()], state.filters.assignee)}</div>
           <div class="button-row">
+            <button class="ghost-button move-toggle ${state.moveMode ? "is-active" : ""}" data-action="toggle-move" aria-pressed="${state.moveMode ? "true" : "false"}" ${!hasPlan ? "disabled" : ""} title="${state.moveMode ? "Nodes can be dragged. Tap to lock them." : "Nodes are locked. Tap to move them."}">${icon(state.moveMode ? "unlock" : "lock")}<span>${state.moveMode ? "Moving: tap to lock" : "Move"}</span></button>
             <button class="ghost-button" data-action="upload-plan">${icon("upload")}<span>Plan</span></button>
             <button class="primary-button" data-action="create-node" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("plus")}<span>Node</span></button>
             <button class="ghost-button" data-action="mass-start" ${!hasPlan || !catsLoaded ? "disabled" : ""}>${icon("mass")}<span>Mass</span></button>
@@ -268,7 +273,7 @@ function renderMapView() {
           <div class="canvas-viewport ${state.massMode.active || state.roomDraw?.mode || state.titlePlacing || state.photoPlace ? "is-placing" : ""} ${osdFloorReady(floor) ? "is-osd" : ""}" id="canvasViewport">
             <div class="plan-stage ${osdFloorReady(floor) ? "is-osd" : ""}" id="planStage" style="--plan-ar:${planAspect}">
               ${hasPlan ? `<img class="floor-plan" src="${escapeHtml(state.floorPlans[floor.id] || "")}" alt="Floor plan" draggable="false" style="opacity:${floor.planOpacity ?? 1};filter:brightness(${floor.planBrightness ?? 1})" />${floor.planGrid ? '<div class="plan-grid"></div>' : ""}${proj.showRooms ? renderRoomOverlays(rooms) : ""}${state.modal?.mode === "auto-rooms" && state.modal.candidates?.length ? renderAutoRoomPreview(state.modal.candidates) : ""}${state.roomDraw?.mode ? renderRoomDrawPreview() + renderRoomVertexHandles() : ""}` : renderEmptyPlanArea()}
-              <div class="node-layer">${nodes.map(renderMarker).join("")}</div>
+              <div class="node-layer${state.moveMode ? " is-moving" : ""}">${nodes.map(renderMarker).join("")}</div>
             </div>
           </div>
           <div class="canvas-tools" aria-label="Canvas tools"><button class="icon-button ${state.ui.planLocked ? "is-active" : ""}" data-action="toggle-plan-lock" title="${state.ui.planLocked ? "Plan locked — tap to allow panning" : "Lock plan (stops panning so you can place/move nodes)"}">${icon(state.ui.planLocked ? "lock" : "unlock")}</button><button class="icon-button" data-action="zoom-in" title="Zoom in">${icon("zoomIn")}</button><button class="icon-button" data-action="zoom-out" title="Zoom out">${icon("zoomOut")}</button><button class="icon-button" data-action="reset-view" title="Recenter">${icon("target")}</button></div>
