@@ -251,7 +251,7 @@
   }
 
   /* Job-level folders that hold files, not levels. Matching is tolerant of case, spacing and dashes. */
-  const RESERVED_FOLDERS = { "excel files": "excel", "excel": "excel", "floor plans": "plans", "floorplans": "plans", "plans": "plans", "watermarked": "watermarked" };
+  const RESERVED_FOLDERS = { "excel files": "excel", "excel": "excel", "floor plans": "plans", "floorplans": "plans", "plans": "plans", "watermarked": "watermarked", "planner data": "data" };
   function reservedFolderKind(name) {
     return RESERVED_FOLDERS[norm(name)] || "";
   }
