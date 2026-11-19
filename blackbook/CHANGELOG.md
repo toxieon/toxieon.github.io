@@ -1,0 +1,3 @@
+# Black Book changelog
+
+## 0.1.0 · 2026-11-19 · initial · Owner-only Black Book at /blackbook/, ported from the tipdash build onto the Neill Data site in Apex Midnight. Reads TipBot's /api/owner/blackbook* live with a Bearer token (nd_owner_token, nd_models_owner_token as fallback; tipdash #t= handoff stripped at load). Screens: list, upcoming runs, archived with restore, horse page with edit/remove, add by search or race card. Signed out shows only the token gate; 404 shows "Not the owner". Demo with fake data on localhost ?demo=1 only. noindex, robots.txt Disallow, no sitemap entry, CSP limited to the TipBot host. Dropped from tipdash: Discord sign-in redirect, rail/tabs, silks images, Geist/Instrument Sans font files (system fonts).
