@@ -353,6 +353,8 @@ function handleAction(event) {
     case "sync-photo-structure": return syncPhotoStructure();
     case "push-photo-folders": return pushPhotoFolders();
     case "photo-list": return openPhotoList();
+    case "job-status": return openJobStatus();
+    case "job-status-refresh": return loadJobStatus();
     case "cancel-photo-place": state.photoPlace = null; return render();
     case "open-batch-folder": {
       // Open the raw Batch folder in Drive (all uploads). The batch-nodes panel

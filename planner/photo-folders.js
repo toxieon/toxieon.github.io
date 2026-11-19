@@ -231,6 +231,46 @@
     return "unsorted";
   }
 
+  /* Backup only: a stage word in the file name ("rough in", "Fit-off", "fitoff") for a photo that is
+   * not inside a stage subfolder. Both words in one name means no hint. */
+  function stageFromFilename(name) {
+    const text = String(name || "").toLowerCase().replace(/\.[a-z0-9]{2,5}$/, "");
+    const rough = /(^|[^a-z])rough[\s_-]*in([^a-z]|$)/.test(text);
+    const fit = /(^|[^a-z])fit[\s_-]*off([^a-z]|$)/.test(text);
+    if (rough && !fit) return "rough-in";
+    if (fit && !rough) return "fit-off";
+    return "";
+  }
+
+  /* The stage folder a photo sits in wins. The file-name hint is used only without one. */
+  function stageForPhoto(info) {
+    const src = info || {};
+    const folder = stageFromName(src.folderName || "");
+    if (folder === "rough-in" || folder === "fit-off") return folder;
+    return stageFromFilename(src.fileName) || "unsorted";
+  }
+
+  /* Job-level folders that hold files, not levels. Matching is tolerant of case, spacing and dashes. */
+  const RESERVED_FOLDERS = { "excel files": "excel", "excel": "excel", "floor plans": "plans", "floorplans": "plans", "plans": "plans", "watermarked": "watermarked" };
+  function reservedFolderKind(name) {
+    return RESERVED_FOLDERS[norm(name)] || "";
+  }
+
+  /* Special items directly inside a job folder: Excel Files and Floor Plans folders, the Plans status sheet. */
+  function jobSpecials(rootFiles) {
+    const out = { excelFolderId: "", plansFolderId: "", plansStatusFileId: "" };
+    (rootFiles || []).forEach((file) => {
+      if (isFolder(file)) {
+        const kind = reservedFolderKind(file.name);
+        if (kind === "excel" && !out.excelFolderId) out.excelFolderId = file.id;
+        if (kind === "plans" && !out.plansFolderId) out.plansFolderId = file.id;
+      } else if (!out.plansStatusFileId && /^application\/vnd\.google-apps\.spreadsheet$/.test(file.mimeType || "") && norm(file.name) === "plans status") {
+        out.plansStatusFileId = file.id;
+      }
+    });
+    return out;
+  }
+
   function matchStageFolder(files, key) {
     const wanted = normalizeStage(key);
     if (!wanted || wanted === "unsorted") return null;
@@ -255,9 +295,14 @@
       if (isFolder(child)) {
         const stage = stageFromName(child.name);
         const inner = (kids[child.id] || []).filter(isPhotoFile);
-        const key = stage === "rough-in" || stage === "fit-off" ? stage : "unsorted";
-        inner.forEach((file) => buckets[key].push(taggedPhoto(file, key)));
-      } else if (isPhotoFile(child)) buckets.unsorted.push(taggedPhoto(child, "unsorted"));
+        inner.forEach((file) => {
+          const key = stageForPhoto({ folderName: child.name, fileName: file.name });
+          buckets[key].push(taggedPhoto(file, key));
+        });
+      } else if (isPhotoFile(child)) {
+        const key = stageForPhoto({ fileName: child.name });
+        buckets[key].push(taggedPhoto(child, key));
+      }
     });
     const stages = ["rough-in", "fit-off", "unsorted"].map((key) => ({
       key: key,
@@ -279,6 +324,7 @@
     const loose = [];
     (rootFiles || []).forEach((file) => {
       if (isFolder(file)) {
+        if (reservedFolderKind(file.name)) return;
         const level = levelFromName(file.name);
         const nested = kids[file.id] || [];
         const apartments = [];
@@ -429,6 +475,10 @@
     matchApartmentFolder: matchApartmentFolder,
     STAGE_FOLDERS: STAGE_FOLDERS,
     stageFromName: stageFromName,
+    stageFromFilename: stageFromFilename,
+    stageForPhoto: stageForPhoto,
+    reservedFolderKind: reservedFolderKind,
+    jobSpecials: jobSpecials,
     normalizeStage: normalizeStage,
     stageMeta: stageMeta,
     effectiveStage: effectiveStage,
