@@ -227,7 +227,7 @@ function renderPhotoTray(proj) {
   if (!proj) return "";
   const linked = proj.photoFolderId || "";
   if (!linked) {
-    return `<section class="photo-tray"><h3 class="section-title">Drive photos</h3><p class="summary-hint">Link the Drive folder technicians upload into. Level folders map onto floors (Level G is the ground floor) and the folders inside them are apartments. Photos stay in Drive.</p><form id="photoLinkForm" class="photo-link-form"><input name="photoFolder" aria-label="Photo folder link" placeholder="Paste a Drive folder link" autocomplete="off" /><button class="primary-button" type="submit">${icon("link")}Link</button></form></section>`;
+    return `<section class="photo-tray"><h3 class="section-title">Drive photos</h3><p class="summary-hint">Link the Drive folder technicians upload into. Level folders map onto floors (Level G is the ground floor) and the folders inside them are apartments. Photos stay in Drive.</p><form id="photoLinkForm" class="photo-link-form"><input name="photoFolder" aria-label="Photo folder link" placeholder="Paste a Drive folder link" autocomplete="off" /><button class="primary-button" type="submit">${icon("link")}Link</button></form><p class="summary-hint">Or paste the folder that holds all your jobs, and projects link to the job folder with the same name.</p><form id="jobsRootForm" class="photo-link-form"><input name="jobsRoot" aria-label="Jobs folder link" placeholder="Paste the jobs folder link" autocomplete="off" /><button class="ghost-button" type="submit">${icon("folder")}Use</button></form></section>`;
   }
   const lib = photoLibrary && photoLibrary.folderId === linked ? photoLibrary : null;
   const placed = placedPhotoIds();
@@ -590,6 +590,8 @@ function bindPhotoTray() {
     event.preventDefault();
     linkProjectPhotoFolder(new FormData(link).get("photoFolder"));
   });
+  const root = document.getElementById("jobsRootForm");
+  if (root) root.addEventListener("submit", (event) => { event.preventDefault(); linkJobsRoot(new FormData(root).get("jobsRoot")); });
   const list = document.getElementById("photoListForm");
   if (list) {
     const file = list.querySelector('input[type="file"]');

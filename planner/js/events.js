@@ -46,6 +46,7 @@ function bindEvents() {
   bindFloorReorder();
   document.querySelectorAll("[data-node]").forEach((b) => b.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (b.classList.contains("node-marker") && Date.now() - lastCanvasPanAt < 350) return;   // the click that ends a pan
     if (e.shiftKey) return toggleBulkSelect(b.dataset.node);
     const node = state.nodes.find((n) => n.id === b.dataset.node);
     // Portal = floor-layer jump affordance: one tap walks through when linked.
@@ -345,6 +346,9 @@ function handleAction(event) {
       persist();
       return render();
     }
+    case "drive-migrate": return driveSyncMigrate();
+    case "drive-retry": driveSync.status = "idle"; driveSync.projectId = ""; return render();
+    case "toggle-move": state.moveMode = !state.moveMode; toast(state.moveMode ? "Move on: drag nodes. Tap Move to lock." : "Nodes locked"); return render();
     case "toggle-plan-lock": state.ui.planLocked = !state.ui.planLocked; persist(); return render();
     case "toggle-completed": state.ui.showCompleted = !state.ui.showCompleted; persist(); return render();
     case "refresh-batch": toast("Refreshing batch nodes…"); refreshInbox({ silent: false }).then(() => toast("Batch nodes refreshed")).catch(() => {}); return;
@@ -486,7 +490,7 @@ function bindCanvasEvents() {
     bindCanvasEvents._wheelPersistT = setTimeout(() => persist(), 180);
   }, { passive: false });
   viewport.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".node-marker")) return;
+    if (e.target.closest(".node-marker") && state.moveMode) return;   // locked: a drag that starts on a marker still pans
     if (e.target.closest(".empty-plan") && !state.photoPlace) return;
     if (e.target.closest("button")) return;
     // Do not capture touch pointers — setPointerCapture on the first finger
@@ -562,6 +566,7 @@ function bindCanvasEvents() {
     try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
     viewport.classList.remove("is-dragging", "is-gesturing");
     const wasMoved = dragState.moved;
+    if (wasMoved) lastCanvasPanAt = Date.now();
     dragState = null;
     persist();
     if (!wasMoved && Date.now() - lastPinchEndedAt > 450 && !e.target.closest(".node-marker") && !e.target.closest("button") && (state.photoPlace || !e.target.closest(".empty-plan"))) {
@@ -615,6 +620,7 @@ function bindMarkerDrag() {
   document.querySelectorAll(".node-marker").forEach((el) => {
     el.addEventListener("pointerdown", (e) => {
       if (e.shiftKey) return; // shift = multi-select, not drag
+      if (!state.moveMode) return;   // nodes are locked unless Move is on; the canvas pans/zooms instead
       const nodeId = el.dataset.node;
       const node = state.nodes.find((n) => n.id === nodeId); if (!node) return;
       e.stopPropagation();

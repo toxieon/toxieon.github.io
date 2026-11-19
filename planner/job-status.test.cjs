@@ -56,6 +56,7 @@ test("job specials and reserved folder names", () => {
   assert.deepEqual(PF.jobSpecials([folder("a", "Level 1")]), { excelFolderId: "", plansFolderId: "", plansStatusFileId: "" });
   assert.equal(PF.reservedFolderKind("excel-files"), "excel");
   assert.equal(PF.reservedFolderKind("FLOOR PLANS"), "plans");
+  assert.equal(PF.reservedFolderKind("Planner data"), "data");
   assert.equal(PF.reservedFolderKind("Level 1"), "");
 });
 
