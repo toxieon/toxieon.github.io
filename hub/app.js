@@ -1,4 +1,4 @@
-/* Hub v0.8.1 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.9.1 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -22,6 +22,7 @@ async function loadHub() {
     const payload = await r.json();
     apps = (payload.apps || []).filter((a) => !a.hidden).sort((a, b) => (a.order || 99) - (b.order || 99));
     await injectOwnerGateCodesTile();
+    await injectOwnerBlackBookTile();
     statusEl.textContent = "Neill Data suite";
   } catch (e) {
     statusEl.textContent = "Could not load apps.json";
@@ -122,6 +123,31 @@ async function injectOwnerGateCodesTile() {
     apps.push(Object.assign({ hidden: false }, link.app));
     apps.sort((a, b) => (a.order || 99) - (b.order || 99));
   } catch (e) { /* path only from backend */ }
+}
+
+/** Private TipBot Black Book: same owner gate as Gate Codes; the path is not in apps.json (the folder has .nd-private). */
+async function injectOwnerBlackBookTile() {
+  if (!window.NDAuth) return;
+  if (!(NDAuth.hasPriorSession && NDAuth.hasPriorSession())) return;
+  try {
+    const cfg = window.NDConfig && NDConfig.forApp("timesheet");
+    if (cfg) NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
+    if (!NDAuth.isSignedIn()) await NDAuth.ensureToken().catch(() => {});
+    const profile = NDAuth.getProfile();
+    if (!profile || String(profile.email).toLowerCase() !== "brandon.j.neill@gmail.com") return;
+    if (apps.some((a) => a.id === "black-book")) return;
+    apps.push({
+      id: "black-book",
+      name: "Black Book",
+      path: "/blackbook/",
+      icon: "/blackbook/favicon.svg",
+      color: "#5b8cff",
+      order: 16,
+      hidden: false,
+      description: "Owner-only horse watchlist with upcoming runs (live TipBot data).",
+    });
+    apps.sort((a, b) => (a.order || 99) - (b.order || 99));
+  } catch (e) { /* owner-only */ }
 }
 
 loadHub();
