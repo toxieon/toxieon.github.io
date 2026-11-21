@@ -16,12 +16,23 @@ test("a valid #t= token is stored under nd_owner_token and the fragment is strip
   assert.deepEqual(r, { stored: true, stripped: true });
   assert.equal(storage.data.nd_owner_token, TOKEN);
   assert.deepEqual(hist.calls, ["/blackbook/?demo=1"]);
+  assert.equal(H.getAuthError(), "");
+});
+
+test("a valid #token= fragment from TipBot OAuth is stored the same way", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#token=" + encodeURIComponent(TOKEN), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: true, stripped: true });
+  assert.equal(storage.data.nd_owner_token, TOKEN);
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
 });
 
 test("the token is decoded exactly once: + stays +, %2B becomes +, %25 becomes %", () => {
   assert.equal(H.readHashToken("#t=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10))).token, "ab+cd/ef=gh%ij" + "k".repeat(10));
   assert.equal(H.readHashToken("#t=a+b").token, "a+b");
   assert.equal(H.readHashToken("#t=a%2Bb").token, "a+b");
+  assert.equal(H.readHashToken("#token=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10))).token, "ab+cd/ef=gh%ij" + "k".repeat(10));
+  assert.equal(H.readHashToken("#token=a+b").token, "a+b");
 });
 
 test("a short or whitespace token is not stored but the fragment is still stripped", () => {
@@ -32,6 +43,10 @@ test("a short or whitespace token is not stored but the fragment is still stripp
     assert.deepEqual(storage.data, {});
     assert.deepEqual(hist.calls, ["/blackbook/"]);
   }
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#token=short", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
 });
 
 test("a bad percent escape stores nothing", () => {
@@ -51,4 +66,76 @@ test("other fragments (deep links) are left alone", () => {
 
 test("t= is found after another fragment parameter", () => {
   assert.equal(H.readHashToken("#x=1&t=" + TOKEN).token, TOKEN);
+});
+
+test("#token= is not misread as #t=, and #t= wins when both are present", () => {
+  assert.equal(H.readHashToken("#token=" + TOKEN).token, TOKEN);
+  assert.equal(H.readHashToken("#token=" + TOKEN).hadT, true);
+  const tFirst = "b".repeat(32);
+  assert.equal(H.readHashToken("#t=" + tFirst + "&token=" + TOKEN).token, tFirst);
+  assert.equal(H.readHashToken("#token=" + TOKEN + "&t=" + tFirst).token, tFirst);
+});
+
+test("an OAuth #error= fragment is stripped, stores nothing, and is exposed as getAuthError", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#error=login_failed", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.getAuthError(), "login_failed");
+  // a later call with no auth hash clears it
+  H.consumeTokenFragment({ hash: "", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.equal(H.getAuthError(), "");
+});
+
+const CODE = "c".repeat(24);
+
+test("#code= is not a session token: it is taken once, the hash is stripped, nothing is stored", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#code=" + encodeURIComponent(CODE), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.readHashToken("#code=" + CODE).hadT, false);
+  assert.equal(H.takePendingCode(), CODE);
+  assert.equal(H.takePendingCode(), "");
+});
+
+test("#code= is decoded exactly once, same as tokens", () => {
+  const { storage, hist } = mock();
+  H.consumeTokenFragment({ hash: "#code=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10)), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.equal(H.takePendingCode(), "ab+cd/ef=gh%ij" + "k".repeat(10));
+});
+
+test("#t= and #token= are stored as session tokens and are not taken as an exchange code", () => {
+  for (const hash of ["#t=" + encodeURIComponent(TOKEN), "#token=" + encodeURIComponent(TOKEN), "#t=" + encodeURIComponent(TOKEN) + "&code=" + CODE]) {
+    const { storage, hist } = mock();
+    const r = H.consumeTokenFragment({ hash, pathname: "/blackbook/", search: "" }, storage, hist);
+    assert.equal(r.stored, true);
+    assert.equal(r.stripped, true);
+    assert.equal(storage.data.nd_owner_token, TOKEN);
+    assert.equal(H.takePendingCode(), "");
+  }
+});
+
+test("#signup= is stripped, stores nothing, and is not treated as a token or exchange code", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#signup=" + "s".repeat(24), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.takePendingCode(), "");
+  assert.equal(H.getAuthError(), "");
+  assert.equal(H.readHashToken("#signup=" + "s".repeat(24)).hadT, false);
+});
+
+test("a whitespace or empty #code= is stripped, stores nothing, and is reported as a failed sign-in", () => {
+  for (const hash of ["#code=", "#code=bad code with spaces", "#code=%E0%A4%A"]) {
+    const { storage, hist } = mock();
+    const r = H.consumeTokenFragment({ hash, pathname: "/blackbook/", search: "" }, storage, hist);
+    assert.deepEqual(r, { stored: false, stripped: true });
+    assert.deepEqual(storage.data, {});
+    assert.equal(H.takePendingCode(), "");
+    assert.equal(H.getAuthError(), "login_failed");
+  }
 });

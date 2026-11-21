@@ -10,7 +10,7 @@
  */
 (function (root) {
   "use strict";
-  var APP_VERSION = "0.1.2";
+  var APP_VERSION = "0.2.1";
   var F = root.BBFormat, D = root.BBDates, A = root.BBApi, DEMO = root.BBDemo;
   var esc = F.esc, fmtPrice = F.fmtPrice, ordinal = F.ordinal, initials = F.initials, resultText = F.resultText, resultClass = F.resultClass;
   var isComingSoon = F.isComingSoon, prioOf = F.prioOf, priceInput = F.priceInput, highlight = F.highlight;
@@ -66,7 +66,7 @@
 
   async function call(method, path, body) {
     var res = demoBackend ? demoBackend.request(method, path, body) : await A.request(method, path, body, { token: token() });
-    if (res.auth === "signin") { A.clearToken(root.localStorage); S.auth = "signin"; S.gateMsg = "Your session has expired. Open Black Book from tipdash again, or paste a new token."; render(); }
+    if (res.auth === "signin") { A.clearToken(root.localStorage); S.auth = "signin"; S.gateMsg = "Your session has expired. Sign in with Discord again."; render(); }
     else if (res.auth === "denied") { S.auth = "denied"; render(); }
     return { status: res.status, data: res.data };
   }
@@ -172,9 +172,11 @@
   }
   function bare(body) { return '<main class="bb-main"><div class="bb-wrap" style="max-width:560px;padding-top:12vh">' + body + '<p style="margin-top:18px"><a class="btn hub-link" href="/hub/">Back to Hub</a></p></div></main>'; }
   function gateHtml() {
-    return '<div class="msg"><h2>Owner token</h2><p>Open Black Book from tipdash, or paste your tipdash session token (saved there as tipbot_token). It is kept on this device only and never put in a URL.</p>' +
-      '<form id="bb-gate" autocomplete="off"><label class="bb-cap" for="bb-token">Bearer token</label><input id="bb-token" name="owner_token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" style="display:block;width:100%;margin:8px 0;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);background:var(--card)">' +
-      '<p class="muted small" role="alert" id="bb-gate-msg">' + esc(S.gateMsg) + '</p><button type="submit" class="btn primary">Save token</button></form></div>';
+    var href = esc(A.loginUrl(location.origin));
+    var msg = S.gateMsg ? '<p class="muted small" role="alert" id="bb-gate-msg">' + esc(S.gateMsg) + "</p>" : "";
+    return '<div class="msg"><h2>Black Book</h2><p>Sign in with Discord to open your Black Book. This page is for the owner only.</p>' +
+      msg +
+      '<p><a class="btn primary" id="bb-discord" href="' + href + '">Sign in with Discord</a></p></div>';
   }
 
   // ── shared pieces ─────────────────────────────────────────────────
@@ -697,7 +699,7 @@
       return;
     }
     if (S.auth === "denied") {
-      app.innerHTML = bare('<div class="msg"><h2>Not the owner</h2><p>This page is not available on your account. Black Book is for the owner only.</p><button type="button" class="btn" data-act="signout">Sign out / change token</button></div>');
+      app.innerHTML = bare('<div class="msg"><h2>Not the owner</h2><p>This page is not available on your account. Black Book is for the owner only.</p><button type="button" class="btn" data-act="signout">Sign out</button></div>');
       return;
     }
     if (S.auth === "checking") { app.innerHTML = bare('<div class="sk"></div>'); return; }
@@ -811,15 +813,6 @@
     im.parentNode.textContent = im.getAttribute("data-ini");
   }, true);
   document.addEventListener("click", onClick);
-  document.addEventListener("submit", function (ev) {
-    if (!ev.target || ev.target.id !== "bb-gate") return;
-    ev.preventDefault();
-    var v = String((document.getElementById("bb-token") || {}).value || "").trim();
-    if (!root.BBHandoff.isPlausibleToken(v)) { S.gateMsg = "That does not look like a session token."; render(); return; }
-    A.saveToken(root.localStorage, v);
-    S.auth = "checking"; S.gateMsg = "";
-    render(); onRoute();
-  });
   document.addEventListener("change", function (ev) {
     if (ev.target && ev.target.getAttribute("data-act") === "sort") { S.sort = ev.target.value; loadBook(); }
   });
@@ -839,6 +832,31 @@
   }
   root.addEventListener("hashchange", onRoute);
   setInterval(tick, 1000);
-  render();
-  onRoute();
+  function failSignIn() {
+    S.auth = "signin";
+    S.gateMsg = "Sign-in did not complete. Try again.";
+    render();
+  }
+  function boot() {
+    if (root.BBHandoff && root.BBHandoff.getAuthError()) {
+      S.gateMsg = "Sign-in did not complete. Try again.";
+    }
+    var code = root.BBHandoff && root.BBHandoff.takePendingCode ? root.BBHandoff.takePendingCode() : "";
+    if (code) {
+      S.auth = "checking";
+      render();
+      A.exchangeAndStore(code, root.localStorage).then(function (res) {
+        if (res && res.ok) {
+          S.auth = "checking";
+          S.gateMsg = "";
+          render();
+          onRoute();
+        } else failSignIn();
+      }, failSignIn);
+      return;
+    }
+    render();
+    onRoute();
+  }
+  boot();
 })(typeof window !== "undefined" ? window : globalThis);

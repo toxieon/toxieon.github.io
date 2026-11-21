@@ -126,3 +126,54 @@ test("edit and restore errors", () => {
   assert.equal(m(500, {}, "restore"), "Not restored. Try again.");
   assert.equal(m(500, {}), "Not saved. Try again.");
 });
+
+test("loginUrl sends the owner to TipBot /auth/login with an allowlisted return_to", () => {
+  const canon = "https://www.neilldata.com/blackbook/";
+  assert.equal(A.returnToUrl(), canon);
+  assert.equal(A.returnToUrl("https://evil.example"), canon);
+  assert.equal(A.returnToUrl("https://www.neilldata.com"), canon);
+  assert.equal(A.returnToUrl("https://www.neilldata.com/"), canon);
+  assert.equal(A.returnToUrl("https://neilldata.com"), "https://neilldata.com/blackbook/");
+  assert.equal(A.returnToUrl("https://toxieon.github.io"), canon);
+  const url = A.loginUrl("https://www.neilldata.com");
+  assert.equal(url, A.API_BASE + "/auth/login?return_to=" + encodeURIComponent(canon));
+  assert.equal(A.API_BASE, "https://afl-tipster-bot.onrender.com");
+  assert.doesNotMatch(url, /#t=|#token=|#code=/);
+});
+
+test("exchangeAndStore POSTs the one-time code and stores a 200 token; 400/401 store nothing", async () => {
+  const TOKEN = "a".repeat(32);
+  const CODE = "c".repeat(24);
+  const calls = [];
+  const store = (d) => ({ d, getItem(k) { return this.d[k]; }, setItem(k, v) { this.d[k] = v; }, removeItem(k) { delete this.d[k]; } });
+
+  const okFetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return { status: 200, json: async () => ({ token: TOKEN }) };
+  };
+  const s1 = store({});
+  const r1 = await A.exchangeAndStore(CODE, s1, { fetch: okFetch });
+  assert.deepEqual(r1, { ok: true, status: 200 });
+  assert.equal(s1.d.nd_owner_token, TOKEN);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, A.API_BASE + "/api/auth/exchange");
+  assert.equal(calls[0].opts.method, "POST");
+  assert.equal(calls[0].opts.credentials, "omit");
+  assert.equal(calls[0].opts.headers["Content-Type"], "application/json");
+  assert.equal(calls[0].opts.body, JSON.stringify({ code: CODE }));
+  assert.ok(!Object.prototype.hasOwnProperty.call(calls[0].opts.headers, "Authorization"));
+
+  for (const status of [400, 401]) {
+    const s = store({});
+    const f = async () => ({ status, json: async () => ({ error: "unauthorised" }) });
+    const r = await A.exchangeAndStore(CODE, s, { fetch: f });
+    assert.deepEqual(r, { ok: false, status });
+    assert.deepEqual(s.d, {});
+  }
+
+  const s3 = store({});
+  const f3 = async () => ({ status: 200, json: async () => ({}) });
+  const r3 = await A.exchangeAndStore(CODE, s3, { fetch: f3 });
+  assert.deepEqual(r3, { ok: false, status: 200 });
+  assert.deepEqual(s3.d, {});
+});

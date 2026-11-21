@@ -47,7 +47,8 @@ test("the only network call is api.js's fetch, to the TipBot host, Bearer only",
   assert.doesNotMatch(read("api.js"), /credentials:\s*["']include["']/);
   assert.match(read("api.js"), /credentials: "omit"/);
   const hosts = new Set([...ALL.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]));
-  for (const h of hosts) assert.ok(["afl-tipster-bot.onrender.com", "www.w3.org", "demo.invalid", "cdn.prod.pricekinetics.com"].includes(h), "unexpected host " + h);
+  const allowed = ["afl-tipster-bot.onrender.com", "www.w3.org", "demo.invalid", "cdn.prod.pricekinetics.com", "www.neilldata.com", "neilldata.com", "toxieon.github.io"];
+  for (const h of hosts) assert.ok(allowed.includes(h), "unexpected host " + h);
 });
 
 test("storage: only the owner token keys, in localStorage; no betting data is persisted or cached", () => {
@@ -58,14 +59,20 @@ test("storage: only the owner token keys, in localStorage; no betting data is pe
   assert.doesNotMatch(read("app.js"), /localStorage\.setItem|root\.localStorage\.setItem/);
 });
 
-test("gate: signed out renders the token form and a Back to Hub link, never the shell; 404 says not the owner", () => {
+test("gate: signed out renders Sign in with Discord and a Back to Hub link, never the shell; 404 says not the owner", () => {
   const app = read("app.js");
   assert.match(app, /if \(S\.auth === "signin"\) \{\s*app\.innerHTML = bare\(gateHtml\(\)\);/);
   assert.match(app, /Not the owner/);
   assert.match(app, /if \(S\.auth === "signin" \|\| S\.auth === "denied"\) \{ render\(\); return; \}/);
   assert.match(app, /href="\/hub\/">Back to Hub/);
   assert.match(app, /A\.clearToken\(root\.localStorage\)/);
-  assert.doesNotMatch(app, /auth\/login|Discord sign-in|return_to/);
+  assert.match(app, /A\.loginUrl\(location\.origin\)/);
+  assert.match(app, /Sign in with Discord/);
+  assert.match(app, /Your session has expired\. Sign in with Discord again\./);
+  assert.match(app, /A\.exchangeAndStore\(code, root\.localStorage\)/);
+  assert.match(app, /takePendingCode\(/);
+  assert.doesNotMatch(app, /bb-token|Save token|paste a new token|paste your tipdash|Owner token|change token/);
+  assert.doesNotMatch(app, /<form/);
 });
 
 test("demo data is wired only through BBDemo.isDemoMode (localhost + ?demo=1)", () => {
