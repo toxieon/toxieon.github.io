@@ -16,12 +16,23 @@ test("a valid #t= token is stored under nd_owner_token and the fragment is strip
   assert.deepEqual(r, { stored: true, stripped: true });
   assert.equal(storage.data.nd_owner_token, TOKEN);
   assert.deepEqual(hist.calls, ["/blackbook/?demo=1"]);
+  assert.equal(H.getAuthError(), "");
+});
+
+test("a valid #token= fragment from TipBot OAuth is stored the same way", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#token=" + encodeURIComponent(TOKEN), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: true, stripped: true });
+  assert.equal(storage.data.nd_owner_token, TOKEN);
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
 });
 
 test("the token is decoded exactly once: + stays +, %2B becomes +, %25 becomes %", () => {
   assert.equal(H.readHashToken("#t=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10))).token, "ab+cd/ef=gh%ij" + "k".repeat(10));
   assert.equal(H.readHashToken("#t=a+b").token, "a+b");
   assert.equal(H.readHashToken("#t=a%2Bb").token, "a+b");
+  assert.equal(H.readHashToken("#token=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10))).token, "ab+cd/ef=gh%ij" + "k".repeat(10));
+  assert.equal(H.readHashToken("#token=a+b").token, "a+b");
 });
 
 test("a short or whitespace token is not stored but the fragment is still stripped", () => {
@@ -32,6 +43,10 @@ test("a short or whitespace token is not stored but the fragment is still stripp
     assert.deepEqual(storage.data, {});
     assert.deepEqual(hist.calls, ["/blackbook/"]);
   }
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#token=short", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
 });
 
 test("a bad percent escape stores nothing", () => {
@@ -51,4 +66,24 @@ test("other fragments (deep links) are left alone", () => {
 
 test("t= is found after another fragment parameter", () => {
   assert.equal(H.readHashToken("#x=1&t=" + TOKEN).token, TOKEN);
+});
+
+test("#token= is not misread as #t=, and #t= wins when both are present", () => {
+  assert.equal(H.readHashToken("#token=" + TOKEN).token, TOKEN);
+  assert.equal(H.readHashToken("#token=" + TOKEN).hadT, true);
+  const tFirst = "b".repeat(32);
+  assert.equal(H.readHashToken("#t=" + tFirst + "&token=" + TOKEN).token, tFirst);
+  assert.equal(H.readHashToken("#token=" + TOKEN + "&t=" + tFirst).token, tFirst);
+});
+
+test("an OAuth #error= fragment is stripped, stores nothing, and is exposed as getAuthError", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#error=login_failed", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.getAuthError(), "login_failed");
+  // a later call with no auth hash clears it
+  H.consumeTokenFragment({ hash: "", pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.equal(H.getAuthError(), "");
 });

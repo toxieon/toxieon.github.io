@@ -13,6 +13,23 @@
   var FALLBACK_TOKEN_KEYS = ["nd_models_owner_token"];
   var BASE = "/api/owner/blackbook";
 
+  var CANONICAL_RETURN = "https://www.neilldata.com/blackbook/";
+  var RETURN_ORIGINS = ["https://www.neilldata.com", "https://neilldata.com", "https://toxieon.github.io"];
+
+  /** Post-login landing URL for TipBot's return_to. Same origin when the page is already on an allowed host. */
+  function returnToUrl(origin) {
+    var o = String(origin || "").replace(/\/$/, "");
+    for (var i = 0; i < RETURN_ORIGINS.length; i++) {
+      if (o === RETURN_ORIGINS[i]) return o + "/blackbook/";
+    }
+    return CANONICAL_RETURN;
+  }
+
+  /** TipBot Discord OAuth start. Navigation only — no XHR, no cookies. */
+  function loginUrl(origin) {
+    return API_BASE + "/auth/login?return_to=" + encodeURIComponent(returnToUrl(origin));
+  }
+
   function readToken(storage) {
     try {
       var keys = [TOKEN_KEY].concat(FALLBACK_TOKEN_KEYS);
@@ -113,5 +130,6 @@
   }
 
   return { describeAddError: describeAddError, describeEditError: describeEditError, API_BASE: API_BASE, TOKEN_KEY: TOKEN_KEY, FALLBACK_TOKEN_KEYS: FALLBACK_TOKEN_KEYS, BASE: BASE,
+    CANONICAL_RETURN: CANONICAL_RETURN, RETURN_ORIGINS: RETURN_ORIGINS, returnToUrl: returnToUrl, loginUrl: loginUrl,
     readToken: readToken, saveToken: saveToken, clearToken: clearToken, paths: paths, classify: classify, request: request };
 });

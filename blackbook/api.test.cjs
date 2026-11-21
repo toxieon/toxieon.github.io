@@ -126,3 +126,17 @@ test("edit and restore errors", () => {
   assert.equal(m(500, {}, "restore"), "Not restored. Try again.");
   assert.equal(m(500, {}), "Not saved. Try again.");
 });
+
+test("loginUrl sends the owner to TipBot /auth/login with an allowlisted return_to", () => {
+  const canon = "https://www.neilldata.com/blackbook/";
+  assert.equal(A.returnToUrl(), canon);
+  assert.equal(A.returnToUrl("https://evil.example"), canon);
+  assert.equal(A.returnToUrl("https://www.neilldata.com"), canon);
+  assert.equal(A.returnToUrl("https://www.neilldata.com/"), canon);
+  assert.equal(A.returnToUrl("https://neilldata.com"), "https://neilldata.com/blackbook/");
+  assert.equal(A.returnToUrl("https://toxieon.github.io"), "https://toxieon.github.io/blackbook/");
+  const url = A.loginUrl("https://www.neilldata.com");
+  assert.equal(url, A.API_BASE + "/auth/login?return_to=" + encodeURIComponent(canon));
+  assert.equal(A.API_BASE, "https://afl-tipster-bot.onrender.com");
+  assert.doesNotMatch(url, /#t=|#token=/);
+});
