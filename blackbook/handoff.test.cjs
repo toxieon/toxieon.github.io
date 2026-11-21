@@ -87,3 +87,55 @@ test("an OAuth #error= fragment is stripped, stores nothing, and is exposed as g
   H.consumeTokenFragment({ hash: "", pathname: "/blackbook/", search: "" }, storage, hist);
   assert.equal(H.getAuthError(), "");
 });
+
+const CODE = "c".repeat(24);
+
+test("#code= is not a session token: it is taken once, the hash is stripped, nothing is stored", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#code=" + encodeURIComponent(CODE), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.readHashToken("#code=" + CODE).hadT, false);
+  assert.equal(H.takePendingCode(), CODE);
+  assert.equal(H.takePendingCode(), "");
+});
+
+test("#code= is decoded exactly once, same as tokens", () => {
+  const { storage, hist } = mock();
+  H.consumeTokenFragment({ hash: "#code=" + encodeURIComponent("ab+cd/ef=gh%ij" + "k".repeat(10)), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.equal(H.takePendingCode(), "ab+cd/ef=gh%ij" + "k".repeat(10));
+});
+
+test("#t= and #token= are stored as session tokens and are not taken as an exchange code", () => {
+  for (const hash of ["#t=" + encodeURIComponent(TOKEN), "#token=" + encodeURIComponent(TOKEN), "#t=" + encodeURIComponent(TOKEN) + "&code=" + CODE]) {
+    const { storage, hist } = mock();
+    const r = H.consumeTokenFragment({ hash, pathname: "/blackbook/", search: "" }, storage, hist);
+    assert.equal(r.stored, true);
+    assert.equal(r.stripped, true);
+    assert.equal(storage.data.nd_owner_token, TOKEN);
+    assert.equal(H.takePendingCode(), "");
+  }
+});
+
+test("#signup= is stripped, stores nothing, and is not treated as a token or exchange code", () => {
+  const { storage, hist } = mock();
+  const r = H.consumeTokenFragment({ hash: "#signup=" + "s".repeat(24), pathname: "/blackbook/", search: "" }, storage, hist);
+  assert.deepEqual(r, { stored: false, stripped: true });
+  assert.deepEqual(storage.data, {});
+  assert.deepEqual(hist.calls, ["/blackbook/"]);
+  assert.equal(H.takePendingCode(), "");
+  assert.equal(H.getAuthError(), "");
+  assert.equal(H.readHashToken("#signup=" + "s".repeat(24)).hadT, false);
+});
+
+test("a whitespace or empty #code= is stripped, stores nothing, and is reported as a failed sign-in", () => {
+  for (const hash of ["#code=", "#code=bad code with spaces", "#code=%E0%A4%A"]) {
+    const { storage, hist } = mock();
+    const r = H.consumeTokenFragment({ hash, pathname: "/blackbook/", search: "" }, storage, hist);
+    assert.deepEqual(r, { stored: false, stripped: true });
+    assert.deepEqual(storage.data, {});
+    assert.equal(H.takePendingCode(), "");
+    assert.equal(H.getAuthError(), "login_failed");
+  }
+});

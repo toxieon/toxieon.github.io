@@ -832,9 +832,31 @@
   }
   root.addEventListener("hashchange", onRoute);
   setInterval(tick, 1000);
-  if (root.BBHandoff && root.BBHandoff.getAuthError()) {
+  function failSignIn() {
+    S.auth = "signin";
     S.gateMsg = "Sign-in did not complete. Try again.";
+    render();
   }
-  render();
-  onRoute();
+  function boot() {
+    if (root.BBHandoff && root.BBHandoff.getAuthError()) {
+      S.gateMsg = "Sign-in did not complete. Try again.";
+    }
+    var code = root.BBHandoff && root.BBHandoff.takePendingCode ? root.BBHandoff.takePendingCode() : "";
+    if (code) {
+      S.auth = "checking";
+      render();
+      A.exchangeAndStore(code, root.localStorage).then(function (res) {
+        if (res && res.ok) {
+          S.auth = "checking";
+          S.gateMsg = "";
+          render();
+          onRoute();
+        } else failSignIn();
+      }, failSignIn);
+      return;
+    }
+    render();
+    onRoute();
+  }
+  boot();
 })(typeof window !== "undefined" ? window : globalThis);

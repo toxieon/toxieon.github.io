@@ -69,6 +69,8 @@ test("gate: signed out renders Sign in with Discord and a Back to Hub link, neve
   assert.match(app, /A\.loginUrl\(location\.origin\)/);
   assert.match(app, /Sign in with Discord/);
   assert.match(app, /Your session has expired\. Sign in with Discord again\./);
+  assert.match(app, /A\.exchangeAndStore\(code, root\.localStorage\)/);
+  assert.match(app, /takePendingCode\(/);
   assert.doesNotMatch(app, /bb-token|Save token|paste a new token|paste your tipdash|Owner token|change token/);
   assert.doesNotMatch(app, /<form/);
 });
