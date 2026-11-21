@@ -87,9 +87,12 @@
   /** User-facing text for a failed add. 409 (duplicate, cap) and 400 (invalid, empty) are normal answers, not crashes. */
   function describeAddError(status, data) {
     var d = data || {};
+    if (status === 503 || d.error === "db_busy" || d.error === "warming" || d.error === "unavailable") {
+      return "Database unavailable.";
+    }
     if (d.code === "duplicate") return "This horse is already in your Black Book.";
     if (d.code === "cap") return d.limit ? "The Black Book is full (limit " + d.limit + ")." : "The Black Book is full.";
-    if (d.code === "unconfirmed") return "That horse could not be confirmed. Search again.";
+    if (d.code === "unconfirmed") return "That horse could not be matched to a stored start.";
     if (d.field === "betPrice") return PRICE_MSG;
     if (d.field === "priority") return "Pick Low, Med or High priority.";
     if (d.code === "empty") return "Enter a horse name first.";
@@ -99,6 +102,9 @@
   /** Text for a failed edit or restore. */
   function describeEditError(status, data, kind) {
     var d = data || {};
+    if (status === 503 || d.error === "db_busy" || d.error === "warming" || d.error === "unavailable") {
+      return "Database unavailable.";
+    }
     if (status === 409 && d.code === "cap") return "The Black Book is full.";
     if (d.field === "betPrice") return PRICE_MSG;
     if (d.field === "priority") return "Pick Low, Med or High priority.";

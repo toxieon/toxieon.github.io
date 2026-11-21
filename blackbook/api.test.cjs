@@ -106,7 +106,10 @@ test("add errors: 409 and 400 come back as data (not thrown) and each has its ow
   assert.equal(m(409, { code: "duplicate" }), "This horse is already in your Black Book.");
   assert.equal(m(409, { code: "cap", limit: 50 }), "The Black Book is full (limit 50).");
   assert.equal(m(409, { code: "cap" }), "The Black Book is full.");
-  assert.equal(m(200, { ok: false, code: "unconfirmed" }), "That horse could not be confirmed. Search again.");
+  assert.equal(m(200, { ok: false, code: "unconfirmed" }), "That horse could not be matched to a stored start.");
+  assert.equal(m(503, { error: "db_busy", retry_after: 3 }), "Database unavailable.");
+  assert.equal(m(503, { ok: false, error: "unavailable" }), "Database unavailable.");
+  assert.equal(m(503, { error: "warming" }), "Database unavailable.");
   assert.equal(m(400, { code: "invalid", field: "betPrice" }), "Your price should be a decimal price such as 4.20.");
   assert.equal(m(400, { code: "invalid", field: "priority" }), "Pick Low, Med or High priority.");
   assert.equal(m(400, { code: "empty" }), "Enter a horse name first.");
