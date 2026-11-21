@@ -10,7 +10,7 @@
  */
 (function (root) {
   "use strict";
-  var APP_VERSION = "0.1.1";
+  var APP_VERSION = "0.1.2";
   var F = root.BBFormat, D = root.BBDates, A = root.BBApi, DEMO = root.BBDemo;
   var esc = F.esc, fmtPrice = F.fmtPrice, ordinal = F.ordinal, initials = F.initials, resultText = F.resultText, resultClass = F.resultClass;
   var isComingSoon = F.isComingSoon, prioOf = F.prioOf, priceInput = F.priceInput, highlight = F.highlight;
