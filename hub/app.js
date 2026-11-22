@@ -1,4 +1,4 @@
-/* Hub v0.9.1 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.9.2 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -23,6 +23,7 @@ async function loadHub() {
     apps = (payload.apps || []).filter((a) => !a.hidden).sort((a, b) => (a.order || 99) - (b.order || 99));
     await injectOwnerGateCodesTile();
     await injectOwnerBlackBookTile();
+    await injectOwnerModelsTile();
     statusEl.textContent = "Neill Data suite";
   } catch (e) {
     statusEl.textContent = "Could not load apps.json";
@@ -145,6 +146,31 @@ async function injectOwnerBlackBookTile() {
       order: 16,
       hidden: false,
       description: "Owner-only horse watchlist with upcoming runs (live TipBot data).",
+    });
+    apps.sort((a, b) => (a.order || 99) - (b.order || 99));
+  } catch (e) { /* owner-only */ }
+}
+
+/** Private TipBot model stats: same owner gate as Black Book; the path is not in apps.json (the folder has .nd-private). */
+async function injectOwnerModelsTile() {
+  if (!window.NDAuth) return;
+  if (!(NDAuth.hasPriorSession && NDAuth.hasPriorSession())) return;
+  try {
+    const cfg = window.NDConfig && NDConfig.forApp("timesheet");
+    if (cfg) NDAuth.init({ clientId: cfg.googleClientId, scopes: cfg.scopes });
+    if (!NDAuth.isSignedIn()) await NDAuth.ensureToken().catch(() => {});
+    const profile = NDAuth.getProfile();
+    if (!profile || String(profile.email).toLowerCase() !== "brandon.j.neill@gmail.com") return;
+    if (apps.some((a) => a.id === "tipbot-models")) return;
+    apps.push({
+      id: "tipbot-models",
+      name: "Model Stats",
+      path: "/models/",
+      icon: "/models/favicon.svg",
+      color: "#7aa2f7",
+      order: 17,
+      hidden: false,
+      description: "Owner-only With, Without and Agree model stats (live TipBot data).",
     });
     apps.sort((a, b) => (a.order || 99) - (b.order || 99));
   } catch (e) { /* owner-only */ }

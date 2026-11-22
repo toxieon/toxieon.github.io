@@ -136,13 +136,22 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   text-align: left;
 }
 
-.gate input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  margin: 8px 0 12px;
+.btn-discord {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 8px;
+  text-decoration: none;
+  background: #5865f2;
+  color: #fff;
+}
+.btn-discord:hover { filter: brightness(1.08); }
+
+.tab-pending {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-style: dashed;
 }
 
 .banner {
@@ -354,7 +363,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .tabs {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
+  flex-wrap: wrap;
   margin: 8px 0;
 }
 

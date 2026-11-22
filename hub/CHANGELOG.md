@@ -1,3 +1,4 @@
+## 0.9.2 · 2026-11-22 · tipbot-models · Owner-only hub tile for the private TipBot model stats at /models/ (same signed-in owner gate as Black Book; not in apps.json or discovery, the folder carries .nd-private). Service worker hub-v18.
 ## 0.9.1 · 2026-11-19 · black-book · Owner-only hub tile for the private Black Book at /blackbook/ (same signed-in owner gate as Gate Codes; not in apps.json or discovery, the folder carries .nd-private). Service worker hub-v17.
 ## 0.8.1 · 2026-11-16 · chess-lab · Chess Lab tile for the external app at /chess-lab/ (pinned in discover.json extra, so auto-discover keeps it). Icon is a local knight tile at hub/icons/chess-lab.svg. /chess/ redirects to /chess-lab/. Service worker hub-v16.
 ## 0.7.6 · 2026-10-27 · csp · Content-Security-Policy <meta> added to the page (script-src limited to this site plus the Google hosts it loads; inline scripts allowed by hash; object-src none, base-uri and form-action self). Service worker hub-v15.

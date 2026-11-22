@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.1.5";
+  const APP_VERSION = "0.2.1";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -12,7 +12,7 @@
   const FMT = window.NDModelsFormat;
 
   const UNAVAILABLE_MSG =
-    "Not available: either the stats API isn't live yet, or this token isn't the owner's.";
+    "Not available: either the stats API isn't live yet, or this account isn't the owner's.";
   const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
   const RECON_KEY = "nd_models_include_reconstructed";
 
@@ -37,6 +37,7 @@
     breakdownModel: "with_price",
     weekdayModel: "with_price",
     gateMessage: "",
+    signingIn: false,
     loadError: "",
     apiNotLive: false,
     calendarMonth: "",
@@ -73,9 +74,10 @@
     }
   }
 
+  /** nd_models_owner_token (read-only fallback to Black Book's nd_owner_token on this origin). */
   function getToken() {
     try {
-      return localStorage.getItem(CFG.TOKEN_KEY) || "";
+      return API.readToken(localStorage);
     } catch (e) {
       return "";
     }
@@ -83,8 +85,8 @@
 
   function setToken(t) {
     try {
-      if (t) localStorage.setItem(CFG.TOKEN_KEY, t);
-      else localStorage.removeItem(CFG.TOKEN_KEY);
+      if (t) API.saveToken(localStorage, t);
+      else API.clearToken(localStorage);
     } catch (e) { /* ignore */ }
   }
 
@@ -114,7 +116,10 @@
     $("btn-signout").hidden = !authed;
     $("demo-badge").hidden = !isDemoMode() || !authed;
     if (!authed) {
-      $("gate-message").textContent = state.gateMessage || "";
+      $("gate-message").textContent = state.signingIn ? "Signing in…" : state.gateMessage || "";
+      const btn = $("btn-discord");
+      btn.href = API.loginUrl(location.origin);
+      btn.hidden = state.signingIn;
     }
   }
 
@@ -139,9 +144,8 @@
       cache: "no-store",
     });
     if (res.status === 401 || res.status === 403) {
-      setToken("");
-      state.token = "";
-      state.gateMessage = "Session expired or invalid token. Paste your owner token again.";
+      signOutAndShowGate();
+      state.gateMessage = "Your session has expired. Sign in with Discord again.";
       setView();
       return { ok: false, auth: true };
     }
@@ -608,6 +612,7 @@
     const model = state.breakdownModel;
     const tab = state.breakdownTab;
     const m = state.data.models[model];
+    // by_stake_bracket is stake size (2u/1u/0.5u/no bet), not threshold. Threshold waits on CFG.THRESHOLD_BREAKDOWN_FIELD.
     const key = tab === "price_band" ? "by_price_band" : tab === "track" ? "by_track" : "by_stake_bracket";
     const rows = m[key];
     const tbody = $("breakdown-body");
@@ -1107,26 +1112,7 @@
     reload();
   }
 
-  function saveTokenFromGate() {
-    const t = ($("token-input").value || "").trim();
-    if (!t) {
-      state.gateMessage = "Enter your owner token.";
-      $("gate-message").textContent = state.gateMessage;
-      return;
-    }
-    state.token = t;
-    setToken(t);
-    state.gateMessage = "";
-    $("token-input").value = "";
-    setView();
-    applyAllTime();
-  }
-
   function bindEvents() {
-    $("auth-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      saveTokenFromGate();
-    });
     $("btn-signout").addEventListener("click", signOutAndShowGate);
     $("btn-banner-change-token").addEventListener("click", signOutAndShowGate);
     $("btn-apply-range").addEventListener("click", () => {
@@ -1214,11 +1200,40 @@
     const reconToggle = $("toggle-reconstructed");
     if (reconToggle) reconToggle.checked = state.includeReconstructed;
     syncReconToggle();
-    if (isDemoMode() && !state.token) {
-      state.token = "demo-local";
-      setToken("demo-local");
-    }
+    if (isDemoMode() && !state.token) state.token = "demo-local"; // localhost ?demo=1 only; never stored
     bindEvents();
+    const H = window.NDModelsHandoff;
+    const authError = H && H.getAuthError ? H.getAuthError() : "";
+    if (authError) state.gateMessage = API.describeAuthError(authError);
+    const code = H && H.takePendingCode ? H.takePendingCode() : "";
+    if (code && !isDemoMode()) {
+      state.token = "";
+      state.signingIn = true;
+      setView();
+      API.exchangeAndStore(code, localStorage).then(
+        (res) => finishSignIn(res && res.ok),
+        () => finishSignIn(false)
+      );
+      return;
+    }
+    startSignedIn();
+  }
+
+  /** After the one-time #code= exchange: 200 stores the token and loads; anything else shows the Discord button again. */
+  function finishSignIn(ok) {
+    state.signingIn = false;
+    if (ok) {
+      state.gateMessage = "";
+      state.token = getToken();
+    } else {
+      setToken("");
+      state.token = "";
+      state.gateMessage = "Sign-in did not complete. Try again.";
+    }
+    startSignedIn();
+  }
+
+  function startSignedIn() {
     setView();
     if (signedIn()) {
       const to = DATES.todayMelbourneIso();
