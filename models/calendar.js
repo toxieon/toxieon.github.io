@@ -31,6 +31,9 @@
       picks: Number(row.picks) || 0,
       bets: Number(row.bets) || 0,
       wins: Number(row.wins) || 0,
+      losses: Number(row.losses) || 0,
+      hyp_bets: Number(row.hyp_bets) || 0,
+      hyp_wins: Number(row.hyp_wins) || 0,
       pl_units: Number(row.pl_units) || 0,
       hyp_pl_units: Number(row.hyp_pl_units) || 0,
       cum_units: pickField(row, "cum_units", "cum"),
@@ -56,6 +59,23 @@
       }
     }
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /** Days for the calendar: the top-level calendar[] when sent, else models.*.daily joined by date. */
+  function calendarDays(payload) {
+    const p = payload && typeof payload === "object" ? payload : {};
+    if (Array.isArray(p.calendar) && p.calendar.length) {
+      return p.calendar
+        .filter((r) => r && r.date)
+        .map((r) => {
+          const out = emptyDay(String(r.date));
+          for (const id of MODEL_IDS) out[id] = r[id] ? normDailySlice(r[id]) : null;
+          if (r.reconstructed) out.reconstructed = true;
+          return out;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+    return joinDailyByDate(p.models);
   }
 
   function parseYm(ym) {
@@ -149,6 +169,7 @@
   return {
     MODEL_IDS,
     joinDailyByDate,
+    calendarDays,
     parseYm,
     ymAdd,
     buildMonthGrid,

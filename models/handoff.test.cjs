@@ -158,3 +158,14 @@ test("a short #t= keeps the existing stored token", () => {
   assert.equal(storage.data.nd_models_owner_token, "keep-me-keep-me-keep");
   assert.equal(hist.calls.length, 1);
 });
+
+test("every TipBot #error= code is recorded and stripped; return lands on /models/", () => {
+  for (const code of ["bad_state", "login_failed", "not_authorised", "region_declined", "rate_limited"]) {
+    const { storage, hist } = mock();
+    const r = H.consumeTokenFragment({ hash: "#error=" + code, pathname: "/models/", search: "" }, storage, hist);
+    assert.deepEqual(r, { stored: false, stripped: true });
+    assert.equal(H.getAuthError(), code);
+    assert.deepEqual(hist.calls, ["/models/"]);
+    assert.equal(H.takePendingCode(), "");
+  }
+});

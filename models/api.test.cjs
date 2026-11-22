@@ -7,7 +7,8 @@ test("buildModelStatsUrl includes staked_only and fixed from for staked fetch", 
   const url = A.buildModelStatsUrl("https://afl-tipster-bot.onrender.com", "2026-11-12", "2026-11-19", {
     stakedOnly: true,
   });
-  assert.match(url, /^https:\/\/afl-tipster-bot\.onrender\.com\/api\/owner\/model-stats\?/);
+  assert.match(url, /^https:\/\/afl-tipster-bot\.onrender\.com\/api\/model-stats\?/);
+  assert.doesNotMatch(url, /\/api\/owner\//);
   const q = new URL(url).searchParams;
   assert.equal(q.get("from"), "2026-11-12");
   assert.equal(q.get("to"), "2026-11-19");
@@ -119,9 +120,92 @@ test("readToken prefers the Models key, falls back to the shared TipBot key; cle
 });
 
 test("describeAuthError maps TipBot #error= codes", () => {
-  assert.match(A.describeAuthError("not_authorised"), /owner only/);
+  assert.match(A.describeAuthError("not_authorised"), /isn't allowed/);
   assert.match(A.describeAuthError("rate_limited"), /Too many/);
   assert.match(A.describeAuthError("region_declined"), /region/);
   for (const c of ["bad_state", "login_failed", "whatever"]) assert.equal(A.describeAuthError(c), "Sign-in did not complete. Try again.");
   assert.equal(A.describeAuthError(""), "");
+});
+
+test("stats go to the horse-server route /api/model-stats, not the owner route", () => {
+  assert.equal(A.STATS_PATH, "/api/model-stats");
+  const u = new URL(A.buildModelStatsUrl(A.API_BASE, "all", "2026-11-22"));
+  assert.equal(u.origin + u.pathname, "https://afl-tipster-bot.onrender.com/api/model-stats");
+});
+
+test("classifyStats separates 401, 403, 503 not_configured, 503 unavailable, 404, 429 and 400", () => {
+  const c = A.classifyStats;
+  assert.equal(c(200, {}), "ok");
+  assert.equal(c(401, { ok: false, error: "unauthorised" }), "signin");
+  assert.equal(c(403, { ok: false, error: "forbidden" }), "forbidden");
+  assert.equal(c(503, { ok: false, error: "not_configured" }), "not_configured");
+  assert.equal(c(503, { ok: false, error: "unavailable" }), "unavailable");
+  assert.equal(c(502, {}), "unavailable");
+  assert.equal(c(404, { error: "not_found" }), "not_live");
+  assert.equal(c(429, { error: "rate_limited" }), "rate_limited");
+  assert.equal(c(400, { ok: false, error: "bad_flag" }), "bad_request");
+  assert.equal(c(500, {}), "error");
+});
+
+function fakeFetch(seq) {
+  const calls = [];
+  const f = async (url, opts) => {
+    calls.push({ url, opts });
+    const next = seq[Math.min(calls.length - 1, seq.length - 1)];
+    return { status: next.status, json: async () => next.body };
+  };
+  f.calls = calls;
+  return f;
+}
+const noSleep = async () => {};
+
+test("requestModelStats sends Bearer only with credentials omitted and caches a 200 for 2 minutes", async () => {
+  A.clearStatsCache();
+  const f = fakeFetch([{ status: 200, body: { scope: "server", models: {} } }]);
+  let t = 1000;
+  const now = () => t;
+  const url = A.buildModelStatsUrl(A.API_BASE, "all", "2026-11-22");
+  const r1 = await A.requestModelStats(url, "tok-1234567890abcdef", { fetch: f, sleep: noSleep, now });
+  assert.equal(r1.kind, "ok");
+  assert.equal(r1.cached, false);
+  assert.equal(f.calls[0].opts.method, "GET");
+  assert.equal(f.calls[0].opts.credentials, "omit");
+  assert.deepEqual(f.calls[0].opts.headers, { Authorization: "Bearer tok-1234567890abcdef" });
+  t += 60000;
+  const r2 = await A.requestModelStats(url, "tok-1234567890abcdef", { fetch: f, sleep: noSleep, now });
+  assert.equal(r2.cached, true);
+  assert.equal(f.calls.length, 1, "no second request inside 2 minutes");
+  t += A.CACHE_TTL_MS;
+  await A.requestModelStats(url, "tok-1234567890abcdef", { fetch: f, sleep: noSleep, now });
+  assert.equal(f.calls.length, 2, "refetch after 2 minutes");
+  assert.ok(A.CACHE_TTL_MS >= 120000);
+});
+
+test("requestModelStats does not cache errors; 401/403/503 not_configured are returned once without retry", async () => {
+  for (const [status, error, kind] of [[401, "unauthorised", "signin"], [403, "forbidden", "forbidden"], [503, "not_configured", "not_configured"]]) {
+    A.clearStatsCache();
+    const f = fakeFetch([{ status, body: { ok: false, error } }]);
+    const r = await A.requestModelStats("https://x.invalid/api/model-stats?from=all&to=2026-11-22", "t".repeat(20), { fetch: f, sleep: noSleep });
+    assert.equal(r.kind, kind);
+    assert.equal(f.calls.length, 1);
+    await A.requestModelStats("https://x.invalid/api/model-stats?from=all&to=2026-11-22", "t".repeat(20), { fetch: f, sleep: noSleep });
+    assert.equal(f.calls.length, 2, "errors are not cached");
+  }
+});
+
+test("requestModelStats retries once on 503 unavailable, then reports it", async () => {
+  A.clearStatsCache();
+  const f = fakeFetch([{ status: 503, body: { ok: false, error: "unavailable" } }, { status: 503, body: { ok: false, error: "unavailable" } }]);
+  const r = await A.requestModelStats("https://x.invalid/a", "t".repeat(20), { fetch: f, sleep: noSleep });
+  assert.equal(r.kind, "unavailable");
+  assert.equal(f.calls.length, 2);
+  A.clearStatsCache();
+  const g = fakeFetch([{ status: 503, body: { ok: false, error: "unavailable" } }, { status: 200, body: {} }]);
+  assert.equal((await A.requestModelStats("https://x.invalid/b", "t".repeat(20), { fetch: g, sleep: noSleep })).kind, "ok");
+});
+
+test("clearPrimaryToken drops only the Models key (403 sign-in-again keeps a shared Black Book token)", () => {
+  const s = mkStore({ nd_models_owner_token: "m", nd_owner_token: "b" });
+  A.clearPrimaryToken(s);
+  assert.deepEqual(s.d, { nd_owner_token: "b" });
 });

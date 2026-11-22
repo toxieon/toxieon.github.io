@@ -28,7 +28,7 @@ test('private app is kept out of hub discovery, the visual catalogue and public 
   const cat = fs.readFileSync(path.join(root, '1234567890/visual-catalog.json'), 'utf8');
   const pubFiles = ['hub/apps.json', 'hub/discover.json', 'robots.txt', 'sitemap.xml', 'hub/index.html', 'assets/suite-icons.js', 'scripts/render-app-icons.cjs'];
   const hubJs = fs.readFileSync(path.join(root, 'hub/app.js'), 'utf8');
-  const hubSansOwnerInject = hubJs.replace(/async function injectOwner[\s\S]*?^}/gm, '');
+  const hubSansOwnerInject = hubJs.replace(/async function inject(?:Owner|Members)[\s\S]*?^}/gm, '');
   for (const d of dirs) {
     assert.ok(!apps.some((a) => a.path === '/' + d.name + '/'), 'not discovered');
     assert.ok(!cat.includes(d.name), 'not in visual catalogue');

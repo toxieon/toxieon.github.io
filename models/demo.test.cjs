@@ -109,3 +109,16 @@ test("staked-only demo does not change when reconstructed would be on", () => {
   assert.ok(a.models.without_price.daily.every((d) => d.date >= "2026-11-12"));
   assert.ok(!b.models.without_price.daily.some((d) => d.reconstructed));
 });
+
+test("demo payload carries the 0.98.0 additions: scope, calendar, by_threshold, by_min_threshold, daily losses/hyp", () => {
+  const D = require("./demo.js");
+  const raw = D.generateDemoStats("all", "2026-11-20");
+  assert.equal(raw.scope, "server");
+  assert.ok(raw.calendar.length > 0);
+  assert.ok(raw.calendar.every((d) => d.with_price && d.without_price && d.agree));
+  const m = raw.models.with_price;
+  assert.deepEqual(m.by_threshold.map((r) => r.label), D.THRESHOLDS);
+  assert.equal(m.by_threshold[0].bets, 0);
+  assert.deepEqual(m.by_min_threshold.map((r) => r.min_pct), D.MIN_THRESHOLDS);
+  assert.ok(["losses", "hyp_bets", "hyp_wins"].every((k) => k in m.daily[0]));
+});

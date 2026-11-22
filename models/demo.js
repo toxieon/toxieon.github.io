@@ -12,6 +12,8 @@
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const PRICE_BANDS = ["$1-2", "$2-3", "$3-5", "$5-8", "$8-15", "$15+"];
   const STAKE_BRACKETS = ["2u", "1u", "0.5u", "no bet"];
+  const THRESHOLDS = ["<30%", "30-32%", "32-35%", "35-40%", "40-45%", "45-50%", "50-60%", "60-70%", "70%+"];
+  const MIN_THRESHOLDS = [30, 32, 35, 40, 45, 50, 60, 70];
   const HEADLINE_SINCE = "2026-11-06";
   const STAKED_FROM = "2026-11-12";
   const RECON_FROM = "2026-10-13";
@@ -136,6 +138,7 @@
       const rand = dayRand(modelId, date);
       const plan = stakedForDay(modelId, date, rand);
       let dayWins = 0;
+      let dayLosses = 0;
       let dayPl = 0;
       let dayHypPl = 0;
       let dayHypBets = 0;
@@ -154,6 +157,7 @@
           else pl = 0;
         }
         if (isStaked && result === "won") dayWins += 1;
+        if (isStaked && (result === "lost" || result === "placed")) dayLosses += 1;
         dayPl += pl;
         dayHypPl += hypPl;
         if (hypCounts) {
@@ -196,6 +200,9 @@
         picks: plan.picks,
         bets: plan.bets,
         wins: dayWins,
+        losses: dayLosses,
+        hyp_bets: dayHypBets,
+        hyp_wins: dayHypWins,
         pl_units: dayPl,
         hyp_pl_units: dayHypPl,
         cum_units: cum,
@@ -233,15 +240,22 @@
         const hb = b + Math.floor(rand() * 4);
         return {
           label: label,
+          picks: hb,
           bets: b,
           wins: w,
           strike_pct: Math.round((w / b) * 1000) / 10,
+          staked_units: round1(st),
           pl_units: pl,
           roi_pct: Math.round((pl / st) * 1000) / 10,
           hyp: hypBlock(hb, w, hpl),
         };
       });
     };
+    /* <30% is all no-bets (0u) from 12 Nov, so only the flat 1u numbers move there. */
+    const noBetRow = (row) => Object.assign({}, row, { bets: 0, wins: 0, strike_pct: 0, staked_units: 0, pl_units: 0, roi_pct: 0 });
+    const byThreshold = mkRows(THRESHOLDS, 41).map((r, i) => (i === 0 ? noBetRow(r) : r));
+    const byMinThreshold = mkRows(MIN_THRESHOLDS.map((n) => n + "%+"), 53)
+      .map((r, i) => Object.assign({ min_pct: MIN_THRESHOLDS[i] }, r));
 
     const by_weekday = WEEKDAYS.map((label) => {
       const w = wd[label];
@@ -269,6 +283,8 @@
       by_price_band: mkRows(PRICE_BANDS, 11),
       by_track: mkRows(TRACKS, 23),
       by_stake_bracket: mkRows(STAKE_BRACKETS, 37),
+      by_threshold: byThreshold,
+      by_min_threshold: byMinThreshold,
       by_weekday: by_weekday,
       recent: recentPool,
       meta: {
@@ -311,6 +327,8 @@
       by_price_band: frozen.by_price_band,
       by_track: frozen.by_track,
       by_stake_bracket: frozen.by_stake_bracket,
+      by_threshold: frozen.by_threshold,
+      by_min_threshold: frozen.by_min_threshold,
       by_weekday: frozen.by_weekday,
       recent: recent,
     };
@@ -397,14 +415,34 @@
     }
     return {
       generated_at: new Date().toISOString(),
+      scope: "server",
       range: { from: resolvedFrom, to: to },
       meta: meta,
       models: models,
+      calendar: buildCalendar(models),
       head_to_head: {
         days: h2hDays,
         disagree_races: { count: 11, with_wins: 5, without_wins: 4 },
       },
     };
+  }
+
+  /** Top-level calendar[]: one row per day, all three models side by side (from each model's daily). */
+  function buildCalendar(models) {
+    const byDate = new Map();
+    for (const id of MODEL_IDS) {
+      for (const d of models[id].daily) {
+        if (!byDate.has(d.date)) {
+          const wdIdx = (new Date(d.date + "T00:00:00Z").getUTCDay() + 6) % 7;
+          byDate.set(d.date, { date: d.date, weekday: WEEKDAYS[wdIdx], reconstructed: !!d.reconstructed });
+        }
+        byDate.get(d.date)[id] = {
+          picks: d.picks, bets: d.bets, wins: d.wins, losses: d.losses, pl_units: d.pl_units,
+          hyp_bets: d.hyp_bets, hyp_wins: d.hyp_wins, hyp_pl_units: d.hyp_pl_units,
+        };
+      }
+    }
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
 
   function isDemoHost() {
@@ -425,14 +463,18 @@
         by_price_band: block.by_price_band,
         by_track: block.by_track,
         by_stake_bracket: block.by_stake_bracket,
+        by_threshold: block.by_threshold,
+        by_min_threshold: block.by_min_threshold,
         recent: block.recent,
       };
     }
     return {
       generated_at: full.generated_at,
+      scope: "server",
       range: { from: STAKED_FROM, to: to },
       meta: full.meta,
       models: models,
+      calendar: full.calendar,
     };
   }
 
@@ -440,6 +482,9 @@
     generateDemoStats: generateDemoStats,
     generateStakedDemoStats: generateStakedDemoStats,
     isDemoHost: isDemoHost,
+    buildCalendar: buildCalendar,
+    THRESHOLDS: THRESHOLDS,
+    MIN_THRESHOLDS: MIN_THRESHOLDS,
     STAKED_FROM: STAKED_FROM,
     HEADLINE_SINCE: HEADLINE_SINCE,
     RECON_FROM: RECON_FROM,

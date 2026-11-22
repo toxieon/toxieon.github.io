@@ -148,11 +148,8 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 .btn-discord:hover { filter: brightness(1.08); }
 
-.tab-pending {
-  opacity: 0.5;
-  cursor: not-allowed;
-  border-style: dashed;
-}
+.thresh-mode { margin-top: 0; }
+.breakdown-table tr.row-nobet td:not(.pos):not(.neg) { color: var(--muted); }
 
 .banner {
   background: #3a2424;
@@ -555,6 +552,9 @@ a:focus-visible, button:focus-visible, input:focus-visible {
     text-overflow: ellipsis;
   }
   .cal-dow { font-size: 0.6rem; padding: 2px 0; }
+  /* 390px: P&L only in the cell; the W/L record is in the day sheet and the row title. */
+  .cal-wl { display: none; }
+  .cal-mini { font-size: 0.55rem; grid-template-columns: 1.5em minmax(0, 1fr); }
 }
 
 .day-sheet {

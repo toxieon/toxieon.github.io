@@ -229,3 +229,70 @@ test("weekday rows keep a hyp block with hyp.bets", () => {
   assert.equal(row.hyp.bets, 8);
   assert.equal(row.bets, 4);
 });
+
+const THRESH = ["<30%", "30-32%", "32-35%", "35-40%", "40-45%", "45-50%", "50-60%", "60-70%", "70%+"];
+
+test("by_threshold keeps the 9 fixed bands in contract order, with picks, staked_units and hyp", () => {
+  const rows = THRESH.slice().reverse().map((label, i) => ({
+    label, picks: i + 1, bets: label === "<30%" ? 0 : i, wins: 0, strike_pct: 0, staked_units: i, pl_units: 0, roi_pct: 0,
+    hyp: { bets: i + 1, wins: 1, strike_pct: 10, pl_units: 1.5, roi_pct: 5 },
+  }));
+  const out = N.normalizeStatsPayload({ models: { with_price: { by_threshold: rows } } });
+  const t = out.models.with_price.by_threshold;
+  assert.deepEqual(t.map((r) => r.label), THRESH);
+  assert.equal(t[0].bets, 0);
+  assert.equal(t[0].hyp.pl_units, 1.5);
+  assert.equal(typeof t[3].picks, "number");
+  assert.equal(typeof t[3].staked_units, "number");
+});
+
+test("by_threshold fills a missing band with an empty row; absent field stays []", () => {
+  const out = N.normalizeStatsPayload({ models: { with_price: { by_threshold: [{ label: "45-50%", picks: 1, bets: 1, wins: 1 }] } } });
+  const t = out.models.with_price.by_threshold;
+  assert.equal(t.length, 9);
+  assert.equal(t[5].label, "45-50%");
+  assert.equal(t[5].wins, 1);
+  assert.equal(t[0].picks, 0);
+  assert.deepEqual(out.models.agree.by_threshold, []);
+  assert.deepEqual(out.models.agree.by_min_threshold, []);
+});
+
+test("by_min_threshold is sorted by min_pct and keeps min_pct", () => {
+  const rows = [70, 30, 45, 32, 60, 35, 50, 40].map((n) => ({ label: n + "%+", min_pct: n, picks: 100 - n, bets: 50 - n / 2, wins: 3, hyp: { bets: 5, wins: 1, pl_units: 1, roi_pct: 1 } }));
+  const t = N.normalizeStatsPayload({ models: { agree: { by_min_threshold: rows } } }).models.agree.by_min_threshold;
+  assert.deepEqual(t.map((r) => r.min_pct), [30, 32, 35, 40, 45, 50, 60, 70]);
+  assert.deepEqual(t.map((r) => r.label), ["30%+", "32%+", "35%+", "40%+", "45%+", "50%+", "60%+", "70%+"]);
+  const noPct = N.normalizeStatsPayload({ models: { agree: { by_min_threshold: [{ label: "40%+" }] } } }).models.agree.by_min_threshold;
+  assert.equal(noPct[0].min_pct, 40);
+});
+
+test("top-level calendar[] is normalised with all three models; daily rows gain losses, hyp_bets, hyp_wins; scope kept", () => {
+  const out = N.normalizeStatsPayload({
+    scope: "server",
+    models: { with_price: { daily: [{ date: "2026-11-16", picks: 2, bets: 2, wins: 1, losses: 1, hyp_bets: 2, hyp_wins: 1 }] } },
+    calendar: [
+      { date: "2026-11-17", weekday: "Tue", with_price: { picks: 1, bets: 1, wins: 0, losses: 1, pl_units: -1, hyp_bets: 1, hyp_wins: 0, hyp_pl_units: -1 } },
+      { date: "2026-11-16", weekday: "Mon", reconstructed: false,
+        with_price: { picks: 2, bets: 2, wins: 1, losses: 1, pl_units: 1.5, hyp_bets: 2, hyp_wins: 1, hyp_pl_units: 1 },
+        without_price: { picks: 2, bets: 1, wins: 1, losses: 0, pl_units: 2, hyp_bets: 2, hyp_wins: 1, hyp_pl_units: 1 },
+        agree: { picks: 1, bets: 1, wins: 1, losses: 0, pl_units: 2, hyp_bets: 1, hyp_wins: 1, hyp_pl_units: 2 } },
+    ],
+  });
+  assert.equal(out.scope, "server");
+  assert.deepEqual(out.calendar.map((d) => d.date), ["2026-11-16", "2026-11-17"]);
+  assert.equal(out.calendar[0].without_price.losses, 0);
+  assert.equal(out.calendar[0].agree.hyp_wins, 1);
+  assert.equal(out.calendar[1].agree, null);
+  const d = out.models.with_price.daily[0];
+  assert.equal(d.losses, 1);
+  assert.equal(d.hyp_bets, 2);
+  assert.equal(d.hyp_wins, 1);
+  assert.equal(N.normalizeStatsPayload({ scope: "guild-123" }).scope, undefined, "only server|all");
+  assert.deepEqual(N.normalizeStatsPayload({}).calendar, []);
+});
+
+test("filterReconstructed drops reconstructed calendar days when the toggle is off", () => {
+  const p = N.normalizeStatsPayload({ calendar: [{ date: "2026-10-20", reconstructed: true }, { date: "2026-11-16" }] });
+  assert.deepEqual(N.filterReconstructed(p, false).calendar.map((d) => d.date), ["2026-11-16"]);
+  assert.equal(N.filterReconstructed(p, true).calendar.length, 2);
+});

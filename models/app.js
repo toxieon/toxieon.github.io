@@ -1,8 +1,8 @@
-/* TipBot model stats — owner-only comparison dashboard. */
+/* TipBot model stats — horse-server comparison dashboard (GET /api/model-stats). */
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.2.1";
+  const APP_VERSION = "0.3.1";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -11,8 +11,15 @@
   const API = window.NDModelsApi;
   const FMT = window.NDModelsFormat;
 
-  const UNAVAILABLE_MSG =
-    "Not available: either the stats API isn't live yet, or this account isn't the owner's.";
+  const UNAVAILABLE_MSG = "Model stats aren't live yet. Check back after the next TipBot update.";
+  const NOT_CONFIGURED_MSG = "Model stats aren't set up on TipBot yet. Check back soon.";
+  const DB_UNAVAILABLE_MSG = "The stats database is unavailable right now. Try again in a few minutes.";
+  const FORBIDDEN_MSG =
+    "You're signed in, but this Discord account isn't in the horse server. If you've just joined, sign in again so TipBot sees it.";
+  const EXPIRED_MSG = "Your session has expired. Sign in with Discord again.";
+  /* One automatic Discord bounce per 10 minutes on 401 (prompt=none makes it instant), so a bad token can't loop. */
+  const REAUTH_KEY = "nd_models_reauth_at";
+  const REAUTH_GAP_MS = 10 * 60 * 1000;
   const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
   const RECON_KEY = "nd_models_include_reconstructed";
 
@@ -38,6 +45,10 @@
     weekdayModel: "with_price",
     gateMessage: "",
     signingIn: false,
+    forbidden: false,
+    authHandled: false,
+    notConfigured: false,
+    thresholdMode: "bands",
     loadError: "",
     apiNotLive: false,
     calendarMonth: "",
@@ -110,17 +121,47 @@
   }
 
   function setView() {
-    const authed = signedIn();
+    const hasToken = signedIn();
+    const authed = hasToken && !state.forbidden;
     $("auth-gate").hidden = authed;
     $("app-main").hidden = !authed;
-    $("btn-signout").hidden = !authed;
+    $("btn-signout").hidden = !hasToken;
     $("demo-badge").hidden = !isDemoMode() || !authed;
     if (!authed) {
-      $("gate-message").textContent = state.signingIn ? "Signing in…" : state.gateMessage || "";
+      const msg = state.signingIn ? "Signing in…" : state.forbidden ? FORBIDDEN_MSG : state.gateMessage || "";
+      $("gate-message").textContent = msg;
       const btn = $("btn-discord");
       btn.href = API.loginUrl(location.origin);
       btn.hidden = state.signingIn;
+      btn.textContent = state.forbidden ? "Sign in again" : "Sign in with Discord";
     }
+  }
+
+  /** 401: token missing, bad or expired. Clear it and go back through Discord (the refresh route has no CORS for neilldata). */
+  function handleUnauthorised() {
+    if (state.authHandled) return;
+    state.authHandled = true;
+    signOutAndShowGate();
+    state.gateMessage = EXPIRED_MSG;
+    let last = 0;
+    try { last = Number(localStorage.getItem(REAUTH_KEY)) || 0; } catch (e) { last = 0; }
+    if (Date.now() - last > REAUTH_GAP_MS) {
+      try { localStorage.setItem(REAUTH_KEY, String(Date.now())); } catch (e) { /* ignore */ }
+      state.signingIn = true;
+      setView();
+      location.assign(API.loginUrl(location.origin));
+      return;
+    }
+    setView();
+  }
+
+  /** 403: the token is valid but this account isn't in the horse server. Keep the token (it may be Black Book's
+   *  shared one); show why, and offer "Sign in again" for someone who has just joined. No automatic loop. */
+  function handleForbidden() {
+    state.forbidden = true;
+    state.data = null;
+    state.stakedData = null;
+    setView();
   }
 
   async function fetchModelStats(from, to, options) {
@@ -137,32 +178,31 @@
       stakedOnly: !!opts.stakedOnly,
       includeReconstructed: shouldRequestReconstructed(opts),
     });
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Authorization: "Bearer " + state.token },
-      credentials: "omit",
-      cache: "no-store",
-    });
-    if (res.status === 401 || res.status === 403) {
-      signOutAndShowGate();
-      state.gateMessage = "Your session has expired. Sign in with Discord again.";
-      setView();
-      return { ok: false, auth: true };
+    const res = await API.requestModelStats(url, state.token);
+    switch (res.kind) {
+      case "ok": {
+        const data = N.normalizeStatsPayload(res.data);
+        return { ok: true, data: finishMainPayload(data, opts) };
+      }
+      case "signin":
+        handleUnauthorised();
+        return { ok: false, auth: true };
+      case "forbidden":
+        handleForbidden();
+        return { ok: false, auth: true };
+      case "not_configured":
+        return { ok: false, notConfigured: true };
+      case "not_live":
+        return { ok: false, notLive: true };
+      case "unavailable":
+        return { ok: false, error: DB_UNAVAILABLE_MSG };
+      case "rate_limited":
+        return { ok: false, error: "Too many requests. Wait a couple of minutes and try again." };
+      case "bad_request":
+        return { ok: false, error: API.describeApiError(400, res.data) };
+      default:
+        return { ok: false, error: API.describeApiError(res.status, {}) };
     }
-    if (res.status === 404) {
-      return { ok: false, notLive: true };
-    }
-    if (res.status === 400) {
-      let body = {};
-      try { body = await res.json(); } catch (e) { body = {}; }
-      return { ok: false, error: API.describeApiError(400, body) };
-    }
-    if (!res.ok) {
-      return { ok: false, error: API.describeApiError(res.status, {}) };
-    }
-    const json = await res.json();
-    const data = N.normalizeStatsPayload(json);
-    return { ok: true, data: finishMainPayload(data, opts) };
   }
 
   function shouldRequestReconstructed(opts) {
@@ -272,6 +312,7 @@
     updatePresetChips();
     state.loadError = "";
     state.apiNotLive = false;
+    state.notConfigured = false;
     $("dashboard").hidden = true;
     $("load-state").hidden = false;
     $("load-state").textContent = "Loading stats…";
@@ -279,8 +320,9 @@
     const result = await fetchModelStats(from, to, {});
     $("load-state").hidden = true;
     if (result.auth) return;
-    if (result.notLive) {
-      state.apiNotLive = true;
+    if (result.notLive || result.notConfigured) {
+      state.apiNotLive = !!result.notLive;
+      state.notConfigured = !!result.notConfigured;
       state.data = null;
       renderStatus();
       $("dashboard").hidden = true;
@@ -294,7 +336,8 @@
     }
     state.data = result.data;
     state.apiNotLive = false;
-    state.joinedByDate = new Map(CAL.joinDailyByDate(state.data.models).map((d) => [d.date, d]));
+    // Top-level calendar[] (all three models per day); falls back to joining models.*.daily by date.
+    state.joinedByDate = new Map(CAL.calendarDays(state.data).map((d) => [d.date, d]));
     state.calendarMonth = state.rangeTo.slice(0, 7);
     if (!state.allTime && state.data.range && state.data.range.from) {
       state.rangeFrom = state.data.range.from;
@@ -305,7 +348,10 @@
 
   function signOutAndShowGate() {
     setToken("");
+    API.clearStatsCache();
     state.token = "";
+    state.forbidden = false;
+    state.notConfigured = false;
     state.data = null;
     state.stakedData = null;
     state.stakedNotLive = false;
@@ -332,6 +378,10 @@
       wrap.classList.add("info");
       text.textContent = UNAVAILABLE_MSG;
       changeBtn.hidden = false;
+    } else if (state.notConfigured) {
+      wrap.hidden = false;
+      wrap.classList.add("info");
+      text.textContent = NOT_CONFIGURED_MSG;
     } else if (state.loadError) {
       wrap.hidden = false;
       text.textContent = state.loadError;
@@ -530,7 +580,8 @@
     const result = await fetchModelStats(from, to, { stakedOnly: true });
     state.stakedLoading = false;
     if (result.auth) return;
-    if (result.notLive) {
+    if (result.notLive || result.notConfigured) {
+      if (result.notConfigured) state.notConfigured = true;
       state.stakedNotLive = true;
       state.stakedData = null;
       renderStakedSection();
@@ -559,7 +610,7 @@
     if (state.stakedNotLive) {
       err.hidden = false;
       err.classList.add("info");
-      errText.textContent = UNAVAILABLE_MSG;
+      errText.textContent = state.notConfigured ? NOT_CONFIGURED_MSG : UNAVAILABLE_MSG;
     } else if (state.stakedError) {
       err.hidden = false;
       err.classList.remove("info");
@@ -608,25 +659,41 @@
     renderCumUnitsChart(chart, state.stakedData.models, { primary: model, faintOthers: true });
   }
 
+  /** Breakdown field for a tab. Stake size = by_stake_bracket (2u/1u/0.5u/no bet). Threshold = by_threshold
+   *  (9 fixed 7am win-chance bands) or by_min_threshold (cumulative "at or above" cuts). */
+  function breakdownKey(tab, thresholdMode) {
+    if (tab === "price_band") return "by_price_band";
+    if (tab === "track") return "by_track";
+    if (tab === "threshold") return thresholdMode === "min" ? "by_min_threshold" : "by_threshold";
+    return "by_stake_bracket";
+  }
+
   function renderBreakdown() {
     const model = state.breakdownModel;
     const tab = state.breakdownTab;
     const m = state.data.models[model];
-    // by_stake_bracket is stake size (2u/1u/0.5u/no bet), not threshold. Threshold waits on CFG.THRESHOLD_BREAKDOWN_FIELD.
-    const key = tab === "price_band" ? "by_price_band" : tab === "track" ? "by_track" : "by_stake_bracket";
-    const rows = m[key];
+    const isThreshold = tab === "threshold";
+    const rows = m[breakdownKey(tab, state.thresholdMode)] || [];
     const tbody = $("breakdown-body");
     const head = $("breakdown-head");
-    const showHyp = breakdownRowsHaveHyp(rows);
+    $("thresh-mode").hidden = !isThreshold;
+    $("thresh-note").hidden = !isThreshold;
+    document.querySelectorAll("[data-thresh-mode]").forEach((btn) => {
+      btn.classList.toggle("on", btn.getAttribute("data-thresh-mode") === state.thresholdMode);
+    });
+    const showHyp = isThreshold || breakdownRowsHaveHyp(rows);
     head.replaceChildren();
     const headTr = document.createElement("tr");
-    ["Label", "Bets", "Wins", "Strike %", "P&L u", "ROI %"].forEach((h) => {
+    const cols = isThreshold
+      ? ["Win chance", "Picks", "Bets", "Wins", "Strike %", "P&L u", "ROI %"]
+      : ["Label", "Bets", "Wins", "Strike %", "P&L u", "ROI %"];
+    cols.forEach((h) => {
       const th = document.createElement("th");
       th.textContent = h;
       headTr.append(th);
     });
     if (showHyp) {
-      ["Flat P&L", "Flat ROI %"].forEach((h) => {
+      (isThreshold ? ["Flat n", "Flat strike %", "Flat P&L", "Flat ROI %"] : ["Flat P&L", "Flat ROI %"]).forEach((h) => {
         const th = document.createElement("th");
         th.textContent = h;
         headTr.append(th);
@@ -636,29 +703,45 @@
     tbody.replaceChildren();
     if (!rows.length) {
       $("breakdown-empty").hidden = false;
+      $("breakdown-empty").textContent = isThreshold
+        ? "No threshold rows yet. They arrive with the new TipBot stats."
+        : "No rows in this breakdown.";
       return;
     }
     $("breakdown-empty").hidden = true;
+    const fields = isThreshold
+      ? ["label", "picks", "bets", "wins", "strike_pct", "pl_units", "roi_pct"]
+      : ["label", "bets", "wins", "strike_pct", "pl_units", "roi_pct"];
     rows.forEach((r) => {
       const tr = document.createElement("tr");
-      ["label", "bets", "wins", "strike_pct", "pl_units", "roi_pct"].forEach((col) => {
+      if (isThreshold && !r.bets) tr.classList.add("row-nobet");
+      fields.forEach((col) => {
         const td = document.createElement("td");
-        if (col === "strike_pct") td.textContent = FMT.formatPctWithN(r[col], r.bets);
-        else if (col === "roi_pct") td.textContent = FMT.formatPctWithN(r[col], r.bets, { signed: true });
+        if (col === "strike_pct") td.textContent = r.bets ? FMT.formatPctWithN(r[col], r.bets) : "—";
+        else if (col === "roi_pct") td.textContent = r.bets ? FMT.formatPctWithN(r[col], r.bets, { signed: true }) : "—";
         else if (col === "pl_units") {
-          td.textContent = fmtPl(r[col]);
+          td.textContent = r.bets ? fmtPl(r[col]) : "—";
           td.className = plClass(r[col]);
-        } else td.textContent = String(r[col]);
+        } else td.textContent = String(r[col] == null ? 0 : r[col]);
         tr.appendChild(td);
       });
       if (showHyp) {
         const hp = r.hyp || {};
+        const n = FMT.hypSampleN(hp, r.bets);
+        if (isThreshold) {
+          const tdN = document.createElement("td");
+          tdN.textContent = String(hp.bets || 0);
+          tr.append(tdN);
+          const tdS = document.createElement("td");
+          tdS.textContent = hp.bets ? FMT.formatPctWithN(hp.strike_pct, n) : "—";
+          tr.append(tdS);
+        }
         const tdPl = document.createElement("td");
         tdPl.textContent = fmtPl(hp.pl_units);
         tdPl.className = plClass(hp.pl_units);
         tr.append(tdPl);
         const tdRoi = document.createElement("td");
-        tdRoi.textContent = FMT.formatPctWithN(hp.roi_pct, FMT.hypSampleN(hp, r.bets), { signed: true });
+        tdRoi.textContent = FMT.formatPctWithN(hp.roi_pct, n, { signed: true });
         tr.append(tdRoi);
       }
       tbody.appendChild(tr);
@@ -905,7 +988,14 @@
             lab.textContent = modelMiniLabel(id);
             const val = document.createElement("span");
             val.className = "cal-val";
-            val.textContent = miniCellText(slice);
+            const pl = document.createElement("span");
+            pl.className = "cal-pl";
+            pl.textContent = fmtPl(slice.pl_units);
+            const wl = document.createElement("span");
+            wl.className = "cal-wl";
+            wl.textContent = " " + slice.wins + "/" + slice.bets;
+            val.append(pl, wl);
+            row.title = CFG.MODEL_LABELS[id] + ": " + miniCellText(slice) + "u";
             row.append(lab, val);
             models.appendChild(row);
           });
@@ -966,6 +1056,7 @@
           "Bets " + slice.bets,
           "Wins " + slice.wins,
         ];
+        if (slice.bets) parts.push("Losses " + (slice.losses || 0));
         if (slice.bets) parts.push("Strike " + fmtPct(strike));
         stats.append(parts.join(" · "));
         card.appendChild(stats);
@@ -976,12 +1067,13 @@
         strong.className = plClass(slice.pl_units);
         strong.textContent = fmtPl(slice.pl_units) + "u";
         plLine.append(strong);
-        if (slice.hyp_pl_units || slice.bets) {
+        if (slice.hyp_pl_units || slice.bets || slice.hyp_bets) {
           plLine.append(" · Flat 1u ");
           const hyp = document.createElement("strong");
           hyp.className = plClass(slice.hyp_pl_units);
           hyp.textContent = fmtPl(slice.hyp_pl_units) + "u";
           plLine.append(hyp);
+          if (slice.hyp_bets) plLine.append(" (" + (slice.hyp_wins || 0) + "/" + slice.hyp_bets + " won)");
         }
         card.appendChild(plLine);
       }
@@ -1114,6 +1206,16 @@
 
   function bindEvents() {
     $("btn-signout").addEventListener("click", signOutAndShowGate);
+    $("btn-discord").addEventListener("click", () => {
+      // 403 "Sign in again": drop only this page's key so the fresh session is used; a shared Black Book token stays.
+      if (state.forbidden) API.clearPrimaryToken(localStorage);
+    });
+    document.querySelectorAll("[data-thresh-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.thresholdMode = btn.getAttribute("data-thresh-mode");
+        renderBreakdown();
+      });
+    });
     $("btn-banner-change-token").addEventListener("click", signOutAndShowGate);
     $("btn-apply-range").addEventListener("click", () => {
       if (!state.allTime) state.rangeFrom = $("date-from").value;
@@ -1211,8 +1313,8 @@
       state.signingIn = true;
       setView();
       API.exchangeAndStore(code, localStorage).then(
-        (res) => finishSignIn(res && res.ok),
-        () => finishSignIn(false)
+        (res) => finishSignIn(res && res.ok, res && res.status),
+        () => finishSignIn(false, 0)
       );
       return;
     }
@@ -1220,15 +1322,18 @@
   }
 
   /** After the one-time #code= exchange: 200 stores the token and loads; anything else shows the Discord button again. */
-  function finishSignIn(ok) {
+  function finishSignIn(ok, status) {
     state.signingIn = false;
     if (ok) {
       state.gateMessage = "";
+      state.authHandled = false;
+      state.forbidden = false;
       state.token = getToken();
     } else {
-      setToken("");
+      // invalid_code (401) or anything else: drop this page's key and show the Discord button again.
+      API.clearPrimaryToken(localStorage);
       state.token = "";
-      state.gateMessage = "Sign-in did not complete. Try again.";
+      state.gateMessage = API.describeAuthError(status === 429 ? "rate_limited" : "login_failed");
     }
     startSignedIn();
   }

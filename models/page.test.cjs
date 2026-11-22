@@ -57,7 +57,8 @@ test("the code is exchanged once via api.js; fetches omit credentials; demo is l
   assert.match(app, /API\.exchangeAndStore\(code, localStorage\)/);
   assert.doesNotMatch(read("handoff.js"), /\bfetch\s*\(|XMLHttpRequest/);
   for (const f of ["app.js", "api.js"]) assert.doesNotMatch(read(f), /credentials:\s*["']include["']/);
-  assert.match(app, /credentials: "omit"/);
+  assert.match(read("api.js"), /credentials: "omit"/);
+  assert.doesNotMatch(app, /\bfetch\s*\(/, "app.js fetches only through api.js");
   assert.doesNotMatch(app, /setToken\("demo-local"\)/);
   assert.doesNotMatch(app + read("api.js") + read("handoff.js"), /document\.cookie|sessionStorage/);
   const demo = read("demo.js");
@@ -65,8 +66,39 @@ test("the code is exchanged once via api.js; fetches omit credentials; demo is l
   assert.doesNotMatch(demo, /neilldata\.com|github\.io/);
 });
 
-test("threshold breakdown is a disabled placeholder until TipBot publishes the field; by_stake_bracket is stake size", () => {
+test("threshold tab is live: by_threshold bands plus by_min_threshold; Stake size stays on by_stake_bracket", () => {
   assert.match(HTML, /data-break-tab="stake_bracket"[^>]*>Stake size</);
-  assert.match(HTML, /id="break-tab-threshold" disabled/);
-  assert.match(read("config.js"), /THRESHOLD_BREAKDOWN_FIELD: null/);
+  assert.match(HTML, /data-break-tab="threshold"[^>]*>Threshold</);
+  assert.match(HTML, /data-thresh-mode="bands"/);
+  assert.match(HTML, /data-thresh-mode="min"/);
+  assert.doesNotMatch(HTML, /Threshold · soon|tab-pending|disabled aria-disabled/);
+  assert.doesNotMatch(read("config.js"), /THRESHOLD_BREAKDOWN_FIELD/);
+  const app = read("app.js");
+  assert.match(app, /"by_threshold"/);
+  assert.match(app, /"by_min_threshold"/);
+  assert.match(app, /"by_stake_bracket"/);
+});
+
+test("calendar uses the top-level calendar[] with a daily join fallback", () => {
+  assert.match(read("app.js"), /CAL\.calendarDays\(state\.data\)/);
+});
+
+test("401 bounces through Discord (guarded), 403 keeps the token, 503 not_configured keeps the session; no /api/auth/refresh", () => {
+  const app = read("app.js");
+  assert.doesNotMatch(app + read("api.js"), /auth\/refresh/);
+  assert.match(app, /case "signin":\s*handleUnauthorised\(\)/);
+  assert.match(app, /case "forbidden":\s*handleForbidden\(\)/);
+  assert.match(app, /case "not_configured":\s*return \{ ok: false, notConfigured: true \}/);
+  const forbidden = /function handleForbidden\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.doesNotMatch(forbidden, /setToken|clearToken|location/);
+  const unauth = /function handleUnauthorised\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(unauth, /REAUTH_GAP_MS/);
+  assert.match(unauth, /location\.assign\(API\.loginUrl/);
+});
+
+test("copy is for horse-server members, never shows server ids or names, and recent picks are not owner-gated", () => {
+  assert.doesNotMatch(HTML, /owner only/i);
+  assert.match(HTML, /horse server/);
+  assert.doesNotMatch(read("app.js"), /\.scope\b/);
+  assert.match(HTML, /id="recent-model"/);
 });

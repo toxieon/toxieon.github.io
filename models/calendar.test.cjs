@@ -81,3 +81,19 @@ test("partitionDailyByReconstructed keeps frozen and reconstructed lines apart",
   assert.deepEqual(reconstructed.map((d) => d.date), ["2026-10-20"]);
   assert.equal(frozen[0].cum_units, 2);
 });
+
+test("calendarDays prefers the top-level calendar[] and falls back to joining daily", () => {
+  const fromCal = C.calendarDays({
+    calendar: [{ date: "2026-11-16", with_price: { picks: 2, bets: 2, wins: 1, losses: 1, pl_units: 1.5, hyp_bets: 2, hyp_wins: 1, hyp_pl_units: 1 }, without_price: null, agree: { picks: 1, bets: 0, wins: 0, losses: 0, pl_units: 0, hyp_bets: 1, hyp_wins: 1, hyp_pl_units: 2 } }],
+    models: { with_price: { daily: [{ date: "2026-11-01", bets: 9 }] } },
+  });
+  assert.equal(fromCal.length, 1);
+  assert.equal(fromCal[0].date, "2026-11-16");
+  assert.equal(fromCal[0].with_price.losses, 1);
+  assert.equal(fromCal[0].with_price.hyp_bets, 2);
+  assert.equal(fromCal[0].without_price, null);
+  assert.equal(fromCal[0].agree.hyp_pl_units, 2);
+  const fallback = C.calendarDays({ calendar: [], models: { agree: { daily: [{ date: "2026-11-02", bets: 1, wins: 1, losses: 0, hyp_bets: 1, hyp_wins: 1 }] } } });
+  assert.equal(fallback[0].date, "2026-11-02");
+  assert.equal(fallback[0].agree.hyp_wins, 1);
+});

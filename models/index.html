@@ -10,23 +10,23 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<script src="handoff.js?v=0.2.1"></script>
-<link rel="stylesheet" href="styles.css?v=0.2.1" />
-<script src="config.js?v=0.2.1"></script>
-<script src="api.js?v=0.2.1"></script>
-<script src="normalise.js?v=0.2.1"></script>
-<script src="calendar.js?v=0.2.1"></script>
-<script src="dates.js?v=0.2.1"></script>
-<script src="format.js?v=0.2.1"></script>
-<script src="demo.js?v=0.2.1"></script>
+<script src="handoff.js?v=0.3.1"></script>
+<link rel="stylesheet" href="styles.css?v=0.3.1" />
+<script src="config.js?v=0.3.1"></script>
+<script src="api.js?v=0.3.1"></script>
+<script src="normalise.js?v=0.3.1"></script>
+<script src="calendar.js?v=0.3.1"></script>
+<script src="dates.js?v=0.3.1"></script>
+<script src="format.js?v=0.3.1"></script>
+<script src="demo.js?v=0.3.1"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.2.1" defer></script>
+<script src="app.js?v=0.3.1" defer></script>
 </head>
 <body>
 <div class="app">
   <header class="sticky-nav top">
     <div>
-      <p class="muted" style="margin:0">Neill Data · owner only</p>
+      <p class="muted" style="margin:0">Neill Data · horse server</p>
       <h1>TipBot model stats</h1>
       <p id="demo-badge" class="hint" hidden>Demo data (?demo=1 on localhost)</p>
     </div>
@@ -38,7 +38,7 @@
 
   <section id="auth-gate" class="card gate" aria-labelledby="gate-title">
     <h2 id="gate-title">Model stats</h2>
-    <p class="muted">Sign in with Discord to see the With, Without and Agree model stats. This page is for the owner only.</p>
+    <p class="muted">Sign in with Discord to see the With, Without and Agree model stats. This page is for members of the horse server.</p>
     <p id="gate-message" class="hint" role="alert"></p>
     <a class="btn btn-primary btn-discord" id="btn-discord" href="https://afl-tipster-bot.onrender.com/auth/login?return_to=https%3A%2F%2Fwww.neilldata.com%2Fmodels%2F">Sign in with Discord</a>
   </section>
@@ -138,9 +138,13 @@
           <button type="button" class="tab on" data-break-tab="price_band">Price band</button>
           <button type="button" class="tab" data-break-tab="track">Track</button>
           <button type="button" class="tab" data-break-tab="stake_bracket" title="Stake size: 2u, 1u, 0.5u, no bet">Stake size</button>
-          <!-- Threshold breakdown: placeholder only. Wire it once TipBot model-stats publishes the field name and bands (see config.js THRESHOLD_BREAKDOWN_FIELD). -->
-          <button type="button" class="tab tab-pending" id="break-tab-threshold" disabled aria-disabled="true" title="Threshold breakdown is coming with the next TipBot stats update">Threshold · soon</button>
+          <button type="button" class="tab" data-break-tab="threshold" title="Model win chance frozen at 7am">Threshold</button>
         </div>
+        <div class="model-pick thresh-mode" id="thresh-mode" role="group" aria-label="Threshold view" hidden>
+          <button type="button" class="tab on" data-thresh-mode="bands">Bands</button>
+          <button type="button" class="tab" data-thresh-mode="min">At or above</button>
+        </div>
+        <p id="thresh-note" class="hint" hidden>Win chance frozen at 7am, not price or stake. &lt;30% has been no bet (0u) since 12 Nov, so read the Flat 1u columns there.</p>
         <p id="breakdown-empty" class="empty" hidden>No rows in this breakdown.</p>
         <div style="overflow-x:auto">
           <table class="breakdown-table">

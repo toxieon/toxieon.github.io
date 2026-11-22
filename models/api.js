@@ -10,6 +10,8 @@
   "use strict";
 
   const API_BASE = "https://afl-tipster-bot.onrender.com";
+  /** Horse-server route: open to members of the horse server (and the owner). Not /api/owner/model-stats. */
+  const STATS_PATH = "/api/model-stats";
   const TOKEN_KEY = "nd_models_owner_token";
   /** Read-only fallback: the same TipBot session token saved by Black Book on this origin. Never written here. */
   const FALLBACK_TOKEN_KEYS = ["nd_owner_token"];
@@ -76,6 +78,11 @@
     try { [TOKEN_KEY].concat(FALLBACK_TOKEN_KEYS).forEach((k) => storage.removeItem(k)); } catch (e) { /* ignore */ }
   }
 
+  /** Drop only this page's key (used for a fresh "sign in again" after 403, so a shared Black Book token survives). */
+  function clearPrimaryToken(storage) {
+    try { storage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+  }
+
   /** Exchange the one-time code and, on success, store the session token as nd_models_owner_token. */
   async function exchangeAndStore(code, storage, opts) {
     const res = await exchangeCode(code, opts);
@@ -89,7 +96,7 @@
   /** Text for a TipBot #error= code or a failed exchange. */
   function describeAuthError(code) {
     switch (String(code || "")) {
-      case "not_authorised": return "That Discord account isn't allowed here. Model stats are for the owner only.";
+      case "not_authorised": return "That Discord account isn't allowed to sign in here.";
       case "region_declined": return "Sign-in isn't available from your region.";
       case "rate_limited": return "Too many sign-in attempts. Wait a minute and try again.";
       case "": return "";
@@ -105,7 +112,69 @@
     const opts = options && typeof options === "object" ? options : {};
     if (opts.stakedOnly) params.set("staked_only", "1");
     if (opts.includeReconstructed) params.set("include_reconstructed", "1");
-    return base + "/api/owner/model-stats?" + params.toString();
+    return base + STATS_PATH + "?" + params.toString();
+  }
+
+  /** Classify a stats response. kind drives the UI:
+   *  ok · signin (401, sign in again) · forbidden (403, signed in but not in the horse server; keep the token) ·
+   *  not_configured (503, TipBot not set up yet; keep the token) · unavailable (503/502, retry later) ·
+   *  not_live (404, route not deployed yet) · rate_limited (429) · bad_request (400) · error. */
+  function classifyStats(status, body) {
+    const code = body && body.error != null ? String(body.error) : "";
+    if (status === 200) return "ok";
+    if (status === 401) return "signin";
+    if (status === 403) return "forbidden";
+    if (status === 503 && code === "not_configured") return "not_configured";
+    if (status === 503 || status === 502) return "unavailable";
+    if (status === 404) return "not_live";
+    if (status === 429) return "rate_limited";
+    if (status === 400) return "bad_request";
+    return "error";
+  }
+
+  /* In-memory only (never localStorage or the SW cache): TipBot caches each query for 2 minutes,
+   * so asking again sooner is wasted. Keyed by URL + token so a new sign-in refetches. */
+  const CACHE_TTL_MS = 120000;
+  const memo = new Map();
+
+  function clearStatsCache() { memo.clear(); }
+
+  /**
+   * GET one model-stats URL with a Bearer token, credentials omitted. Returns {status, data, kind, cached}.
+   * status 0 = network failure. One retry after a short wait on 502 or 503 unavailable (Render cold start).
+   * opts: {fetch, sleep, now}.
+   */
+  async function requestModelStats(url, token, opts) {
+    const o = opts || {};
+    const doFetch = o.fetch || (typeof fetch !== "undefined" ? fetch : null);
+    const sleep = o.sleep || ((ms) => new Promise((ok) => setTimeout(ok, ms)));
+    const now = o.now || Date.now;
+    const key = url + "\n" + (token || "");
+    const hit = memo.get(key);
+    if (hit && now() - hit.at < CACHE_TTL_MS) return Object.assign({}, hit.res, { cached: true });
+    for (let i = 1; i <= 2; i++) {
+      let r;
+      try {
+        r = await doFetch(url, {
+          method: "GET",
+          headers: token ? { Authorization: "Bearer " + token } : {},
+          credentials: "omit",
+          cache: "no-store",
+        });
+      } catch (e) {
+        if (i < 2) { await sleep(1500); continue; }
+        return { status: 0, data: {}, kind: "error", cached: false };
+      }
+      let data = null;
+      try { data = await r.json(); } catch (e) { data = null; }
+      data = data || {};
+      const kind = classifyStats(r.status, data);
+      if (kind === "unavailable" && i < 2) { await sleep(1500); continue; }
+      const res = { status: r.status, data: data, kind: kind, cached: false };
+      if (kind === "ok") memo.set(key, { at: now(), res: res });
+      return res;
+    }
+    return { status: 0, data: {}, kind: "error", cached: false };
   }
 
   /** Human message for a failed model-stats response. Body is {ok:false, error}. */
@@ -124,6 +193,7 @@
   return {
     API_BASE, TOKEN_KEY, FALLBACK_TOKEN_KEYS, CANONICAL_RETURN, RETURN_ORIGINS,
     returnToUrl, loginUrl, exchangeCode, exchangeAndStore, describeAuthError,
-    readToken, saveToken, clearToken, buildModelStatsUrl, describeApiError,
+    readToken, saveToken, clearToken, clearPrimaryToken, buildModelStatsUrl, describeApiError,
+    STATS_PATH, CACHE_TTL_MS, classifyStats, requestModelStats, clearStatsCache,
   };
 });

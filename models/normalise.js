@@ -1,4 +1,4 @@
-/* Normalise owner model-stats API payloads. No DOM. Used by app.js and normalise.test.cjs. */
+/* Normalise TipBot model-stats API payloads (GET /api/model-stats). No DOM. Used by app.js and normalise.test.cjs. */
 (function (root, factory) {
   "use strict";
   const api = factory();
@@ -9,6 +9,11 @@
 
   const MODEL_IDS = ["with_price", "without_price", "agree"];
   const PRICE_BAND_ORDER = ["$1-2", "$2-3", "$3-5", "$5-8", "$8-15", "$15+"];
+  /* by_threshold: 9 fixed bands of the model's win chance frozen at 7am (not price, not stake). */
+  const THRESHOLD_ORDER = ["<30%", "30-32%", "32-35%", "35-40%", "40-45%", "45-50%", "50-60%", "60-70%", "70%+"];
+  /* by_min_threshold: cumulative "what if the cut were X%" rows. */
+  const MIN_THRESHOLD_ORDER = [30, 32, 35, 40, 45, 50, 60, 70];
+  const SCOPES = new Set(["server", "all"]);
   const VALID_RESULTS = new Set(["won", "lost", "placed", "scratched", "void"]);
 
   function num(v, fallback) {
@@ -61,6 +66,9 @@
       picks: num(x.picks),
       bets: num(x.bets),
       wins: num(x.wins),
+      losses: num(x.losses),
+      hyp_bets: num(x.hyp_bets),
+      hyp_wins: num(x.hyp_wins),
       pl_units: num(x.pl_units),
       hyp_pl_units: num(x.hyp_pl_units),
       cum_units: pickField(x, "cum_units", "cum"),
@@ -80,9 +88,65 @@
       pl_units: num(x.pl_units),
       roi_pct: num(x.roi_pct),
     };
+    if (x.picks != null) out.picks = num(x.picks);
+    if (x.staked_units != null) out.staked_units = num(x.staked_units);
+    if (x.min_pct != null) out.min_pct = num(x.min_pct);
     const hyp = normHypBlock(x.hyp);
     if (hyp) out.hyp = hyp;
     return out;
+  }
+
+  function emptyBand(label) {
+    return { label: label, picks: 0, bets: 0, wins: 0, strike_pct: 0, staked_units: 0, pl_units: 0, roi_pct: 0 };
+  }
+
+  /** by_threshold in the fixed contract order; a missing band shows as an empty row. Absent field → []. */
+  function normThreshold(rows) {
+    if (!Array.isArray(rows)) return [];
+    const byLabel = new Map(rows.map(normBreakdownRow).map((r) => [r.label, r]));
+    const out = THRESHOLD_ORDER.map((label) => byLabel.get(label) || emptyBand(label));
+    for (const [label, r] of byLabel) if (!THRESHOLD_ORDER.includes(label)) out.push(r);
+    return out;
+  }
+
+  /** by_min_threshold sorted by min_pct (30%+ … 70%+). Absent field → []. */
+  function normMinThreshold(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.map(normBreakdownRow).map((r) => {
+      if (r.min_pct == null) {
+        const m = /^(\d+)%\+$/.exec(r.label);
+        if (m) r.min_pct = Number(m[1]);
+      }
+      return r;
+    }).sort((a, b) => num(a.min_pct, 999) - num(b.min_pct, 999));
+  }
+
+  function normCalendarSlice(x) {
+    if (!x || typeof x !== "object") return null;
+    return {
+      picks: num(x.picks),
+      bets: num(x.bets),
+      wins: num(x.wins),
+      losses: num(x.losses),
+      pl_units: num(x.pl_units),
+      hyp_bets: num(x.hyp_bets),
+      hyp_wins: num(x.hyp_wins),
+      hyp_pl_units: num(x.hyp_pl_units),
+    };
+  }
+
+  /** Top-level calendar[]: one row per day with all three models side by side. */
+  function normCalendar(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter((r) => r && typeof r === "object" && r.date)
+      .map((r) => {
+        const out = { date: String(r.date), weekday: r.weekday != null ? String(r.weekday) : "" };
+        for (const id of MODEL_IDS) out[id] = normCalendarSlice(r[id]);
+        if (r.reconstructed) out.reconstructed = true;
+        return out;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   function sortPriceBands(rows) {
@@ -191,6 +255,8 @@
       by_price_band: normBreakdown(m.by_price_band, "price_band"),
       by_track: normBreakdown(m.by_track, "track"),
       by_stake_bracket: normBreakdown(m.by_stake_bracket, "stake"),
+      by_threshold: normThreshold(m.by_threshold),
+      by_min_threshold: normMinThreshold(m.by_min_threshold),
       by_weekday: weekday,
       recent: Array.isArray(m.recent) ? m.recent.map(normRecent) : [],
     };
@@ -251,8 +317,11 @@
         to: range.to != null ? String(range.to) : "",
       },
       models,
+      calendar: normCalendar(data.calendar),
       head_to_head: normHeadToHead(data.head_to_head),
     };
+    // scope is only "server" or "all"; the payload never carries server ids or names, and none are shown.
+    if (SCOPES.has(data.scope)) out.scope = data.scope;
     if (topMeta) out.meta = topMeta;
     return out;
   }
@@ -279,6 +348,7 @@
     const h = payload.head_to_head && typeof payload.head_to_head === "object" ? payload.head_to_head : {};
     return Object.assign({}, payload, {
       models,
+      calendar: Array.isArray(payload.calendar) ? payload.calendar.filter(notReconstructed) : [],
       head_to_head: Object.assign({}, h, {
         days: Array.isArray(h.days) ? h.days.filter(notReconstructed) : [],
       }),
@@ -288,6 +358,11 @@
   return {
     MODEL_IDS,
     PRICE_BAND_ORDER,
+    THRESHOLD_ORDER,
+    MIN_THRESHOLD_ORDER,
+    normThreshold,
+    normMinThreshold,
+    normCalendar,
     VALID_RESULTS,
     normalizeStatsPayload,
     normSummary,
