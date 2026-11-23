@@ -1,4 +1,4 @@
-/* Hub v0.9.1 — registry, not crawler (§5.1). See hub/VERSION.
+/* Hub v0.9.3 — registry, not crawler (§5.1). See hub/VERSION.
  * Apps come from apps.json, generated at build time by hub/build-apps.cjs from
  * each top-level folder's index.html (nd:* meta tags); search is nd-match fuzzy;
  * "Recent jobs" lists the last 5 jobs/plans opened in any suite app, read from
@@ -23,6 +23,7 @@ async function loadHub() {
     apps = (payload.apps || []).filter((a) => !a.hidden).sort((a, b) => (a.order || 99) - (b.order || 99));
     await injectOwnerGateCodesTile();
     await injectOwnerBlackBookTile();
+    await injectMembersModelsTile();
     statusEl.textContent = "Neill Data suite";
   } catch (e) {
     statusEl.textContent = "Could not load apps.json";
@@ -148,6 +149,24 @@ async function injectOwnerBlackBookTile() {
     });
     apps.sort((a, b) => (a.order || 99) - (b.order || 99));
   } catch (e) { /* owner-only */ }
+}
+
+/** TipBot model stats: open to horse-server members (TipBot checks membership on Discord sign-in), so the tile
+ * shows for everyone with no Google owner check. Still not in apps.json, discovery or the sitemap (.nd-private),
+ * and the page itself is noindex and shows only the Discord gate when signed out. */
+async function injectMembersModelsTile() {
+  if (apps.some((a) => a.id === "tipbot-models")) return;
+  apps.push({
+    id: "tipbot-models",
+    name: "Model Stats",
+    path: "/models/",
+    icon: "/models/favicon.svg",
+    color: "#7aa2f7",
+    order: 17,
+    hidden: false,
+    description: "With, Without and Agree model stats for horse server members (Discord sign-in).",
+  });
+  apps.sort((a, b) => (a.order || 99) - (b.order || 99));
 }
 
 loadHub();

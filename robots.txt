@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /timesheetlive/
 Disallow: /blackbook/
+Disallow: /models/
 
 Sitemap: https://neilldata.com/sitemap.xml
