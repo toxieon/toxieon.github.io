@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.3.1";
+  const APP_VERSION = "0.3.2";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -385,6 +385,10 @@
     } else if (state.loadError) {
       wrap.hidden = false;
       text.textContent = state.loadError;
+    } else if (state.data && FMT.ungradedPicks(state.data.models) > 0) {
+      wrap.hidden = false;
+      wrap.classList.add("info");
+      text.textContent = FMT.UNGRADED_MSG;
     }
   }
 
@@ -649,6 +653,7 @@
     const empty = $("staked-empty");
     const chart = $("staked-chart");
     if (!summary.bets) {
+      empty.textContent = summary.picks > 0 ? FMT.STAKED_UNGRADED_MSG : FMT.STAKED_EMPTY_MSG;
       empty.hidden = false;
       chart.hidden = true;
       chart.replaceChildren();
