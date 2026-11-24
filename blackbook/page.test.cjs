@@ -133,3 +133,14 @@ test("pending entries get a tag; empty race cards and next starts say Not entere
   assert.match(app, /document\.addEventListener\("error"[\s\S]*?, true\);/);
   assert.doesNotMatch(read("index.html") + read("app.js"), /\bon(error|load|click)=/i);
 });
+
+test("0.2.2 fixes stay in: first-load retry, stale answers dropped, drafts kept on toggle, 401 closes the add sheet", () => {
+  const app = read("app.js");
+  assert.match(app, /if \(S\.auth === "checking"\) \{[\s\S]*?data-act="retry"/);
+  assert.match(app, /if \(act === "retry"\)/);
+  assert.equal((app.match(/if \(seq !== loadSeq\) return;/g) || []).length, 3);
+  assert.match(app, /var drafts = isEdit \? null : editDrafts\(\);/);
+  assert.match(app, /S\.gateMsg = "Your session has expired\. Sign in with Discord again\."; dropAdd\(\);/);
+  assert.match(app, /S\.add\.racesErr/);
+  assert.match(app, /if \(!S\.add\) return;\s*var q = S\.add\.q\.trim\(\);/);
+});

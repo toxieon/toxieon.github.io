@@ -10,7 +10,7 @@
  */
 (function (root) {
   "use strict";
-  var APP_VERSION = "0.2.1";
+  var APP_VERSION = "0.2.2";
   var F = root.BBFormat, D = root.BBDates, A = root.BBApi, DEMO = root.BBDemo;
   var esc = F.esc, fmtPrice = F.fmtPrice, ordinal = F.ordinal, initials = F.initials, resultText = F.resultText, resultClass = F.resultClass;
   var isComingSoon = F.isComingSoon, prioOf = F.prioOf, priceInput = F.priceInput, highlight = F.highlight;
@@ -66,13 +66,15 @@
 
   async function call(method, path, body) {
     var res = demoBackend ? demoBackend.request(method, path, body) : await A.request(method, path, body, { token: token() });
-    if (res.auth === "signin") { A.clearToken(root.localStorage); S.auth = "signin"; S.gateMsg = "Your session has expired. Sign in with Discord again."; render(); }
-    else if (res.auth === "denied") { S.auth = "denied"; render(); }
-    return { status: res.status, data: res.data };
+    if (res.auth === "signin") { A.clearToken(root.localStorage); S.auth = "signin"; S.gateMsg = "Your session has expired. Sign in with Discord again."; dropAdd(); render(); }
+    else if (res.auth === "denied") { S.auth = "denied"; dropAdd(); render(); }
+    return { status: res.status, data: res.data, auth: res.auth };
   }
+  function dropAdd() { if (S.add) { S.add = null; renderModal(); } }
   function signOut() {
     A.clearToken(root.localStorage);
     S.auth = "signin"; S.gateMsg = ""; S.book = null; S.upcoming = null; S.detail = {};
+    dropAdd();
     render();
   }
 
@@ -98,30 +100,41 @@
     return { view: "list" };
   }
 
+  // Each load takes a ticket. An answer that arrives after a newer load started (fast filter taps,
+  // quick back/forward) is dropped, so an old answer never paints over the current view.
+  var loadSeq = 0;
+  var loadedAt = 0;
+  function failed(res) { return !res.auth; }
   async function loadBook() {
     var r = route();
+    var seq = ++loadSeq;
     S.loading = true;
     var res = await call("GET", A.paths.list({ priority: S.prio, filter: r.archived ? "archived" : S.filter, sort: S.sort }));
+    if (seq !== loadSeq) return;
     S.loading = false;
-    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.book = res.data; noteServer(res.data); }
-    else if (res.status !== 401 && !(res.status === 404)) S.error = "The Black Book did not load. Try again in a moment.";
+    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.book = res.data; loadedAt = Date.now(); noteServer(res.data); }
+    else if (failed(res)) S.error = "The Black Book did not load. Try again in a moment.";
     render();
   }
   async function loadUpcoming() {
+    var seq = ++loadSeq;
     S.loading = true;
     var res = await call("GET", A.paths.upcoming());
+    if (seq !== loadSeq) return;
     S.loading = false;
-    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.upcoming = res.data; noteServer(res.data); }
-    else if (res.status !== 401 && res.status !== 404) S.error = "Upcoming runs did not load. Try again in a moment.";
+    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.upcoming = res.data; loadedAt = Date.now(); noteServer(res.data); }
+    else if (failed(res)) S.error = "Upcoming runs did not load. Try again in a moment.";
     render();
   }
   async function loadDetail(id) {
+    var seq = ++loadSeq;
     S.loading = true;
     var res = await call("GET", A.paths.entry(id));
+    if (seq !== loadSeq) return;
     S.loading = false;
-    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.detail[id] = res.data; noteServer(res.data); }
-    else if (res.status === 404 && res.data.code === "missing") { S.auth = "ok"; S.detail[id] = { missing: true }; }
-    else if (res.status !== 401 && res.status !== 404) S.error = "This horse did not load. Try again in a moment.";
+    if (res.status === 200 && res.data.ok) { S.auth = "ok"; S.error = ""; S.detail[id] = res.data; loadedAt = Date.now(); noteServer(res.data); }
+    else if (res.status === 404 && res.data.code === "missing") { S.auth = "ok"; S.error = ""; S.detail[id] = { missing: true }; }
+    else if (failed(res)) S.error = "This horse did not load. Try again in a moment.";
     render();
   }
   function load() {
@@ -168,7 +181,7 @@
     }).join("") + "</nav>";
     var top = '<div class="bb-topbar"><span class="spacer"></span>' + (demoMode ? '<span class="chip-soon">Demo data</span>' : "") + ownerChip("Owner view") + "</div>";
     return '<div class="bb-shell">' + side + '<div class="bb-col">' + mtop + '<main class="bb-main"><div class="bb-wrap">' + top +
-      (S.error ? '<div class="banner" role="status">' + esc(S.error) + "</div>" : "") + body + legal() + "</div></main></div></div>" + tabbar;
+      (S.error ? '<div class="banner" role="status">' + esc(S.error) + ' <button class="btn" type="button" data-act="retry" style="margin-left:10px;min-height:36px">Try again</button></div>' : "") + body + legal() + "</div></main></div></div>" + tabbar;
   }
   function bare(body) { return '<main class="bb-main"><div class="bb-wrap" style="max-width:560px;padding-top:12vh">' + body + '<p style="margin-top:18px"><a class="btn hub-link" href="/hub/">Back to Hub</a></p></div></main>'; }
   function gateHtml() {
@@ -292,7 +305,7 @@
     var b = S.book;
     var active = r.archived ? "archived" : "list";
     var head = '<div class="bb-head"><div><h1 class="bb-h1">' + (r.archived ? "Archived" : "Black Book") + '</h1><p class="bb-sub">' +
-      (r.archived ? "Horses with no run for 120 days. One tap brings a horse back." : (b && !b.counts.horses && !b.archived_count ? "Nothing here yet." : "The horses you follow. Next starts and results in one place.")) +
+      (r.archived ? "Horses with no run for 120 days. One tap brings a horse back." : (b && !(b.counts && b.counts.horses) && !b.archived_count ? "Nothing here yet." : "The horses you follow. Next starts and results in one place.")) +
       '</p></div><a class="btn primary" href="#/add">' + svg("plus") + "Add horse</a></div>";
     if (!b) return shell(active, "Black Book", head + '<div class="grid"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>');
     var c = b.counts || {};
@@ -350,8 +363,11 @@
       (groups[k] = groups[k] || []).push(e);
     });
     var today = dayKey(new Date(t));
+    // Step from 02:00 UTC (midday in Melbourne) so a 23- or 25-hour DST day never skips or repeats a date.
+    var noon = Date.parse(today + "T02:00:00Z");
+    var tomorrow = dayKey(new Date(noon + 86400000));
     var keys = [];
-    for (var i = 0; i < 7; i++) keys.push(dayKey(new Date(t + i * 86400000)));
+    for (var i = 0; i < 7; i++) keys.push(dayKey(new Date(noon + i * 86400000)));
     Object.keys(groups).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
     keys.sort();
     keys = keys.filter(function (k) { return k >= today || groups[k]; });
@@ -359,10 +375,10 @@
     if (!rows.length) {
       html += '<div class="msg"><h2>No runs on file</h2><p>None of your horses has a race on file in the next 7 days. A start shows here once its race is snapshotted.</p></div>';
     } else {
-      keys.forEach(function (k, idx) {
+      keys.forEach(function (k) {
         var list = groups[k] || [];
         var first = list[0] ? toDate(list[0].next.jump_at) : new Date(k + "T02:00:00Z");
-        var title = k === today ? "Today" : idx === 1 && k === keys[1] && k === dayKey(new Date(t + 86400000)) ? "Tomorrow" : fmtDay(first);
+        var title = k === today ? "Today" : k === tomorrow ? "Tomorrow" : fmtDay(first);
         html += '<div class="dayh"><h2>' + esc(title) + "</h2><span>" + (title === "Today" || title === "Tomorrow" ? esc(fmtDay(first)) + " · " : "") +
           (list.length ? list.length + (list.length === 1 ? " run" : " runs") : "No runs") + "</span></div>";
         if (!list.length) { html += '<div class="dashrow">None of your horses are entered.</div>'; return; }
@@ -504,8 +520,9 @@
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async function () {
       var seq = ++searchSeq;
-      var q = S.add && S.add.q.trim();
-      if (!q || q.replace(/[^a-z0-9]/gi, "").length < 2) { S.add.hits = null; paintHits(); return; }
+      if (!S.add) return;
+      var q = S.add.q.trim();
+      if (!q || q.replace(/[^a-z0-9]/gi, "").length < 2) { S.add.hits = null; S.add.err = ""; paintHits(); return; }
       var res = await call("GET", A.paths.search(q));
       if (!S.add || seq !== searchSeq) return;
       S.add.hits = res.status === 200 ? res.data.hits || [] : [];
@@ -542,14 +559,14 @@
     var res = await call("GET", A.paths.races());
     if (!S.add) return;
     S.add.races = res.status === 200 && res.data.ok ? res.data.races || [] : [];
-    S.add.err = res.status === 200 ? "" : res.status === 503 ? "Race cards are not available right now." : "Race cards did not load.";
-    renderModal();
+    S.add.racesErr = res.status === 200 ? "" : res.status === 503 ? "Race cards are not available right now." : "Race cards did not load.";
+    if (S.add.tab === "race" && !S.add.pick) renderModal();
   }
   async function loadCard(id) {
     S.add.card = { loading: true };
     renderModal();
     var res = await call("GET", A.paths.raceCard(id));
-    if (!S.add) return;
+    if (!S.add || !S.add.card || !S.add.card.loading) return;
     S.add.card = res.status === 200 && res.data.ok ? res.data : { error: res.status === 503 ? "This race card is not available right now." : "This race card did not load." };
     renderModal();
   }
@@ -573,7 +590,8 @@
         }).join("") + '<p class="muted small">Prices are the cached race card price when one is on file.</p>';
     }
     if (!a.races) return '<div class="sk" style="height:220px"></div>';
-    if (!a.races.length) return '<p class="muted">' + esc(a.err || "No upcoming thoroughbred races are cached right now.") + "</p>";
+    if (!a.races.length) return '<p class="muted">' + esc(a.racesErr || "No upcoming thoroughbred races are cached right now.") + "</p>" +
+      (a.racesErr ? '<button class="btn" type="button" data-act="races-retry">Try again</button>' : "");
     return '<div class="racepick">' + a.races.slice(0, 60).map(function (r) {
       var d = toDate(r.start_time);
       return '<button type="button" data-act="pick-race" data-id="' + esc(r.id) + '"><b>' + esc(r.label || ((r.meeting || "") + " R" + (r.race_number || ""))) + "</b><span>" + (d ? esc(fmtDay(d) + " · " + fmtTime(d)) : "") + "</span>" + svg("chev").replace("<svg", '<svg width="16" height="16" style="stroke:var(--muted);fill:none;stroke-width:2"') + "</button>";
@@ -658,14 +676,31 @@
 
   // ── edits ──────────────────────────────────────────────────────────
   var editPrio = null;
+  var patching = {};
+  function editDrafts() {
+    var n = document.getElementById("bb-note"), p = document.getElementById("bb-price");
+    return { note: n ? n.value : null, price: p ? p.value : null };
+  }
+  function restoreDrafts(d) {
+    var n = document.getElementById("bb-note"), p = document.getElementById("bb-price");
+    if (n && d.note != null) n.value = d.note;
+    if (p && d.price != null) p.value = d.price;
+  }
   async function patch(id, body, okMsg) {
-    var res = await call("PATCH", A.paths.entry(id), body);
+    if (patching[id]) return false;
+    patching[id] = true;
+    // A toggle only changes its own field. Anything typed in the edit form and not yet saved stays.
+    var isEdit = "note" in body || "betPrice" in body || "priority" in body;
+    var res;
+    try { res = await call("PATCH", A.paths.entry(id), body); } finally { delete patching[id]; }
     if (res.status === 200 && res.data.ok) {
       if (S.detail[id]) S.detail[id].entry = res.data.entry;
       toast(okMsg || "Saved.");
       if (res.data.jump_soon_ignored) toast("Jump soon is for High priority only.");
-      editPrio = null;
+      var drafts = isEdit ? null : editDrafts();
+      if (isEdit) editPrio = null;
       render();
+      if (drafts) restoreDrafts(drafts);
       return true;
     }
     if (res.status !== 401 && res.status !== 404) toast(A.describeEditError(res.status, res.data));
@@ -702,7 +737,13 @@
       app.innerHTML = bare('<div class="msg"><h2>Not the owner</h2><p>This page is not available on your account. Black Book is for the owner only.</p><button type="button" class="btn" data-act="signout">Sign out</button></div>');
       return;
     }
-    if (S.auth === "checking") { app.innerHTML = bare('<div class="sk"></div>'); return; }
+    if (S.auth === "checking") {
+      // The first load failed before the API confirmed the session (Render asleep, a 500, offline).
+      // Say so and offer a retry instead of leaving the skeleton up forever.
+      app.innerHTML = bare(S.error ? '<div class="msg"><h2>Black Book</h2><p role="alert">' + esc(S.error) +
+        '</p><p><button class="btn primary" type="button" data-act="retry">Try again</button></p></div>' : '<div class="sk"></div>');
+      return;
+    }
     var html;
     if (r.view === "upcoming") html = upcomingView();
     else if (r.view === "horse") {
@@ -728,6 +769,7 @@
     var v = t.getAttribute("data-v");
     if (act === "scrim") { if (ev.target === t) closeAdd(); return; }
     if (act === "signout") { ev.preventDefault(); signOut(); return; }
+    if (act === "retry") { S.error = ""; render(); load(); return; }
     if (act === "prio") { S.prio = v; S.book && (S.book.entries = null); loadBook(); return; }
     if (act === "filter") { S.filter = S.filter === v ? "" : v; if (/^#\/archived/.test(location.hash)) location.hash = "#/"; else loadBook(); return; }
     if (act === "upf") { S.upFilter = v; render(); return; }
@@ -752,10 +794,14 @@
     if (act === "remove") {
       var rid = t.getAttribute("data-id");
       var ent = S.detail[rid] && S.detail[rid].entry;
+      if (patching[rid]) return;
       if (!root.confirm("Remove " + (ent ? ent.horse_name : "this horse") + " from your Black Book? Its note and logged prices go too. This cannot be undone.")) return;
+      patching[rid] = true;
+      t.disabled = true;
       call("DELETE", A.paths.entry(rid)).then(function (res) {
-        if (res.status === 200) { toast("Removed."); delete S.detail[rid]; S.book = null; location.hash = "#/"; }
-        else if (res.status !== 401) toast("Not removed. Try again.");
+        delete patching[rid];
+        if (res.status === 200 || (res.status === 404 && res.data && res.data.code === "missing")) { toast("Removed."); delete S.detail[rid]; S.book = null; location.hash = "#/"; }
+        else { t.disabled = false; if (res.status !== 401) toast("Not removed. Try again."); }
       });
       return;
     }
@@ -774,6 +820,7 @@
     if (act === "add-tab") { S.add.tab = v; S.add.err = ""; renderModal(); if (v === "race" && !S.add.races) loadRaces(); return; }
     if (act === "pick-race") { loadCard(t.getAttribute("data-id")); return; }
     if (act === "cards-back") { S.add.card = null; renderModal(); return; }
+    if (act === "races-retry") { S.add.races = null; S.add.racesErr = ""; renderModal(); loadRaces(); return; }
     if (act === "pick-hit") {
       var h = S.add.hits[+t.getAttribute("data-i")];
       S.add.pick = { kind: "search", name: h.horse_name, token: h.token, meta: h.last_start || pedigree(h) };
@@ -831,6 +878,14 @@
     try { root.scrollTo(0, 0); } catch (e) {}
   }
   root.addEventListener("hashchange", onRoute);
+  // A phone tab that slept keeps showing old next starts. Coming back after 5 minutes reloads the list
+  // or upcoming runs (never the horse page, so a half-typed edit is not lost, and never under the add sheet).
+  var STALE_MS = 5 * 60000;
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || S.auth !== "ok" || S.add || !loadedAt) return;
+    if (Date.now() - loadedAt < STALE_MS || route().view === "horse") return;
+    load();
+  });
   setInterval(tick, 1000);
   function failSignIn() {
     S.auth = "signin";

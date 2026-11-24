@@ -112,30 +112,45 @@
     return "";
   }
 
+  /** Waits between GET attempts. Render's free tier can take 30s+ to wake, so the gaps grow. */
+  var RETRY_WAITS = [1200, 4000, 8000];
+  /** A request that hangs longer than this is abandoned (status 0) instead of spinning forever. */
+  var TIMEOUT_MS = 25000;
+
   /**
-   * One request. opts: {base, token, fetch, sleep}. Returns {status, data, auth}.
-   * status 0 = network failure. GET retries once on 502/503 (Render cold start).
+   * One request. opts: {base, token, fetch, sleep, timeoutMs}. Returns {status, data, auth}.
+   * status 0 = network failure or timeout. GET retries on 502/503/504 and on network failure
+   * (Render cold start), waiting RETRY_WAITS between tries. Writes never retry.
    */
   async function request(method, path, body, opts) {
     var o = opts || {};
     var doFetch = o.fetch || (typeof fetch !== "undefined" ? fetch : null);
     var sleep = o.sleep || function (ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); };
+    var timeoutMs = o.timeoutMs || TIMEOUT_MS;
     var headers = {};
     if (o.token) headers.Authorization = "Bearer " + o.token;
     if (body !== undefined) headers["Content-Type"] = "application/json";
-    var tries = method === "GET" ? 2 : 1;
+    var tries = method === "GET" ? RETRY_WAITS.length + 1 : 1;
+    if (!doFetch) return { status: 0, data: {}, auth: "" };
     for (var i = 1; i <= tries; i++) {
+      var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function (c) { c.abort(); }, timeoutMs, ctrl) : null;
       try {
-        var r = await doFetch((o.base || API_BASE) + path, {
+        var init = {
           method: method, headers: headers, cache: "no-store", credentials: "omit",
           body: body !== undefined ? JSON.stringify(body) : undefined
-        });
-        if ((r.status === 502 || r.status === 503) && i < tries) { await sleep(1200); continue; }
+        };
+        if (ctrl) init.signal = ctrl.signal;
+        var r = await doFetch((o.base || API_BASE) + path, init);
+        if ((r.status === 502 || r.status === 503 || r.status === 504) && i < tries) { clearTimeout(timer); await sleep(RETRY_WAITS[i - 1]); continue; }
         var data = null;
         try { data = await r.json(); } catch (e) { data = null; }
+        clearTimeout(timer);
         return { status: r.status, data: data || {}, auth: classify(r.status, data) };
       } catch (err) {
+        clearTimeout(timer);
         if (i >= tries) return { status: 0, data: {}, auth: "" };
+        await sleep(RETRY_WAITS[i - 1]);
       }
     }
     return { status: 0, data: {}, auth: "" };
@@ -170,7 +185,7 @@
     return kind === "restore" ? "Not restored. Try again." : "Not saved. Try again.";
   }
 
-  return { describeAddError: describeAddError, describeEditError: describeEditError, API_BASE: API_BASE, TOKEN_KEY: TOKEN_KEY, FALLBACK_TOKEN_KEYS: FALLBACK_TOKEN_KEYS, BASE: BASE,
+  return { describeAddError: describeAddError, describeEditError: describeEditError, API_BASE: API_BASE, RETRY_WAITS: RETRY_WAITS, TIMEOUT_MS: TIMEOUT_MS, TOKEN_KEY: TOKEN_KEY, FALLBACK_TOKEN_KEYS: FALLBACK_TOKEN_KEYS, BASE: BASE,
     CANONICAL_RETURN: CANONICAL_RETURN, RETURN_ORIGINS: RETURN_ORIGINS, returnToUrl: returnToUrl, loginUrl: loginUrl,
     exchangeCode: exchangeCode, exchangeAndStore: exchangeAndStore,
     readToken: readToken, saveToken: saveToken, clearToken: clearToken, paths: paths, classify: classify, request: request };

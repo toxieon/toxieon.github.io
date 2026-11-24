@@ -76,7 +76,7 @@ test("401 means sign in, 404 not_found means not the owner, other 404s are neith
   assert.equal((await A.request("GET", "/x", undefined, { fetch: f })).auth, "signin");
 });
 
-test("GET retries once on 503 (cold start); writes never retry; network failure is status 0", async () => {
+test("GET retries on 503 (cold start); writes never retry; network failure is status 0", async () => {
   const sleeps = [];
   const sleep = async (ms) => sleeps.push(ms);
   const f = fakeFetch([{ status: 503, body: {} }, { status: 200, body: { ok: true } }]);
@@ -87,8 +87,29 @@ test("GET retries once on 503 (cold start); writes never retry; network failure 
   const f2 = fakeFetch([{ status: 503, body: {} }, { status: 200, body: {} }]);
   assert.equal((await A.request("POST", "/x", {}, { fetch: f2, sleep })).status, 503);
   assert.equal(f2.calls.length, 1);
-  const f3 = fakeFetch([new Error("net"), new Error("net")]);
+  const f3 = fakeFetch([new Error("net"), new Error("net"), new Error("net"), new Error("net")]);
   assert.deepEqual(await A.request("GET", "/x", undefined, { fetch: f3, sleep }), { status: 0, data: {}, auth: "" });
+  assert.equal(f3.calls.length, 4);
+});
+
+test("cold start: GET backs off 1.2s, 4s, 8s across 502/504 and network errors, then answers", async () => {
+  const sleeps = [];
+  const sleep = async (ms) => sleeps.push(ms);
+  const f = fakeFetch([{ status: 502, body: {} }, new Error("net"), { status: 504, body: {} }, { status: 200, body: { ok: true } }]);
+  const r = await A.request("GET", "/x", undefined, { fetch: f, sleep });
+  assert.equal(r.status, 200);
+  assert.deepEqual(sleeps, [1200, 4000, 8000]);
+  const f2 = fakeFetch([new Error("net"), { status: 200, body: { ok: true } }]);
+  assert.equal((await A.request("GET", "/x", undefined, { fetch: f2, sleep: async () => {} })).status, 200);
+  const f3 = fakeFetch([new Error("net"), { status: 200, body: {} }]);
+  assert.equal((await A.request("POST", "/x", {}, { fetch: f3, sleep })).status, 0);
+  assert.equal(f3.calls.length, 1);
+});
+
+test("a hung request is abandoned after the timeout and reported as status 0", async () => {
+  const hang = (url, init) => new Promise((ok, fail) => { init.signal.addEventListener("abort", () => fail(new Error("aborted"))); });
+  const r = await A.request("POST", "/x", {}, { fetch: hang, timeoutMs: 20 });
+  assert.deepEqual(r, { status: 0, data: {}, auth: "" });
 });
 
 test("a non-JSON body yields an empty object, not a throw", async () => {
