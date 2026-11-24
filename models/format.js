@@ -105,7 +105,34 @@
   const RECON_CHART_LABEL =
     "Reconstructed estimate (fair price 1/market_p), 13 Oct to 5 Nov, not live results";
 
+  /**
+   * Picks exist but nothing is graded: every model has 0 bets and 0 hypothetical bets.
+   * Returns the largest model pick count in that case (TipBot has picks, no settled results), else 0.
+   */
+  function ungradedPicks(models) {
+    if (!models || typeof models !== "object") return 0;
+    let picks = 0;
+    for (const id of Object.keys(models)) {
+      const s = models[id] && models[id].summary;
+      if (!s) continue;
+      const hypBets = s.hyp ? Number(s.hyp.bets) || 0 : 0;
+      if ((Number(s.bets) || 0) > 0 || hypBets > 0) return 0;
+      picks = Math.max(picks, Number(s.picks) || 0);
+    }
+    return picks;
+  }
+
+  const UNGRADED_MSG =
+    "TipBot has picks in this range but no graded results for them yet, so the totals read 0. " +
+    "Void picks (abandoned or scratched races) still show in Recent form.";
+  const STAKED_EMPTY_MSG = "Not enough staked data yet";
+  const STAKED_UNGRADED_MSG = "Staked picks found, but none graded yet";
+
   return {
+    UNGRADED_MSG,
+    STAKED_EMPTY_MSG,
+    STAKED_UNGRADED_MSG,
+    ungradedPicks,
     HEADLINE_SINCE,
     RECONSTRUCTED_FROM,
     RECONSTRUCTED_TO,
