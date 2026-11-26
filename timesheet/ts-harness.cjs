@@ -50,7 +50,7 @@ function loadApp(seedState, extra = {}) {
   };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
-  for (const f of ["../shared/nd-site-match.js", "ts-time.js", "ts-map.js"]) {
+  for (const f of ["../shared/nd-site-match.js", "ts-time.js", "ts-map.js", "ts-export-xlsx.js"]) {
     const p = path.join(__dirname, f);
     if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, "utf8"), ctx, { filename: path.basename(f) });
   }
