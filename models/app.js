@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.3.2";
+  const APP_VERSION = "0.3.3";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -296,8 +296,27 @@
     return (rows || []).some((r) => r.hyp);
   }
 
+  /** Main stats first, then the staked-only card. Not in parallel: each cold request makes TipBot grade every
+   *  day through its single DB slot, and two at once made both 503 under load. Once the main request succeeds,
+   *  TipBot's 30-minute per-day cache makes the staked request cheap. */
   async function reload() {
     if (!signedIn()) return;
+    markStakedPending();
+    try {
+      await loadMainStats();
+    } finally {
+      if (signedIn()) loadStakedOnly();
+    }
+  }
+
+  function markStakedPending() {
+    state.stakedLoading = true;
+    state.stakedNotLive = false;
+    state.stakedError = "";
+    renderStakedSection();
+  }
+
+  async function loadMainStats() {
     const from = effectiveFrom();
     const to = $("date-to").value || state.rangeTo;
     const err = validateRange(from, to);
@@ -316,7 +335,6 @@
     $("dashboard").hidden = true;
     $("load-state").hidden = false;
     $("load-state").textContent = "Loading stats…";
-    loadStakedOnly();
     const result = await fetchModelStats(from, to, {});
     $("load-state").hidden = true;
     if (result.auth) return;
