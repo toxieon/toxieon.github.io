@@ -1516,8 +1516,16 @@
       card.appendChild(h);
       const race = [p.track, Number.isFinite(p.race_no) ? "R" + p.race_no : ""].filter(Boolean).join(" ");
       card.appendChild(sheetLine("Race", race || "—"));
-      card.appendChild(sheetLine("Price", Number.isFinite(p.price) ? p.price.toFixed(2) : "—"));
-      card.appendChild(sheetLine("Win chance (7am)", Number.isFinite(p.p_win) ? fmtPct(p.p_win * 100) : "—"));
+      const stage = BP.stageLabel(p.stage);
+      const priceLine = sheetLine("Price", Number.isFinite(p.price) ? p.price.toFixed(2) : "—");
+      if (stage) {
+        const note = document.createElement("span");
+        note.className = "muted bp-stage";
+        note.textContent = " " + stage;
+        priceLine.appendChild(note);
+      }
+      card.appendChild(priceLine);
+      card.appendChild(sheetLine("Win chance", Number.isFinite(p.p_win) ? fmtPct(p.p_win * 100) : "—"));
       const tone = p.result === "won" ? "pos" : p.result === "lost" ? "neg" : "";
       card.appendChild(sheetLine("Result", resultLabel(p.result), tone));
       if (Number.isFinite(p.stake_units)) card.appendChild(sheetLine("Stake", p.stake_units + "u"));

@@ -116,3 +116,42 @@ test("best picks are requested from 4 Nov 2026, the first 7am best-pick lock", (
   const cfg = require("node:fs").readFileSync(require("node:path").join(__dirname, "config.js"), "utf8");
   assert.match(cfg, /BEST_PICKS_FROM: "2026-11-04"/);
 });
+
+/* TipBot 0.106.4 /api/model-stats/best-picks shape (Husker), made-up names only. */
+const REAL_SHAPE = {
+  ok: true,
+  range: { from: "2026-11-14", to: "2026-11-17" },
+  days: [
+    { date: "2026-11-14", horse: "Pretend Pony", track: "Mocksville", race_no: 5, price: 1.5, p_win: 0.64, stake_units: 1.0, result: "won", pl_units: 0.5, model: "with_price", stage: "07" },
+    { date: "2026-11-15", horse: null, track: null, race_no: null, price: null, p_win: null, stake_units: null, result: null, pl_units: null, model: null, stage: null },
+    { date: "2026-11-16", horse: "Fake Horse", track: "Faketown", race_no: 3, price: 1.3, p_win: 0.721, stake_units: 1.0, result: "lost", pl_units: -1.0, model: "with_price", stage: "t60" },
+    { date: "2026-11-17", horse: "Sample Steed", track: "Faketown", race_no: 1, price: 2.2, p_win: 0.55, stake_units: 1.0, result: "pending", pl_units: null, model: "with_price", stage: "t60" },
+  ],
+};
+
+test("TipBot's real best-picks shape parses with no mismatch", () => {
+  const days = BP.normaliseBestPicks(REAL_SHAPE);
+  assert.deepEqual(days.map((d) => d.date), ["2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17"]);
+  assert.equal(days[1].pick, null, "an all-null day is no pick");
+  assert.deepEqual(days[2].pick, {
+    horse: "Fake Horse", track: "Faketown", race_no: 3, price: 1.3, p_win: 0.721, stake_units: 1,
+    result: "lost", pl_units: -1, model: "with_price", stage: "t60",
+  });
+  assert.equal(days[3].pick.result, "pending");
+  assert.equal(days[3].pick.pl_units, null);
+  assert.equal(BP.earliestPickDate(days), "2026-11-14");
+  const r = BP.computeLadder(days, { stake: 20 });
+  assert.deepEqual(r.rows.map((x) => [x.result, x.stake, x.bankAfter]),
+    [["won", 20, 30], ["none", null, 30], ["lost", 30, 0], ["pending", null, 0]]);
+  assert.equal(r.cashIn, 20);
+  assert.equal(r.netProfit, -20);
+});
+
+test("stageLabel: t60 is T-60, 07 is 7am, 09 is 9am, empty is blank", () => {
+  assert.equal(BP.stageLabel("t60"), "T-60");
+  assert.equal(BP.stageLabel("T-30"), "T-30");
+  assert.equal(BP.stageLabel("07"), "7am");
+  assert.equal(BP.stageLabel("09"), "9am");
+  assert.equal(BP.stageLabel(null), "");
+  assert.equal(BP.stageLabel("close"), "close");
+});

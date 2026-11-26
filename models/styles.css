@@ -779,3 +779,4 @@ tr.reconstructed td:first-child {
   .ladder-table td, .ladder-table th { padding: 5px 3px; }
   .ladder-val { font-size: 0.95rem; }
 }
+.bp-stage { font-size: 0.8rem; font-weight: 400; }

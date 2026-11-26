@@ -70,6 +70,17 @@
     };
   }
 
+  /** Human label for TipBot's price stage: "t60" → "T-60", "07" → "7am", "09" → "9am"; anything else as sent. */
+  function stageLabel(stage) {
+    const raw = String(stage == null ? "" : stage).trim();
+    if (!raw) return "";
+    const t = /^t-?(\d+)$/i.exec(raw);
+    if (t) return "T-" + Number(t[1]);
+    const h = /^(\d{1,2})(?:am)?$/i.exec(raw);
+    if (h && Number(h[1]) >= 1 && Number(h[1]) <= 12) return Number(h[1]) + "am";
+    return raw;
+  }
+
   /** Sorted, one entry per date (the last one wins if TipBot repeats a date). */
   function normaliseBestPicks(payload) {
     const byDate = new Map();
@@ -212,5 +223,5 @@
     return { ok: true, days };
   }
 
-  return { resultCode, normaliseDay, normaliseBestPicks, earliestPickDate, computeLadder, demoBestPicks, round2, LOSS_RULES };
+  return { resultCode, stageLabel, normaliseDay, normaliseBestPicks, earliestPickDate, computeLadder, demoBestPicks, round2, LOSS_RULES };
 });
