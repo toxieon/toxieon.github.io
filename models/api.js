@@ -12,6 +12,11 @@
   const API_BASE = "https://afl-tipster-bot.onrender.com";
   /** Horse-server route: open to members of the horse server (and the owner). Not /api/owner/model-stats. */
   const STATS_PATH = "/api/model-stats";
+  /** TipBot's single daily best pick per day (highest 7am win chance). Same auth and errors as STATS_PATH. */
+  const BEST_PICKS_PATH = "/api/model-stats/best-picks";
+  /** Longest wait honoured from a 503 {error:"db_busy", retry_after} before the one retry. */
+  const RETRY_AFTER_CAP_S = 15;
+  const DEFAULT_RETRY_MS = 1500;
   const TOKEN_KEY = "nd_models_owner_token";
   /** Read-only fallback: the same TipBot session token saved by Black Book on this origin. Never written here. */
   const FALLBACK_TOKEN_KEYS = ["nd_owner_token"];
@@ -115,6 +120,25 @@
     return base + STATS_PATH + "?" + params.toString();
   }
 
+  function buildBestPicksUrl(apiBase, from, to) {
+    const base = String(apiBase || "").replace(/\/+$/, "");
+    const params = new URLSearchParams();
+    params.set("from", from);
+    params.set("to", to);
+    return base + BEST_PICKS_PATH + "?" + params.toString();
+  }
+
+  /** Milliseconds to wait before retrying an unavailable response. 503 {error:"db_busy", retry_after:N}
+   *  waits N seconds (capped at 15); anything else keeps the short 1.5 s wait. */
+  function retryDelayMs(status, body) {
+    const code = body && body.error != null ? String(body.error) : "";
+    const n = body ? Number(body.retry_after) : NaN;
+    if (status === 503 && code === "db_busy" && Number.isFinite(n) && n > 0) {
+      return Math.round(Math.min(n, RETRY_AFTER_CAP_S) * 1000);
+    }
+    return DEFAULT_RETRY_MS;
+  }
+
   /** Classify a stats response. kind drives the UI:
    *  ok · signin (401, sign in again) · forbidden (403, signed in but not in the horse server; keep the token) ·
    *  not_configured (503, TipBot not set up yet; keep the token) · unavailable (503/502, retry later) ·
@@ -141,7 +165,8 @@
 
   /**
    * GET one model-stats URL with a Bearer token, credentials omitted. Returns {status, data, kind, cached}.
-   * status 0 = network failure. One retry after a short wait on 502 or 503 unavailable (Render cold start).
+   * status 0 = network failure. One retry on 502 or 503 unavailable: after 1.5 s (Render cold start), or after
+   * retry_after seconds (max 15) when TipBot says 503 {error:"db_busy", retry_after}. Used for best picks too.
    * opts: {fetch, sleep, now}.
    */
   async function requestModelStats(url, token, opts) {
@@ -169,7 +194,7 @@
       try { data = await r.json(); } catch (e) { data = null; }
       data = data || {};
       const kind = classifyStats(r.status, data);
-      if (kind === "unavailable" && i < 2) { await sleep(1500); continue; }
+      if (kind === "unavailable" && i < 2) { await sleep(retryDelayMs(r.status, data)); continue; }
       const res = { status: r.status, data: data, kind: kind, cached: false };
       if (kind === "ok") memo.set(key, { at: now(), res: res });
       return res;
@@ -195,5 +220,6 @@
     returnToUrl, loginUrl, exchangeCode, exchangeAndStore, describeAuthError,
     readToken, saveToken, clearToken, clearPrimaryToken, buildModelStatsUrl, describeApiError,
     STATS_PATH, CACHE_TTL_MS, classifyStats, requestModelStats, clearStatsCache,
+    BEST_PICKS_PATH, buildBestPicksUrl, retryDelayMs, RETRY_AFTER_CAP_S,
   };
 });

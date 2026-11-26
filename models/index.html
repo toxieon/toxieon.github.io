@@ -10,17 +10,18 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<script src="handoff.js?v=0.3.3"></script>
-<link rel="stylesheet" href="styles.css?v=0.3.3" />
-<script src="config.js?v=0.3.3"></script>
-<script src="api.js?v=0.3.3"></script>
-<script src="normalise.js?v=0.3.3"></script>
-<script src="calendar.js?v=0.3.3"></script>
-<script src="dates.js?v=0.3.3"></script>
-<script src="format.js?v=0.3.3"></script>
-<script src="demo.js?v=0.3.3"></script>
+<script src="handoff.js?v=0.4.0"></script>
+<link rel="stylesheet" href="styles.css?v=0.4.0" />
+<script src="config.js?v=0.4.0"></script>
+<script src="api.js?v=0.4.0"></script>
+<script src="normalise.js?v=0.4.0"></script>
+<script src="calendar.js?v=0.4.0"></script>
+<script src="dates.js?v=0.4.0"></script>
+<script src="format.js?v=0.4.0"></script>
+<script src="bestpick.js?v=0.4.0"></script>
+<script src="demo.js?v=0.4.0"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.3.3" defer></script>
+<script src="app.js?v=0.4.0" defer></script>
 </head>
 <body>
 <div class="app">
@@ -84,6 +85,58 @@
         <p id="staked-stats" class="stats-row"></p>
         <p id="staked-empty" class="empty" hidden>Not enough staked data yet</p>
         <svg id="staked-chart" class="chart-svg" role="img" aria-label="Staked running bankroll" height="160" hidden></svg>
+      </div>
+    </section>
+
+    <section id="bestpick-section" class="card bp-panel" aria-labelledby="bp-h">
+      <h2 id="bp-h">Best pick of the day</h2>
+      <p class="muted">TipBot's single best pick each day (highest win chance, locked at 7am). Price is the latest stage price, usually T-60.</p>
+      <p id="bp-load" class="loading" hidden>Loading best picks…</p>
+      <div id="bp-error" class="banner info" hidden><p id="bp-error-text"></p></div>
+      <div id="bp-body" hidden>
+        <div class="cal-head">
+          <button type="button" class="btn calnav" id="bp-prev" aria-label="Previous month">‹</button>
+          <h3 id="bp-month-label" class="bp-month">Month</h3>
+          <button type="button" class="btn calnav" id="bp-next" aria-label="Next month">›</button>
+        </div>
+        <div id="bp-grid" class="cal-grid bp-grid" role="grid" aria-label="Best pick each day"></div>
+        <ul class="legend bp-legend">
+          <li><span class="swatch bp-sw-won"></span>Won</li>
+          <li><span class="swatch bp-sw-lost"></span>Lost</li>
+          <li><span class="swatch bp-sw-pending"></span>Pending</li>
+          <li><span class="swatch bp-sw-void"></span>Scratched / abandoned</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ladder-section" class="card" aria-labelledby="ladder-h" hidden>
+      <h2 id="ladder-h">Ladder calculator</h2>
+      <p class="hint" id="ladder-rule">Each day the whole bank goes on that day's best pick. A win makes the bank stake × price ($20 at 1.5 = $30, then at 2.0 = $60). Scratched, abandoned and no-pick days carry the bank over with no bet. Pending days aren't counted.</p>
+      <div class="ladder-inputs">
+        <label class="ladder-field" for="ladder-start">Start date
+          <input type="date" id="ladder-start" />
+        </label>
+        <label class="ladder-field" for="ladder-stake">Starting stake ($)
+          <input type="number" id="ladder-stake" inputmode="decimal" min="1" step="1" value="20" />
+        </label>
+      </div>
+      <div class="ladder-loss" role="group" aria-label="On a loss">
+        <span class="muted">On a loss</span>
+        <div class="model-pick">
+          <button type="button" class="tab on" data-ladder-loss="reset">Reset to starting stake</button>
+          <button type="button" class="tab" data-ladder-loss="stop">Stop (ladder busted)</button>
+        </div>
+      </div>
+      <p class="hint" id="ladder-loss-rule"></p>
+      <div id="ladder-summary" class="summary-grid ladder-summary"></div>
+      <p id="ladder-empty" class="empty" hidden>No best picks from this start date yet.</p>
+      <div class="ladder-table-wrap">
+        <table class="breakdown-table ladder-table">
+          <thead>
+            <tr><th>Date</th><th>Horse</th><th>Price</th><th>Stake</th><th>Result</th><th>Bank after</th></tr>
+          </thead>
+          <tbody id="ladder-body"></tbody>
+        </table>
       </div>
     </section>
 
