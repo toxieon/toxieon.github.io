@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.3.3";
+  const APP_VERSION = "0.4.0";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -10,6 +10,7 @@
   const DATES = window.NDModelsDates;
   const API = window.NDModelsApi;
   const FMT = window.NDModelsFormat;
+  const BP = window.NDModelsBestPick;
 
   const UNAVAILABLE_MSG = "Model stats aren't live yet. Check back after the next TipBot update.";
   const NOT_CONFIGURED_MSG = "Model stats aren't set up on TipBot yet. Check back soon.";
@@ -22,6 +23,12 @@
   const REAUTH_GAP_MS = 10 * 60 * 1000;
   const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
   const RECON_KEY = "nd_models_include_reconstructed";
+  const BP_UNAVAILABLE_MSG = "Best picks not available yet. Check back after the next TipBot update.";
+  const LADDER_KEY = "nd_models_ladder_v1";
+  const LADDER_LOSS_TEXT = {
+    reset: "On a loss the ladder resets: the next best pick starts a new ladder at the starting stake, and that stake counts as more cash in.",
+    stop: "On a loss the ladder stops (busted): the bank is gone and later picks aren't bet.",
+  };
 
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d) => (Number.isFinite(n) ? n.toFixed(d ?? 1) : "—");
@@ -60,6 +67,8 @@
     stakedError: "",
     includeReconstructed: false,
     reconstructedAvailable: null,
+    bp: { loading: false, error: "", days: null, month: "" },
+    ladder: { start: "", stake: 20, onLoss: "reset" },
   };
 
   function isDemoMode() {
@@ -374,6 +383,7 @@
     state.stakedData = null;
     state.stakedNotLive = false;
     state.stakedError = "";
+    state.bp = { loading: false, error: "", days: null, month: "" };
     state.gateMessage = "";
     state.apiNotLive = false;
     state.loadError = "";
@@ -1318,6 +1328,326 @@
     $("day-sheet-backdrop").addEventListener("click", closeDaySheet);
   }
 
+
+  /* ---------- Best pick of the day + ladder (independent of the main stats requests) ---------- */
+
+  function bestPicksRange() {
+    const to = DATES.todayMelbourneIso();
+    const floor = DATES.addCalendarDays(to, -364);
+    const from = CFG.BEST_PICKS_FROM > floor ? CFG.BEST_PICKS_FROM : floor;
+    return { from: from > to ? to : from, to };
+  }
+
+  /** GET /api/model-stats/best-picks. Any failure only shows a message in this section. */
+  async function loadBestPicks() {
+    if (!signedIn() || !BP) return;
+    state.bp.loading = true;
+    state.bp.error = "";
+    renderBestPicks();
+    const { from, to } = bestPicksRange();
+    let days = null;
+    let error = "";
+    if (isDemoMode()) {
+      days = BP.normaliseBestPicks(BP.demoBestPicks(from, to));
+    } else {
+      let res;
+      try {
+        res = await API.requestModelStats(API.buildBestPicksUrl(CFG.API_BASE, from, to), state.token);
+      } catch (e) {
+        res = { kind: "error", data: {} };
+      }
+      if (res.kind === "signin") { state.bp.loading = false; handleUnauthorised(); return; }
+      if (res.kind === "forbidden") { state.bp.loading = false; handleForbidden(); return; }
+      if (res.kind === "ok") days = BP.normaliseBestPicks(res.data);
+      else error = BP_UNAVAILABLE_MSG;
+    }
+    state.bp.loading = false;
+    state.bp.error = error;
+    state.bp.days = error ? null : days;
+    if (days && !state.bp.month) {
+      const last = days.length ? days[days.length - 1].date : to;
+      state.bp.month = last.slice(0, 7);
+    }
+    renderBestPicks();
+  }
+
+  function bpDayMap() {
+    return new Map((state.bp.days || []).map((d) => [d.date, d]));
+  }
+
+  function bpTone(pick) {
+    if (!pick) return "bp-none";
+    if (pick.result === "won") return "bp-won";
+    if (pick.result === "lost") return "bp-lost";
+    if (pick.result === "pending") return "bp-pending";
+    return "bp-void";
+  }
+
+  function fmtPrice(p) {
+    return Number.isFinite(p) ? "@" + p.toFixed(2) : "";
+  }
+
+  function fmtMoney(n) {
+    if (!Number.isFinite(n)) return "—";
+    const sign = n < 0 ? "-" : "";
+    return sign + "$" + Math.abs(n).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function shortDate(iso) {
+    const p = String(iso).split("-").map(Number);
+    return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+      new Date(Date.UTC(p[0], p[1] - 1, p[2]))
+    );
+  }
+
+  function resultLabel(code) {
+    return { won: "Won", lost: "Lost", scratched: "Scratched", abandoned: "Abandoned", pending: "Pending", none: "No pick" }[code] || code;
+  }
+
+  function renderBestPicks() {
+    const section = $("bestpick-section");
+    if (!section) return;
+    $("bp-load").hidden = !state.bp.loading;
+    const err = $("bp-error");
+    err.hidden = !state.bp.error;
+    $("bp-error-text").textContent = state.bp.error || "";
+    const has = !!state.bp.days && !state.bp.error;
+    $("bp-body").hidden = !has || state.bp.loading;
+    $("ladder-section").hidden = !has || state.bp.loading;
+    if (!has) return;
+    if (!state.bp.days.some((d) => d.pick)) {
+      err.hidden = false;
+      $("bp-error-text").textContent = "No best picks yet in this range.";
+    }
+    renderBpCalendar();
+    renderLadder();
+  }
+
+  function renderBpCalendar() {
+    const days = state.bp.days || [];
+    const { from, to } = bestPicksRange();
+    const ym = state.bp.month || to.slice(0, 7);
+    $("bp-month-label").textContent = monthTitle(ym);
+    $("bp-prev").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, -1), from, to);
+    $("bp-next").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, 1), from, to);
+    const map = bpDayMap();
+    const grid = $("bp-grid");
+    grid.replaceChildren();
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d) => {
+      const h = document.createElement("div");
+      h.className = "cal-dow";
+      h.textContent = d;
+      grid.appendChild(h);
+    });
+    CAL.buildMonthGrid(ym).forEach((iso) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "cal-day bp-day";
+      if (!iso) {
+        cell.classList.add("cal-pad");
+        cell.disabled = true;
+        cell.tabIndex = -1;
+        grid.appendChild(cell);
+        return;
+      }
+      const num = document.createElement("span");
+      num.className = "cal-num";
+      num.textContent = iso.slice(8, 10).replace(/^0/, "");
+      cell.appendChild(num);
+      cell.dataset.date = iso;
+      const day = map.get(iso);
+      const inRange = CAL.dateInRange(iso, from, to);
+      if (day && day.pick) {
+        const p = day.pick;
+        cell.classList.add("cal-has-data", bpTone(p));
+        const horse = document.createElement("span");
+        horse.className = "bp-horse";
+        horse.textContent = p.horse;
+        const price = document.createElement("span");
+        price.className = "bp-price";
+        price.textContent = fmtPrice(p.price);
+        cell.append(horse, price);
+        cell.title = p.horse + " " + fmtPrice(p.price) + " · " + resultLabel(p.result);
+        cell.addEventListener("click", () => openBestPickSheet(iso));
+      } else if (day && inRange) {
+        cell.classList.add("bp-none");
+        const none = document.createElement("span");
+        none.className = "bp-price";
+        none.textContent = "no pick";
+        cell.appendChild(none);
+        cell.addEventListener("click", () => openBestPickSheet(iso));
+      } else {
+        if (!inRange) cell.classList.add("cal-out");
+        cell.disabled = true;
+      }
+      grid.appendChild(cell);
+    });
+  }
+
+  function sheetLine(label, value, cls) {
+    const p = document.createElement("p");
+    p.className = "stats-row bp-line";
+    const l = document.createElement("span");
+    l.className = "muted";
+    l.textContent = label + " ";
+    const v = document.createElement("strong");
+    if (cls) v.className = cls;
+    v.textContent = value;
+    p.append(l, v);
+    return p;
+  }
+
+  function openBestPickSheet(date) {
+    const day = bpDayMap().get(date);
+    $("day-sheet-title").textContent = "Best pick · " + shortDate(date);
+    const body = $("day-sheet-body");
+    body.replaceChildren();
+    const card = document.createElement("div");
+    card.className = "day-model card";
+    if (!day || !day.pick) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "No best pick this day.";
+      card.appendChild(p);
+    } else {
+      const p = day.pick;
+      const h = document.createElement("h3");
+      h.textContent = p.horse;
+      card.appendChild(h);
+      const race = [p.track, Number.isFinite(p.race_no) ? "R" + p.race_no : ""].filter(Boolean).join(" ");
+      card.appendChild(sheetLine("Race", race || "—"));
+      card.appendChild(sheetLine("Price", Number.isFinite(p.price) ? p.price.toFixed(2) : "—"));
+      card.appendChild(sheetLine("Win chance (7am)", Number.isFinite(p.p_win) ? fmtPct(p.p_win * 100) : "—"));
+      const tone = p.result === "won" ? "pos" : p.result === "lost" ? "neg" : "";
+      card.appendChild(sheetLine("Result", resultLabel(p.result), tone));
+      if (Number.isFinite(p.stake_units)) card.appendChild(sheetLine("Stake", p.stake_units + "u"));
+      card.appendChild(sheetLine("P/L", Number.isFinite(p.pl_units) ? fmtPl(p.pl_units) + "u" : "—", plClass(p.pl_units)));
+      if (p.model) card.appendChild(sheetLine("Model", CFG.MODEL_LABELS[p.model] || p.model));
+    }
+    body.appendChild(card);
+    $("day-sheet").hidden = false;
+    document.body.classList.add("sheet-open");
+  }
+
+  function readLadderPrefs() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LADDER_KEY) || "null");
+      if (raw && typeof raw === "object") {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw.start || "")) state.ladder.start = raw.start;
+        const st = Number(raw.stake);
+        if (Number.isFinite(st) && st > 0) state.ladder.stake = st;
+        if (BP.LOSS_RULES.includes(raw.onLoss)) state.ladder.onLoss = raw.onLoss;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveLadderPrefs() {
+    try { localStorage.setItem(LADDER_KEY, JSON.stringify(state.ladder)); } catch (e) { /* ignore */ }
+  }
+
+  function summaryTile(label, value, cls) {
+    const d = document.createElement("div");
+    d.className = "card summary-card ladder-tile";
+    const l = document.createElement("p");
+    l.className = "muted";
+    l.textContent = label;
+    const v = document.createElement("p");
+    v.className = "ladder-val" + (cls ? " " + cls : "");
+    v.textContent = value;
+    d.append(l, v);
+    return d;
+  }
+
+  function renderLadder() {
+    const days = state.bp.days || [];
+    const earliest = BP.earliestPickDate(days);
+    const startInput = $("ladder-start");
+    const start = state.ladder.start || earliest;
+    startInput.value = start;
+    if (earliest) startInput.min = days[0].date;
+    if (days.length) startInput.max = days[days.length - 1].date;
+    $("ladder-stake").value = String(state.ladder.stake);
+    document.querySelectorAll("[data-ladder-loss]").forEach((b) => {
+      b.classList.toggle("on", b.getAttribute("data-ladder-loss") === state.ladder.onLoss);
+    });
+    $("ladder-loss-rule").textContent = LADDER_LOSS_TEXT[state.ladder.onLoss];
+    const r = BP.computeLadder(days, { startDate: start, stake: state.ladder.stake, onLoss: state.ladder.onLoss });
+    const sum = $("ladder-summary");
+    sum.replaceChildren(
+      summaryTile("Current bank", fmtMoney(r.currentBank)),
+      summaryTile("Net profit", (r.netProfit > 0 ? "+" : "") + fmtMoney(r.netProfit), plClass(r.netProfit)),
+      summaryTile("Cash in", fmtMoney(r.cashIn) + (r.laddersStarted > 1 ? " (" + r.laddersStarted + " ladders)" : "")),
+      summaryTile("Peak bank", fmtMoney(r.peakBank)),
+      summaryTile("Longest win streak", String(r.longestWinStreak)),
+      summaryTile(r.onLoss === "stop" ? "Status" : "Resets", r.onLoss === "stop" ? (r.busted ? "Busted" : "Alive") : String(r.resets), r.busted ? "neg" : "")
+    );
+    if (r.awaitingNewLadder) {
+      sum.appendChild(summaryTile("Next pick", "New ladder at " + fmtMoney(r.stake)));
+    }
+    const tbody = $("ladder-body");
+    tbody.replaceChildren();
+    $("ladder-empty").hidden = r.rows.length > 0;
+    r.rows.slice().reverse().forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.className = "ladder-row lr-" + row.result + (row.stake == null ? " row-nobet" : "");
+      const cells = [
+        shortDate(row.date),
+        row.horse || "—",
+        Number.isFinite(row.price) ? row.price.toFixed(2) : "—",
+        row.stake != null ? fmtMoney(row.stake) : "—",
+        ladderResultText(row),
+        row.bankAfter != null ? fmtMoney(row.bankAfter) : "—",
+      ];
+      cells.forEach((txt, i) => {
+        const td = document.createElement("td");
+        td.textContent = txt;
+        if (i === 4) td.className = row.result === "won" ? "pos" : row.result === "lost" ? "neg" : "";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  /** Short result text for the 390px table; the full rule is stated above the table. */
+  function ladderResultText(row) {
+    if (row.note === "stopped") return "Not bet (stopped)";
+    if (row.result === "none") return "No pick · carry";
+    if (row.result === "pending") return "Pending";
+    if (row.stake == null) return resultLabel(row.result) + " · carry";
+    if (row.result === "lost") return row.note === "ladder busted" ? "Lost · busted" : "Lost · reset";
+    return resultLabel(row.result);
+  }
+
+  function bindBestPickEvents() {
+    if (!$("bestpick-section")) return;
+    $("bp-prev").addEventListener("click", () => {
+      state.bp.month = CAL.ymAdd(state.bp.month || bestPicksRange().to.slice(0, 7), -1);
+      renderBpCalendar();
+    });
+    $("bp-next").addEventListener("click", () => {
+      state.bp.month = CAL.ymAdd(state.bp.month || bestPicksRange().to.slice(0, 7), 1);
+      renderBpCalendar();
+    });
+    $("ladder-start").addEventListener("change", (e) => {
+      state.ladder.start = /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) ? e.target.value : "";
+      saveLadderPrefs();
+      renderLadder();
+    });
+    $("ladder-stake").addEventListener("change", (e) => {
+      const v = Number(e.target.value);
+      state.ladder.stake = Number.isFinite(v) && v > 0 ? BP.round2(v) : 20;
+      saveLadderPrefs();
+      renderLadder();
+    });
+    document.querySelectorAll("[data-ladder-loss]").forEach((b) => {
+      b.addEventListener("click", () => {
+        state.ladder.onLoss = b.getAttribute("data-ladder-loss");
+        saveLadderPrefs();
+        renderLadder();
+      });
+    });
+  }
+
   function init() {
     $("ver").textContent = "v" + APP_VERSION;
     state.token = getToken();
@@ -1327,6 +1657,8 @@
     syncReconToggle();
     if (isDemoMode() && !state.token) state.token = "demo-local"; // localhost ?demo=1 only; never stored
     bindEvents();
+    if (BP) readLadderPrefs();
+    bindBestPickEvents();
     const H = window.NDModelsHandoff;
     const authError = H && H.getAuthError ? H.getAuthError() : "";
     if (authError) state.gateMessage = API.describeAuthError(authError);
@@ -1369,6 +1701,7 @@
       state.rangeTo = to;
       state.allTime = true;
       syncRangeInputs();
+      loadBestPicks(); // own request; a model-stats failure never blanks it
       applyAllTime();
     }
   }

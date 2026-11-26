@@ -209,3 +209,30 @@ test("clearPrimaryToken drops only the Models key (403 sign-in-again keeps a sha
   A.clearPrimaryToken(s);
   assert.deepEqual(s.d, { nd_owner_token: "b" });
 });
+
+test("503 db_busy waits retry_after seconds (capped at 15) before the one retry; other 503s keep 1.5 s", async () => {
+  const waits = [];
+  const sleep = async (ms) => { waits.push(ms); };
+  for (const [body, want] of [
+    [{ ok: false, error: "db_busy", retry_after: 3 }, 3000],
+    [{ ok: false, error: "db_busy", retry_after: 90 }, 15000],
+    [{ ok: false, error: "db_busy" }, 1500],
+    [{ ok: false, error: "unavailable", retry_after: 5 }, 1500],
+  ]) {
+    A.clearStatsCache();
+    waits.length = 0;
+    const f = fakeFetch([{ status: 503, body }, { status: 200, body: {} }]);
+    const r = await A.requestModelStats("https://x.invalid/c", "t".repeat(20), { fetch: f, sleep });
+    assert.equal(r.kind, "ok");
+    assert.equal(f.calls.length, 2);
+    assert.deepEqual(waits, [want]);
+  }
+  assert.equal(A.classifyStats(503, { ok: false, error: "db_busy", retry_after: 3 }), "unavailable");
+});
+
+test("buildBestPicksUrl hits /api/model-stats/best-picks with from and to only", () => {
+  assert.equal(
+    A.buildBestPicksUrl("https://afl-tipster-bot.onrender.com/", "2026-11-06", "2026-11-26"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/best-picks?from=2026-11-06&to=2026-11-26"
+  );
+});
