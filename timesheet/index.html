@@ -218,7 +218,8 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .excel-range input[type="date"] { width: 100%; max-width: 100%; min-height: 44px; box-sizing: border-box; }
 #btn-xlsx { min-height: 44px; }
 .excel-export-hint { font-size: 12px; margin: 8px 0 10px; }
-#view-history .page { padding-bottom: calc(220px + env(safe-area-inset-bottom)); }
+#view-settings .page { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
+#view-settings .excel-export { margin: 16px 0 0; padding: 16px 0 0; border: none; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
 .home-coords-status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 .home-coords-status.ok { color: var(--on-accent); }
 .ot-flag { color: var(--off-accent); }
@@ -466,22 +467,9 @@ body.ts-tl-dragging { overscroll-behavior: none; }
       <div><div class="muted" style="font-size:11px;">PER DAY</div><div class="mono" id="ta-day">—</div></div>
       <div><div class="muted" style="font-size:11px;">PER WEEK</div><div class="mono" id="ta-week">—</div></div>
     </div>
-    <div class="excel-export" id="excel-export">
-      <h4>Export Excel (date range or all time)</h4>
-      <p class="muted" style="font-size:12px; margin:0 0 6px;">Trip-by-trip work km for the cents-per-km method, plus a weekly hours-by-site sheet. Pick a date range or every entry since the earliest record. A financial year is just a custom range (for example 1 Jul to 30 Jun).</p>
-      <div class="excel-modes">
-        <label><input type="radio" name="xlsx-mode" id="xlsx-mode-range" value="range" checked> Custom date range</label>
-        <label><input type="radio" name="xlsx-mode" id="xlsx-mode-all" value="all"> All time</label>
-      </div>
-      <div class="excel-range" id="xlsx-range-fields">
-        <div class="field"><label for="xlsx-from">From</label><input type="date" id="xlsx-from"></div>
-        <div class="field"><label for="xlsx-to">To</label><input type="date" id="xlsx-to"></div>
-      </div>
-      <button class="btn btn-primary btn-block" id="btn-xlsx" type="button">Download Excel</button>
-    </div>
     <details class="export-panel" id="export-panel">
       <summary>Export this week</summary>
-      <p class="muted excel-export-hint">Excel export (date range / all time) is above.</p>
+      <p class="muted excel-export-hint">Excel export (date range / all time) is in Settings → Timesheet Export.</p>
       <div class="export-opts" id="export-opts">
         <label><input type="checkbox" id="xo-travelTime"> Travel time</label>
         <label><input type="checkbox" id="xo-travelCost"> Travel cost</label>
@@ -594,6 +582,19 @@ body.ts-tl-dragging { overscroll-behavior: none; }
           <select id="s-preferredMailApp"><option>Gmail</option><option>Outlook (web)</option><option>Apple / default mail</option><option>Just copy</option></select>
         </div>
         <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email. Use Copy map (or Download map) for the week's site map image.</p>
+        <div class="excel-export" id="excel-export">
+          <h4>Export Excel (date range or all time)</h4>
+          <p class="muted" style="font-size:12px; margin:0 0 6px;">Trip-by-trip work km for the cents-per-km method, plus a weekly hours-by-site sheet. Pick a date range or every entry since the earliest record. A financial year is just a custom range (for example 1 Jul to 30 Jun).</p>
+          <div class="excel-modes">
+            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-range" value="range" checked> Custom date range</label>
+            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-all" value="all"> All time</label>
+          </div>
+          <div class="excel-range" id="xlsx-range-fields">
+            <div class="field"><label for="xlsx-from">From</label><input type="date" id="xlsx-from"></div>
+            <div class="field"><label for="xlsx-to">To</label><input type="date" id="xlsx-to"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="btn-xlsx" type="button">Download Excel</button>
+        </div>
       </div>
       <div class="card">
         <div class="row-between"><div style="font-weight:500;">Timesheet Live</div><a href="../timesheetlive/" target="_blank" rel="noopener" style="font-size:13px; color:var(--on-accent);">Open ↗</a></div>
