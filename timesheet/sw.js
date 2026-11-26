@@ -11,17 +11,17 @@
  *     (a stale CDN copy must not get frozen into the SW cache)
  */
 
-const CACHE_VERSION = 'timesheet-0.7.1';
+const CACHE_VERSION = 'timesheet-0.7.2';
 const SHELL_ASSETS = [
   "./",
   "../shared/nd-backend.js",
   "./index.html",
-  "../shared/nd-site-match.js?v=0.7.1",
-  "../shared/nd-gate-codes.js?v=0.7.1",
-  "./ts-time.js?v=0.7.1",
-  "./ts-map.js?v=0.7.1",
-  "./ts-clipboard.js?v=0.7.1",
-  "./ts-export-xlsx.js?v=0.7.1",
+  "../shared/nd-site-match.js?v=0.7.2",
+  "../shared/nd-gate-codes.js?v=0.7.2",
+  "./ts-time.js?v=0.7.2",
+  "./ts-map.js?v=0.7.2",
+  "./ts-clipboard.js?v=0.7.2",
+  "./ts-export-xlsx.js?v=0.7.2",
   "../shared/vendor/sheetjs/xlsx.full.min.js",
   "./vendor/leaflet/leaflet.js",
   "./vendor/leaflet/leaflet.css",
