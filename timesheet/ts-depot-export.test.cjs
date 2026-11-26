@@ -183,16 +183,21 @@ test("0.7.1: Excel model filters a custom range, all-time uses earliest to lates
   const dates = fy.trips.rows.map((r) => r.date);
   assert.ok(dates.includes("2025-07-01"));
   assert.ok(dates.includes("2026-06-30"));
-  assert.ok(!dates.includes("2026-07-02"), "custom range stops at 30 Jun");
+  assert.ok(!dates.includes("2026-07-02"), "custom range trips stop at To");
+  assert.ok(fy.trips.rows.every((r) => r.date >= "2025-07-01" && r.date <= "2026-06-30"));
   assert.ok(fy.totalWorkKm > 0);
   assert.ok(fy.siteRecords.some((s) => s.site === "Frankston"));
-  assert.ok(fy.siteRecords.some((s) => s.weekStart === "2025-06-30" || s.weekStart === "2025-07-01" || s.weekStart <= "2025-07-01"));
+  // Week labels may start the Monday before From, but no week that begins after To.
+  assert.ok(fy.siteRecords.every((s) => s.weekStart <= "2026-06-30"), JSON.stringify(fy.siteRecords.map((s) => s.weekStart)));
+  assert.ok(fy.siteRecords.every((s) => s.weekEnd >= "2025-07-01"));
   const bounds = app.TsExport.allTimeDateRange();
   assert.equal(bounds && bounds.from, "2025-07-01");
   assert.equal(bounds && bounds.to, "2026-07-02");
   const all = app.TsExport.buildExcelModel(bounds.from, bounds.to);
   assert.ok(all.trips.rows.some((r) => r.date === "2026-07-02"));
   assert.ok(all.totalWorkKm >= fy.totalWorkKm);
+  const hours = (model, site) => model.siteRecords.filter((s) => s.site === site).reduce((n, s) => n + s.hours, 0);
+  assert.ok(hours(all, "Frankston") > hours(fy, "Frankston"), "all-time site hours include the 2 Jul session that custom range excludes");
 
   const xlsxPath = path.join(__dirname, "../shared/vendor/sheetjs/xlsx.full.min.js");
   const XLSX = require(xlsxPath);

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-0wgPx1WYEQKylIRv5WpW+lsdf9HZEEeTR5751JCX8No=' https://accounts.google.com/gsi/client https://apis.google.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://docs.google.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org data: blob:; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ssdTuNs0XQXy+LC26DHYlqA5sjsF6xEgRroZJXQ/wYA=' https://accounts.google.com/gsi/client https://apis.google.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com/gsi/ https://apis.google.com https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://openidconnect.googleapis.com https://script.google.com/macros/s/ https://script.googleusercontent.com/macros/ https://docs.google.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://nominatim.openstreetmap.org data: blob:; frame-src https://accounts.google.com/gsi/ https://content.googleapis.com https://content-sheets.googleapis.com https://content-drive.googleapis.com; media-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0d0d0d" />
 <title>Timesheet — Neill Data</title>
@@ -16,18 +16,18 @@
 <script src="../shared/nd-auth.js"></script>
 <script src="../shared/nd-ui.js"></script>
 <script src="../shared/nd-recent-jobs.js?v=1"></script>
-<script src="ts-time.js?v=0.7.1"></script>
+<script src="ts-time.js?v=0.7.2"></script>
 <!-- Leaflet 1.9.4, BSD-2-Clause (vendor/leaflet/LICENSE). Tiles © OpenStreetMap contributors. -->
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="ts-map.js?v=0.7.1"></script>
-<script src="ts-clipboard.js?v=0.7.1"></script>
+<script src="ts-map.js?v=0.7.2"></script>
+<script src="ts-clipboard.js?v=0.7.2"></script>
 <script src="../shared/vendor/sheetjs/xlsx.full.min.js"></script>
-<script src="ts-export-xlsx.js?v=0.7.1"></script>
+<script src="ts-export-xlsx.js?v=0.7.2"></script>
 <script src="../assets/here.js"></script>
 <script src="../assets/address-autocomplete.js"></script>
-<script src="../shared/nd-site-match.js?v=0.7.1"></script>
-<script src="../shared/nd-gate-codes.js?v=0.7.1"></script>
+<script src="../shared/nd-site-match.js?v=0.7.2"></script>
+<script src="../shared/nd-gate-codes.js?v=0.7.2"></script>
 <script src="../assets/logo.js"></script>
 <script src="../assets/doc-invoice.js"></script>
 <script src="../assets/status-tint.js"></script>
@@ -208,13 +208,18 @@ input, select, textarea { font-family: inherit; color: inherit; background: var(
 .day-travel-legs tr.commute-leg td:first-child { color: var(--on-accent); }
 .day-travel-legs tr.private-leg td { color: var(--text-muted); font-style: italic; }
 .day-travel-note { font-size: 11px; color: var(--text-muted); margin: 0 0 8px; line-height: 1.4; }
-.excel-export { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-.excel-export h4 { margin: 0 0 6px; font-size: 14px; }
+.excel-export { margin: 16px 0 12px; padding: 14px 16px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+.excel-export h4 { margin: 0 0 6px; font-size: 15px; }
 .excel-modes { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
 .excel-modes label { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; }
-.excel-range { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 10px; }
-.excel-range .field { flex: 1; min-width: 140px; }
+.excel-range { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 10px; max-width: 100%; }
+.excel-range .field { flex: 1 1 140px; min-width: 0; margin-bottom: 0; }
 .excel-range .field label { font-size: 12px; }
+.excel-range input[type="date"] { width: 100%; max-width: 100%; min-height: 44px; box-sizing: border-box; }
+#btn-xlsx { min-height: 44px; }
+.excel-export-hint { font-size: 12px; margin: 8px 0 10px; }
+#view-settings .page { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
+#view-settings .excel-export { margin: 16px 0 0; padding: 16px 0 0; border: none; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
 .home-coords-status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 .home-coords-status.ok { color: var(--on-accent); }
 .ot-flag { color: var(--off-accent); }
@@ -464,6 +469,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
     </div>
     <details class="export-panel" id="export-panel">
       <summary>Export this week</summary>
+      <p class="muted excel-export-hint">Excel export (date range / all time) is in Settings → Timesheet Export.</p>
       <div class="export-opts" id="export-opts">
         <label><input type="checkbox" id="xo-travelTime"> Travel time</label>
         <label><input type="checkbox" id="xo-travelCost"> Travel cost</label>
@@ -482,19 +488,6 @@ body.ts-tl-dragging { overscroll-behavior: none; }
         <button class="btn btn-ghost btn-block" id="btn-open">Open in mail app</button>
         <button class="btn btn-ghost btn-block" id="btn-csv">Export CSV</button>
         <button class="btn btn-ghost btn-block" id="btn-pdf">Export / Print PDF</button>
-        <div class="excel-export" id="excel-export">
-          <h4>Export Excel</h4>
-          <p class="muted" style="font-size:12px; margin:0 0 6px;">Trip-by-trip work km for the cents-per-km method, plus a weekly hours-by-site sheet. Pick a date range or every entry since the earliest record. A financial year is just a custom range (for example 1 Jul to 30 Jun).</p>
-          <div class="excel-modes">
-            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-range" value="range" checked> Custom date range</label>
-            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-all" value="all"> All time</label>
-          </div>
-          <div class="excel-range" id="xlsx-range-fields">
-            <div class="field"><label for="xlsx-from">From</label><input type="date" id="xlsx-from"></div>
-            <div class="field"><label for="xlsx-to">To</label><input type="date" id="xlsx-to"></div>
-          </div>
-          <button class="btn btn-ghost btn-block" id="btn-xlsx" type="button">Download Excel</button>
-        </div>
       </div>
     </details>
     <button class="fab" id="btn-add-shift" aria-label="Add shift">+</button>
@@ -589,6 +582,19 @@ body.ts-tl-dragging { overscroll-behavior: none; }
           <select id="s-preferredMailApp"><option>Gmail</option><option>Outlook (web)</option><option>Apple / default mail</option><option>Just copy</option></select>
         </div>
         <p class="muted" style="font-size:12px; margin:0;">Copy timesheet and Open in mail app live in History → Export this week. The timesheet text is copied to your clipboard; paste it into the email. Use Copy map (or Download map) for the week's site map image.</p>
+        <div class="excel-export" id="excel-export">
+          <h4>Export Excel (date range or all time)</h4>
+          <p class="muted" style="font-size:12px; margin:0 0 6px;">Trip-by-trip work km for the cents-per-km method, plus a weekly hours-by-site sheet. Pick a date range or every entry since the earliest record. A financial year is just a custom range (for example 1 Jul to 30 Jun).</p>
+          <div class="excel-modes">
+            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-range" value="range" checked> Custom date range</label>
+            <label><input type="radio" name="xlsx-mode" id="xlsx-mode-all" value="all"> All time</label>
+          </div>
+          <div class="excel-range" id="xlsx-range-fields">
+            <div class="field"><label for="xlsx-from">From</label><input type="date" id="xlsx-from"></div>
+            <div class="field"><label for="xlsx-to">To</label><input type="date" id="xlsx-to"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="btn-xlsx" type="button">Download Excel</button>
+        </div>
       </div>
       <div class="card">
         <div class="row-between"><div style="font-weight:500;">Timesheet Live</div><a href="../timesheetlive/" target="_blank" rel="noopener" style="font-size:13px; color:var(--on-accent);">Open ↗</a></div>
@@ -793,7 +799,7 @@ body.ts-tl-dragging { overscroll-behavior: none; }
 
 <script>
 /* Timesheet — single-file build. Reads/writes Google Sheets via TsSheets (gapi). */
-const APP_VERSION = '0.7.1';   // see timesheet/VERSIONING.md
+const APP_VERSION = '0.7.2';   // see timesheet/VERSIONING.md
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app-version'); if (v) v.textContent = 'Timesheet v' + APP_VERSION; });
 
 /* ----- CONFIG ----- */
