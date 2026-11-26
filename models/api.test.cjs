@@ -232,7 +232,7 @@ test("503 db_busy waits retry_after seconds (capped at 15) before the one retry;
 
 test("buildBestPicksUrl hits /api/model-stats/best-picks with from and to only", () => {
   assert.equal(
-    A.buildBestPicksUrl("https://afl-tipster-bot.onrender.com/", "2026-11-06", "2026-11-26"),
-    "https://afl-tipster-bot.onrender.com/api/model-stats/best-picks?from=2026-11-06&to=2026-11-26"
+    A.buildBestPicksUrl("https://afl-tipster-bot.onrender.com/", "2026-11-04", "2026-11-26"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/best-picks?from=2026-11-04&to=2026-11-26"
   );
 });

@@ -111,3 +111,8 @@ test("normaliseBestPicks accepts days, best_picks or a bare array, and null hors
   assert.equal(BP.resultCode("Abandoned"), "abandoned");
   assert.deepEqual(BP.normaliseBestPicks({ ok: false }), []);
 });
+
+test("best picks are requested from 4 Nov 2026, the first 7am best-pick lock", () => {
+  const cfg = require("node:fs").readFileSync(require("node:path").join(__dirname, "config.js"), "utf8");
+  assert.match(cfg, /BEST_PICKS_FROM: "2026-11-04"/);
+});
