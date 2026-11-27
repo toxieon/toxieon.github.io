@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.6.0";
+  const APP_VERSION = "0.6.1";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -334,6 +334,12 @@
     renderStakedSection();
   }
 
+  function setDashboardHidden(hidden) {
+    $("dashboard").hidden = hidden;
+    const rest = $("dashboard-rest");
+    if (rest) rest.hidden = hidden;
+  }
+
   async function loadMainStats() {
     const from = effectiveFrom();
     const to = $("date-to").value || state.rangeTo;
@@ -350,7 +356,7 @@
     state.loadError = "";
     state.apiNotLive = false;
     state.notConfigured = false;
-    $("dashboard").hidden = true;
+    setDashboardHidden(true);
     $("load-state").hidden = false;
     $("load-state").textContent = "Loading stats…";
     const result = await fetchModelStats(from, to, {});
@@ -361,7 +367,7 @@
       state.notConfigured = !!result.notConfigured;
       state.data = null;
       renderStatus();
-      $("dashboard").hidden = true;
+      setDashboardHidden(true);
       return;
     }
     if (!result.ok) {
@@ -378,7 +384,7 @@
     if (!state.allTime && state.data.range && state.data.range.from) {
       state.rangeFrom = state.data.range.from;
     }
-    $("dashboard").hidden = false;
+    setDashboardHidden(false);
     renderAll();
   }
 
@@ -399,7 +405,7 @@
     state.reconstructedAvailable = null;
     setView();
     renderStatus();
-    $("dashboard").hidden = true;
+    setDashboardHidden(true);
   }
 
   function renderStatus() {
