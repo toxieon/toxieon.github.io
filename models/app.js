@@ -1664,8 +1664,8 @@
 
   function hybridPicksRange() {
     const to = DATES.todayMelbourneIso();
-    const from = DATES.addCalendarDays(to, -1094); // ~3 years: backdate as far as the data goes
-    return { from: from > to ? to : from, to };
+    const from = CFG.HYBRID_PICKS_FROM || ""; // empty from = all history
+    return { from, to };
   }
 
   /** Switch the signed-in page between Model stats and HorsePicks AI Hybrid. Hybrid is fetched only when this tab is opened. */

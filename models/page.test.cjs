@@ -126,3 +126,12 @@ test("HorsePicks AI Hybrid is a lazy signed-in tab and does not change existing 
   assert.match(HTML, /id="bestpick-section"/);
   assert.match(HTML, /id="ladder-section"/);
 });
+
+test("hybrid range starts 3 Nov 2026, include=all is never requested, tip price is labelled", () => {
+  assert.match(read("config.js"), /HYBRID_PICKS_FROM:\s*"2026-11-03"/);
+  const app = read("app.js");
+  assert.match(app, /CFG\.HYBRID_PICKS_FROM/);
+  assert.doesNotMatch(app + read("api.js"), /params\.set\(["']include["']/);
+  assert.match(read("bestpick.js"), /tip price/);
+  assert.match(read("bestpick.js"), /\^tip\$/);
+});

@@ -42,8 +42,12 @@
     return [];
   }
 
+  function isOmitted(row) {
+    return !!(row && row.omitted === true);
+  }
+
   function normalisePick(raw) {
-    if (!raw || typeof raw !== "object") return null;
+    if (!raw || typeof raw !== "object" || isOmitted(raw)) return null;
     const horse = String(raw.horse || raw.runner_name || raw.name || "").trim();
     if (!horse) return null;
     let pWin = num(raw.p_win);
@@ -93,7 +97,7 @@
   }
 
   function normaliseDay(raw) {
-    if (!raw || typeof raw !== "object") return null;
+    if (!raw || typeof raw !== "object" || isOmitted(raw)) return null;
     const date = String(raw.date || raw.day || "").slice(0, 10);
     if (!ISO.test(date)) return null;
     const list = Array.isArray(raw.picks) ? raw.picks : [];
@@ -102,12 +106,14 @@
       const n = normalisePick(p);
       if (n) picks.push(n);
     }
+    if (!picks.length) return null;
     return enrichDay({ date, picks });
   }
 
   /**
    * Adapter for GET /api/model-stats/hybrid-picks.
-   * Proposed shape: {ok, range:{from,to}, days:[{date, picks:[{horse, track, race_no, price, price_stage, p_win, stake_units, result, pl_units}]}]}
+   * Live shape (TipBot 0.106.5): {ok, range:{from,to}, days:[{date, picks:[{horse, track, race_no, price, price_stage, p_win, stake_units, result, pl_units}]}]}
+   * price_stage is "tip". Rows with omitted:true (include=all non-matches) are dropped; this page never requests include=all.
    * This is the function to change if Husker's live shape differs.
    */
   function adaptHybridPayload(payload) {
@@ -219,7 +225,7 @@
           track: tracks[(i + j) % tracks.length],
           race_no: 1 + ((i + j) % 8),
           price,
-          price_stage: "t60",
+          price_stage: "tip",
           p_win: 0.28 + ((i + j) % 5) * 0.04,
           stake_units: 1,
           result: res,

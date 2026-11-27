@@ -147,11 +147,13 @@ test("TipBot's real best-picks shape parses with no mismatch", () => {
   assert.equal(r.netProfit, -20);
 });
 
-test("stageLabel: t60 is T-60, 07 is 7am, 09 is 9am, empty is blank", () => {
+test("stageLabel: t60 is T-60, 07 is 7am, 09 is 9am, tip is tip price, empty is blank", () => {
   assert.equal(BP.stageLabel("t60"), "T-60");
   assert.equal(BP.stageLabel("T-30"), "T-30");
   assert.equal(BP.stageLabel("07"), "7am");
   assert.equal(BP.stageLabel("09"), "9am");
+  assert.equal(BP.stageLabel("tip"), "tip price");
+  assert.equal(BP.stageLabel("TIP"), "tip price");
   assert.equal(BP.stageLabel(null), "");
   assert.equal(BP.stageLabel("close"), "close");
 });

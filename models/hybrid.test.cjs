@@ -224,3 +224,26 @@ test("demoHybridPicks is localhost fixture data with obviously fake names only",
   const t = H.computeHybridTotals(adapted.days);
   assert.ok(t.n >= 0);
 });
+
+test("adaptHybridPayload drops picks and days with omitted:true (include=all non-matches)", () => {
+  const out = H.adaptHybridPayload({
+    ok: true,
+    days: [
+      { date: "2026-11-03", omitted: true, picks: [pick({ horse: "Should Drop Day", result: "won", pl_units: 9 })] },
+      { date: "2026-11-04", picks: [
+        pick({ horse: "Keep Me", result: "won", pl_units: 1.2, stake_units: 1, price_stage: "tip" }),
+        pick({ horse: "Non Match", result: "won", pl_units: 8, omitted: true }),
+      ] },
+      { date: "2026-11-05", picks: [pick({ horse: "Only Omitted", omitted: true, result: "lost", pl_units: -1 })] },
+    ],
+  });
+  assert.deepEqual(out.days.map((d) => d.date), ["2026-11-04"]);
+  assert.equal(out.days[0].picks.length, 1);
+  assert.equal(out.days[0].picks[0].horse, "Keep Me");
+  assert.equal(out.days[0].picks[0].price_stage, "tip");
+  assert.equal(out.days[0].wins, 1);
+  assert.equal(out.days[0].pl_units, 1.2);
+  const tot = H.computeHybridTotals(out.days);
+  assert.equal(tot.n, 1);
+  assert.equal(tot.net_units, 1.2);
+});

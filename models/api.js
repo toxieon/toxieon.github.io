@@ -130,12 +130,14 @@
     return base + BEST_PICKS_PATH + "?" + params.toString();
   }
 
+  /** from and to are optional. An omitted from means all history on TipBot. Never sends include=all. */
   function buildHybridPicksUrl(apiBase, from, to) {
     const base = String(apiBase || "").replace(/\/+$/, "");
     const params = new URLSearchParams();
-    params.set("from", from);
-    params.set("to", to);
-    return base + HYBRID_PICKS_PATH + "?" + params.toString();
+    if (from != null && String(from) !== "") params.set("from", from);
+    if (to != null && String(to) !== "") params.set("to", to);
+    const q = params.toString();
+    return base + HYBRID_PICKS_PATH + (q ? "?" + q : "");
   }
 
   /** Milliseconds to wait before retrying an unavailable response. 503 {error:"db_busy", retry_after:N}

@@ -237,10 +237,20 @@ test("buildBestPicksUrl hits /api/model-stats/best-picks with from and to only",
   );
 });
 
-test("buildHybridPicksUrl hits /api/model-stats/hybrid-picks with from and to only", () => {
+test("buildHybridPicksUrl hits /api/model-stats/hybrid-picks; omitted from means all history; never sends include=all", () => {
   assert.equal(
-    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/", "2025-01-01", "2026-11-27"),
-    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks?from=2025-01-01&to=2026-11-27"
+    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/", "2026-11-03", "2026-11-27"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks?from=2026-11-03&to=2026-11-27"
+  );
+  assert.equal(
+    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/", "", "2026-11-27"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks?to=2026-11-27"
+  );
+  assert.equal(
+    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks"
   );
   assert.equal(A.HYBRID_PICKS_PATH, "/api/model-stats/hybrid-picks");
+  const u = A.buildHybridPicksUrl(A.API_BASE, "2026-11-03", "2026-11-27");
+  assert.equal(new URL(u).searchParams.get("include"), null);
 });
