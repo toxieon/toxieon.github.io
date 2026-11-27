@@ -70,10 +70,11 @@
     };
   }
 
-  /** Human label for TipBot's price stage: "t60" → "T-60", "07" → "7am", "09" → "9am"; anything else as sent. */
+  /** Human label for TipBot's price stage: "t60" → "T-60", "07" → "7am", "09" → "9am", "tip" → "tip price"; anything else as sent. */
   function stageLabel(stage) {
     const raw = String(stage == null ? "" : stage).trim();
     if (!raw) return "";
+    if (/^tip$/i.test(raw)) return "tip price";
     const t = /^t-?(\d+)$/i.exec(raw);
     if (t) return "T-" + Number(t[1]);
     const h = /^(\d{1,2})(?:am)?$/i.exec(raw);
