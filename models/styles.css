@@ -831,3 +831,45 @@ tr.reconstructed td:first-child {
 
 .hy-error-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .hy-error-actions .btn { min-height: 40px; }
+
+.hy-compare-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 4px 0 12px;
+}
+.hy-compare-row label { font-size: 0.85rem; margin: 0; }
+.hy-compare-row select {
+  min-height: 40px;
+  min-width: 9.5rem;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  color: inherit;
+  font: inherit;
+}
+.hy-totals-groups { display: grid; gap: 12px; margin: 8px 0 12px; }
+.hy-totals-group h3 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.hy-totals-groups .hy-totals { margin: 0; }
+.hy-cmp-pl {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+.hy-cmp-pl.hy-cmp-won { color: var(--win); }
+.hy-cmp-pl.hy-cmp-lost { color: var(--loss); }
+.hy-cmp-pl.hy-cmp-pending { color: var(--placed); }
+.hy-cmp-day { margin-top: 10px; }
+#hy-grid .cal-day.bp-day { min-height: 64px; }
+@media (max-width: 420px) {
+  .hy-cmp-pl { font-size: 0.62rem; }
+}

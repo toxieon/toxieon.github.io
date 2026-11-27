@@ -127,11 +127,15 @@ test("HorsePicks AI Hybrid is a lazy signed-in tab and does not change existing 
   assert.match(HTML, /id="ladder-section"/);
 });
 
-test("hybrid range starts 3 Nov 2026, include=all is never requested, tip price is labelled", () => {
+test("hybrid range starts 3 Nov 2026; include=all is only for HorsePicks AI comparison; tip price is labelled", () => {
   assert.match(read("config.js"), /HYBRID_PICKS_FROM:\s*"2026-11-03"/);
   const app = read("app.js");
   assert.match(app, /CFG\.HYBRID_PICKS_FROM/);
-  assert.doesNotMatch(app + read("api.js"), /params\.set\(["']include["']/);
+  const load = /async function loadHybridPicks\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.doesNotMatch(load, /includeAll/);
+  const compare = /async function loadHybridCompare\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(compare, /includeAll:\s*true/);
+  assert.match(compare, /API\.requestHybridPicks/);
   assert.match(read("bestpick.js"), /tip price/);
   assert.match(read("bestpick.js"), /\^tip\$/);
 });
@@ -151,4 +155,41 @@ test("hybrid load uses requestHybridPicks, always clears the spinner, and shows 
   assert.match(HTML, />Retry</);
   assert.match(HTML, /id="hy-signin"/);
   assert.match(app, /Server busy, try again in a minute|describeHybridError/);
+});
+
+test("hybrid compare dropdown persists in localStorage and shows comparison totals", () => {
+  const html = HTML;
+  assert.match(html, /id="hy-compare"/);
+  assert.match(html, /<option value="none" selected>None</);
+  assert.match(html, /<option value="with_price">With</);
+  assert.match(html, /<option value="without_price">Without</);
+  assert.match(html, /<option value="agree">Agree</);
+  assert.match(html, /<option value="horsepicks">HorsePicks AI</);
+  const app = read("app.js");
+  assert.match(app, /HY\.readCompareChoice\(localStorage\)/);
+  assert.match(app, /HY\.writeCompareChoice\(localStorage/);
+  assert.match(app, /function loadHybridCompare\(/);
+  assert.match(app, /HY\.adaptModelStatsCompare/);
+  assert.match(app, /includeOmitted:\s*true/);
+  assert.match(app, /hy-cmp-pl/);
+  assert.match(app, /hy-totals-groups/);
+  const compare = /async function loadHybridCompare\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(compare, /API\.buildModelStatsUrl/);
+  assert.match(compare, /API\.requestHybridPicks/);
+  assert.match(compare, /try \{/);
+  assert.match(compare, /finally/);
+  const load = /async function loadHybridPicks\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(load, /await loadHybridCompare\(\)/);
+});
+
+test("main model-stats calendar still stacks With, Without and Agree per day", () => {
+  const app = read("app.js");
+  const cal = /function renderCalendar\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(cal, /cal-models/);
+  assert.match(cal, /CFG\.MODELS\.forEach/);
+  assert.match(cal, /cal-mini/);
+  assert.doesNotMatch(cal, /hy-cmp-pl/);
+  const bp = /function renderBpCalendar\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(bp, /bp-horse/);
+  assert.doesNotMatch(bp, /hy-cmp-pl/);
 });

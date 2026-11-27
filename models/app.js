@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.5.1";
+  const APP_VERSION = "0.6.0";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -72,7 +72,12 @@
     bp: { loading: false, error: "", days: null, month: "" },
     ladder: { start: "", stake: 20, onLoss: "reset" },
     pageTab: "models",
-    hy: { loading: false, error: "", days: null, month: "", fetched: false },
+    hy: {
+      loading: false, error: "", days: null, month: "", fetched: false,
+      compare: "none", compareDays: null, compareTotals: null,
+      compareLoading: false, compareError: "",
+      hpDays: null, statsPayload: null,
+    },
   };
 
   function isDemoMode() {
@@ -1724,10 +1729,118 @@
       state.hy.fetched = true;
       renderHybrid();
     }
+    if (state.hy.compare && state.hy.compare !== "none") {
+      await loadHybridCompare();
+    }
   }
 
   function hyDayMap() {
     return new Map((state.hy.days || []).map((d) => [d.date, d]));
+  }
+
+  function hyCompareMap() {
+    return new Map((state.hy.compareDays || []).map((d) => [d.date, d]));
+  }
+
+  function hyCompareMeta() {
+    return HY && HY.compareModel ? HY.compareModel(state.hy.compare) : { id: "none", label: "None", short: "", source: null };
+  }
+
+  function applyHorsePicksCompare() {
+    const days = state.hy.hpDays || [];
+    state.hy.compareDays = days;
+    state.hy.compareTotals = HY.computeHybridTotals(days);
+    state.hy.compareError = "";
+  }
+
+  function applyModelStatsCompare(payload) {
+    const out = HY.adaptModelStatsCompare(payload, state.hy.compare);
+    state.hy.compareDays = out.days;
+    state.hy.compareTotals = out.totals;
+    state.hy.compareError = "";
+  }
+
+  function usableMainStats() {
+    const data = state.data;
+    if (!data) return null;
+    const id = state.hy.compare;
+    const meta = hyCompareMeta();
+    if (meta.source !== "model-stats") return null;
+    const hasCal = Array.isArray(data.calendar) && data.calendar.length;
+    const hasDaily = data.models && data.models[id] && Array.isArray(data.models[id].daily);
+    return (hasCal || hasDaily) ? data : null;
+  }
+
+  /** Lazy compare fetch. Never starts until hybrid-picks has finished (single DB slot). */
+  async function loadHybridCompare() {
+    if (!signedIn() || !HY) return;
+    const id = state.hy.compare || "none";
+    if (id === "none") {
+      state.hy.compareDays = null;
+      state.hy.compareTotals = null;
+      state.hy.compareError = "";
+      state.hy.compareLoading = false;
+      renderHybrid();
+      return;
+    }
+    const meta = hyCompareMeta();
+    if (id === "horsepicks" && state.hy.hpDays) {
+      applyHorsePicksCompare();
+      renderHybrid();
+      return;
+    }
+    if (meta.source === "model-stats") {
+      const ready = state.hy.statsPayload || usableMainStats();
+      if (ready) {
+        applyModelStatsCompare(ready);
+        renderHybrid();
+        return;
+      }
+    }
+    state.hy.compareLoading = true;
+    state.hy.compareError = "";
+    renderHybrid();
+    const { from, to } = hybridPicksRange();
+    try {
+      if (isDemoMode()) {
+        if (id === "horsepicks") {
+          state.hy.hpDays = HY.adaptHybridPayload(HY.demoHybridPicks(from, to, { includeOmitted: true }), { includeOmitted: true }).days;
+          applyHorsePicksCompare();
+        } else {
+          state.hy.statsPayload = HY.demoModelStatsCompare(from || "2026-11-03", to);
+          applyModelStatsCompare(state.hy.statsPayload);
+        }
+      } else if (id === "horsepicks") {
+        const url = API.buildHybridPicksUrl(CFG.API_BASE, from, to, { includeAll: true });
+        const res = await API.requestHybridPicks(url, state.token);
+        if (res.kind === "ok") {
+          state.hy.hpDays = HY.adaptHybridPayload(res.data, { includeOmitted: true }).days;
+          applyHorsePicksCompare();
+        } else {
+          state.hy.compareError = API.describeHybridError(res);
+          state.hy.compareDays = null;
+          state.hy.compareTotals = null;
+        }
+      } else {
+        const url = API.buildModelStatsUrl(CFG.API_BASE, from || "all", to);
+        const res = await API.requestHybridPicks(url, state.token);
+        if (res.kind === "ok") {
+          state.hy.statsPayload = res.data;
+          applyModelStatsCompare(res.data);
+        } else {
+          state.hy.compareError = API.describeHybridError(res);
+          state.hy.compareDays = null;
+          state.hy.compareTotals = null;
+        }
+      }
+    } catch (err) {
+      state.hy.compareError = API.describeHybridError(null, err);
+      state.hy.compareDays = null;
+      state.hy.compareTotals = null;
+    } finally {
+      state.hy.compareLoading = false;
+      renderHybrid();
+    }
   }
 
   function renderHybrid() {
@@ -1751,19 +1864,81 @@
       err.hidden = false;
       $("hy-error-text").textContent = "No hybrid picks yet in this range.";
     }
+    syncHybridCompareSelect();
+    renderHybridCompareStatus();
     renderHybridTotals();
     renderHybridCalendar();
+  }
+
+  function syncHybridCompareSelect() {
+    const sel = $("hy-compare");
+    if (!sel) return;
+    const id = state.hy.compare || "none";
+    if (sel.value !== id) sel.value = id;
+  }
+
+  function renderHybridCompareStatus() {
+    const el = $("hy-compare-status");
+    if (!el) return;
+    const meta = hyCompareMeta();
+    if (state.hy.compareLoading) {
+      el.hidden = false;
+      el.textContent = "Loading " + (meta.label || "comparison") + "\u2026";
+      return;
+    }
+    if (state.hy.compareError && meta.id !== "none") {
+      el.hidden = false;
+      el.textContent = meta.label + ": " + state.hy.compareError;
+      return;
+    }
+    el.hidden = true;
+    el.textContent = "";
+  }
+
+  function totalsTiles(t) {
+    return [
+      summaryTile("Record", t.wins + "\u2013" + t.losses),
+      summaryTile("Net units", fmtPl(t.net_units) + "u", plClass(t.net_units)),
+      summaryTile("ROI", t.roi_pct == null ? "\u2014" : fmtPct(t.roi_pct)),
+      summaryTile("n", String(t.n)),
+    ];
   }
 
   function renderHybridTotals() {
     const days = state.hy.days || [];
     const t = HY.computeHybridTotals(days);
-    $("hy-totals").replaceChildren(
-      summaryTile("Record", t.wins + "\u2013" + t.losses),
-      summaryTile("Net units", fmtPl(t.net_units) + "u", plClass(t.net_units)),
-      summaryTile("ROI", t.roi_pct == null ? "\u2014" : fmtPct(t.roi_pct)),
-      summaryTile("n", String(t.n))
-    );
+    const host = $("hy-totals");
+    const meta = hyCompareMeta();
+    const showCmp = meta.id !== "none" && (state.hy.compareTotals || state.hy.compareLoading || state.hy.compareError);
+    host.replaceChildren();
+    if (!showCmp) {
+      host.className = "summary-grid hy-totals";
+      host.setAttribute("aria-label", "Hybrid totals");
+      host.append(...totalsTiles(t));
+    } else {
+      host.className = "hy-totals-groups";
+      host.setAttribute("aria-label", "Hybrid and comparison totals");
+      const hyGroup = document.createElement("div");
+      hyGroup.className = "hy-totals-group";
+      const hyH = document.createElement("h3");
+      hyH.textContent = "Hybrid";
+      const hyGrid = document.createElement("div");
+      hyGrid.className = "summary-grid hy-totals";
+      hyGrid.append(...totalsTiles(t));
+      hyGroup.append(hyH, hyGrid);
+      host.appendChild(hyGroup);
+      if (state.hy.compareTotals) {
+        const cmpGroup = document.createElement("div");
+        cmpGroup.className = "hy-totals-group";
+        const cmpH = document.createElement("h3");
+        cmpH.textContent = meta.label;
+        const cmpGrid = document.createElement("div");
+        cmpGrid.className = "summary-grid hy-totals";
+        cmpGrid.append(...totalsTiles(state.hy.compareTotals));
+        cmpGroup.append(cmpH, cmpGrid);
+        host.appendChild(cmpGroup);
+      }
+    }
     const box = $("hy-highlights");
     box.replaceChildren();
     box.append(
@@ -1803,6 +1978,8 @@
     $("hy-prev").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, -1), from, to);
     $("hy-next").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, 1), from, to);
     const map = hyDayMap();
+    const cmpMap = hyCompareMap();
+    const cmpMeta = hyCompareMeta();
     const grid = $("hy-grid");
     grid.replaceChildren();
     ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d) => {
@@ -1828,17 +2005,37 @@
       cell.appendChild(num);
       cell.dataset.date = iso;
       const day = map.get(iso);
+      const cmpDay = cmpMap.get(iso);
       const inRange = CAL.dateInRange(iso, from, to);
-      if (day && day.picks && day.picks.length) {
-        cell.classList.add("cal-has-data", HY.dayTone(day));
-        const pl = document.createElement("span");
-        pl.className = "hy-pl bp-price";
-        if ((day.wins || 0) + (day.losses || 0) > 0) pl.textContent = fmtPl(day.pl_units);
-        else if (day.pending > 0) pl.textContent = "pend";
-        else pl.textContent = "scr";
-        cell.appendChild(pl);
-        const n = day.picks.length;
-        cell.title = shortDate(iso) + " \u00b7 " + (fmtPl(day.pl_units) + "u") + " \u00b7 " + n + (n === 1 ? " pick" : " picks");
+      const hasHy = !!(day && day.picks && day.picks.length);
+      const hasCmp = !!(cmpMeta.id !== "none" && cmpDay && ((cmpDay.wins || 0) + (cmpDay.losses || 0) > 0 || (cmpDay.bets || 0) > 0 || (cmpDay.pending || 0) > 0 || (cmpDay.picks && cmpDay.picks.length)));
+      if (hasHy || hasCmp) {
+        if (hasHy) cell.classList.add("cal-has-data", HY.dayTone(day));
+        else cell.classList.add("cal-has-data");
+        if (hasHy) {
+          const pl = document.createElement("span");
+          pl.className = "hy-pl bp-price";
+          if ((day.wins || 0) + (day.losses || 0) > 0) pl.textContent = fmtPl(day.pl_units);
+          else if (day.pending > 0) pl.textContent = "pend";
+          else pl.textContent = "scr";
+          cell.appendChild(pl);
+        }
+        if (hasCmp) {
+          const cmp = document.createElement("span");
+          const tone = HY.compareDayTone(cmpDay);
+          cmp.className = "hy-cmp-pl" + (tone === "bp-won" ? " hy-cmp-won" : tone === "bp-lost" ? " hy-cmp-lost" : tone === "bp-pending" ? " hy-cmp-pending" : "");
+          let cmpText = fmtPl(cmpDay.pl_units);
+          if ((cmpDay.wins || 0) + (cmpDay.losses || 0) <= 0 && (cmpDay.pending || 0) > 0) cmpText = "pend";
+          cmp.textContent = (cmpMeta.short || cmpMeta.label) + " " + cmpText;
+          cell.appendChild(cmp);
+        }
+        const bits = [shortDate(iso)];
+        if (hasHy) {
+          const n = day.picks.length;
+          bits.push(fmtPl(day.pl_units) + "u", n + (n === 1 ? " pick" : " picks"));
+        }
+        if (hasCmp) bits.push(cmpMeta.label + " " + fmtPl(cmpDay.pl_units) + "u");
+        cell.title = bits.join(" \u00b7 ");
         cell.addEventListener("click", () => openHybridDay(iso));
       } else {
         if (!inRange) cell.classList.add("cal-out");
@@ -1895,6 +2092,19 @@
         body.appendChild(card);
       });
     }
+    const cmpMeta = hyCompareMeta();
+    const cmpDay = hyCompareMap().get(date);
+    if (cmpMeta.id !== "none" && cmpDay && ((cmpDay.wins || 0) + (cmpDay.losses || 0) > 0 || (cmpDay.bets || 0) > 0 || Number.isFinite(cmpDay.pl_units))) {
+      const card = document.createElement("div");
+      card.className = "day-model card hy-cmp-day";
+      const h = document.createElement("h3");
+      h.textContent = cmpMeta.label;
+      card.appendChild(h);
+      const wl = (cmpDay.wins || 0) + "\u2013" + (cmpDay.losses || 0);
+      card.appendChild(sheetLine("Record", wl));
+      card.appendChild(sheetLine("Day units", fmtPl(cmpDay.pl_units) + "u", plClass(cmpDay.pl_units)));
+      body.appendChild(card);
+    }
     $("day-sheet").hidden = false;
     document.body.classList.add("sheet-open");
   }
@@ -1917,6 +2127,15 @@
       state.hy.fetched = false;
       loadHybridPicks();
     });
+    const sel = $("hy-compare");
+    if (sel) {
+      sel.value = state.hy.compare || "none";
+      sel.addEventListener("change", () => {
+        const id = HY.writeCompareChoice(localStorage, sel.value);
+        state.hy.compare = id;
+        loadHybridCompare();
+      });
+    }
   }
 
   function init() {
@@ -1930,6 +2149,7 @@
     bindEvents();
     if (BP) readLadderPrefs();
     bindBestPickEvents();
+    if (HY) state.hy.compare = HY.readCompareChoice(localStorage);
     bindHybridEvents();
     const H = window.NDModelsHandoff;
     const authError = H && H.getAuthError ? H.getAuthError() : "";
