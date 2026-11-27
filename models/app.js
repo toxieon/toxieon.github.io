@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.5.0";
+  const APP_VERSION = "0.5.1";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -1680,43 +1680,50 @@
     if ($("models-view")) $("models-view").hidden = onHybrid;
     if ($("hybrid-view")) $("hybrid-view").hidden = !onHybrid;
     if (!onHybrid) return;
-    const shouldFetch = !state.hy.loading && (!state.hy.fetched || (state.hy.error && !state.hy.days));
+    const shouldFetch = !state.hy.loading && !state.hy.fetched;
     if (shouldFetch) loadHybridPicks();
     else renderHybrid();
   }
 
-  /** GET /api/model-stats/hybrid-picks. Any failure only shows a message in this tab. */
+  /** GET /api/model-stats/hybrid-picks. Failures stay in this tab; the spinner is always cleared in finally. */
   async function loadHybridPicks() {
     if (!signedIn() || !HY) return;
     state.hy.loading = true;
     state.hy.error = "";
+    state.hy.signinHint = false;
     renderHybrid();
     const { from, to } = hybridPicksRange();
-    let days = null;
-    let error = "";
-    if (isDemoMode()) {
-      days = HY.adaptHybridPayload(HY.demoHybridPicks(from, to)).days;
-    } else {
-      let res;
-      try {
-        res = await API.requestModelStats(API.buildHybridPicksUrl(CFG.API_BASE, from, to), state.token);
-      } catch (e) {
-        res = { kind: "error", data: {} };
+    try {
+      let days = null;
+      if (isDemoMode()) {
+        days = HY.adaptHybridPayload(HY.demoHybridPicks(from, to)).days;
+      } else {
+        const res = await API.requestHybridPicks(API.buildHybridPicksUrl(CFG.API_BASE, from, to), state.token);
+        if (res.kind === "ok") {
+          days = HY.adaptHybridPayload(res.data).days;
+        } else {
+          state.hy.error = API.describeHybridError(res);
+          state.hy.signinHint = res.kind === "signin";
+          state.hy.days = null;
+          return;
+        }
       }
-      if (res.kind === "signin") { state.hy.loading = false; handleUnauthorised(); return; }
-      if (res.kind === "forbidden") { state.hy.loading = false; handleForbidden(); return; }
-      if (res.kind === "ok") days = HY.adaptHybridPayload(res.data).days;
-      else error = HY_UNAVAILABLE_MSG;
+      state.hy.days = days;
+      state.hy.error = "";
+      if (days && !state.hy.month) {
+        const last = days.length ? days[days.length - 1].date : to;
+        state.hy.month = last.slice(0, 7);
+      }
+      renderHybrid();
+    } catch (err) {
+      state.hy.error = API.describeHybridError(null, err);
+      state.hy.days = null;
+      state.hy.signinHint = false;
+    } finally {
+      state.hy.loading = false;
+      state.hy.fetched = true;
+      renderHybrid();
     }
-    state.hy.loading = false;
-    state.hy.fetched = true;
-    state.hy.error = error;
-    state.hy.days = error ? null : days;
-    if (days && !state.hy.month) {
-      const last = days.length ? days[days.length - 1].date : to;
-      state.hy.month = last.slice(0, 7);
-    }
-    renderHybrid();
   }
 
   function hyDayMap() {
@@ -1728,8 +1735,15 @@
     if (!section) return;
     $("hy-load").hidden = !state.hy.loading;
     const err = $("hy-error");
-    err.hidden = !state.hy.error;
+    err.hidden = !state.hy.error || state.hy.loading;
     $("hy-error-text").textContent = state.hy.error || "";
+    const retry = $("hy-retry");
+    if (retry) retry.hidden = !state.hy.error || state.hy.loading;
+    const signin = $("hy-signin");
+    if (signin) {
+      signin.hidden = !state.hy.signinHint || state.hy.loading;
+      signin.href = API.loginUrl(location.origin);
+    }
     const has = !!state.hy.days && !state.hy.error;
     $("hy-body").hidden = !has || state.hy.loading;
     if (!has) return;
@@ -1897,6 +1911,11 @@
     $("hy-next").addEventListener("click", () => {
       state.hy.month = CAL.ymAdd(state.hy.month || hybridPicksRange().to.slice(0, 7), 1);
       renderHybridCalendar();
+    });
+    const retry = $("hy-retry");
+    if (retry) retry.addEventListener("click", () => {
+      state.hy.fetched = false;
+      loadHybridPicks();
     });
   }
 

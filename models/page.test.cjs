@@ -135,3 +135,20 @@ test("hybrid range starts 3 Nov 2026, include=all is never requested, tip price 
   assert.match(read("bestpick.js"), /tip price/);
   assert.match(read("bestpick.js"), /\^tip\$/);
 });
+
+test("hybrid load uses requestHybridPicks, always clears the spinner, and shows Retry plus specific errors", () => {
+  const app = read("app.js");
+  const load = /async function loadHybridPicks\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(load, /API\.requestHybridPicks/);
+  assert.doesNotMatch(load, /API\.requestModelStats/);
+  assert.match(load, /try \{/);
+  assert.match(load, /catch \(err\)/);
+  assert.match(load, /finally/);
+  assert.match(load, /state\.hy\.loading = false/);
+  assert.match(load, /API\.describeHybridError/);
+  assert.doesNotMatch(app + read("api.js"), /AbortSignal\.timeout\s*\(/);
+  assert.match(HTML, /id="hy-retry"/);
+  assert.match(HTML, />Retry</);
+  assert.match(HTML, /id="hy-signin"/);
+  assert.match(app, /Server busy, try again in a minute|describeHybridError/);
+});

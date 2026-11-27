@@ -254,3 +254,47 @@ test("buildHybridPicksUrl hits /api/model-stats/hybrid-picks; omitted from means
   const u = A.buildHybridPicksUrl(A.API_BASE, "2026-11-03", "2026-11-27");
   assert.equal(new URL(u).searchParams.get("include"), null);
 });
+
+test("requestHybridPicks times out a hanging fetch via AbortController and setTimeout, not AbortSignal.timeout", async () => {
+  const hang = () => new Promise(() => {});
+  const r = await A.requestHybridPicks("https://x.invalid/h", "t".repeat(20), { fetch: hang, timeoutMs: 30, sleep: noSleep, maxRetries: 0 });
+  assert.equal(r.kind, "timeout");
+  assert.equal(A.describeHybridError(r), "Timed out, try again.");
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "api.js"), "utf8");
+  assert.match(src, /new AbortController/);
+  assert.match(src, /setTimeout/);
+  assert.doesNotMatch(src, /AbortSignal\.timeout\s*\(/);
+  assert.equal(A.HYBRID_TIMEOUT_MS, 20000);
+});
+
+test("requestHybridPicks returns signin on 401 and describeHybridError explains the expired session", async () => {
+  A.clearStatsCache();
+  const f = fakeFetch([{ status: 401, body: { ok: false, error: "unauthorised" } }]);
+  const r = await A.requestHybridPicks("https://x.invalid/h", "t".repeat(20), { fetch: f, sleep: noSleep });
+  assert.equal(r.kind, "signin");
+  assert.equal(f.calls.length, 1);
+  assert.equal(A.describeHybridError(r), "Your session has expired. Sign in again.");
+});
+
+test("requestHybridPicks caps db_busy retries at 3 then returns db_busy; a later 200 stops early", async () => {
+  const busy = { status: 503, body: { ok: false, error: "db_busy", retry_after: 1 } };
+  A.clearStatsCache();
+  const f = fakeFetch([busy, busy, busy, busy]);
+  const r = await A.requestHybridPicks("https://x.invalid/h1", "t".repeat(20), { fetch: f, sleep: noSleep });
+  assert.equal(r.kind, "db_busy");
+  assert.equal(f.calls.length, 4, "1 attempt + 3 retries");
+  assert.equal(A.describeHybridError(r), "Server busy, try again in a minute");
+  assert.equal(A.HYBRID_DB_BUSY_RETRIES, 3);
+
+  A.clearStatsCache();
+  const g = fakeFetch([busy, busy, { status: 200, body: { ok: true, days: [] } }]);
+  const ok = await A.requestHybridPicks("https://x.invalid/h2", "t".repeat(20), { fetch: g, sleep: noSleep });
+  assert.equal(ok.kind, "ok");
+  assert.equal(g.calls.length, 3);
+});
+
+test("describeHybridError reports a page render error and a numbered server error", () => {
+  assert.equal(A.describeHybridError(null, new Error("cannot read 'pl_units'")), "Page error: cannot read 'pl_units'");
+  assert.equal(A.describeHybridError({ kind: "error", status: 500, data: {} }), "Server error 500");
+  assert.equal(A.describeHybridError({ kind: "not_live", status: 404, data: {} }), "Server error 404");
+});
