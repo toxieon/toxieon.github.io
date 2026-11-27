@@ -193,3 +193,25 @@ test("main model-stats calendar still stacks With, Without and Agree per day", (
   assert.match(bp, /bp-horse/);
   assert.doesNotMatch(bp, /hy-cmp-pl/);
 });
+test("stacked calendar sits after the summary and before best-pick, and renders a cal-mini row per model", () => {
+  const modelsView = /id="models-view"[\s\S]*?id="hybrid-view"/.exec(HTML)[0];
+  const staked = modelsView.indexOf('id="staked-section"');
+  const dash = modelsView.indexOf('id="dashboard"');
+  const summary = modelsView.indexOf('id="summary-cards"');
+  const cal = modelsView.indexOf('id="cal-grid"');
+  const bpSec = modelsView.indexOf('id="bestpick-section"');
+  const bp = modelsView.indexOf('id="bp-grid"');
+  const ladder = modelsView.indexOf('id="ladder-section"');
+  const rest = modelsView.indexOf('id="dashboard-rest"');
+  assert.ok(staked > -1 && dash > staked, "dashboard follows the staked section");
+  assert.ok(summary > dash && cal > summary, "stacked calendar follows the summary cards");
+  assert.ok(bpSec > cal && bp > bpSec, "best-pick calendar stays its own section after the stacked calendar");
+  assert.ok(ladder > bp && rest > ladder, "ladder stays after best-pick; remaining stats follow");
+  assert.match(HTML, /aria-label="Daily model comparison"/);
+  const app = read("app.js");
+  const fn = /function renderCalendar\(\) \{[\s\S]*?\n  \}/.exec(app)[0];
+  assert.match(fn, /models\.className = "cal-models"/);
+  assert.match(fn, /CFG\.MODELS\.forEach\(\(id\) => \{/);
+  assert.match(fn, /row\.className = "cal-mini"/);
+  assert.match(read("config.js"), /MODELS:\s*\["with_price",\s*"without_price",\s*"agree"\]/);
+});
