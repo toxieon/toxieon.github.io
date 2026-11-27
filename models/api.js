@@ -19,6 +19,10 @@
   /** Longest wait honoured from a 503 {error:"db_busy", retry_after} before the one retry. */
   const RETRY_AFTER_CAP_S = 15;
   const DEFAULT_RETRY_MS = 1500;
+  /** Hybrid-only: hard timeout per attempt (AbortController + setTimeout, not AbortSignal.timeout). */
+  const HYBRID_TIMEOUT_MS = 20000;
+  /** Hybrid-only: max db_busy retries after the first attempt (4 attempts in total). */
+  const HYBRID_DB_BUSY_RETRIES = 3;
   const TOKEN_KEY = "nd_models_owner_token";
   /** Read-only fallback: the same TipBot session token saved by Black Book on this origin. Never written here. */
   const FALLBACK_TOKEN_KEYS = ["nd_owner_token"];
@@ -227,11 +231,98 @@
     return "Request failed.";
   }
 
+  function isTimeoutError(err) {
+    if (!err) return false;
+    const name = String(err.name || "");
+    const msg = String(err.message || "");
+    return name === "TimeoutError" || name === "AbortError" || msg === "timeout" || /aborted/i.test(msg);
+  }
+
+  /** Hybrid-tab copy. Prefer a thrown page error when one is passed. */
+  function describeHybridError(res, err) {
+    if (err && (err.message || err.name)) {
+      return "Page error: " + (err.message || err.name);
+    }
+    const kind = res && res.kind;
+    if (kind === "timeout") return "Timed out, try again.";
+    if (kind === "db_busy") return "Server busy, try again in a minute";
+    if (kind === "signin") return "Your session has expired. Sign in again.";
+    if (res && res.status) return "Server error " + res.status;
+    return "Server error";
+  }
+
+  /**
+   * GET /api/model-stats/hybrid-picks. Same auth as requestModelStats, but with a 20s
+   * AbortController+setTimeout cap per attempt and at most 3 db_busy retries.
+   * Does not share the model-stats memo, so Retry always hits the network.
+   * opts: {fetch, sleep, timeoutMs, maxRetries}.
+   */
+  async function requestHybridPicks(url, token, opts) {
+    const o = opts || {};
+    const doFetch = o.fetch || (typeof fetch !== "undefined" ? fetch : null);
+    const sleep = o.sleep || ((ms) => new Promise((ok) => setTimeout(ok, ms)));
+    const timeoutMs = o.timeoutMs != null ? Number(o.timeoutMs) : HYBRID_TIMEOUT_MS;
+    const maxRetries = o.maxRetries != null ? Number(o.maxRetries) : HYBRID_DB_BUSY_RETRIES;
+    const init = {
+      method: "GET",
+      headers: token ? { Authorization: "Bearer " + token } : {},
+      credentials: "omit",
+      cache: "no-store",
+    };
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const ac = typeof AbortController !== "undefined" ? new AbortController() : null;
+      let timedOut = false;
+      let timer = null;
+      const work = (async () => {
+        const req = Object.assign({}, init);
+        if (ac) req.signal = ac.signal;
+        const r = await doFetch(url, req);
+        let data = null;
+        try { data = await r.json(); } catch (e) { data = null; }
+        return { r: r, data: data || {} };
+      })();
+      const raced = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          if (ac) ac.abort();
+          const err = new Error("timeout");
+          err.name = "TimeoutError";
+          reject(err);
+        }, timeoutMs);
+        work.then(
+          (v) => { clearTimeout(timer); resolve(v); },
+          (e) => { clearTimeout(timer); reject(e); }
+        );
+      });
+      let got;
+      try {
+        got = await raced;
+      } catch (e) {
+        if (timedOut || isTimeoutError(e)) {
+          return { status: 0, data: {}, kind: "timeout", cached: false };
+        }
+        if (attempt < maxRetries) { await sleep(DEFAULT_RETRY_MS); continue; }
+        return { status: 0, data: {}, kind: "error", cached: false, message: e && e.message ? e.message : "" };
+      }
+      const kind = classifyStats(got.r.status, got.data);
+      const busy = kind === "unavailable" && String(got.data.error || "") === "db_busy";
+      if (busy && attempt < maxRetries) {
+        await sleep(retryDelayMs(got.r.status, got.data));
+        continue;
+      }
+      if (busy) return { status: got.r.status, data: got.data, kind: "db_busy", cached: false };
+      return { status: got.r.status, data: got.data, kind: kind, cached: false };
+    }
+    return { status: 0, data: {}, kind: "error", cached: false };
+  }
+
   return {
     API_BASE, TOKEN_KEY, FALLBACK_TOKEN_KEYS, CANONICAL_RETURN, RETURN_ORIGINS,
     returnToUrl, loginUrl, exchangeCode, exchangeAndStore, describeAuthError,
     readToken, saveToken, clearToken, clearPrimaryToken, buildModelStatsUrl, describeApiError,
     STATS_PATH, CACHE_TTL_MS, classifyStats, requestModelStats, clearStatsCache,
     BEST_PICKS_PATH, buildBestPicksUrl, HYBRID_PICKS_PATH, buildHybridPicksUrl, retryDelayMs, RETRY_AFTER_CAP_S,
+    requestHybridPicks, describeHybridError, HYBRID_TIMEOUT_MS, HYBRID_DB_BUSY_RETRIES,
   };
 });

@@ -247,3 +247,26 @@ test("adaptHybridPayload drops picks and days with omitted:true (include=all non
   assert.equal(tot.n, 1);
   assert.equal(tot.net_units, 1.2);
 });
+
+test("a live-shaped pending pick with pl_units null (including today's date) does not throw and is excluded from totals", () => {
+  const today = "2026-11-27";
+  const raw = {
+    ok: true,
+    range: { from: "2026-11-03", to: today },
+    days: [
+      { date: "2026-11-03", picks: [{ horse: "Fake Flyer", track: "Demo Park", race_no: 1, price: 2.2, price_stage: "tip", stake_units: 1, result: "won", pl_units: 1.2 }] },
+      { date: today, picks: [{ horse: "Still Running", track: "Sample Oval", race_no: 4, price: 2.6, price_stage: "tip", p_win: 0.31, stake_units: 1, result: "pending", pl_units: null }] },
+    ],
+  };
+  const adapted = H.adaptHybridPayload(raw);
+  assert.equal(adapted.days.length, 2);
+  assert.equal(adapted.days[1].picks[0].result, "pending");
+  assert.equal(adapted.days[1].picks[0].pl_units, null);
+  assert.equal(adapted.days[1].pending, 1);
+  assert.equal(adapted.days[1].pl_units, 0);
+  const totals = H.computeHybridTotals(adapted.days);
+  assert.equal(totals.n, 1);
+  assert.equal(totals.pending, 1);
+  assert.equal(totals.net_units, 1.2);
+  assert.equal(H.dayTone(adapted.days[1]), "bp-pending");
+});

@@ -828,3 +828,6 @@ tr.reconstructed td:first-child {
   .hy-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hy-callout strong { font-size: 0.9rem; }
 }
+
+.hy-error-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.hy-error-actions .btn { min-height: 40px; }
