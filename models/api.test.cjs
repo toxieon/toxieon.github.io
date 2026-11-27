@@ -253,6 +253,10 @@ test("buildHybridPicksUrl hits /api/model-stats/hybrid-picks; omitted from means
   assert.equal(A.HYBRID_PICKS_PATH, "/api/model-stats/hybrid-picks");
   const u = A.buildHybridPicksUrl(A.API_BASE, "2026-11-03", "2026-11-27");
   assert.equal(new URL(u).searchParams.get("include"), null);
+  assert.equal(
+    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/", "2026-11-03", "2026-11-27", { includeAll: true }),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks?from=2026-11-03&to=2026-11-27&include=all"
+  );
 });
 
 test("requestHybridPicks times out a hanging fetch via AbortController and setTimeout, not AbortSignal.timeout", async () => {

@@ -134,12 +134,15 @@
     return base + BEST_PICKS_PATH + "?" + params.toString();
   }
 
-  /** from and to are optional. An omitted from means all history on TipBot. Never sends include=all. */
-  function buildHybridPicksUrl(apiBase, from, to) {
+  /** from and to are optional. An omitted from means all history on TipBot.
+   *  include=all is only sent when options.includeAll is set (HorsePicks AI comparison). */
+  function buildHybridPicksUrl(apiBase, from, to, options) {
     const base = String(apiBase || "").replace(/\/+$/, "");
     const params = new URLSearchParams();
     if (from != null && String(from) !== "") params.set("from", from);
     if (to != null && String(to) !== "") params.set("to", to);
+    const opts = options && typeof options === "object" ? options : {};
+    if (opts.includeAll) params.set("include", "all");
     const q = params.toString();
     return base + HYBRID_PICKS_PATH + (q ? "?" + q : "");
   }
