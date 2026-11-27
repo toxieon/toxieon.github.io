@@ -236,3 +236,11 @@ test("buildBestPicksUrl hits /api/model-stats/best-picks with from and to only",
     "https://afl-tipster-bot.onrender.com/api/model-stats/best-picks?from=2026-11-04&to=2026-11-26"
   );
 });
+
+test("buildHybridPicksUrl hits /api/model-stats/hybrid-picks with from and to only", () => {
+  assert.equal(
+    A.buildHybridPicksUrl("https://afl-tipster-bot.onrender.com/", "2025-01-01", "2026-11-27"),
+    "https://afl-tipster-bot.onrender.com/api/model-stats/hybrid-picks?from=2025-01-01&to=2026-11-27"
+  );
+  assert.equal(A.HYBRID_PICKS_PATH, "/api/model-stats/hybrid-picks");
+});

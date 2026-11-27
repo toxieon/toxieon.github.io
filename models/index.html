@@ -10,18 +10,19 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="manifest.json" />
 <meta name="apple-mobile-web-app-title" content="Models" />
-<script src="handoff.js?v=0.4.0"></script>
-<link rel="stylesheet" href="styles.css?v=0.4.0" />
-<script src="config.js?v=0.4.0"></script>
-<script src="api.js?v=0.4.0"></script>
-<script src="normalise.js?v=0.4.0"></script>
-<script src="calendar.js?v=0.4.0"></script>
-<script src="dates.js?v=0.4.0"></script>
-<script src="format.js?v=0.4.0"></script>
-<script src="bestpick.js?v=0.4.0"></script>
-<script src="demo.js?v=0.4.0"></script>
+<script src="handoff.js?v=0.5.0"></script>
+<link rel="stylesheet" href="styles.css?v=0.5.0" />
+<script src="config.js?v=0.5.0"></script>
+<script src="api.js?v=0.5.0"></script>
+<script src="normalise.js?v=0.5.0"></script>
+<script src="calendar.js?v=0.5.0"></script>
+<script src="dates.js?v=0.5.0"></script>
+<script src="format.js?v=0.5.0"></script>
+<script src="bestpick.js?v=0.5.0"></script>
+<script src="hybrid.js?v=0.5.0"></script>
+<script src="demo.js?v=0.5.0"></script>
 <script src="../shared/nd-pwa.js" defer></script>
-<script src="app.js?v=0.4.0" defer></script>
+<script src="app.js?v=0.5.0" defer></script>
 </head>
 <body>
 <div class="app">
@@ -45,6 +46,12 @@
   </section>
 
   <main id="app-main" hidden>
+    <div class="tabs page-tabs" role="tablist" aria-label="Models views">
+      <button type="button" class="tab on" role="tab" id="tab-models" data-page-tab="models" aria-selected="true" aria-controls="models-view">Model stats</button>
+      <button type="button" class="tab" role="tab" id="tab-hybrid" data-page-tab="hybrid" aria-selected="false" aria-controls="hybrid-view">HorsePicks AI Hybrid</button>
+    </div>
+
+    <div id="models-view" role="tabpanel" aria-labelledby="tab-models">
     <div class="filters" role="group" aria-label="Date presets">
       <button type="button" class="chip on" data-preset="all">All time</button>
       <button type="button" class="chip" data-preset="7">7d</button>
@@ -266,6 +273,33 @@
         </div>
       </section>
     </div>
+
+    </div>
+
+    <section id="hybrid-view" role="tabpanel" aria-labelledby="tab-hybrid" hidden>
+      <section id="hybrid-section" class="card bp-panel" aria-labelledby="hy-h">
+        <h2 id="hy-h">HorsePicks AI Hybrid</h2>
+        <p class="muted">HorsePicks tips that matched the With model's top pick for that race. Backdated as far as the data goes.</p>
+        <p id="hy-load" class="loading" hidden>Loading hybrid picks…</p>
+        <div id="hy-error" class="banner info" hidden><p id="hy-error-text"></p></div>
+        <div id="hy-body" hidden>
+          <div id="hy-totals" class="summary-grid hy-totals" aria-label="Hybrid totals"></div>
+          <div id="hy-highlights" class="hy-highlights"></div>
+          <div class="cal-head">
+            <button type="button" class="btn calnav" id="hy-prev" aria-label="Previous month">‹</button>
+            <h3 id="hy-month-label" class="bp-month">Month</h3>
+            <button type="button" class="btn calnav" id="hy-next" aria-label="Next month">›</button>
+          </div>
+          <div id="hy-grid" class="cal-grid bp-grid" role="grid" aria-label="Hybrid picks each day"></div>
+          <ul class="legend bp-legend">
+            <li><span class="swatch bp-sw-won"></span>Won / + units</li>
+            <li><span class="swatch bp-sw-lost"></span>Lost / − units</li>
+            <li><span class="swatch bp-sw-pending"></span>Pending</li>
+            <li><span class="swatch bp-sw-void"></span>Scratched</li>
+          </ul>
+        </div>
+      </section>
+    </section>
 
     <p id="ver" class="muted foot"></p>
   </main>

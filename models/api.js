@@ -14,6 +14,8 @@
   const STATS_PATH = "/api/model-stats";
   /** TipBot's single daily best pick per day (highest 7am win chance). Same auth and errors as STATS_PATH. */
   const BEST_PICKS_PATH = "/api/model-stats/best-picks";
+  /** HorsePicks tips that matched the With model's top pick that race. Same auth and errors as STATS_PATH. */
+  const HYBRID_PICKS_PATH = "/api/model-stats/hybrid-picks";
   /** Longest wait honoured from a 503 {error:"db_busy", retry_after} before the one retry. */
   const RETRY_AFTER_CAP_S = 15;
   const DEFAULT_RETRY_MS = 1500;
@@ -128,6 +130,14 @@
     return base + BEST_PICKS_PATH + "?" + params.toString();
   }
 
+  function buildHybridPicksUrl(apiBase, from, to) {
+    const base = String(apiBase || "").replace(/\/+$/, "");
+    const params = new URLSearchParams();
+    params.set("from", from);
+    params.set("to", to);
+    return base + HYBRID_PICKS_PATH + "?" + params.toString();
+  }
+
   /** Milliseconds to wait before retrying an unavailable response. 503 {error:"db_busy", retry_after:N}
    *  waits N seconds (capped at 15); anything else keeps the short 1.5 s wait. */
   function retryDelayMs(status, body) {
@@ -220,6 +230,6 @@
     returnToUrl, loginUrl, exchangeCode, exchangeAndStore, describeAuthError,
     readToken, saveToken, clearToken, clearPrimaryToken, buildModelStatsUrl, describeApiError,
     STATS_PATH, CACHE_TTL_MS, classifyStats, requestModelStats, clearStatsCache,
-    BEST_PICKS_PATH, buildBestPicksUrl, retryDelayMs, RETRY_AFTER_CAP_S,
+    BEST_PICKS_PATH, buildBestPicksUrl, HYBRID_PICKS_PATH, buildHybridPicksUrl, retryDelayMs, RETRY_AFTER_CAP_S,
   };
 });

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const APP_VERSION = "0.4.0";
+  const APP_VERSION = "0.5.0";
   const CFG = window.ND_MODELS_CONFIG;
   const N = window.NDModelsNormalise;
   const DEMO = window.NDModelsDemo;
@@ -11,6 +11,7 @@
   const API = window.NDModelsApi;
   const FMT = window.NDModelsFormat;
   const BP = window.NDModelsBestPick;
+  const HY = window.NDModelsHybrid;
 
   const UNAVAILABLE_MSG = "Model stats aren't live yet. Check back after the next TipBot update.";
   const NOT_CONFIGURED_MSG = "Model stats aren't set up on TipBot yet. Check back soon.";
@@ -24,6 +25,7 @@
   const STAKED_SEG = { without_price: "Without", with_price: "With", agree: "Agree" };
   const RECON_KEY = "nd_models_include_reconstructed";
   const BP_UNAVAILABLE_MSG = "Best picks not available yet. Check back after the next TipBot update.";
+  const HY_UNAVAILABLE_MSG = "HorsePicks AI Hybrid not available yet. Check back after the next TipBot update.";
   const LADDER_KEY = "nd_models_ladder_v1";
   const LADDER_LOSS_TEXT = {
     reset: "On a loss the ladder resets: the next best pick starts a new ladder at the starting stake, and that stake counts as more cash in.",
@@ -69,6 +71,8 @@
     reconstructedAvailable: null,
     bp: { loading: false, error: "", days: null, month: "" },
     ladder: { start: "", stake: 20, onLoss: "reset" },
+    pageTab: "models",
+    hy: { loading: false, error: "", days: null, month: "", fetched: false },
   };
 
   function isDemoMode() {
@@ -1656,6 +1660,246 @@
     });
   }
 
+  /* ---------- HorsePicks AI Hybrid tab (lazy; independent of the main stats and best-pick requests) ---------- */
+
+  function hybridPicksRange() {
+    const to = DATES.todayMelbourneIso();
+    const from = DATES.addCalendarDays(to, -1094); // ~3 years: backdate as far as the data goes
+    return { from: from > to ? to : from, to };
+  }
+
+  /** Switch the signed-in page between Model stats and HorsePicks AI Hybrid. Hybrid is fetched only when this tab is opened. */
+  function setPageTab(tab) {
+    state.pageTab = tab === "hybrid" ? "hybrid" : "models";
+    const onHybrid = state.pageTab === "hybrid";
+    document.querySelectorAll("[data-page-tab]").forEach((btn) => {
+      const on = btn.getAttribute("data-page-tab") === state.pageTab;
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    if ($("models-view")) $("models-view").hidden = onHybrid;
+    if ($("hybrid-view")) $("hybrid-view").hidden = !onHybrid;
+    if (!onHybrid) return;
+    const shouldFetch = !state.hy.loading && (!state.hy.fetched || (state.hy.error && !state.hy.days));
+    if (shouldFetch) loadHybridPicks();
+    else renderHybrid();
+  }
+
+  /** GET /api/model-stats/hybrid-picks. Any failure only shows a message in this tab. */
+  async function loadHybridPicks() {
+    if (!signedIn() || !HY) return;
+    state.hy.loading = true;
+    state.hy.error = "";
+    renderHybrid();
+    const { from, to } = hybridPicksRange();
+    let days = null;
+    let error = "";
+    if (isDemoMode()) {
+      days = HY.adaptHybridPayload(HY.demoHybridPicks(from, to)).days;
+    } else {
+      let res;
+      try {
+        res = await API.requestModelStats(API.buildHybridPicksUrl(CFG.API_BASE, from, to), state.token);
+      } catch (e) {
+        res = { kind: "error", data: {} };
+      }
+      if (res.kind === "signin") { state.hy.loading = false; handleUnauthorised(); return; }
+      if (res.kind === "forbidden") { state.hy.loading = false; handleForbidden(); return; }
+      if (res.kind === "ok") days = HY.adaptHybridPayload(res.data).days;
+      else error = HY_UNAVAILABLE_MSG;
+    }
+    state.hy.loading = false;
+    state.hy.fetched = true;
+    state.hy.error = error;
+    state.hy.days = error ? null : days;
+    if (days && !state.hy.month) {
+      const last = days.length ? days[days.length - 1].date : to;
+      state.hy.month = last.slice(0, 7);
+    }
+    renderHybrid();
+  }
+
+  function hyDayMap() {
+    return new Map((state.hy.days || []).map((d) => [d.date, d]));
+  }
+
+  function renderHybrid() {
+    const section = $("hybrid-section");
+    if (!section) return;
+    $("hy-load").hidden = !state.hy.loading;
+    const err = $("hy-error");
+    err.hidden = !state.hy.error;
+    $("hy-error-text").textContent = state.hy.error || "";
+    const has = !!state.hy.days && !state.hy.error;
+    $("hy-body").hidden = !has || state.hy.loading;
+    if (!has) return;
+    if (!state.hy.days.some((d) => d.picks && d.picks.length)) {
+      err.hidden = false;
+      $("hy-error-text").textContent = "No hybrid picks yet in this range.";
+    }
+    renderHybridTotals();
+    renderHybridCalendar();
+  }
+
+  function renderHybridTotals() {
+    const days = state.hy.days || [];
+    const t = HY.computeHybridTotals(days);
+    $("hy-totals").replaceChildren(
+      summaryTile("Record", t.wins + "\u2013" + t.losses),
+      summaryTile("Net units", fmtPl(t.net_units) + "u", plClass(t.net_units)),
+      summaryTile("ROI", t.roi_pct == null ? "\u2014" : fmtPct(t.roi_pct)),
+      summaryTile("n", String(t.n))
+    );
+    const box = $("hy-highlights");
+    box.replaceChildren();
+    box.append(
+      hybridCallout("best", "Best day", t.bestDay),
+      hybridCallout("worst", "Worst day", t.worstDay)
+    );
+  }
+
+  function hybridCallout(kind, label, entry) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "hy-callout hy-" + kind;
+    const l = document.createElement("span");
+    l.className = "muted";
+    l.textContent = label;
+    const v = document.createElement("strong");
+    if (entry) {
+      v.className = plClass(entry.pl_units);
+      v.textContent = shortDate(entry.date) + " \u00b7 " + fmtPl(entry.pl_units) + "u";
+      btn.addEventListener("click", () => openHybridDay(entry.date));
+    } else {
+      v.textContent = "\u2014";
+      btn.disabled = true;
+    }
+    btn.append(l, v);
+    return btn;
+  }
+
+  function renderHybridCalendar() {
+    const days = state.hy.days || [];
+    const today = DATES.todayMelbourneIso();
+    const span = HY.dataRange(days, today);
+    const from = span.from || today;
+    const to = span.to && span.to > today ? span.to : today;
+    const ym = state.hy.month || to.slice(0, 7);
+    $("hy-month-label").textContent = monthTitle(ym);
+    $("hy-prev").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, -1), from, to);
+    $("hy-next").disabled = !CAL.monthOverlapsRange(CAL.ymAdd(ym, 1), from, to);
+    const map = hyDayMap();
+    const grid = $("hy-grid");
+    grid.replaceChildren();
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d) => {
+      const h = document.createElement("div");
+      h.className = "cal-dow";
+      h.textContent = d;
+      grid.appendChild(h);
+    });
+    CAL.buildMonthGrid(ym).forEach((iso) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "cal-day bp-day";
+      if (!iso) {
+        cell.classList.add("cal-pad");
+        cell.disabled = true;
+        cell.tabIndex = -1;
+        grid.appendChild(cell);
+        return;
+      }
+      const num = document.createElement("span");
+      num.className = "cal-num";
+      num.textContent = iso.slice(8, 10).replace(/^0/, "");
+      cell.appendChild(num);
+      cell.dataset.date = iso;
+      const day = map.get(iso);
+      const inRange = CAL.dateInRange(iso, from, to);
+      if (day && day.picks && day.picks.length) {
+        cell.classList.add("cal-has-data", HY.dayTone(day));
+        const pl = document.createElement("span");
+        pl.className = "hy-pl bp-price";
+        if ((day.wins || 0) + (day.losses || 0) > 0) pl.textContent = fmtPl(day.pl_units);
+        else if (day.pending > 0) pl.textContent = "pend";
+        else pl.textContent = "scr";
+        cell.appendChild(pl);
+        const n = day.picks.length;
+        cell.title = shortDate(iso) + " \u00b7 " + (fmtPl(day.pl_units) + "u") + " \u00b7 " + n + (n === 1 ? " pick" : " picks");
+        cell.addEventListener("click", () => openHybridDay(iso));
+      } else {
+        if (!inRange) cell.classList.add("cal-out");
+        cell.disabled = true;
+      }
+      grid.appendChild(cell);
+    });
+  }
+
+  function openHybridDay(date) {
+    const ym = String(date || "").slice(0, 7);
+    if (ym && state.hy.month !== ym) {
+      state.hy.month = ym;
+      renderHybridCalendar();
+    }
+    openHybridSheet(date);
+  }
+
+  function openHybridSheet(date) {
+    const day = hyDayMap().get(date);
+    $("day-sheet-title").textContent = "Hybrid \u00b7 " + shortDate(date);
+    const body = $("day-sheet-body");
+    body.replaceChildren();
+    const picks = day && Array.isArray(day.picks) ? day.picks : [];
+    if (!picks.length) {
+      const card = document.createElement("div");
+      card.className = "day-model card";
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "No hybrid picks this day.";
+      card.appendChild(p);
+      body.appendChild(card);
+    } else {
+      picks.forEach((p) => {
+        const card = document.createElement("div");
+        card.className = "day-model card hy-pick";
+        const h = document.createElement("h3");
+        h.textContent = p.horse;
+        card.appendChild(h);
+        const race = [p.track, Number.isFinite(p.race_no) ? "R" + p.race_no : ""].filter(Boolean).join(" ");
+        card.appendChild(sheetLine("Track / race", race || "\u2014"));
+        const stage = p.price_stage && BP && BP.stageLabel ? BP.stageLabel(p.price_stage) : p.price_stage;
+        const priceLine = sheetLine("Price", Number.isFinite(p.price) ? p.price.toFixed(2) : "\u2014");
+        if (stage) {
+          const note = document.createElement("span");
+          note.className = "muted bp-stage";
+          note.textContent = " " + stage;
+          priceLine.appendChild(note);
+        }
+        card.appendChild(priceLine);
+        const tone = p.result === "won" ? "pos" : p.result === "lost" ? "neg" : "";
+        card.appendChild(sheetLine("Result", resultLabel(p.result), tone));
+        card.appendChild(sheetLine("P/L", Number.isFinite(p.pl_units) ? fmtPl(p.pl_units) + "u" : "\u2014", plClass(p.pl_units)));
+        body.appendChild(card);
+      });
+    }
+    $("day-sheet").hidden = false;
+    document.body.classList.add("sheet-open");
+  }
+
+  function bindHybridEvents() {
+    if (!$("hybrid-section")) return;
+    document.querySelectorAll("[data-page-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => setPageTab(btn.getAttribute("data-page-tab")));
+    });
+    $("hy-prev").addEventListener("click", () => {
+      state.hy.month = CAL.ymAdd(state.hy.month || hybridPicksRange().to.slice(0, 7), -1);
+      renderHybridCalendar();
+    });
+    $("hy-next").addEventListener("click", () => {
+      state.hy.month = CAL.ymAdd(state.hy.month || hybridPicksRange().to.slice(0, 7), 1);
+      renderHybridCalendar();
+    });
+  }
+
   function init() {
     $("ver").textContent = "v" + APP_VERSION;
     state.token = getToken();
@@ -1667,6 +1911,7 @@
     bindEvents();
     if (BP) readLadderPrefs();
     bindBestPickEvents();
+    bindHybridEvents();
     const H = window.NDModelsHandoff;
     const authError = H && H.getAuthError ? H.getAuthError() : "";
     if (authError) state.gateMessage = API.describeAuthError(authError);
@@ -1711,6 +1956,7 @@
       syncRangeInputs();
       loadBestPicks(); // own request; a model-stats failure never blanks it
       applyAllTime();
+      if (state.pageTab === "hybrid") setPageTab("hybrid");
     }
   }
 

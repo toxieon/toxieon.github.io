@@ -780,3 +780,51 @@ tr.reconstructed td:first-child {
   .ladder-val { font-size: 0.95rem; }
 }
 .bp-stage { font-size: 0.8rem; font-weight: 400; }
+
+
+/* Page view tabs + HorsePicks AI Hybrid (0.5.0) */
+.page-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.page-tabs .tab {
+  flex: 1;
+  text-align: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+.hy-totals { margin: 8px 0 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hy-totals .ladder-tile { padding: 8px 10px; }
+.hy-highlights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.hy-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  text-align: left;
+}
+.hy-callout .muted { margin: 0; font-size: 0.72rem; }
+.hy-callout strong { font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+.hy-callout.hy-best { border-color: rgba(143, 217, 168, 0.55); background: rgba(143, 217, 168, 0.12); }
+.hy-callout.hy-worst { border-color: rgba(240, 160, 160, 0.5); background: rgba(240, 160, 160, 0.1); }
+.hy-pl { font-variant-numeric: tabular-nums; font-weight: 700; }
+.bp-day.bp-won .hy-pl { color: var(--win); }
+.bp-day.bp-lost .hy-pl { color: var(--loss); }
+.bp-day.bp-pending .hy-pl { color: var(--placed); }
+.hy-pick + .hy-pick { margin-top: 10px; }
+@media (max-width: 420px) {
+  .hy-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hy-callout strong { font-size: 0.9rem; }
+}
